@@ -36,12 +36,12 @@ export default function UserProfile() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
+        className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
       >
-        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8338EC] to-purple-600 flex items-center justify-center text-xs font-bold">
+        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8338EC] to-purple-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
           {initials}
         </div>
-        <span className="text-sm hidden md:inline">{user.email}</span>
+        <span className="text-xs md:text-sm hidden md:inline truncate max-w-[100px] lg:max-w-[150px]">{user.email}</span>
       </button>
 
       <AnimatePresence>

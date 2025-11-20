@@ -117,22 +117,22 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       {/* Navigation */}
-      <nav className="border-b border-zinc-800 px-6 md:px-12 py-4">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold">
+      <nav className="border-b border-zinc-800 px-4 md:px-12 py-4">
+        <div className="flex items-center justify-between gap-2">
+          <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
             <span className="text-[#8338EC]">C</span>lick
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <User className="w-4 h-4" />
-              <span>{user.email}</span>
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-zinc-400">
+              <User className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
+              <span className="truncate max-w-[100px] md:max-w-[200px]">{user.email}</span>
             </div>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-2 text-sm px-4 py-2 rounded-full border border-zinc-700 hover:border-red-500 hover:text-red-500 transition-colors"
+              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-red-500 hover:text-red-500 transition-colors whitespace-nowrap"
             >
-              <LogOut className="w-4 h-4" />
-              Sign Out
+              <LogOut className="w-3 h-3 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>

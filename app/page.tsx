@@ -59,21 +59,30 @@ export default function Home() {
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6"
+        className="relative z-10 flex items-center justify-between px-4 md:px-12 py-6 gap-2"
       >
-        <div className="text-2xl font-bold">
+        <div className="text-xl md:text-2xl font-bold flex-shrink-0">
           <span className="text-[#8338EC]">C</span>lick
         </div>
-        <div className="flex items-center gap-6 md:gap-8">
-          <a href="#mission" className="text-sm hover:text-[#8338EC] transition-colors">
+        <div className="flex items-center gap-2 md:gap-6">
+          <button
+            onClick={() => {
+              const missionSection = document.getElementById('mission');
+              missionSection?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
+          >
             Mission
+          </button>
+          <a href="/about" className="text-xs md:text-sm hover:text-[#8338EC] transition-colors">
+            About
           </a>
           {user ? (
             <UserProfile />
           ) : (
             <button
               onClick={() => setIsLoginOpen(true)}
-              className="text-sm px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
+              className="text-xs md:text-sm px-3 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
             >
               Login
             </button>
@@ -100,8 +109,9 @@ export default function Home() {
               <span className="text-sm text-zinc-300">Launching Soon</span>
             </motion.div>
 
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight">
-              From{' '}
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight">
+              <span className="text-[#8338EC]">Click</span>
+              <span className="text-zinc-500">:</span> From{' '}
               <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
                 Handshake
               </span>
@@ -111,10 +121,11 @@ export default function Home() {
               <span className="text-[#8338EC] animate-pulse">.</span>
             </h1>
 
-            <p className="text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto mb-12 leading-relaxed">
-              Stop collecting followers. Start building real connections.
-              <br className="hidden md:block" />
-              Transform fleeting in-person moments into lasting friendships with the digital handshake.
+            <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto mb-3 leading-relaxed px-4">
+              <span className="text-[#8338EC] font-semibold">Click</span> transforms fleeting in-person moments into lasting friendships.
+            </p>
+            <p className="text-sm sm:text-base md:text-lg text-zinc-500 max-w-3xl mx-auto mb-12 leading-relaxed px-4">
+              Stop collecting followers. Start building real connections with the digital handshake.
             </p>
 
             {/* Email Waitlist Form */}
@@ -123,24 +134,24 @@ export default function Home() {
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.6 }}
               onSubmit={handleSubmit}
-              className="max-w-md mx-auto"
+              className="max-w-md mx-auto px-4"
             >
               {!isSubmitted ? (
-                <div className="flex flex-col sm:flex-row gap-3 glass p-2 rounded-full">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                     required
-                    className="flex-1 bg-transparent px-6 py-3 text-white placeholder-zinc-500 focus:outline-none rounded-full"
+                    className="w-full sm:flex-1 glass px-6 py-3 text-white placeholder-zinc-500 focus:outline-none rounded-full text-sm sm:text-base"
                   />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
                     disabled={isLoading}
-                    className="px-8 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-full font-semibold transition-all glow-violet disabled:opacity-50"
+                    className="w-full sm:w-auto px-8 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-full font-semibold transition-all glow-violet disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
                   >
                     {isLoading ? 'Joining...' : 'Join the Waitlist'}
                   </motion.button>
@@ -156,6 +167,26 @@ export default function Home() {
                 </motion.div>
               )}
             </motion.form>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Why Click Section */}
+      <section className="relative z-10 px-6 md:px-12 py-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
+              Why <span className="text-[#8338EC]">Click</span>?
+            </h2>
+            <p className="text-base sm:text-lg text-zinc-400 leading-relaxed px-4">
+              Because great connections shouldn't be left to chance. One <span className="text-[#8338EC] font-semibold">Click</span>,
+              and you've turned a fleeting moment into a lasting friendship.
+            </p>
           </motion.div>
         </div>
       </section>
@@ -181,8 +212,8 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mb-6">
                   <span className="text-2xl">💀</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">The Connection Graveyard</h3>
-                <p className="text-zinc-400 leading-relaxed">
+                <h3 className="text-xl sm:text-2xl font-bold mb-4">The Connection Graveyard</h3>
+                <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
                   You meet someone at an event, swap social media, and never speak again. Sound familiar?
                 </p>
               </div>
@@ -199,9 +230,11 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <Smartphone className="w-6 h-6 text-[#8338EC]" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4">NFC Tap</h3>
-                <p className="text-zinc-400 leading-relaxed">
-                  Instant, phone-free exchange. Just tap and go. No awkward "what's your @?"
+                <h3 className="text-xl sm:text-2xl font-bold mb-4">
+                  <span className="text-[#8338EC]">Click</span> to Connect
+                </h3>
+                <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+                  Instant NFC tap to exchange profiles. Just tap phones and go. No awkward "what's your @?"
                 </p>
               </div>
             </motion.div>
@@ -219,9 +252,9 @@ export default function Home() {
                     <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                       <Clock className="w-6 h-6 text-[#8338EC]" />
                     </div>
-                    <h3 className="text-2xl font-bold mb-4">30-Minute Vibe Check</h3>
-                    <p className="text-zinc-400 leading-relaxed max-w-2xl">
-                      A timed chat to spark real conversation. No pressure, no permanence.
+                    <h3 className="text-xl sm:text-2xl font-bold mb-4">30-Minute Vibe Check</h3>
+                    <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl">
+                      After you <span className="text-[#8338EC] font-semibold">Click</span>, start a timed chat to spark real conversation. No pressure, no permanence.
                       Deleted by default unless you both opt-in. If the vibe's right, save it.
                       If not, no harm done.
                     </p>
@@ -249,10 +282,10 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6 mx-auto">
                   <Zap className="w-6 h-6 text-[#8338EC]" />
                 </div>
-                <h3 className="text-3xl md:text-4xl font-bold mb-4">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
                   No Feed. <span className="text-[#8338EC]">Ever.</span>
                 </h3>
-                <p className="text-zinc-400 leading-relaxed text-lg max-w-2xl mx-auto">
+                <p className="text-sm sm:text-base md:text-lg text-zinc-400 leading-relaxed max-w-2xl mx-auto">
                   A tool, not a trap. No doomscrolling. No ads. No algorithm deciding who matters.
                   Just real people, real moments, real connections.
                 </p>
@@ -272,11 +305,11 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              The <span className="text-[#8338EC]">Digital Handshake</span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
+              How <span className="text-[#8338EC]">Click</span> Works
             </h2>
-            <p className="text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed">
-              Connection technology built for the real world
+            <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed px-4">
+              The digital handshake: Connection technology built for the real world
             </p>
           </motion.div>
 
@@ -394,14 +427,14 @@ export default function Home() {
           >
             <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/5 to-transparent" />
             <div className="relative z-10">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 text-center">
-                Building the{' '}
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-center">
+                <span className="text-[#8338EC]">Click</span> is Building the{' '}
                 <span className="bg-gradient-to-r from-[#8338EC] to-purple-400 bg-clip-text text-transparent">
                   Connection Economy
                 </span>
               </h2>
-              <p className="text-xl text-zinc-400 text-center max-w-3xl mx-auto mb-12 leading-relaxed">
-                We're not building another social media app. We're building a bridge
+              <p className="text-base sm:text-lg md:text-xl text-zinc-400 text-center max-w-3xl mx-auto mb-12 leading-relaxed px-4">
+                We're not building another social media app. <span className="text-[#8338EC] font-semibold">Click</span> is a bridge
                 between the digital and the real world.
               </p>
 
@@ -451,21 +484,23 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 px-6 md:px-12 py-12 border-t border-zinc-800">
+      <footer className="relative z-50 px-6 md:px-12 py-12 border-t border-zinc-800 bg-zinc-950">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="text-2xl font-bold">
+          <div className="flex flex-col items-center justify-center gap-6 mb-8">
+            <div className="text-2xl md:text-3xl font-bold">
               <span className="text-[#8338EC]">C</span>lick
             </div>
-            <div className="flex items-center gap-6 text-sm text-zinc-500">
-              <a href="/privacy" className="hover:text-[#8338EC] transition-colors">Privacy</a>
-              <a href="/terms" className="hover:text-[#8338EC] transition-colors">Terms</a>
-              <a href="/about" className="hover:text-[#8338EC] transition-colors">About</a>
+            <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm md:text-base">
+              <a href="/privacy" className="text-white hover:text-[#8338EC] transition-colors">Privacy</a>
+              <span className="text-zinc-600">•</span>
+              <a href="/terms" className="text-white hover:text-[#8338EC] transition-colors">Terms</a>
+              <span className="text-zinc-600">•</span>
+              <a href="/about" className="text-white hover:text-[#8338EC] transition-colors">About</a>
             </div>
           </div>
-          <div className="mt-8 text-center text-sm text-zinc-500">
+          <div className="text-center text-xs md:text-sm text-zinc-400 space-y-2">
             <p>Made with 💜 at UW</p>
-            <p className="mt-2">© 2025 Click. All rights reserved.</p>
+            <p>© 2025 Click. All rights reserved.</p>
           </div>
         </div>
       </footer>
