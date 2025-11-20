@@ -4,11 +4,11 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MapPin, MessageCircle, LogOut, User } from 'lucide-react';
+import { MapPin, MessageCircle } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface Connection {
   id: string;
@@ -22,7 +22,7 @@ interface Connection {
 }
 
 export default function Dashboard() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'chats' | 'map'>('chats');
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -97,17 +97,8 @@ export default function Dashboard() {
     }
   }, [activeTab, connections]);
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push('/');
-  };
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!user) {
@@ -116,27 +107,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Navigation */}
-      <nav className="border-b border-zinc-800 px-4 md:px-12 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
-            <span className="text-[#8338EC]">C</span>lick
-          </Link>
-          <div className="flex items-center gap-2 md:gap-4">
-            <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-zinc-400">
-              <User className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
-              <span className="truncate max-w-[100px] md:max-w-[200px]">{user.email}</span>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-red-500 hover:text-red-500 transition-colors whitespace-nowrap"
-            >
-              <LogOut className="w-3 h-3 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          </div>
-        </div>
-      </nav>
 
       {/* Tabs */}
       <div className="border-b border-zinc-800">

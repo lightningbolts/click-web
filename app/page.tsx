@@ -4,8 +4,6 @@ import { motion } from 'framer-motion';
 import { Smartphone, Zap, Shield, Users, Clock, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import LoginModal from '@/components/LoginModal';
-import UserProfile from '@/components/UserProfile';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function Home() {
@@ -14,7 +12,6 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   // Redirect to dashboard if user is logged in
   useEffect(() => {
@@ -53,42 +50,6 @@ export default function Home() {
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[120px] opacity-20" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[120px] opacity-20" />
       </div>
-
-      {/* Navigation */}
-      <motion.nav
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 flex items-center justify-between px-4 md:px-12 py-6 gap-2"
-      >
-        <div className="text-xl md:text-2xl font-bold flex-shrink-0">
-          <span className="text-[#8338EC]">C</span>lick
-        </div>
-        <div className="flex items-center gap-2 md:gap-6">
-          <button
-            onClick={() => {
-              const missionSection = document.getElementById('mission');
-              missionSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
-          >
-            Mission
-          </button>
-          <a href="/about" className="text-xs md:text-sm hover:text-[#8338EC] transition-colors">
-            About
-          </a>
-          {user ? (
-            <UserProfile />
-          ) : (
-            <button
-              onClick={() => setIsLoginOpen(true)}
-              className="text-xs md:text-sm px-3 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
-            >
-              Login
-            </button>
-          )}
-        </div>
-      </motion.nav>
 
       {/* Hero Section */}
       <section className="relative z-10 px-6 md:px-12 pt-20 md:pt-32 pb-20">
@@ -332,16 +293,16 @@ export default function Home() {
                   The true digital handshake. Tap phones or scan QR codes to exchange profiles instantly.
                 </p>
                 <ul className="space-y-2 text-zinc-500 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#8338EC] mt-1">✓</span>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
                     <span>No searching for usernames</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#8338EC] mt-1">✓</span>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
                     <span>Works offline, syncs later</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#8338EC] mt-1">✓</span>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
                     <span>One tap, instant connection</span>
                   </li>
                 </ul>
@@ -482,31 +443,6 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="relative z-50 px-6 md:px-12 py-12 border-t border-zinc-800 bg-zinc-950">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col items-center justify-center gap-6 mb-8">
-            <div className="text-2xl md:text-3xl font-bold">
-              <span className="text-[#8338EC]">C</span>lick
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm md:text-base">
-              <a href="/privacy" className="text-white hover:text-[#8338EC] transition-colors">Privacy</a>
-              <span className="text-zinc-600">•</span>
-              <a href="/terms" className="text-white hover:text-[#8338EC] transition-colors">Terms</a>
-              <span className="text-zinc-600">•</span>
-              <a href="/about" className="text-white hover:text-[#8338EC] transition-colors">About</a>
-            </div>
-          </div>
-          <div className="text-center text-xs md:text-sm text-zinc-400 space-y-2">
-            <p>Made with 💜 at UW</p>
-            <p>© 2025 Click. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-
-      {/* Login Modal */}
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
     </div>
   );
 }

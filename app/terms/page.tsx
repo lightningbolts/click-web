@@ -6,15 +6,6 @@ import Link from 'next/link';
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Navigation */}
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6 border-b border-zinc-800">
-        <Link href="/" className="text-2xl font-bold">
-          <span className="text-[#8338EC]">C</span>lick
-        </Link>
-        <Link href="/" className="text-sm hover:text-[#8338EC] transition-colors">
-          ← Back to Home
-        </Link>
-      </nav>
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 md:px-12 py-20">
