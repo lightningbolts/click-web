@@ -38,20 +38,31 @@ export default function SettingsView() {
     setProfileMessage({ type: '', text: '' });
 
     const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        full_name: fullName,
-      },
-    });
-
-    if (error) {
-      setProfileMessage({ type: 'error', text: error.message });
-    } else {
-      setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
+    if (!supabase) {
+      setProfileMessage({ type: 'error', text: 'Supabase client not initialized' });
+      setProfileLoading(false);
+      return;
     }
-    setProfileLoading(false);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: fullName,
+        },
+      });
+
+      if (error) {
+        setProfileMessage({ type: 'error', text: error.message });
+      } else {
+        setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
+        // Refresh the page to update the navbar name
+        router.refresh();
+      }
+    } catch (err: any) {
+      setProfileMessage({ type: 'error', text: err.message || 'An unexpected error occurred' });
+    } finally {
+      setProfileLoading(false);
+    }
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -65,20 +76,29 @@ export default function SettingsView() {
     setPasswordMessage({ type: '', text: '' });
 
     const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (error) {
-      setPasswordMessage({ type: 'error', text: error.message });
-    } else {
-      setPasswordMessage({ type: 'success', text: 'Password updated successfully!' });
-      setNewPassword('');
-      setConfirmNewPassword('');
+    if (!supabase) {
+      setPasswordMessage({ type: 'error', text: 'Supabase client not initialized' });
+      setPasswordLoading(false);
+      return;
     }
-    setPasswordLoading(false);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        setPasswordMessage({ type: 'error', text: error.message });
+      } else {
+        setPasswordMessage({ type: 'success', text: 'Password updated successfully!' });
+        setNewPassword('');
+        setConfirmNewPassword('');
+      }
+    } catch (err: any) {
+      setPasswordMessage({ type: 'error', text: err.message || 'An unexpected error occurred' });
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
