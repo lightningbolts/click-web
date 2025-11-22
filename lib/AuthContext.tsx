@@ -45,7 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      await supabase.auth.signOut();
+      try {
+        // Attempt to sign out from Supabase
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+        ]);
+      } catch (error) {
+        console.error('Sign out error or timeout:', error);
+      } finally {
+        // Always clear local state
+        setUser(null);
+      }
+    } else {
       setUser(null);
     }
   };

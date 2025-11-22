@@ -5,10 +5,11 @@ import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { MapPin, MessageCircle } from 'lucide-react';
+import { MapPin, MessageCircle, Settings } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import LoadingScreen from '@/components/LoadingScreen';
+import SettingsView from '@/components/SettingsView';
 
 interface Connection {
   id: string;
@@ -24,7 +25,7 @@ interface Connection {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'chats' | 'map'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'map' | 'settings'>('chats');
   const [connections, setConnections] = useState<Connection[]>([]);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -42,16 +43,20 @@ export default function Dashboard() {
         const supabase = getSupabaseClient();
         if (!supabase) return;
 
-        const { data, error } = await supabase
-          .from('connections')
-          .select('*')
-          .contains('user_ids', [user.id])
-          .order('created', { ascending: false });
+        try {
+          const { data, error } = await supabase
+            .from('connections')
+            .select('*')
+            .contains('user_ids', [user.id])
+            .order('created', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching connections:', error);
-        } else {
-          setConnections(data || []);
+          if (error) {
+            console.error('Error fetching connections:', error.message || error);
+          } else {
+            setConnections(data || []);
+          }
+        } catch (err) {
+          console.error('Unexpected error fetching connections:', err);
         }
       };
 
@@ -137,6 +142,19 @@ export default function Dashboard() {
               <span>Connection Map</span>
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`py-4 border-b-2 transition-colors ${
+              activeTab === 'settings'
+                ? 'border-[#8338EC] text-[#8338EC]'
+                : 'border-transparent text-zinc-400 hover:text-white'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              <span>Settings</span>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -208,6 +226,8 @@ export default function Dashboard() {
             )}
           </motion.div>
         )}
+
+        {activeTab === 'settings' && <SettingsView />}
       </div>
     </div>
   );

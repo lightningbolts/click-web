@@ -16,8 +16,14 @@ export default function Navbar() {
   const isDashboard = pathname === '/dashboard';
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push('/');
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      router.push('/');
+      router.refresh();
+    }
   };
 
   return (
