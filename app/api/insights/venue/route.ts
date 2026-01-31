@@ -46,10 +46,19 @@ export async function GET(request: Request) {
       .eq('id', user.id)
       .single();
 
-    if (profileError || userProfile?.role !== 'verified_business') {
-      // For development/testing, we might want to bypass this or log it.
-      // But per requirements:
-      return NextResponse.json({ error: 'Forbidden: Requires verified_business role' }, { status: 403 });
+    console.log('User ID:', user.id);
+    console.log('User Email:', user.email);
+    console.log('Profile Query Result:', { userProfile, profileError });
+
+    // Allow specific emails for development/testing
+    const allowedDevEmails = ['timberlake2025@gmail.com'];
+    const isDevUser = allowedDevEmails.includes(user.email || '');
+
+    if (!isDevUser && (profileError || userProfile?.role !== 'verified_business')) {
+      return NextResponse.json({ 
+        error: 'Forbidden: Requires verified_business role',
+        debug: { profileError: profileError?.message, role: userProfile?.role }
+      }, { status: 403 });
     }
 
     // 3. Get Venue ID
