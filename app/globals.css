@@ -3,6 +3,10 @@
 :root {
   --background: #09090b;
   --foreground: #fafafa;
+  --accent-purple: #8338EC;
+  --accent-blue: #3A86FF;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
@@ -25,9 +29,27 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Enhanced glass panel for insights dashboard */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.glass-panel:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 /* Gradient glow effect */
 .glow-violet {
   box-shadow: 0 0 60px -12px rgba(131, 56, 236, 0.5);
+}
+
+.glow-blue {
+  box-shadow: 0 0 60px -12px rgba(58, 134, 255, 0.5);
 }
 
 /* Text gradient */
@@ -37,3 +59,81 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Cyberpunk neon text effects */
+.text-neon-purple {
+  color: #8338EC;
+  text-shadow: 0 0 10px rgba(131, 56, 236, 0.5), 0 0 20px rgba(131, 56, 236, 0.3);
+}
+
+.text-neon-blue {
+  color: #3A86FF;
+  text-shadow: 0 0 10px rgba(58, 134, 255, 0.5), 0 0 20px rgba(58, 134, 255, 0.3);
+}
+
+/* Custom scrollbar for insights dashboard */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Firefox scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* Animation utilities for insights */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+    box-shadow: 0 0 20px rgba(131, 56, 236, 0.3);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 40px rgba(131, 56, 236, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Gradient border effect */
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(131, 56, 236, 0.5), rgba(58, 134, 255, 0.5));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
