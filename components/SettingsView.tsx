@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
-import { User, Lock, Trash2, Save, AlertTriangle } from 'lucide-react';
+import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsView() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -25,12 +25,17 @@ export default function SettingsView() {
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Reset initialization when user changes (e.g., after refresh)
   useEffect(() => {
-    if (user && !isInitialized) {
-      setFullName(user.user_metadata?.full_name || '');
+    if (user) {
+      const currentName = user.user_metadata?.full_name || '';
+      // Only update if the name from server is different and we haven't just saved
+      if (!profileLoading && currentName !== fullName) {
+        setFullName(currentName);
+      }
       setIsInitialized(true);
     }
-  }, [user, isInitialized]);
+  }, [user?.user_metadata?.full_name]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,18 +50,19 @@ export default function SettingsView() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { data, error } = await supabase.auth.updateUser({
         data: {
-          full_name: fullName,
+          full_name: fullName.trim(), // Trim whitespace
         },
       });
 
       if (error) {
         setProfileMessage({ type: 'error', text: error.message });
       } else {
-        setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
-        // Refresh the page to update the navbar name
-        router.refresh();
+        // Force refresh the user data from Supabase
+        await refreshUser();
+        setProfileMessage({ type: 'success', text: `Profile updated to "${fullName.trim()}"!` });
+        console.log('Profile updated successfully:', data.user?.user_metadata);
       }
     } catch (err: any) {
       setProfileMessage({ type: 'error', text: err.message || 'An unexpected error occurred' });

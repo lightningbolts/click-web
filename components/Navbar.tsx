@@ -6,14 +6,16 @@ import UserProfile from '@/components/UserProfile';
 import { useState } from 'react';
 import LoginModal from '@/components/LoginModal';
 import { usePathname, useRouter } from 'next/navigation';
-import { User, LogOut } from 'lucide-react';
+import { User, LogOut, BarChart2 } from 'lucide-react';
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const isDashboard = pathname === '/dashboard';
+  
+  // User is viewing their dashboard when logged in at root or /dashboard
+  const isLoggedInView = user && (pathname === '/' || pathname === '/dashboard');
 
   const handleSignOut = async () => {
     try {
@@ -28,16 +30,26 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className={`relative z-10 flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isDashboard ? 'border-b border-zinc-800' : ''}`}>
+      <nav className={`relative z-10 flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? 'border-b border-zinc-800' : ''}`}>
         <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
           <span className="text-[#8338EC]">C</span>lick
         </Link>
         <div className="flex items-center gap-2 md:gap-6">
-          {isDashboard ? (
+          {isLoggedInView ? (
             <>
+              {/* Business Insights link for verified businesses */}
+              <Link
+                href="/insights"
+                className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] hover:text-[#8338EC] transition-colors whitespace-nowrap"
+              >
+                <BarChart2 className="w-3 h-3 md:w-4 md:h-4" />
+                <span className="hidden sm:inline">Insights</span>
+              </Link>
               <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-zinc-400">
                 <User className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
-                <span className="truncate max-w-[100px] md:max-w-[200px]">{user?.email}</span>
+                <span className="truncate max-w-[100px] md:max-w-[200px]">
+                  {user?.user_metadata?.full_name || user?.email}
+                </span>
               </div>
               <button
                 onClick={handleSignOut}

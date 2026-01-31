@@ -2,23 +2,26 @@
 
 import { motion } from 'framer-motion';
 import { Smartphone, Zap, Shield, Users, Clock, Sparkles } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import LoadingScreen from '@/components/LoadingScreen';
+import DashboardView from '@/components/DashboardView';
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect to dashboard if user is logged in
-  useEffect(() => {
-    if (!loading && user) {
-      router.push('/dashboard');
-    }
-  }, [user, loading, router]);
+  // Show loading screen while checking auth
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  // Show dashboard directly if user is logged in (no redirect needed)
+  if (user) {
+    return <DashboardView user={user} />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
