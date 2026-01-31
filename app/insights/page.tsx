@@ -232,8 +232,8 @@ export default function InsightsPage() {
               </div>
               <span className="text-xs text-zinc-500">Last 30 days</span>
             </div>
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[280px] w-full min-h-[280px]" style={{ minWidth: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                 <LineChart data={data?.dailyData || []}>
                   <defs>
                     <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
@@ -358,8 +358,8 @@ export default function InsightsPage() {
               </div>
               <span className="text-xs text-zinc-500">Hourly distribution</span>
             </div>
-            <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[200px] w-full min-h-[200px]" style={{ minWidth: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={150}>
                 <BarChart data={hourlyData}>
                   <XAxis 
                     dataKey="hour" 

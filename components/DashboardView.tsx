@@ -21,7 +21,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import SettingsView from '@/components/SettingsView';
 
 // Digital Memory Box components
-import { ConnectionTable, TimeCapsule, QRIdentityCard } from '@/components/dashboard';
+import { ConnectionTable, TimeCapsule, QRIdentityCard, StatsOverview, AchievementBadge, MilestoneProgress } from '@/components/dashboard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import { 
@@ -249,6 +249,45 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 transition={{ duration: 0.3 }}
                 className="space-y-8"
               >
+                {/* Stats Overview Section */}
+                <section>
+                  <StatsOverview
+                    totalConnections={connectionRecords.length}
+                    thisMonth={connectionRecords.filter(c => {
+                      const now = new Date();
+                      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                      return c.dateMet >= thisMonth;
+                    }).length}
+                    streak={7}
+                    retentionRate={Math.round((connectionRecords.filter(c => c.status === 'kept').length / Math.max(connectionRecords.length, 1)) * 100)}
+                  />
+                </section>
+
+                {/* Achievements & Milestones Row */}
+                <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-zinc-400 mb-2">Recent Achievements</h3>
+                    <AchievementBadge
+                      title="Social Butterfly"
+                      description="Met 10+ people this month"
+                      isNew={true}
+                    />
+                    <AchievementBadge
+                      title="Week Warrior"
+                      description="7-day connection streak"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-zinc-400 mb-2">Next Milestone</h3>
+                    <MilestoneProgress
+                      current={connectionRecords.length}
+                      target={25}
+                      label="Connection Collector"
+                      reward="Special badge unlock"
+                    />
+                  </div>
+                </section>
+
                 {/* Time Capsule Section */}
                 <section className="glass p-6 rounded-3xl border-zinc-800">
                   <TimeCapsule chapters={chapters} />

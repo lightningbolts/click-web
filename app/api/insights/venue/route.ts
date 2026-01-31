@@ -70,8 +70,30 @@ export async function GET(request: Request) {
       venueId = user.user_metadata?.venue_id;
     }
 
+    // If no venue_id, return mock/demo data for development
     if (!venueId) {
-      return NextResponse.json({ error: 'Venue ID is required' }, { status: 400 });
+      // Return demo data for development/testing
+      const demoHourlyDistribution = [2, 1, 0, 0, 0, 0, 1, 3, 8, 15, 22, 28, 35, 42, 38, 45, 52, 58, 65, 72, 68, 55, 42, 28];
+      const demoDailyData = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - i);
+        demoDailyData.push({
+          date: date.toISOString().split('T')[0],
+          count: Math.floor(Math.random() * 30) + 10 + (i < 7 ? 15 : 0), // Higher recent activity
+        });
+      }
+      
+      return NextResponse.json({
+        totalConnections: 847,
+        hourlyDistribution: demoHourlyDistribution,
+        dailyData: demoDailyData,
+        peakHour: 19,
+        retentionRate: '68%',
+        busiestDay: demoDailyData.sort((a, b) => b.count - a.count)[0]?.date || 'Saturday',
+        isDemo: true,
+      });
     }
 
     // 4. Query Connections

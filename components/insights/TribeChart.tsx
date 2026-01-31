@@ -20,13 +20,20 @@ export default function TribeChart({ tribes }: TribeChartProps) {
 
   // Normalize bubble sizes for visualization
   const normalizedTribes = useMemo(() => {
-    const maxSize = Math.max(...tribes.map(t => t.size));
+    // Handle empty tribes array
+    if (!tribes || tribes.length === 0) {
+      return [];
+    }
+    
+    const sizes = tribes.map(t => t.size);
+    const maxSize = Math.max(...sizes) || 1; // Prevent division by zero
     const minRadius = 25;
     const maxRadius = 60;
     
     return tribes.map(tribe => ({
       ...tribe,
-      radius: minRadius + (tribe.size / maxSize) * (maxRadius - minRadius),
+      // Ensure radius is always a valid positive number
+      radius: Math.max(minRadius, minRadius + ((tribe.size || 0) / maxSize) * (maxRadius - minRadius)),
     }));
   }, [tribes]);
 
@@ -102,8 +109,8 @@ export default function TribeChart({ tribes }: TribeChartProps) {
             const isRelated = hoveredTribe?.overlap?.includes(tribe.id) || 
                             tribe.overlap?.includes(hoveredTribe?.id || '');
             
-            // Scale radius for SVG viewBox
-            const svgRadius = (tribe.radius / 300) * 100;
+            // Scale radius for SVG viewBox - ensure minimum value to prevent rendering issues
+            const svgRadius = Math.max(3, ((tribe.radius || 25) / 300) * 100);
             
             return (
               <motion.g
