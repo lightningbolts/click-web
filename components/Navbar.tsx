@@ -32,7 +32,8 @@ export default function Navbar() {
     <>
       <nav className={`relative z-10 flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? 'border-b border-zinc-800' : ''}`}>
         <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
-          <span className="text-[#8338EC]">C</span>lick
+          <span className="text-[#8338EC]">C</span>
+          <span className="text-white">lick</span>
         </Link>
         <div className="flex items-center gap-2 md:gap-6">
           {isLoggedInView ? (

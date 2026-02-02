@@ -31,17 +31,6 @@ import {
   generateChaptersFromConnections 
 } from '@/lib/dashboard/mockData';
 
-interface Connection {
-  id: string;
-  created: number;
-  geo_location: {
-    latitude: number;
-    longitude: number;
-  };
-  semantic_location?: string;
-  user_ids: string[];
-}
-
 type DashboardTab = 'memory' | 'map' | 'identity' | 'settings';
 
 interface DashboardViewProps {
@@ -55,11 +44,11 @@ interface DashboardViewProps {
 export default function DashboardView({ user }: DashboardViewProps) {
   const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
-  const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   const [chapters, setChapters] = useState<TimelineChapter[]>([]);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
 
   // Fetch user connections
   useEffect(() => {
@@ -86,9 +75,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
             setConnectionRecords(mockConnections);
             setChapters(mockChapters);
           } else if (data && data.length > 0) {
-            setConnections(data);
-            
-            // Transform to ConnectionRecord format
+            // Transform to ConnectionRecord format with geo_location
             const records: ConnectionRecord[] = data.map((conn: any) => ({
               id: conn.id,
               name: conn.other_user_name || conn.semantic_location || 'Connection',
@@ -96,6 +83,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
               location: conn.semantic_location || 'Unknown location',
               context: conn.context || undefined,
               status: conn.status || 'kept',
+              // Include geo_location from the connection schema
+              geo_location: conn.geo_location ? {
+                latitude: conn.geo_location.latitude,
+                longitude: conn.geo_location.longitude,
+              } : undefined,
             }));
             
             setConnectionRecords(records);
@@ -118,21 +110,32 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   // Initialize map when tab is active
   useEffect(() => {
-    if (activeTab === 'map' && mapContainer.current && !map.current) {
-      // Initialize map with connections or default view
-      const hasGeoConnections = connections.some(c => c.geo_location);
+    if (activeTab === 'map' && mapContainer.current) {
+      // Check if we have connections with geo_location
+      const geoConnections = connectionRecords.filter(c => c.geo_location);
+      const hasGeoConnections = geoConnections.length > 0;
       
-      map.current = new maplibregl.Map({
-        container: mapContainer.current,
-        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-        center: hasGeoConnections && connections[0]?.geo_location 
-          ? [connections[0].geo_location.longitude, connections[0].geo_location.latitude]
-          : [-122.3321, 47.6062], // Seattle default
-        zoom: 10,
-      });
+      // Calculate center from first connection or use Seattle default
+      const initialCenter: [number, number] = hasGeoConnections && geoConnections[0]?.geo_location 
+        ? [geoConnections[0].geo_location.longitude, geoConnections[0].geo_location.latitude]
+        : [-122.3321, 47.6062]; // Seattle default
+
+      // Initialize map if not already initialized
+      if (!map.current) {
+        map.current = new maplibregl.Map({
+          container: mapContainer.current,
+          style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+          center: initialCenter,
+          zoom: 12,
+        });
+      }
+
+      // Clear existing markers
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
 
       // Add markers for each connection with location
-      connections.forEach((connection) => {
+      geoConnections.forEach((connection) => {
         if (connection.geo_location && map.current) {
           const el = document.createElement('div');
           el.className = 'marker';
@@ -144,27 +147,43 @@ export default function DashboardView({ user }: DashboardViewProps) {
           el.style.cursor = 'pointer';
           el.style.boxShadow = '0 0 12px rgba(131, 56, 236, 0.5)';
 
-          new maplibregl.Marker({ element: el })
+          const marker = new maplibregl.Marker({ element: el })
             .setLngLat([connection.geo_location.longitude, connection.geo_location.latitude])
             .setPopup(
               new maplibregl.Popup({ offset: 25 }).setHTML(
                 `<div style="color: white; background: #18181b; padding: 12px; border-radius: 12px; border: 1px solid #27272a;">
-                  <strong style="color: #8338EC;">${connection.semantic_location || 'Connection'}</strong><br/>
-                  <span style="color: #71717a; font-size: 12px;">${new Date(connection.created).toLocaleDateString()}</span>
+                  <strong style="color: #8338EC;">${connection.name}</strong><br/>
+                  <span style="color: #a1a1aa; font-size: 12px;">${connection.location}</span><br/>
+                  <span style="color: #71717a; font-size: 11px;">${connection.dateMet.toLocaleDateString()}</span>
                 </div>`
               )
             )
             .addTo(map.current);
+          
+          markersRef.current.push(marker);
         }
       });
+
+      // Fit bounds to show all markers if we have multiple
+      if (geoConnections.length > 1 && map.current) {
+        const bounds = new maplibregl.LngLatBounds();
+        geoConnections.forEach(conn => {
+          if (conn.geo_location) {
+            bounds.extend([conn.geo_location.longitude, conn.geo_location.latitude]);
+          }
+        });
+        map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+      }
     }
 
     return () => {
-      if (map.current && activeTab !== 'map') {
-        // Don't destroy, just leave it
+      // Clean up markers when leaving the map tab
+      if (activeTab !== 'map') {
+        markersRef.current.forEach(marker => marker.remove());
+        markersRef.current = [];
       }
     };
-  }, [activeTab, connections]);
+  }, [activeTab, connectionRecords]);
 
   // Handle CSV export
   const handleExport = useCallback(() => {
@@ -338,7 +357,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   </div>
                 </div>
 
-                {connections.length === 0 || !connections.some(c => c.geo_location) ? (
+                {connectionRecords.length === 0 || !connectionRecords.some(c => c.geo_location) ? (
                   <div className="glass p-12 rounded-3xl border-zinc-800 text-center">
                     <MapPin className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>

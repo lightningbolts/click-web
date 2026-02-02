@@ -22,6 +22,11 @@ export interface ConnectionRecord {
   context?: string;
   status: 'kept' | 'expired' | 'pending';
   avatarUrl?: string;
+  // Geolocation data following the connection schema
+  geo_location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface ConnectionTableProps {

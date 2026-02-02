@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { QrCode, Copy, Check, Share2, Download } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface QRIdentityCardProps {
   userId: string;
@@ -16,86 +17,11 @@ interface QRIdentityCardProps {
  */
 export default function QRIdentityCard({ userId, userName, userEmail }: QRIdentityCardProps) {
   const [copied, setCopied] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const qrRef = useRef<HTMLDivElement>(null);
 
   // Generate a short Click ID from the user ID
   const clickId = `CLICK-${userId.substring(0, 8).toUpperCase()}`;
   const qrContent = `https://click.app/c/${userId}`;
-
-  // Generate QR code using canvas
-  useEffect(() => {
-    const generateQR = async () => {
-      // Simple QR code generation using a basic pattern
-      // In production, you'd use a library like 'qrcode'
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const size = 200;
-      canvas.width = size;
-      canvas.height = size;
-
-      // Background
-      ctx.fillStyle = '#121212';
-      ctx.fillRect(0, 0, size, size);
-
-      // QR code pattern (simplified visual representation)
-      // In production, use a proper QR library
-      const moduleSize = 6;
-      const modules = Math.floor(size / moduleSize);
-      
-      // Generate a deterministic pattern from userId
-      const seed = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const pattern: boolean[][] = [];
-      
-      for (let i = 0; i < modules; i++) {
-        pattern[i] = [];
-        for (let j = 0; j < modules; j++) {
-          // Create QR-like patterns
-          const isEdge = i < 7 || j < 7 || i >= modules - 7 || j >= modules - 7;
-          const isCorner = (i < 7 && j < 7) || (i < 7 && j >= modules - 7) || (i >= modules - 7 && j < 7);
-          
-          if (isCorner) {
-            // Position patterns (finder patterns)
-            const cornerI = i < 7 ? i : i - (modules - 7);
-            const cornerJ = j < 7 ? j : j - (modules - 7);
-            pattern[i][j] = (
-              (cornerI === 0 || cornerI === 6 || cornerJ === 0 || cornerJ === 6) ||
-              (cornerI >= 2 && cornerI <= 4 && cornerJ >= 2 && cornerJ <= 4)
-            );
-          } else {
-            // Data area - use hash for deterministic pattern
-            const hash = ((seed + i * 31 + j * 17) % 100);
-            pattern[i][j] = hash > 45;
-          }
-        }
-      }
-
-      // Draw modules
-      for (let i = 0; i < modules; i++) {
-        for (let j = 0; j < modules; j++) {
-          if (pattern[i][j]) {
-            // Gradient effect for QR modules
-            const gradient = ctx.createLinearGradient(
-              j * moduleSize, i * moduleSize,
-              (j + 1) * moduleSize, (i + 1) * moduleSize
-            );
-            gradient.addColorStop(0, '#8338EC');
-            gradient.addColorStop(1, '#3A86FF');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(j * moduleSize, i * moduleSize, moduleSize - 1, moduleSize - 1);
-          }
-        }
-      }
-
-      setQrDataUrl(canvas.toDataURL());
-    };
-
-    generateQR();
-  }, [userId]);
 
   const handleCopy = async () => {
     try {
@@ -124,12 +50,31 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
   };
 
   const handleDownload = () => {
-    if (qrDataUrl) {
-      const link = document.createElement('a');
-      link.download = `click-qr-${clickId}.png`;
-      link.href = qrDataUrl;
-      link.click();
-    }
+    // Get the SVG element and convert to image for download
+    const svg = qrRef.current?.querySelector('svg');
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      canvas.width = 256;
+      canvas.height = 256;
+      if (ctx) {
+        ctx.fillStyle = '#121212';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 28, 28, 200, 200);
+        
+        const link = document.createElement('a');
+        link.download = `click-qr-${clickId}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+    };
+    
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
   return (
@@ -180,19 +125,21 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/30 to-[#3A86FF]/30 blur-xl" />
             
             {/* QR Container */}
-            <div className="relative bg-[#121212] p-4 rounded-2xl border border-white/10">
-              <canvas 
-                ref={canvasRef} 
-                className="w-[200px] h-[200px] rounded-lg"
+            <div ref={qrRef} className="relative bg-[#121212] p-4 rounded-2xl border border-white/10">
+              <QRCodeSVG
+                value={qrContent}
+                size={200}
+                level="M"
+                bgColor="#121212"
+                fgColor="#8338EC"
+                marginSize={0}
+                title={`Click ID QR Code for ${userName || userEmail || userId}`}
               />
               
               {/* Center logo overlay */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-[#121212] p-2 rounded-lg">
-                  <span className="text-lg font-bold">
-                    <span className="text-[#8338EC]">C</span>
-                    <span className="text-white text-sm">lick</span>
-                  </span>
+                <div className="bg-[#121212] px-2 py-1 rounded-lg">
+                  <span className="text-lg font-bold text-white tracking-wide">Click</span>
                 </div>
               </div>
             </div>
