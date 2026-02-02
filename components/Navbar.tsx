@@ -30,7 +30,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className={`relative z-10 flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? 'border-b border-zinc-800' : ''}`}>
+      <nav className={`relative z-[99999] flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? 'border-b border-zinc-800' : ''}`} style={{ isolation: 'isolate' }}>
         <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
           <span className="text-[#8338EC]">C</span>
           <span className="text-white">lick</span>

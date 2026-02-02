@@ -81,17 +81,18 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
 
       {/* Floor Plan Container */}
       <div 
-        className={`relative bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden transition-all duration-300 ${
+        className={`relative bg-[#0a0a0a] rounded-xl border border-white/10 overflow-hidden transition-all duration-300 ${
           isExpanded ? 'h-[500px]' : 'h-[300px]'
         }`}
+        style={{ isolation: 'isolate' }}
       >
         {/* Grid overlay */}
         <div 
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0 opacity-30 pointer-events-none"
           style={{
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+              linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
             `,
             backgroundSize: '20px 20px',
           }}

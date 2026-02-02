@@ -32,15 +32,15 @@ export default function InsightShell({
   };
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white">
+    <div className="min-h-screen bg-[#121212] text-white relative" style={{ isolation: 'isolate' }}>
       {/* Ambient background gradient */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8338EC]/10 rounded-full blur-[128px]" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#3A86FF]/10 rounded-full blur-[128px]" />
       </div>
 
       {/* Main content */}
-      <div className="relative z-0 p-4 md:p-6 lg:p-8">
+      <div className="relative p-4 md:p-6 lg:p-8">
         <div className="max-w-[1800px] mx-auto">
           {/* Header */}
           <motion.header

@@ -10,6 +10,9 @@
 // Layout
 export { default as InsightShell, GlassPanel } from './InsightShell';
 
+// Main Dashboard Content
+export { default as InsightsDashboard } from './InsightsDashboard';
+
 // Metric Cards
 export { StickyScoreCard, ConnectionDensityCard, LiveCountCard } from './StickyScoreCard';
 

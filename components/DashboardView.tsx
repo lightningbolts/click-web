@@ -1,27 +1,29 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapPin, 
-  MessageCircle, 
   Settings, 
   Users, 
-  Clock, 
   QrCode,
-  Download,
   BookOpen,
   Sparkles
 } from 'lucide-react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import LoadingScreen from '@/components/LoadingScreen';
 import SettingsView from '@/components/SettingsView';
 
 // Digital Memory Box components
-import { ConnectionTable, TimeCapsule, QRIdentityCard, StatsOverview, AchievementBadge, MilestoneProgress } from '@/components/dashboard';
+import { 
+  ConnectionTable, 
+  TimeCapsule, 
+  QRIdentityCard, 
+  StatsOverview, 
+  AchievementBadge, 
+  MilestoneProgress,
+  ConnectionMap 
+} from '@/components/dashboard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import { 
@@ -46,9 +48,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   const [chapters, setChapters] = useState<TimelineChapter[]>([]);
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
 
   // Fetch user connections
   useEffect(() => {
@@ -56,7 +55,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
       const fetchConnections = async () => {
         const supabase = getSupabaseClient();
         if (!supabase) {
-          // Use mock data if no supabase
           setConnectionRecords(mockConnections);
           setChapters(mockChapters);
           return;
@@ -71,11 +69,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
           if (error) {
             console.error('Error fetching connections:', error.message || error);
-            // Fall back to mock data
             setConnectionRecords(mockConnections);
             setChapters(mockChapters);
           } else if (data && data.length > 0) {
-            // Transform to ConnectionRecord format with geo_location
             const records: ConnectionRecord[] = data.map((conn: any) => ({
               id: conn.id,
               name: conn.other_user_name || conn.semantic_location || 'Connection',
@@ -83,7 +79,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
               location: conn.semantic_location || 'Unknown location',
               context: conn.context || undefined,
               status: conn.status || 'kept',
-              // Include geo_location from the connection schema
               geo_location: conn.geo_location ? {
                 latitude: conn.geo_location.latitude,
                 longitude: conn.geo_location.longitude,
@@ -93,7 +88,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
             setConnectionRecords(records);
             setChapters(generateChaptersFromConnections(records));
           } else {
-            // No connections yet, use mock for demo
             setConnectionRecords(mockConnections);
             setChapters(mockChapters);
           }
@@ -107,83 +101,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
       fetchConnections();
     }
   }, [user]);
-
-  // Initialize map when tab is active
-  useEffect(() => {
-    if (activeTab === 'map' && mapContainer.current) {
-      // Check if we have connections with geo_location
-      const geoConnections = connectionRecords.filter(c => c.geo_location);
-      const hasGeoConnections = geoConnections.length > 0;
-      
-      // Calculate center from first connection or use Seattle default
-      const initialCenter: [number, number] = hasGeoConnections && geoConnections[0]?.geo_location 
-        ? [geoConnections[0].geo_location.longitude, geoConnections[0].geo_location.latitude]
-        : [-122.3321, 47.6062]; // Seattle default
-
-      // Initialize map if not already initialized
-      if (!map.current) {
-        map.current = new maplibregl.Map({
-          container: mapContainer.current,
-          style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-          center: initialCenter,
-          zoom: 12,
-        });
-      }
-
-      // Clear existing markers
-      markersRef.current.forEach(marker => marker.remove());
-      markersRef.current = [];
-
-      // Add markers for each connection with location
-      geoConnections.forEach((connection) => {
-        if (connection.geo_location && map.current) {
-          const el = document.createElement('div');
-          el.className = 'marker';
-          el.style.width = '24px';
-          el.style.height = '24px';
-          el.style.borderRadius = '50%';
-          el.style.background = 'linear-gradient(135deg, #8338EC, #3A86FF)';
-          el.style.border = '3px solid white';
-          el.style.cursor = 'pointer';
-          el.style.boxShadow = '0 0 12px rgba(131, 56, 236, 0.5)';
-
-          const marker = new maplibregl.Marker({ element: el })
-            .setLngLat([connection.geo_location.longitude, connection.geo_location.latitude])
-            .setPopup(
-              new maplibregl.Popup({ offset: 25 }).setHTML(
-                `<div style="color: white; background: #18181b; padding: 12px; border-radius: 12px; border: 1px solid #27272a;">
-                  <strong style="color: #8338EC;">${connection.name}</strong><br/>
-                  <span style="color: #a1a1aa; font-size: 12px;">${connection.location}</span><br/>
-                  <span style="color: #71717a; font-size: 11px;">${connection.dateMet.toLocaleDateString()}</span>
-                </div>`
-              )
-            )
-            .addTo(map.current);
-          
-          markersRef.current.push(marker);
-        }
-      });
-
-      // Fit bounds to show all markers if we have multiple
-      if (geoConnections.length > 1 && map.current) {
-        const bounds = new maplibregl.LngLatBounds();
-        geoConnections.forEach(conn => {
-          if (conn.geo_location) {
-            bounds.extend([conn.geo_location.longitude, conn.geo_location.latitude]);
-          }
-        });
-        map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
-      }
-    }
-
-    return () => {
-      // Clean up markers when leaving the map tab
-      if (activeTab !== 'map') {
-        markersRef.current.forEach(marker => marker.remove());
-        markersRef.current = [];
-      }
-    };
-  }, [activeTab, connectionRecords]);
 
   // Handle CSV export
   const handleExport = useCallback(() => {
@@ -357,22 +274,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   </div>
                 </div>
 
-                {connectionRecords.length === 0 || !connectionRecords.some(c => c.geo_location) ? (
-                  <div className="glass p-12 rounded-3xl border-zinc-800 text-center">
-                    <MapPin className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>
-                    <p className="text-zinc-400">
-                      Your connection map will appear here once you start making connections!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="glass rounded-3xl border-zinc-800 overflow-hidden">
-                    <div
-                      ref={mapContainer}
-                      className="w-full h-[600px]"
-                    />
-                  </div>
-                )}
+                <ConnectionMap connections={connectionRecords} />
               </motion.div>
             )}
 

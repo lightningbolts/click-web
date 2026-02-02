@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { QrCode, Copy, Check, Share2, Download } from 'lucide-react';
+import { QrCode, Copy, Check, Share2, Download, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface QRIdentityCardProps {
@@ -11,17 +11,66 @@ interface QRIdentityCardProps {
   userEmail?: string;
 }
 
+interface QRData {
+  connectionUrl: string;
+  clickId: string;
+  deepLink: string;
+}
+
 /**
  * QRIdentityCard - Displays the user's static "Click ID" QR code
  * For scanning without the mobile app - part of the Digital Memory Box
  */
 export default function QRIdentityCard({ userId, userName, userEmail }: QRIdentityCardProps) {
   const [copied, setCopied] = useState(false);
+  const [qrData, setQrData] = useState<QRData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
 
-  // Generate a short Click ID from the user ID
-  const clickId = `CLICK-${userId.substring(0, 8).toUpperCase()}`;
-  const qrContent = `https://click.app/c/${userId}`;
+  // Fetch QR data from the API
+  useEffect(() => {
+    const fetchQRData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/qr');
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          setQrData({
+            connectionUrl: data.data.connectionUrl,
+            clickId: data.data.clickId,
+            deepLink: data.data.deepLink,
+          });
+        } else {
+          // Fallback to client-side generation using current origin
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          setQrData({
+            connectionUrl: `${baseUrl}/connect/${userId}`,
+            clickId: `CLICK-${userId.substring(0, 8).toUpperCase()}`,
+            deepLink: `click://connect/${userId}`,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch QR data:', err);
+        // Fallback to client-side generation
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        setQrData({
+          connectionUrl: `${baseUrl}/connect/${userId}`,
+          clickId: `CLICK-${userId.substring(0, 8).toUpperCase()}`,
+          deepLink: `click://connect/${userId}`,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQRData();
+  }, [userId]);
+
+  // Fallback values while loading
+  const clickId = qrData?.clickId || `CLICK-${userId.substring(0, 8).toUpperCase()}`;
+  const qrContent = qrData?.connectionUrl || '';
 
   const handleCopy = async () => {
     try {
@@ -34,7 +83,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
+    if (navigator.share && qrContent) {
       try {
         await navigator.share({
           title: 'My Click ID',
@@ -126,25 +175,44 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             
             {/* QR Container */}
             <div ref={qrRef} className="relative bg-[#121212] p-4 rounded-2xl border border-white/10">
-              <QRCodeSVG
-                value={qrContent}
-                size={200}
-                level="M"
-                bgColor="#121212"
-                fgColor="#8338EC"
-                marginSize={0}
-                title={`Click ID QR Code for ${userName || userEmail || userId}`}
-              />
-              
-              {/* Center logo overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-[#121212] px-2 py-1 rounded-lg">
-                  <span className="text-lg font-bold text-white tracking-wide">Click</span>
+              {loading ? (
+                <div className="w-[200px] h-[200px] flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin" />
                 </div>
-              </div>
+              ) : qrContent ? (
+                <QRCodeSVG
+                  value={qrContent}
+                  size={200}
+                  level="M"
+                  bgColor="#121212"
+                  fgColor="#8338EC"
+                  marginSize={0}
+                  title={`Click ID QR Code for ${userName || userEmail || userId}`}
+                />
+              ) : (
+                <div className="w-[200px] h-[200px] flex items-center justify-center text-zinc-500 text-sm">
+                  Unable to generate QR code
+                </div>
+              )}
+              
+              {/* Center logo overlay - only show when QR is rendered */}
+              {!loading && qrContent && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-[#121212] px-2 py-1 rounded-lg">
+                    <span className="text-lg font-bold text-white tracking-wide">Click</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Connection URL Display */}
+        {qrContent && (
+          <div className="text-center">
+            <p className="text-xs text-zinc-600 break-all">{qrContent}</p>
+          </div>
+        )}
 
         {/* Click ID Display */}
         <div className="space-y-2">
