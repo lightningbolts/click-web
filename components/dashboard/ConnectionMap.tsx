@@ -60,9 +60,9 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
           if (connection.geo_location) {
             const el = document.createElement('div');
             el.className = 'connection-marker';
-            el.style.cssText = 'width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #8338EC, #3A86FF); border: 3px solid white; cursor: pointer; box-shadow: 0 0 16px rgba(131, 56, 236, 0.6); transition: transform 0.2s ease;';
-            el.onmouseenter = () => { el.style.transform = 'scale(1.2)'; };
-            el.onmouseleave = () => { el.style.transform = 'scale(1)'; };
+            el.style.cssText = 'width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #8338EC, #3A86FF); border: 3px solid white; cursor: pointer; box-shadow: 0 0 16px rgba(131, 56, 236, 0.6); transition: box-shadow 0.2s ease, width 0.2s ease, height 0.2s ease;';
+            el.onmouseenter = () => { el.style.width = '34px'; el.style.height = '34px'; el.style.boxShadow = '0 0 24px rgba(131, 56, 236, 0.8)'; };
+            el.onmouseleave = () => { el.style.width = '28px'; el.style.height = '28px'; el.style.boxShadow = '0 0 16px rgba(131, 56, 236, 0.6)'; };
 
             const popupContent = `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
               <strong style="color: #8338EC; font-size: 14px; display: block; margin-bottom: 4px;">${connection.name}</strong>
@@ -77,7 +77,7 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
               maxWidth: '280px',
             }).setHTML(popupContent);
 
-            const marker = new maplibregl.Marker({ element: el })
+            const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
               .setLngLat([connection.geo_location.longitude, connection.geo_location.latitude])
               .setPopup(popup)
               .addTo(mapInstance);
@@ -165,7 +165,7 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
   }
 
   return (
-    <div className="relative rounded-3xl border border-zinc-800 overflow-hidden bg-zinc-900">
+    <div className="relative rounded-3xl border border-zinc-800 overflow-hidden bg-zinc-900 h-[600px]">
       {/* Loading overlay */}
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
@@ -179,10 +179,7 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
       {/* Map container */}
       <div
         ref={mapContainer}
-        style={{
-          width: '100%',
-          height: '600px',
-        }}
+        className="absolute inset-0"
       />
       
       {/* Connection count badge */}

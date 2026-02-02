@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Maximize2 } from 'lucide-react';
-import { GlassPanel } from './InsightShell';
+import { GlassPanel } from './InsightsDashboard';
 import type { HeatmapZone } from '@/lib/insights/mockData';
 
 interface HeatmapViewProps {

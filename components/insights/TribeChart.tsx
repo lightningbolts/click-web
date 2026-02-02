@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users2, Info } from 'lucide-react';
-import { GlassPanel } from './InsightShell';
+import { GlassPanel } from './InsightsDashboard';
 import type { TribeBubble } from '@/lib/insights/mockData';
 
 interface TribeChartProps {

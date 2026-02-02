@@ -4,14 +4,11 @@
  * This module exports all components for the B2B venue analytics dashboard.
  * 
  * Usage:
- * import { InsightShell, StickyScoreCard, HeatmapView } from '@/components/insights';
+ * import { InsightsDashboard, StickyScoreCard, HeatmapView } from '@/components/insights';
  */
 
-// Layout
-export { default as InsightShell, GlassPanel } from './InsightShell';
-
-// Main Dashboard Content
-export { default as InsightsDashboard } from './InsightsDashboard';
+// Main Dashboard (Shell + Content) + GlassPanel
+export { default as InsightsDashboard, GlassPanel } from './InsightsDashboard';
 
 // Metric Cards
 export { StickyScoreCard, ConnectionDensityCard, LiveCountCard } from './StickyScoreCard';

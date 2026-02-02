@@ -10,15 +10,27 @@ import { createPortal } from 'react-dom';
 export default function UserProfile() {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  // Create a dedicated portal root element at the very end of body
   useEffect(() => {
-    setIsClient(true);
+    let root = document.getElementById('user-profile-portal-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'user-profile-portal-root';
+      root.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2147483647;';
+      document.body.appendChild(root);
+    }
+    setPortalRoot(root);
+    
+    return () => {
+      // Don't remove on unmount - other instances might use it
+    };
   }, []);
 
   useEffect(() => {
@@ -83,65 +95,83 @@ export default function UserProfile() {
         <span className="text-xs md:text-sm hidden md:inline truncate max-w-[100px] lg:max-w-[150px]">{user.email}</span>
       </button>
 
-      {isClient && createPortal(
+      {portalRoot && createPortal(
         <AnimatePresence>
           {isOpen && menuPosition && (
-            <motion.div
-              ref={menuRef}
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              transition={{ duration: 0.15 }}
-              style={{
-                position: 'fixed',
-                top: menuPosition.top,
-                left: menuPosition.left,
-                zIndex: 2147483647,
-              }}
-              className="w-64 glass rounded-2xl border-zinc-800 overflow-hidden shadow-xl"
+            <>
+              {/* Backdrop to catch clicks */}
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  pointerEvents: 'auto',
+                }}
+                onClick={() => setIsOpen(false)}
+              />
+              {/* Menu - using opacity animation only, no transforms */}
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.1 }}
+                style={{
+                  position: 'fixed',
+                  top: menuPosition.top,
+                  left: menuPosition.left,
+                  width: 256,
+                  pointerEvents: 'auto',
+                  backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(63, 63, 70, 0.5)',
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                }}
               >
-              <div className="p-4 border-b border-zinc-800">
-                <p className="text-sm font-semibold">{user.email}</p>
-                <p className="text-xs text-zinc-500 mt-1">Signed in</p>
-              </div>
+                <div className="p-4 border-b border-zinc-800">
+                  <p className="text-sm font-semibold text-white">{user.email}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Signed in</p>
+                </div>
 
-              <div className="p-2">
-                <button
-                  onClick={() => {
-                    router.push('/dashboard');
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-left"
-                >
-                  <MessageCircle className="w-4 h-4 text-[#8338EC]" />
-                  <span className="text-sm">My Chats</span>
-                </button>
+                <div className="p-2">
+                  <button
+                    onClick={() => {
+                      router.push('/dashboard');
+                      setIsOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-left text-white"
+                  >
+                    <MessageCircle className="w-4 h-4 text-[#8338EC]" />
+                    <span className="text-sm">My Chats</span>
+                  </button>
 
-                <button
-                  onClick={() => {
-                    router.push('/dashboard');
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-left"
-                >
-                  <MapPin className="w-4 h-4 text-[#8338EC]" />
-                  <span className="text-sm">Connection Map</span>
-                </button>
-              </div>
+                  <button
+                    onClick={() => {
+                      router.push('/dashboard');
+                      setIsOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-left text-white"
+                  >
+                    <MapPin className="w-4 h-4 text-[#8338EC]" />
+                    <span className="text-sm">Connection Map</span>
+                  </button>
+                </div>
 
-              <div className="p-2 border-t border-zinc-800">
-                <button
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="text-sm">Sign Out</span>
-                </button>
-              </div>
-            </motion.div>
+                <div className="p-2 border-t border-zinc-800">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left text-white"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-sm">Sign Out</span>
+                  </button>
+                </div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>,
-        document.body
+        portalRoot
       )}
     </div>
   );

@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import InsightShell from '@/components/insights/InsightShell';
 import InsightsDashboard from '@/components/insights/InsightsDashboard';
 
 /**
  * InsightsPage - Business analytics dashboard for venue partners
- * Uses InsightShell as the layout wrapper and InsightsDashboard for content
+ * Uses InsightsDashboard as a consolidated shell + content component
  */
 export default function InsightsPage() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -22,16 +21,13 @@ export default function InsightsPage() {
   }, []);
 
   return (
-    <InsightShell
+    <InsightsDashboard
       venueName="The Neon Lounge"
       lastUpdated={lastUpdated}
       onRefresh={handleRefresh}
       isLive={true}
-    >
-      <InsightsDashboard 
-        key={refreshTrigger}
-        onLastUpdatedChange={handleLastUpdatedChange}
-      />
-    </InsightShell>
+      refreshKey={refreshTrigger}
+      onLastUpdatedChange={handleLastUpdatedChange}
+    />
   );
 }

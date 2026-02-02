@@ -13,7 +13,7 @@ import {
   Minus,
   Filter
 } from 'lucide-react';
-import { GlassPanel } from './InsightShell';
+import { GlassPanel } from './InsightsDashboard';
 import type { VibeMessage } from '@/lib/insights/mockData';
 
 interface VibeStreamProps {

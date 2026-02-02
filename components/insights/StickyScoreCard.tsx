@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, Users, Link2, Sparkles } from 'lucide-react';
-import { GlassPanel } from './InsightShell';
+import { GlassPanel } from './InsightsDashboard';
 import type { StickyScore, ConnectionDensity, LiveCount } from '@/lib/insights/mockData';
 
 // ============================================
