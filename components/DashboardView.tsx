@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
+import { ChatView } from '@/components/chat';
 
 // Digital Memory Box components
 import { 
@@ -48,6 +49,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   const [chapters, setChapters] = useState<TimelineChapter[]>([]);
+  /** The connection whose chat is currently open, or null */
+  const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
 
   // Fetch user connections
   useEffect(() => {
@@ -243,6 +246,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   <ConnectionTable 
                     connections={connectionRecords} 
                     onExport={handleExport}
+                    onSelect={(conn) => setSelectedConnection(conn)}
                   />
                 </section>
 
@@ -311,6 +315,40 @@ export default function DashboardView({ user }: DashboardViewProps) {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* ── Chat slide-over ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {selectedConnection && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="chat-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedConnection(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30"
+            />
+
+            {/* Panel */}
+            <motion.div
+              key="chat-panel"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+              className="fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] z-40 p-3"
+            >
+              <ChatView
+                connection={selectedConnection}
+                currentUserId={user.id}
+                otherUserName={selectedConnection.name}
+                onClose={() => setSelectedConnection(null)}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

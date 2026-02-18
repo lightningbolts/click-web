@@ -11,7 +11,8 @@ import {
   Download,
   ChevronUp,
   ChevronDown,
-  Filter
+  Filter,
+  MessageCircle
 } from 'lucide-react';
 
 export interface ConnectionRecord {
@@ -32,6 +33,8 @@ export interface ConnectionRecord {
 interface ConnectionTableProps {
   connections: ConnectionRecord[];
   onExport?: () => void;
+  /** Called when a row is clicked – opens the chat view */
+  onSelect?: (connection: ConnectionRecord) => void;
 }
 
 type SortField = 'name' | 'dateMet' | 'location' | 'status';
@@ -41,7 +44,7 @@ type SortOrder = 'asc' | 'desc';
  * ConnectionTable - A searchable, sortable data table of "People I've Met"
  * Part of the Digital Memory Box experience
  */
-export default function ConnectionTable({ connections, onExport }: ConnectionTableProps) {
+export default function ConnectionTable({ connections, onExport, onSelect }: ConnectionTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('dateMet');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -243,6 +246,7 @@ export default function ConnectionTable({ connections, onExport }: ConnectionTab
                   <SortIcon field="status" />
                 </div>
               </th>
+              <th className="px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
@@ -264,6 +268,7 @@ export default function ConnectionTable({ connections, onExport }: ConnectionTab
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ delay: index * 0.02 }}
                     className="hover:bg-zinc-900/30 transition-colors cursor-pointer group"
+                  onClick={() => onSelect?.(connection)}
                   >
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
@@ -294,6 +299,15 @@ export default function ConnectionTable({ connections, onExport }: ConnectionTab
                     </td>
                     <td className="px-4 py-4">
                       {getStatusBadge(connection.status)}
+                    </td>
+                    <td className="px-4 py-4">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onSelect?.(connection); }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-[#8338EC]/10 hover:bg-[#8338EC]/20 border border-[#8338EC]/30 rounded-xl text-xs text-[#8338EC] font-medium"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        Chat
+                      </button>
                     </td>
                   </motion.tr>
                 ))
