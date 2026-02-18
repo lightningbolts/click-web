@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import MessageBubble from './MessageBubble';
@@ -49,6 +49,18 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
 
   const PAGE_SIZE = 40;
 
+  // ─────────────────────────── auth header helper ─────────────────────────
+
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return { 'Content-Type': 'application/json' };
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    };
+  }, []);
+
   // ─────────────────────────── helpers ────────────────────────────────────
 
   const scrollToBottom = useCallback((smooth = true) => {
@@ -66,7 +78,8 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
   useEffect(() => {
     const init = async () => {
       try {
-        const res = await fetch(`/api/chat?connectionId=${connection.id}`);
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/chat?connectionId=${connection.id}`, { headers });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Failed to load chat');
         setChatId(json.chat.id);
@@ -84,7 +97,8 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
     const params = new URLSearchParams({ chatId: id, limit: String(PAGE_SIZE) });
     if (cursor) params.set('cursor', String(cursor));
 
-    const res = await fetch(`/api/chat/messages?${params}`);
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/chat/messages?${params}`, { headers });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? 'Failed to load messages');
 
@@ -245,9 +259,10 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
     inputRef.current?.focus();
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ chatId, content }),
       });
       if (!res.ok) throw new Error('Send failed');
@@ -288,9 +303,10 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
   const submitEdit = useCallback(async () => {
     if (!editingId || !editText.trim()) return;
 
+    const headers = await getAuthHeaders();
     const res = await fetch('/api/chat/messages', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
     });
     if (res.ok) {
@@ -303,239 +319,269 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
   // ─────────────────────────── delete message ──────────────────────────────
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    await fetch(`/api/chat/messages?messageId=${messageId}`, { method: 'DELETE' });
+    const headers = await getAuthHeaders();
+    await fetch(`/api/chat/messages?messageId=${messageId}`, { method: 'DELETE', headers });
     // Realtime DELETE event will remove from UI
-  }, []);
+  }, [getAuthHeaders]);
 
   // ─────────────────────────── react ───────────────────────────────────────
 
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
+    const headers = await getAuthHeaders();
     await fetch('/api/chat/reactions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ messageId, reactionType: emoji }),
     });
     // Realtime handles UI
-  }, []);
+  }, [getAuthHeaders]);
 
   // ─────────────────────────── render ──────────────────────────────────────
 
   const otherInitial = otherUserName.charAt(0).toUpperCase();
+  const metDate = connection.dateMet.toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 40 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-      className="flex flex-col h-full bg-zinc-950 rounded-3xl border border-zinc-800 overflow-hidden"
-    >
+    <div className="flex flex-col h-full">
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/60 backdrop-blur-sm shrink-0">
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-xl hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-white"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+      <div className="glass rounded-2xl mb-4 shrink-0">
+        <div className="flex items-center gap-4 px-5 py-4">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
 
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
-          flex items-center justify-center text-sm font-bold shrink-0">
-          {otherInitial}
-        </div>
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
+            flex items-center justify-center text-sm font-bold shrink-0 glow-violet">
+            {otherInitial}
+          </div>
 
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white truncate">{otherUserName}</p>
-          <p className="text-xs text-zinc-500 truncate">{connection.location}</p>
-        </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-white truncate text-lg">{otherUserName}</p>
+            <div className="flex items-center gap-3 text-xs text-zinc-500">
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3 h-3" /> {connection.location}
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> {metDate}
+              </span>
+            </div>
+          </div>
 
-        {/* Connection badge */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full 
-          bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC] text-xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#8338EC] animate-pulse" />
-          Connected
+          {/* Connection status badge */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full 
+            bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC] text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#8338EC] animate-pulse" />
+            Connected
+          </div>
         </div>
       </div>
 
-      {/* ── Messages ── */}
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scroll-smooth"
-      >
-        {/* Load-more indicator */}
-        {loadingMore && (
-          <div className="flex justify-center py-2">
-            <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
-          </div>
-        )}
+      {/* ── Messages area ── */}
+      <div className="glass rounded-2xl flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        {/* Subtle gradient glow behind messages */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#8338EC] rounded-full blur-[160px] opacity-[0.04]" />
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#3A86FF] rounded-full blur-[160px] opacity-[0.04]" />
+        </div>
 
-        {/* Initial load */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-zinc-500">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <p className="text-sm">Loading messages…</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="flex items-center gap-2 text-red-400 text-sm justify-center py-6">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {error}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && !error && messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12 gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8338EC]/20 to-[#3A86FF]/20 
-              border border-[#8338EC]/20 flex items-center justify-center text-2xl">
-              👋
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-5 py-5 space-y-3 scrollbar-thin relative z-[1]"
+        >
+          {/* Load-more indicator */}
+          {loadingMore && (
+            <div className="flex justify-center py-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/60 border border-zinc-700/50">
+                <Loader2 className="w-3.5 h-3.5 text-[#8338EC] animate-spin" />
+                <span className="text-xs text-zinc-500">Loading older messages…</span>
+              </div>
             </div>
-            <p className="font-semibold text-white">Say hello to {otherUserName}!</p>
-            <p className="text-sm text-zinc-500 max-w-xs">
-              You met at <span className="text-zinc-300">{connection.location}</span>. Break the ice!
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Message list */}
-        <AnimatePresence initial={false}>
-          {messages.map((msg) => (
-            editingId === msg.id ? (
-              /* Inline edit form */
+          {/* Initial load */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-500">
+              <div className="p-4 rounded-2xl bg-[#8338EC]/5 border border-[#8338EC]/10">
+                <Loader2 className="w-6 h-6 animate-spin text-[#8338EC]" />
+              </div>
+              <p className="text-sm">Loading messages…</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex flex-col items-center gap-3 text-red-400 text-sm py-8">
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <p>{error}</p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-center py-16 gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8338EC]/20 to-[#3A86FF]/20 
+                border border-[#8338EC]/20 flex items-center justify-center text-3xl glow-violet">
+                👋
+              </div>
+              <div>
+                <p className="font-semibold text-white text-lg">Say hello to {otherUserName}!</p>
+                <p className="text-sm text-zinc-500 max-w-xs mt-1">
+                  You met at <span className="text-[#8338EC]">{connection.location}</span>. Start the conversation!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Message list */}
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              editingId === msg.id ? (
+                /* Inline edit form */
+                <motion.div
+                  key={`edit-${msg.id}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className={`flex ${msg.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className="flex gap-2 max-w-[72%]">
+                    <input
+                      autoFocus
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitEdit();
+                        if (e.key === 'Escape') { setEditingId(null); setEditText(''); }
+                      }}
+                      className="flex-1 bg-zinc-900/80 border border-[#8338EC] rounded-xl px-3 py-2 
+                        text-sm focus:outline-none focus:ring-1 focus:ring-[#8338EC]/50 text-white"
+                    />
+                    <button
+                      onClick={submitEdit}
+                      className="px-3 py-2 bg-gradient-to-r from-[#8338EC] to-[#6520c0] rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setEditingId(null); setEditText(''); }}
+                      className="px-3 py-2 glass rounded-xl text-sm hover:bg-white/10 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  isMine={msg.user_id === currentUserId}
+                  currentUserId={currentUserId}
+                  senderInitial={otherInitial}
+                  onReact={handleReact}
+                  onEdit={startEdit}
+                  onDelete={deleteMessage}
+                />
+              )
+            ))}
+          </AnimatePresence>
+
+          {/* Typing indicator */}
+          <AnimatePresence>
+            {typingIndicator && (
               <motion.div
-                key={`edit-${msg.id}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className={`flex ${msg.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
+                key="typing"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                className="flex items-center gap-2"
               >
-                <div className="flex gap-2 max-w-[72%]">
-                  <input
-                    autoFocus
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') submitEdit();
-                      if (e.key === 'Escape') { setEditingId(null); setEditText(''); }
-                    }}
-                    className="flex-1 bg-zinc-800 border border-[#8338EC] rounded-xl px-3 py-2 
-                      text-sm focus:outline-none text-white"
-                  />
-                  <button
-                    onClick={submitEdit}
-                    className="px-3 py-2 bg-[#8338EC] rounded-xl text-sm font-medium hover:bg-[#9d4eff] transition-colors"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => { setEditingId(null); setEditText(''); }}
-                    className="px-3 py-2 bg-zinc-800 rounded-xl text-sm hover:bg-zinc-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
+                  flex items-center justify-center text-[10px] font-bold shrink-0">
+                  {otherInitial}
+                </div>
+                <div className="glass-panel rounded-2xl rounded-bl-sm px-4 py-2.5">
+                  <span className="inline-flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 bg-[#8338EC] rounded-full animate-bounce"
+                        style={{ animationDelay: `${i * 150}ms` }}
+                      />
+                    ))}
+                  </span>
                 </div>
               </motion.div>
-            ) : (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                isMine={msg.user_id === currentUserId}
-                currentUserId={currentUserId}
-                senderInitial={otherInitial}
-                onReact={handleReact}
-                onEdit={startEdit}
-                onDelete={deleteMessage}
-              />
-            )
-          ))}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
 
-        {/* Typing indicator */}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Scroll-to-bottom button */}
         <AnimatePresence>
-          {typingIndicator && (
-            <motion.div
-              key="typing"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 4 }}
-              className="flex items-center gap-2 text-xs text-zinc-500"
+          {showScrollBtn && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              onClick={() => scrollToBottom()}
+              className="absolute right-5 bottom-20 bg-[#8338EC]/90 backdrop-blur-sm
+                rounded-full p-2.5 shadow-lg hover:bg-[#8338EC] transition-colors z-10 glow-violet"
             >
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
-                flex items-center justify-center text-xs font-bold shrink-0">
-                {otherInitial}
-              </div>
-              <div className="bg-zinc-800 border border-zinc-700 rounded-2xl rounded-bl-sm px-3 py-2">
-                <span className="inline-flex gap-0.5">
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"
-                      style={{ animationDelay: `${i * 120}ms` }}
-                    />
-                  ))}
-                </span>
-              </div>
-            </motion.div>
+              <ChevronDown className="w-4 h-4 text-white" />
+            </motion.button>
           )}
         </AnimatePresence>
-
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Scroll to bottom button */}
-      <AnimatePresence>
-        {showScrollBtn && (
+      {/* ── Input area ── */}
+      <div className="glass rounded-2xl mt-4 px-4 py-3 shrink-0">
+        <div className="flex items-end gap-3">
+          <div className="flex-1 bg-zinc-900/60 border border-zinc-700/50 
+            rounded-2xl px-4 py-2.5 focus-within:border-[#8338EC]/50 transition-colors">
+            <textarea
+              ref={inputRef}
+              value={inputText}
+              onChange={(e) => {
+                setInputText(e.target.value);
+                broadcastTyping();
+                // Auto-resize
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message ${otherUserName}…`}
+              rows={1}
+              className="w-full resize-none bg-transparent text-sm text-white placeholder-zinc-600 
+                focus:outline-none leading-relaxed"
+              style={{ minHeight: '24px', maxHeight: '120px' }}
+            />
+          </div>
           <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            onClick={() => scrollToBottom()}
-            className="absolute right-6 bottom-24 bg-zinc-800 border border-zinc-700 
-              rounded-full p-2 shadow-lg hover:bg-zinc-700 transition-colors z-10"
-          >
-            <ChevronDown className="w-4 h-4 text-zinc-300" />
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* ── Input ── */}
-      <div className="shrink-0 border-t border-zinc-800 bg-zinc-900/60 backdrop-blur-sm px-4 py-3">
-        <div className="flex items-end gap-2 bg-zinc-800 border border-zinc-700 
-          rounded-2xl px-3 py-2 focus-within:border-[#8338EC] transition-colors">
-          <textarea
-            ref={inputRef}
-            value={inputText}
-            onChange={(e) => {
-              setInputText(e.target.value);
-              broadcastTyping();
-              // Auto-resize
-              e.target.style.height = 'auto';
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder={`Message ${otherUserName}…`}
-            rows={1}
-            className="flex-1 resize-none bg-transparent text-sm text-white placeholder-zinc-600 
-              focus:outline-none leading-relaxed"
-            style={{ minHeight: '24px', maxHeight: '120px' }}
-          />
-          <button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={sendMessage}
             disabled={!inputText.trim() || sending}
-            className="p-2 rounded-xl bg-[#8338EC] hover:bg-[#9d4eff] disabled:opacity-40 
-              disabled:cursor-not-allowed transition-colors shrink-0"
+            className="p-3 rounded-xl bg-gradient-to-br from-[#8338EC] to-[#6520c0] 
+              hover:from-[#9b4dff] hover:to-[#7b30e0] disabled:opacity-30 
+              disabled:cursor-not-allowed transition-all shrink-0 glow-violet"
           >
             {sending
               ? <Loader2 className="w-4 h-4 animate-spin" />
               : <Send className="w-4 h-4" />
             }
-          </button>
+          </motion.button>
         </div>
-        <p className="text-[10px] text-zinc-600 mt-1.5 text-center">
+        <p className="text-[10px] text-zinc-600 mt-2 text-center">
           Press Enter to send · Shift+Enter for new line
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 }

@@ -71,8 +71,8 @@ export default function MessageBubble({
     >
       {/* Avatar */}
       {!isMine && (
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
-          flex items-center justify-center text-xs font-bold shrink-0 mb-1">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
+          flex items-center justify-center text-xs font-bold shrink-0 mb-1 shadow-[0_0_12px_rgba(131,56,236,0.3)]">
           {senderInitial}
         </div>
       )}
@@ -97,8 +97,8 @@ export default function MessageBubble({
           <div
             className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words
               ${isMine
-                ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm'
-                : 'bg-zinc-800 text-zinc-100 rounded-bl-sm border border-zinc-700'
+                ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm shadow-[0_2px_16px_rgba(131,56,236,0.25)]'
+                : 'glass-panel text-zinc-100 rounded-bl-sm'
               }`}
           >
             {message.content}
@@ -113,13 +113,13 @@ export default function MessageBubble({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               className={`absolute top-[-6px] flex items-center gap-1 
-                bg-zinc-800 border border-zinc-700 rounded-full px-1.5 py-1 shadow-lg z-10
+                glass rounded-full px-1.5 py-1 shadow-xl z-10
                 ${isMine ? 'right-full mr-2' : 'left-full ml-2'}`}
             >
               {/* Reaction toggle */}
               <button
                 onClick={() => setShowPicker((p) => !p)}
-                className="p-1 rounded-full hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                className="p-1 rounded-full hover:bg-[#8338EC]/20 text-zinc-400 hover:text-[#8338EC] transition-colors"
                 title="React"
               >
                 <SmilePlus className="w-3.5 h-3.5" />
@@ -128,7 +128,7 @@ export default function MessageBubble({
                 <>
                   <button
                     onClick={() => onEdit(message.id, message.content)}
-                    className="p-1 rounded-full hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                    className="p-1 rounded-full hover:bg-[#3A86FF]/20 text-zinc-400 hover:text-[#3A86FF] transition-colors"
                     title="Edit"
                   >
                     <Pencil className="w-3.5 h-3.5" />

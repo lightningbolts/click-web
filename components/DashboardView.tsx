@@ -10,7 +10,8 @@ import {
   Users, 
   QrCode,
   BookOpen,
-  Sparkles
+  Sparkles,
+  MessageCircle
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import { ChatView } from '@/components/chat';
@@ -34,7 +35,7 @@ import {
   generateChaptersFromConnections 
 } from '@/lib/dashboard/mockData';
 
-type DashboardTab = 'memory' | 'map' | 'identity' | 'settings';
+type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
 
 interface DashboardViewProps {
   user: any;
@@ -115,6 +116,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const tabs: { id: DashboardTab; label: string; icon: any }[] = [
     { id: 'memory', label: 'Memory Box', icon: BookOpen },
     { id: 'map', label: 'Map', icon: MapPin },
+    { id: 'chat', label: 'Chat', icon: MessageCircle },
     { id: 'identity', label: 'QR Identity', icon: QrCode },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -246,7 +248,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   <ConnectionTable 
                     connections={connectionRecords} 
                     onExport={handleExport}
-                    onSelect={(conn) => setSelectedConnection(conn)}
+                    onSelect={(conn) => {
+                      setSelectedConnection(conn);
+                      setActiveTab('chat');
+                    }}
                   />
                 </section>
 
@@ -279,6 +284,78 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 </div>
 
                 <ConnectionMap connections={connectionRecords} />
+              </motion.div>
+            )}
+
+            {/* Chat Tab */}
+            {activeTab === 'chat' && (
+              <motion.div
+                key="chat"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="h-[calc(100vh-180px)]"
+              >
+                {selectedConnection ? (
+                  <ChatView
+                    connection={selectedConnection}
+                    currentUserId={user.id}
+                    otherUserName={selectedConnection.name}
+                    onClose={() => setSelectedConnection(null)}
+                  />
+                ) : (
+                  /* Connection picker list */
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[#8338EC]/20 rounded-xl">
+                        <MessageCircle className="w-5 h-5 text-[#8338EC]" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold">Messages</h2>
+                        <p className="text-sm text-zinc-500">Chat with your connections</p>
+                      </div>
+                    </div>
+
+                    {connectionRecords.length === 0 ? (
+                      <div className="glass p-12 rounded-3xl text-center">
+                        <MessageCircle className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold mb-2">No Conversations Yet</h3>
+                        <p className="text-zinc-400">
+                          Start meeting people and your chats will appear here!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="glass rounded-3xl overflow-hidden divide-y divide-zinc-800/50">
+                        {connectionRecords.filter(c => c.status === 'kept' || c.status === 'pending').map((conn) => (
+                          <motion.button
+                            key={conn.id}
+                            whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
+                            whileTap={{ scale: 0.995 }}
+                            onClick={() => setSelectedConnection(conn)}
+                            className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors"
+                          >
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-sm font-bold shrink-0">
+                              {conn.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-white truncate">{conn.name}</p>
+                              <p className="text-xs text-zinc-500 truncate">
+                                {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </p>
+                            </div>
+                            {conn.context && (
+                              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC]/10 text-[#8338EC] border border-[#8338EC]/20">
+                                {conn.context}
+                              </span>
+                            )}
+                            <MessageCircle className="w-4 h-4 text-zinc-600 shrink-0" />
+                          </motion.button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -316,39 +393,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         </div>
       </div>
 
-      {/* ── Chat slide-over ─────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {selectedConnection && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              key="chat-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedConnection(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30"
-            />
-
-            {/* Panel */}
-            <motion.div
-              key="chat-panel"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-              className="fixed top-0 right-0 h-full w-full sm:w-[420px] md:w-[480px] z-40 p-3"
-            >
-              <ChatView
-                connection={selectedConnection}
-                currentUserId={user.id}
-                otherUserName={selectedConnection.name}
-                onClose={() => setSelectedConnection(null)}
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
