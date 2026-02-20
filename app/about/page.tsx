@@ -28,7 +28,7 @@ export default function About() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8 }}
               viewport={{ once: true }}
-              className="glass p-12 md:p-16 rounded-3xl border-zinc-800"
+              className="glass p-12 md:p-16 rounded-3xl border border-zinc-800"
             >
               <h2 className="text-3xl md:text-4xl font-bold mb-6 text-center">Our Mission</h2>
               <p className="text-lg text-zinc-300 leading-relaxed max-w-3xl mx-auto text-center">
@@ -51,7 +51,7 @@ export default function About() {
                 whileInView={{ x: 0, opacity: 1 }}
                 transition={{ duration: 0.8 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800"
+                className="glass p-8 rounded-3xl border border-zinc-800"
               >
                 <h3 className="text-2xl font-bold mb-4 text-red-400">The Problem</h3>
                 <p className="text-zinc-300 leading-relaxed">
@@ -66,7 +66,7 @@ export default function About() {
                 whileInView={{ x: 0, opacity: 1 }}
                 transition={{ duration: 0.8 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800"
+                className="glass p-8 rounded-3xl border border-zinc-800"
               >
                 <h3 className="text-2xl font-bold mb-4 text-[#8338EC]">Our Solution</h3>
                 <p className="text-zinc-300 leading-relaxed">
@@ -97,7 +97,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.1 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
+                className="glass p-8 rounded-3xl border border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
               >
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#8338EC] to-purple-600 mx-auto mb-6 flex items-center justify-center text-4xl font-bold">
                   K
@@ -118,7 +118,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.2 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
+                className="glass p-8 rounded-3xl border border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
               >
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 mx-auto mb-6 flex items-center justify-center text-4xl font-bold">
                   M
@@ -139,7 +139,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.3 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
+                className="glass p-8 rounded-3xl border border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
               >
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-pink-600 to-red-600 mx-auto mb-6 flex items-center justify-center text-4xl font-bold">
                   R
@@ -167,7 +167,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.1 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800"
+                className="glass p-8 rounded-3xl border border-zinc-800"
               >
                 <div className="text-4xl mb-4">🛡️</div>
                 <h3 className="text-xl font-bold mb-3">Privacy First</h3>
@@ -182,7 +182,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.2 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800"
+                className="glass p-8 rounded-3xl border border-zinc-800"
               >
                 <div className="text-4xl mb-4">🌍</div>
                 <h3 className="text-xl font-bold mb-3">Real-World First</h3>
@@ -197,7 +197,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.3 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800"
+                className="glass p-8 rounded-3xl border border-zinc-800"
               >
                 <div className="text-4xl mb-4">⚡</div>
                 <h3 className="text-xl font-bold mb-3">Intentional Design</h3>
@@ -212,7 +212,7 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
                 viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border-zinc-800"
+                className="glass p-8 rounded-3xl border border-zinc-800"
               >
                 <div className="text-4xl mb-4">🎓</div>
                 <h3 className="text-xl font-bold mb-3">Student-Driven</h3>
@@ -231,7 +231,7 @@ export default function About() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8 }}
               viewport={{ once: true }}
-              className="glass p-12 md:p-16 rounded-3xl border-zinc-800 text-center"
+              className="glass p-12 md:p-16 rounded-3xl border border-zinc-800 text-center"
             >
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
                 Building the <span className="text-[#8338EC]">Connection Economy</span>

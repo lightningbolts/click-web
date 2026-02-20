@@ -141,7 +141,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="glass max-w-md w-full p-8 rounded-3xl border-zinc-800 relative">
+            <div className="glass max-w-md w-full p-8 rounded-3xl border border-zinc-800 relative">
               {/* Close button */}
               <button
                 onClick={onClose}

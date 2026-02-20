@@ -9,8 +9,11 @@ import {
   ChevronLeft, 
   ChevronRight,
   Star,
-  Calendar
+  Calendar,
+  MessageCircle,
+  TrendingUp,
 } from 'lucide-react';
+import type { ConnectionRecord } from './ConnectionTable';
 
 export interface TimelineChapter {
   id: string;
@@ -25,18 +28,22 @@ export interface TimelineChapter {
   coverImage?: string;
   color?: string;
   highlights?: string[];
+  /** The actual connections made during this chapter */
+  connections?: ConnectionRecord[];
 }
 
 interface TimeCapsuleProps {
   chapters: TimelineChapter[];
   onChapterClick?: (chapter: TimelineChapter) => void;
+  /** Called when the user clicks "Chat" on a person inside the detail panel */
+  onConnectionClick?: (connection: ConnectionRecord) => void;
 }
 
 /**
  * TimeCapsule - Visual timeline showing distinct "Chapters" of your social journey
  * Part of the Digital Memory Box experience
  */
-export default function TimeCapsule({ chapters, onChapterClick }: TimeCapsuleProps) {
+export default function TimeCapsule({ chapters, onChapterClick, onConnectionClick }: TimeCapsuleProps) {
   const [selectedChapter, setSelectedChapter] = useState<TimelineChapter | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -249,60 +256,133 @@ export default function TimeCapsule({ chapters, onChapterClick }: TimeCapsulePro
 
       {/* Selected chapter detail */}
       <AnimatePresence>
-        {selectedChapter && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="glass p-6 rounded-2xl border-zinc-800">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="text-lg font-bold text-white">{selectedChapter.title}</h4>
-                  <p className="text-sm text-zinc-400">
-                    {formatDateRange(selectedChapter.dateRange.start, selectedChapter.dateRange.end)}
-                    {selectedChapter.location && ` • ${selectedChapter.location}`}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedChapter(null)}
-                  className="text-zinc-500 hover:text-white transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              {selectedChapter.description && (
-                <p className="text-zinc-300 text-sm mb-4">{selectedChapter.description}</p>
-              )}
-              
-              <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-[#8338EC]/20 rounded-lg">
-                    <Users className="w-4 h-4 text-[#8338EC]" />
+        {selectedChapter && (() => {
+          const conns = selectedChapter.connections ?? [];
+          const kept    = conns.filter(c => c.status === 'kept').length;
+          const pending = conns.filter(c => c.status === 'pending').length;
+          const expired = conns.filter(c => c.status === 'expired').length;
+
+          // Unique active days
+          const activeDays = new Set(conns.map(c =>
+            c.dateMet.toISOString().split('T')[0]
+          )).size;
+
+          // Most-visited location
+          const locationCounts: Record<string, number> = {};
+          conns.forEach(c => { locationCounts[c.location] = (locationCounts[c.location] ?? 0) + 1; });
+          const topLocation = Object.entries(locationCounts)
+            .sort((a, b) => b[1] - a[1])[0]?.[0];
+
+          return (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="glass p-5 rounded-2xl border border-zinc-800 space-y-5">
+                {/* Panel header — label only, no duplicate title */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-[#8338EC]" />
+                    <span className="text-sm font-semibold text-zinc-300">Chapter Breakdown</span>
                   </div>
-                  <div>
-                    <p className="text-white font-semibold">{selectedChapter.connectionCount}</p>
-                    <p className="text-xs text-zinc-500">People Met</p>
-                  </div>
+                  <button
+                    onClick={() => setSelectedChapter(null)}
+                    className="text-zinc-500 hover:text-white transition-colors text-lg leading-none"
+                  >
+                    ✕
+                  </button>
                 </div>
-                {selectedChapter.highlights && (
-                  <div className="flex-1">
-                    <p className="text-xs text-zinc-500 mb-1">Highlights</p>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedChapter.highlights.map((h, i) => (
-                        <span key={i} className="px-2 py-1 bg-zinc-800 rounded-lg text-xs text-zinc-300">
-                          {h}
+
+                {/* Activity stats — kept / pending / expired / active days */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Kept',    value: kept,       color: 'text-green-400',   bg: 'bg-green-500/10' },
+                    { label: 'Pending', value: pending,    color: 'text-amber-400',   bg: 'bg-amber-500/10' },
+                    { label: 'Expired', value: expired,    color: 'text-zinc-500',    bg: 'bg-zinc-700/30'  },
+                    { label: 'Active days', value: activeDays, color: 'text-[#8338EC]', bg: 'bg-[#8338EC]/10' },
+                  ].map(({ label, value, color, bg }) => (
+                    <div key={label} className={`${bg} rounded-xl p-3 text-center`}>
+                      <p className={`text-xl font-bold ${color}`}>{value}</p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Most active location */}
+                {topLocation && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/40 rounded-lg">
+                    <MapPin className="w-3.5 h-3.5 text-[#8338EC] shrink-0" />
+                    <p className="text-xs text-zinc-400">
+                      Most active at{' '}
+                      <span className="text-white font-medium">{topLocation}</span>
+                      {Object.keys(locationCounts).length > 1 && (
+                        <span className="text-zinc-600">
+                          {' '}· {Object.keys(locationCounts).length} locations total
                         </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* People list */}
+                {conns.length > 0 ? (
+                  <div>
+                    <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+                      People met during this chapter
+                    </p>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto scrollbar-thin pr-1">
+                      {conns.map((conn) => (
+                        <div
+                          key={conn.id}
+                          className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors group"
+                        >
+                          {/* Avatar */}
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-[10px] font-bold shrink-0">
+                            {conn.name.charAt(0).toUpperCase()}
+                          </div>
+                          {/* Name + location */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white font-medium truncate">{conn.name}</p>
+                            <p className="text-[10px] text-zinc-500 truncate">{conn.location}</p>
+                          </div>
+                          {/* Context tag */}
+                          {conn.context && (
+                            <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC]/10 text-[#8338EC] border border-[#8338EC]/20 shrink-0">
+                              {conn.context}
+                            </span>
+                          )}
+                          {/* Status */}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
+                            conn.status === 'kept'    ? 'bg-green-500/10 text-green-400' :
+                            conn.status === 'pending' ? 'bg-amber-500/10 text-amber-400' :
+                                                        'bg-zinc-700/40 text-zinc-500'
+                          }`}>
+                            {conn.status}
+                          </span>
+                          {/* Chat CTA — visible on hover */}
+                          {onConnectionClick && conn.status !== 'expired' && (
+                            <button
+                              onClick={() => onConnectionClick(conn)}
+                              className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC] text-white shrink-0 transition-opacity"
+                            >
+                              <MessageCircle className="w-3 h-3" /> Chat
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 text-center py-2">
+                    No detailed records for this chapter yet.
+                  </p>
                 )}
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

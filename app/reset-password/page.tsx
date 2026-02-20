@@ -58,7 +58,7 @@ export default function ResetPassword() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass max-w-md w-full p-8 rounded-3xl border-zinc-800"
+        className="glass max-w-md w-full p-8 rounded-3xl border border-zinc-800"
       >
         <div className="flex items-center justify-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">

@@ -8,18 +8,22 @@ import type { ConnectionRecord } from './ConnectionTable';
 
 interface ConnectionMapProps {
   connections: ConnectionRecord[];
+  onConnectionClick?: (connection: ConnectionRecord) => void;
 }
 
 /**
  * ConnectionMap - MapLibre GL map component for displaying connection locations
  * Separated into its own component for better isolation and rendering
  */
-export default function ConnectionMap({ connections }: ConnectionMapProps) {
+export default function ConnectionMap({ connections, onConnectionClick }: ConnectionMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  // Keep a ref to connections so event delegation can read them without stale closures
+  const connectionsRef = useRef(connections);
+  useEffect(() => { connectionsRef.current = connections; }, [connections]);
 
   // Filter connections with geo_location
   const geoConnections = connections.filter(c => c.geo_location);
@@ -69,6 +73,9 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
               <span style="color: #a1a1aa; font-size: 12px; display: block;">${connection.location}</span>
               <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
               ${connection.context ? `<span style="color: #8338EC; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${connection.context}</span>` : ''}
+              <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #8338EC, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">
+                Chat →
+              </button>
             </div>`;
 
             const popup = new maplibregl.Popup({ 
@@ -109,8 +116,20 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
       setMapError('Failed to initialize map');
     }
 
+    // Event delegation for popup "Chat" buttons
+    const handlePopupClick = (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement).closest('[data-conn-id]') as HTMLElement | null;
+      if (btn && onConnectionClick) {
+        const id = btn.getAttribute('data-conn-id');
+        const conn = connectionsRef.current.find(c => c.id === id);
+        if (conn) onConnectionClick(conn);
+      }
+    };
+    mapContainer.current.addEventListener('click', handlePopupClick);
+
     // Cleanup on unmount
     return () => {
+      mapContainer.current?.removeEventListener('click', handlePopupClick);
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
       if (map.current) {
@@ -143,7 +162,7 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
   // Show empty state if no geo connections
   if (!hasGeoConnections) {
     return (
-      <div className="glass p-12 rounded-3xl border-zinc-800 text-center">
+      <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
         <MapPin className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
         <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>
         <p className="text-zinc-400">
@@ -156,7 +175,7 @@ export default function ConnectionMap({ connections }: ConnectionMapProps) {
   // Show error state
   if (mapError) {
     return (
-      <div className="glass p-12 rounded-3xl border-zinc-800 text-center">
+      <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
         <MapPin className="w-16 h-16 text-red-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold mb-2">Map Error</h3>
         <p className="text-zinc-400">{mapError}</p>

@@ -111,6 +111,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
     downloadCSV(connectionRecords, `click-connections-${user.email?.split('@')[0] || 'user'}`);
   }, [connectionRecords, user]);
 
+  // Shared handler: open chat for a specific connection
+  const handleOpenChat = useCallback((conn: ConnectionRecord) => {
+    setSelectedConnection(conn);
+    setActiveTab('chat');
+  }, []);
+
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
 
   const tabs: { id: DashboardTab; label: string; icon: any }[] = [
@@ -230,12 +236,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 </section>
 
                 {/* Time Capsule Section */}
-                <section className="glass p-6 rounded-3xl border-zinc-800">
-                  <TimeCapsule chapters={chapters} />
+                <section className="glass p-6 rounded-3xl border border-zinc-800">
+                  <TimeCapsule chapters={chapters} onConnectionClick={handleOpenChat} />
                 </section>
 
                 {/* Connection Table Section */}
-                <section className="glass p-6 rounded-3xl border-zinc-800">
+                <section className="glass p-6 rounded-3xl border border-zinc-800">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-[#8338EC]/20 rounded-xl">
                       <Users className="w-5 h-5 text-[#8338EC]" />
@@ -248,10 +254,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   <ConnectionTable 
                     connections={connectionRecords} 
                     onExport={handleExport}
-                    onSelect={(conn) => {
-                      setSelectedConnection(conn);
-                      setActiveTab('chat');
-                    }}
+                    onSelect={handleOpenChat}
                   />
                 </section>
 
@@ -283,7 +286,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   </div>
                 </div>
 
-                <ConnectionMap connections={connectionRecords} />
+                <ConnectionMap connections={connectionRecords} onConnectionClick={handleOpenChat} />
               </motion.div>
             )}
 
@@ -318,7 +321,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     </div>
 
                     {connectionRecords.length === 0 ? (
-                      <div className="glass p-12 rounded-3xl text-center">
+                      <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
                         <MessageCircle className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
                         <h3 className="text-xl font-semibold mb-2">No Conversations Yet</h3>
                         <p className="text-zinc-400">
@@ -326,7 +329,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         </p>
                       </div>
                     ) : (
-                      <div className="glass rounded-3xl overflow-hidden divide-y divide-zinc-800/50">
+                      <div className="glass rounded-3xl border border-zinc-800 overflow-hidden divide-y divide-zinc-800/50">
                         {connectionRecords.filter(c => c.status === 'kept' || c.status === 'pending').map((conn) => (
                           <motion.button
                             key={conn.id}

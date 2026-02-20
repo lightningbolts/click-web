@@ -139,7 +139,7 @@ export default function SettingsView() {
       <h2 className="text-3xl font-bold mb-6">Settings</h2>
 
       {/* Profile Settings */}
-      <div className="glass p-8 rounded-3xl border-zinc-800">
+      <div className="glass p-8 rounded-3xl border border-zinc-800">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
             <User className="w-6 h-6 text-[#8338EC]" />
@@ -190,7 +190,7 @@ export default function SettingsView() {
       </div>
 
       {/* Security Settings */}
-      <div className="glass p-8 rounded-3xl border-zinc-800">
+      <div className="glass p-8 rounded-3xl border border-zinc-800">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
             <Lock className="w-6 h-6 text-[#8338EC]" />
@@ -253,7 +253,7 @@ export default function SettingsView() {
       </div>
 
       {/* Danger Zone */}
-      <div className="glass p-8 rounded-3xl border-red-900/30">
+      <div className="glass p-8 rounded-3xl border border-red-900/30">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-red-500" />

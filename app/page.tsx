@@ -169,7 +169,7 @@ export default function Home() {
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
@@ -187,7 +187,7 @@ export default function Home() {
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
@@ -207,7 +207,7 @@ export default function Home() {
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group md:col-span-2"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group md:col-span-2"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
@@ -239,7 +239,7 @@ export default function Home() {
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group md:col-span-2"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group md:col-span-2"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10 text-center">
@@ -284,7 +284,7 @@ export default function Home() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.1 }}
               viewport={{ once: true }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
@@ -318,7 +318,7 @@ export default function Home() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.2 }}
               viewport={{ once: true }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
@@ -348,7 +348,7 @@ export default function Home() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
               viewport={{ once: true }}
-              className="glass p-8 rounded-3xl border-zinc-800 relative overflow-hidden group"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
@@ -387,7 +387,7 @@ export default function Home() {
             whileInView={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
-            className="glass p-12 md:p-16 rounded-3xl border-zinc-800 relative overflow-hidden"
+            className="glass p-12 md:p-16 rounded-3xl border border-zinc-800 relative overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/5 to-transparent" />
             <div className="relative z-10">

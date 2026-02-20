@@ -143,6 +143,7 @@ export const mockChapters: TimelineChapter[] = [
     connectionCount: 8,
     description: 'New semester, new connections! Started the year with energy.',
     highlights: ['Study groups', 'Coffee chats', 'Tech meetups'],
+    connections: [mockConnections[0], mockConnections[1], mockConnections[2]],
   },
   {
     id: 'ch-2',
@@ -155,6 +156,7 @@ export const mockChapters: TimelineChapter[] = [
     connectionCount: 5,
     description: 'Holiday gatherings and spontaneous meetups.',
     highlights: ['Holiday parties', 'Family friends', 'New Year celebrations'],
+    connections: [mockConnections[3], mockConnections[4]],
   },
   {
     id: 'ch-3',
@@ -167,6 +169,7 @@ export const mockChapters: TimelineChapter[] = [
     connectionCount: 12,
     description: 'Busy end to the quarter with projects and events.',
     highlights: ['Hackathon', 'Thanksgiving', 'Finals study sessions'],
+    connections: [mockConnections[5], mockConnections[6]],
   },
   {
     id: 'ch-4',
@@ -179,6 +182,7 @@ export const mockChapters: TimelineChapter[] = [
     connectionCount: 7,
     description: 'Halloween vibes and autumn adventures.',
     highlights: ['Costume parties', 'Pumpkin picking', 'Night events'],
+    connections: [mockConnections[7], mockConnections[8]],
   },
   {
     id: 'ch-5',
@@ -192,6 +196,7 @@ export const mockChapters: TimelineChapter[] = [
     description: 'The beginning of the college journey. Met so many amazing people!',
     highlights: ['Dawg Daze', 'Dorm meetups', 'Club fairs', 'Campus tours'],
     color: 'from-[#8338EC] to-[#FF6B6B]',
+    connections: [mockConnections[9]],
   },
 ];
 
@@ -250,6 +255,7 @@ export function generateChaptersFromConnections(connections: ConnectionRecord[])
       connectionCount: conns.length,
       description: `${conns.length} new connections made this month`,
       highlights: locations.slice(0, 4),
+      connections: conns,
     });
   });
 

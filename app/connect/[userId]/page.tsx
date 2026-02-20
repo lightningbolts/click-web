@@ -84,7 +84,7 @@ export default function ConnectPage() {
         animate={{ opacity: 1, scale: 1 }}
         className="relative z-10 max-w-md w-full"
       >
-        <div className="glass rounded-3xl p-8 text-center">
+        <div className="glass rounded-3xl border border-zinc-800 p-8 text-center">
           {/* Logo */}
           <motion.div
             initial={{ scale: 0.5, opacity: 0 }}
