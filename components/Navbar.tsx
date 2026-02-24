@@ -1,36 +1,42 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useAuth } from '@/lib/AuthContext';
-import UserProfile from '@/components/UserProfile';
-import { useState } from 'react';
-import LoginModal from '@/components/LoginModal';
-import { usePathname, useRouter } from 'next/navigation';
-import { User, LogOut, BarChart2 } from 'lucide-react';
+import Link from "next/link";
+import { useAuth } from "@/lib/AuthContext";
+import UserProfile from "@/components/UserProfile";
+import { useState } from "react";
+import LoginModal from "@/components/LoginModal";
+import { usePathname, useRouter } from "next/navigation";
+import { User, LogOut, BarChart2 } from "lucide-react";
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  
+
+  // Hide on /insights — BusinessInsightsShell has its own sticky nav there
+  if (pathname.startsWith("/insights")) return null;
+
   // User is viewing their dashboard when logged in at root or /dashboard
-  const isLoggedInView = user && (pathname === '/' || pathname === '/dashboard');
+  const isLoggedInView =
+    user && (pathname === "/" || pathname === "/dashboard");
 
   const handleSignOut = async () => {
     try {
       await signOut();
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
     } finally {
-      router.push('/');
+      router.push("/");
       router.refresh();
     }
   };
 
   return (
     <>
-      <nav className={`relative z-[99999] flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? 'border-b border-zinc-800' : ''}`}>
+      <nav
+        className={`relative z-[99999] flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? "border-b border-zinc-800" : ""}`}
+      >
         <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
           <span className="text-[#8338EC]">C</span>
           <span className="text-white">lick</span>
@@ -64,18 +70,21 @@ export default function Navbar() {
             <>
               <button
                 onClick={() => {
-                  const missionSection = document.getElementById('mission');
+                  const missionSection = document.getElementById("mission");
                   if (missionSection) {
-                    missionSection.scrollIntoView({ behavior: 'smooth' });
+                    missionSection.scrollIntoView({ behavior: "smooth" });
                   } else {
-                    window.location.href = '/#mission';
+                    window.location.href = "/#mission";
                   }
                 }}
                 className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
               >
                 Mission
               </button>
-              <Link href="/about" className="text-xs md:text-sm hover:text-[#8338EC] transition-colors">
+              <Link
+                href="/about"
+                className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
+              >
                 About
               </Link>
               {user ? (
@@ -96,4 +105,3 @@ export default function Navbar() {
     </>
   );
 }
-

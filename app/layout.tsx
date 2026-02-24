@@ -5,16 +5,16 @@ import { AuthProvider } from "@/lib/AuthContext";
 import { Analytics } from "@vercel/analytics/next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import LoadingScreen from "@/components/LoadingScreen";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
- export const metadata: Metadata = {
+export const metadata: Metadata = {
   title: "Click - From Handshake to Friendship",
-  description: "Stop collecting followers. Start building real connections. Click transforms fleeting in-person moments into lasting friendships.",
+  description:
+    "Stop collecting followers. Start building real connections. Click transforms fleeting in-person moments into lasting friendships.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${inter.variable} antialiased bg-[#121212] text-white`}>
         <AuthProvider>
           <Navbar />
           {children}
