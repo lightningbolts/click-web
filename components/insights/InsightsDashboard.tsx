@@ -110,15 +110,16 @@ function InsightsSkeleton() {
  * InsightsDashboard - The main content component for the Insights page
  * Contains all the bento box cards and charts
  */
-function InsightsDashboardContent() {
+function InsightsDashboardContent({ venueId }: { venueId?: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [liveCount, setLiveCount] = useState(mockLiveCount);
   const [vibeMessages, setVibeMessages] = useState(mockVibeStream);
 
+  const apiUrl = venueId ? `/api/insights/${venueId}` : null;
   const { data, error, isLoading } = useSWR<InsightsResponse>(
-    user ? "/api/insights/venue" : null,
+    user ? apiUrl : null,
     fetcher,
   );
 
@@ -474,9 +475,9 @@ function InsightsDashboardContent() {
                       style={
                         index === data?.peakHour
                           ? {
-                              filter:
-                                "drop-shadow(0 0 8px rgba(131, 56, 236, 0.5))",
-                            }
+                            filter:
+                              "drop-shadow(0 0 8px rgba(131, 56, 236, 0.5))",
+                          }
                           : {}
                       }
                     />
@@ -500,9 +501,10 @@ function InsightsDashboardContent() {
 /**
  * InsightsDashboard - Renders the overview bento-grid content.
  * The layout shell is provided by app/insights/layout.tsx (BusinessInsightsShell).
+ * Pass venueId to fetch real data from the API.
  */
-export default function InsightsDashboard() {
-  return <InsightsDashboardContent />;
+export default function InsightsDashboard({ venueId }: { venueId?: string }) {
+  return <InsightsDashboardContent venueId={venueId} />;
 }
 
 /**

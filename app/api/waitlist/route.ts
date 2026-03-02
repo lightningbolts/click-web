@@ -3,13 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    const { email, source, referrer_user_id } = await request.json();
 
     if (!email || !email.includes('@')) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    // Check if Supabase is configured
     const supabase = getSupabaseClient();
     if (!supabase) {
       console.log('Supabase not configured. Email captured:', email);
@@ -19,21 +18,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Insert into waitlist table
+    // Insert into waitlist table with attribution data
     const { error } = await supabase
       .from('waitlist')
       .insert({
-        email
+        email,
+        source: source || 'website',
+        referrer_user_id: referrer_user_id || null,
       });
 
     if (error) {
-      // If it's a duplicate email error, return success anyway
+      // Duplicate email — still success from user perspective
       if (error.code === '23505') {
         return NextResponse.json({
           success: true,
           message: 'You\'re already on the waitlist!'
         });
       }
+      console.error('Waitlist insert error:', error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
       message: 'Successfully joined the waitlist!'
     });
   } catch (error) {
+    console.error('Waitlist API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

@@ -17,103 +17,133 @@ export default function PrivacyPolicy() {
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             Privacy <span className="text-[#8338EC]">Policy</span>
           </h1>
-          <p className="text-zinc-400 mb-12">Last updated: December 2025</p>
+          <p className="text-zinc-400 mb-12">Last updated: March 2026</p>
 
           <div className="space-y-8 text-zinc-300 leading-relaxed">
             <section>
-              <h2 className="text-2xl font-bold text-white mb-4">Our Commitment</h2>
+              <h2 className="text-2xl font-bold text-white mb-4">Our Privacy Promise</h2>
               <p>
-                At Click, we believe your data is yours. Period. We're building a connection platform,
-                not an advertising machine. This privacy policy explains how we collect, use, and protect
-                your information.
+                Click is built on a simple conviction: your social life is nobody else&apos;s business.
+                We collect the minimum data needed to make the product work, we never sell your data,
+                and we delete it when it&apos;s no longer needed. Privacy isn&apos;t a feature — it&apos;s the
+                foundation.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-white mb-4">What We Collect</h2>
+              <h2 className="text-2xl font-bold text-white mb-4">Data We Collect</h2>
+              <p className="mb-4">We collect only what&apos;s necessary to power Click:</p>
               <ul className="space-y-3 list-disc list-inside">
-                <li>
-                  <strong>Account Information:</strong> Email address, display name, and profile picture (optional)
-                </li>
-                <li>
-                  <strong>Connection Data:</strong> Information about when and where you connected with others (stored locally on your device)
-                </li>
-                <li>
-                  <strong>Usage Analytics:</strong> Anonymized data about app performance and feature usage
-                </li>
+                <li><strong className="text-white">Account info:</strong> Email address and display name</li>
+                <li><strong className="text-white">Interest tags:</strong> Self-selected interests you choose during onboarding</li>
+                <li><strong className="text-white">Connection data:</strong> Records of who you connected with, when, and where (semantic location only — e.g. &quot;Coffee Lab&quot;, not GPS coordinates)</li>
+                <li><strong className="text-white">Messages:</strong> Chat messages sent during active connections</li>
+                <li><strong className="text-white">Device info:</strong> Platform (iOS/Android) for NFC compatibility</li>
               </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-bold text-white mb-4">What We DON'T Collect</h2>
-              <ul className="space-y-3 list-disc list-inside">
-                <li>We don't track your location continuously</li>
-                <li>We don't read your messages (they're end-to-end encrypted)</li>
-                <li>We don't sell your data to advertisers</li>
-                <li>We don't build shadow profiles or track you across other apps</li>
-              </ul>
+              <p className="mt-4">
+                We do <strong className="text-white">not</strong> collect: precise GPS location history, contacts, photos,
+                browsing history, advertising identifiers, or any data from other apps on your device.
+              </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">How We Use Your Data</h2>
-              <p className="mb-4">We use your information only to:</p>
               <ul className="space-y-3 list-disc list-inside">
-                <li>Enable you to connect with people you meet in real life</li>
-                <li>Facilitate the 30-minute vibe check conversations</li>
-                <li>Improve app performance and fix bugs</li>
-                <li>Send you important updates about the service (you can opt out)</li>
+                <li>Display your profile to connections you&apos;ve approved via NFC/QR tap</li>
+                <li>Show Common Ground interest overlaps when you meet someone</li>
+                <li>Power the 48-hour &quot;Say Hi&quot; window and connection lifecycle</li>
+                <li>Store messages during the connection lifecycle (deleted on expiry)</li>
+                <li>Generate anonymized, aggregated analytics for business partners (never individual data)</li>
               </ul>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-white mb-4">Business Insights</h2>
-              <p>
-                For organizations using Click at events, we provide aggregated, anonymized analytics
-                about connection density and event engagement. Individual user data is never shared.
-                All reports show trends and patterns, not individual behaviors.
+              <h2 className="text-2xl font-bold text-white mb-4">Data Retention &amp; Deletion</h2>
+              <p className="mb-4">
+                Deletion is a feature, not a flaw. Here&apos;s exactly when your data is removed:
+              </p>
+              <ul className="space-y-3 list-disc list-inside">
+                <li><strong className="text-white">Pending connections:</strong> Auto-deleted after 48 hours if no message is sent</li>
+                <li><strong className="text-white">Active connections:</strong> Auto-deleted after 7 days of no messages (unless both users tap &quot;Keep&quot;)</li>
+                <li><strong className="text-white">Kept connections:</strong> Stored permanently until either user deletes the connection</li>
+                <li><strong className="text-white">Messages:</strong> Deleted when the parent connection expires or is deleted</li>
+                <li><strong className="text-white">Account deletion:</strong> All data permanently removed within 30 days</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4">B2B Anonymization Guarantee</h2>
+              <p className="mb-4">
+                Click offers anonymized analytics to venue partners (&quot;Insights&quot;). Here&apos;s what they can see:
+              </p>
+              <ul className="space-y-3 list-disc list-inside">
+                <li>Total connection count by day and hour — <strong className="text-white">never</strong> individual identities</li>
+                <li>Aggregated interest tag distributions — <strong className="text-white">never</strong> which specific users</li>
+                <li>Kept ratio (percentage of connections that become permanent) — <strong className="text-white">never</strong> which connections</li>
+              </ul>
+              <p className="mt-4">
+                All analytics queries aggregate before returning data. No user IDs,
+                names, or emails are ever included in Insights API responses.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-white mb-4">Data Retention</h2>
+              <h2 className="text-2xl font-bold text-white mb-4">Third Parties</h2>
               <ul className="space-y-3 list-disc list-inside">
-                <li>Vibe check chats are deleted after 30 minutes unless both parties save them</li>
-                <li>Connection context (where you met) is stored on your device, not our servers</li>
-                <li>You can delete your account and all associated data at any time</li>
+                <li><strong className="text-white">Supabase:</strong> Database and authentication provider (SOC 2 Type II compliant)</li>
+                <li><strong className="text-white">Vercel:</strong> Website hosting and analytics (page views only, no personal data)</li>
               </ul>
+              <p className="mt-4">
+                We do not use ad networks, data brokers, or third-party tracking SDKs.
+                We will never sell, rent, or share your personal data with advertisers.
+              </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">Your Rights</h2>
               <p className="mb-4">You have the right to:</p>
               <ul className="space-y-3 list-disc list-inside">
-                <li>Access all data we have about you</li>
-                <li>Request deletion of your data</li>
-                <li>Export your connection history</li>
-                <li>Opt out of analytics collection</li>
+                <li><strong className="text-white">Access:</strong> Request a copy of all data we hold about you</li>
+                <li><strong className="text-white">Correct:</strong> Update your profile information at any time</li>
+                <li><strong className="text-white">Delete:</strong> Delete your account and all associated data</li>
+                <li><strong className="text-white">Port:</strong> Export your connections list</li>
+                <li><strong className="text-white">Object:</strong> Opt out of anonymized analytics inclusion</li>
               </ul>
+              <p className="mt-4">
+                To exercise any of these rights, email us at the addresses below.
+                We&apos;ll respond within 30 days.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-white mb-4">Children&apos;s Privacy</h2>
+              <p>
+                Click is not intended for users under 13. We do not knowingly collect data
+                from children. If you believe a child under 13 is using Click, contact us
+                and we will delete their account.
+              </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">Security</h2>
               <p>
-                We use industry-standard encryption for all data transmission and storage.
-                Your messages are end-to-end encrypted. We regularly audit our security practices
-                and will notify you immediately of any breach.
+                We use industry-standard encryption for all data transmission. Our
+                database provider (Supabase) is SOC 2 Type II compliant. We regularly audit
+                our security practices and will notify you promptly of any breach.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">Changes to This Policy</h2>
               <p>
-                We'll notify you of any material changes to this privacy policy via email and
-                in-app notification. Your continued use of Click after changes constitutes acceptance.
+                We&apos;ll notify you of material changes via email and in-app notification
+                at least 14 days before they take effect.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">Contact Us</h2>
-              <p>Questions about privacy? Email us at:</p>
+              <p>Questions about privacy? Reach out:</p>
               <div className="mt-4 space-y-2">
                 <p>
                   <a href="mailto:mepsht@uw.edu" className="text-[#8338EC] hover:underline">
@@ -132,10 +162,19 @@ export default function PrivacyPolicy() {
                 </p>
               </div>
             </section>
+
+            <section className="border-t border-zinc-800 pt-8 mt-8">
+              <p className="text-zinc-500 text-sm">
+                By using Click, you acknowledge that you&apos;ve read, understood, and agree to this
+                Privacy Policy and our{' '}
+                <Link href="/terms" className="text-[#8338EC] hover:underline">
+                  Terms of Service
+                </Link>.
+              </p>
+            </section>
           </div>
         </motion.div>
       </div>
     </div>
   );
 }
-
