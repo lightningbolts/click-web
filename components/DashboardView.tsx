@@ -60,18 +60,32 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   useEffect(() => {
     if (user) {
+      // 1. Check user_metadata first (always available via Supabase Auth)
+      const metaTags = user.user_metadata?.tags;
+      if (metaTags && Array.isArray(metaTags) && metaTags.length > 0) {
+        setNeedsTagging(false);
+        return;
+      }
+
+      // 2. Try DB query as fallback (may fail if column doesn't exist yet)
       const checkTags = async () => {
         const supabase = getSupabaseClient();
         if (!supabase) { setNeedsTagging(false); return; }
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('users')
             .select('tags')
             .eq('id', user.id)
             .single();
+          if (error) {
+            // Column likely doesn't exist yet — don't block the user
+            setNeedsTagging(true);
+            return;
+          }
           setNeedsTagging(!data?.tags || data.tags.length === 0);
         } catch {
-          setNeedsTagging(false);
+          // Network or schema error — show tagging but don't block
+          setNeedsTagging(true);
         }
       };
       checkTags();
@@ -81,7 +95,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const handleTagsComplete = async (tags: string[]) => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      await supabase.from('users').update({ tags }).eq('id', user.id);
+      // Save to user_metadata (always works, persists across sessions)
+      await supabase.auth.updateUser({ data: { tags } });
+
+      // Also try saving to DB (best-effort, may fail if column doesn't exist)
+      try {
+        await supabase.from('users').update({ tags }).eq('id', user.id);
+      } catch {
+        // Column doesn't exist yet — metadata save is sufficient
+      }
     }
     setNeedsTagging(false);
   };
@@ -206,8 +228,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`relative py-4 px-4 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
-                      ? 'text-[#8338EC]'
-                      : 'text-zinc-400 hover:text-white'
+                    ? 'text-[#8338EC]'
+                    : 'text-zinc-400 hover:text-white'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
