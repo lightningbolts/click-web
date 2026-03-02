@@ -8,7 +8,7 @@ import { cookies } from 'next/headers';
  */
 export async function GET(
     request: NextRequest,
-    { params }: { params: { venueId: string } }
+    { params }: { params: Promise<{ venueId: string }> }
 ) {
     try {
         const cookieStore = await cookies();

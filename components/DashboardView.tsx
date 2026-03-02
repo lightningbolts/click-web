@@ -4,10 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MapPin, 
-  Settings, 
-  Users, 
+import {
+  MapPin,
+  Settings,
+  Users,
   QrCode,
   BookOpen,
   Sparkles,
@@ -15,24 +15,25 @@ import {
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import { ChatView } from '@/components/chat';
+import InterestTagging from '@/components/InterestTagging';
 
 // Digital Memory Box components
-import { 
-  ConnectionTable, 
-  TimeCapsule, 
-  QRIdentityCard, 
-  StatsOverview, 
-  AchievementBadge, 
+import {
+  ConnectionTable,
+  TimeCapsule,
+  QRIdentityCard,
+  StatsOverview,
+  AchievementBadge,
   MilestoneProgress,
-  ConnectionMap 
+  ConnectionMap
 } from '@/components/dashboard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
-import { 
-  mockConnections, 
-  mockChapters, 
+import {
+  mockConnections,
+  mockChapters,
   downloadCSV,
-  generateChaptersFromConnections 
+  generateChaptersFromConnections
 } from '@/lib/dashboard/mockData';
 
 type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
@@ -52,6 +53,38 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [chapters, setChapters] = useState<TimelineChapter[]>([]);
   /** The connection whose chat is currently open, or null */
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
+
+  // Interest tagging onboarding gate
+  const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
+  const [taggingSkipped, setTaggingSkipped] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      const checkTags = async () => {
+        const supabase = getSupabaseClient();
+        if (!supabase) { setNeedsTagging(false); return; }
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('tags')
+            .eq('id', user.id)
+            .single();
+          setNeedsTagging(!data?.tags || data.tags.length === 0);
+        } catch {
+          setNeedsTagging(false);
+        }
+      };
+      checkTags();
+    }
+  }, [user]);
+
+  const handleTagsComplete = async (tags: string[]) => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.from('users').update({ tags }).eq('id', user.id);
+    }
+    setNeedsTagging(false);
+  };
 
   // Fetch user connections
   useEffect(() => {
@@ -88,7 +121,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 longitude: conn.geo_location.longitude,
               } : undefined,
             }));
-            
+
             setConnectionRecords(records);
             setChapters(generateChaptersFromConnections(records));
           } else {
@@ -129,6 +162,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
+      {/* Interest tagging onboarding overlay */}
+      {needsTagging === true && !taggingSkipped && (
+        <InterestTagging
+          onComplete={handleTagsComplete}
+          onSkip={() => setTaggingSkipped(true)}
+          canSkip={true}
+        />
+      )}
+
       {/* Background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[150px] opacity-10" />
@@ -163,11 +205,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative py-4 px-4 transition-colors flex items-center gap-2 whitespace-nowrap ${
-                    activeTab === tab.id
+                  className={`relative py-4 px-4 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
                       ? 'text-[#8338EC]'
                       : 'text-zinc-400 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -251,8 +292,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       <p className="text-sm text-zinc-500">Your connection history</p>
                     </div>
                   </div>
-                  <ConnectionTable 
-                    connections={connectionRecords} 
+                  <ConnectionTable
+                    connections={connectionRecords}
                     onExport={handleExport}
                     onSelect={handleOpenChat}
                   />
