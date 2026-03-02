@@ -37,7 +37,8 @@ export default function TermsOfService() {
               </p>
               <ul className="mt-4 space-y-3 list-disc list-inside">
                 <li>NFC/QR-based instant profile exchange</li>
-                <li>30-minute timed "vibe check" conversations</li>
+                <li>48-hour "Say Hi" window to start conversations</li>
+                <li>Optional 30-minute "Vibe Check" for live chats</li>
                 <li>Contextual tagging (where and when you met)</li>
                 <li>Privacy-first, ad-free experience</li>
               </ul>
@@ -61,7 +62,7 @@ export default function TermsOfService() {
                 <li>Spam, scams, or misleading content</li>
                 <li>Impersonation or identity theft</li>
                 <li>Sharing explicit content without consent</li>
-                <li>Attempting to circumvent the 30-minute vibe check feature</li>
+                <li>Attempting to circumvent connection expiry features</li>
               </ul>
               <p className="mt-4">
                 Violations may result in account suspension or termination.
@@ -69,16 +70,17 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-white mb-4">The 30-Minute Vibe Check</h2>
+              <h2 className="text-2xl font-bold text-white mb-4">Connections & Expiry</h2>
               <p>
-                Conversations are automatically deleted after 30 minutes unless both parties
-                choose to save the connection. This is a core feature, not a bug. It's designed
-                to create authentic interactions without the pressure of permanence.
+                Click uses a multi-stage connection model to encourage authentic interactions:
               </p>
               <ul className="mt-4 space-y-3 list-disc list-inside">
-                <li>Both users must opt-in to save a conversation</li>
-                <li>Deleted conversations cannot be recovered</li>
-                <li>Screenshots are discouraged but technically possible - be respectful</li>
+                <li>New connections start with a 48-hour &quot;Say Hi&quot; window — send a message to activate the connection</li>
+                <li>Active connections stay open as long as messages are exchanged within a 7-day rolling window</li>
+                <li>Both users can choose to &quot;Keep&quot; a connection, making it permanent</li>
+                <li>An optional 30-minute Vibe Check is available for real-time conversations</li>
+                <li>Expired connections and their messages are permanently deleted</li>
+                <li>Screenshots are discouraged but technically possible — be respectful</li>
               </ul>
             </section>
 
@@ -90,7 +92,7 @@ export default function TermsOfService() {
               </p>
               <ul className="mt-4 space-y-3 list-disc list-inside">
                 <li>Display your profile to connections you've approved</li>
-                <li>Store messages temporarily (30 minutes or until saved)</li>
+                <li>Store messages temporarily (during connection lifecycle or until kept)</li>
                 <li>Use anonymized, aggregated data for analytics</li>
               </ul>
               <p className="mt-4">
