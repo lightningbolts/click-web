@@ -143,7 +143,7 @@ export default function BusinessInsightsShell({
             <div className="flex items-center gap-2">
               {/* Back to dashboard */}
               <Link
-                href="/dashboard"
+                href="/"
                 className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors"
               >
                 <ChevronLeft className="w-3 h-3" />

@@ -24,10 +24,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased bg-[#121212] text-white`}>
+      <body className={`${inter.variable} antialiased bg-[#121212] text-white flex flex-col min-h-screen`}>
         <AuthProvider>
           <Navbar />
-          {children}
+          <main className="flex-1 flex flex-col">
+            {children}
+          </main>
           <Footer />
         </AuthProvider>
         <Analytics />

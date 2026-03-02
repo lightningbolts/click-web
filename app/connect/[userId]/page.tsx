@@ -90,7 +90,7 @@ export default function ConnectPage() {
 
   if (!userId) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+      <div className="flex-1 bg-zinc-950 flex items-center justify-center p-4">
         <div className="text-center">
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white mb-2">Invalid Link</h1>
@@ -101,7 +101,7 @@ export default function ConnectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+    <div className="flex-1 bg-zinc-950 flex items-center justify-center p-4">
       {/* Background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[150px] opacity-20" />

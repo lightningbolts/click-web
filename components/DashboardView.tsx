@@ -56,39 +56,32 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
-  const [taggingSkipped, setTaggingSkipped] = useState(false);
 
   useEffect(() => {
     if (user) {
-      // 1. Check user_metadata first (always available via Supabase Auth)
-      const metaTags = user.user_metadata?.tags;
-      if (metaTags && Array.isArray(metaTags) && metaTags.length > 0) {
-        setNeedsTagging(false);
-        return;
-      }
-
-      // 2. Try DB query as fallback (may fail if column doesn't exist yet)
-      const checkTags = async () => {
+      // Query tags_initialized — the canonical signal for onboarding completion.
+      // Falls back gracefully on any schema/network error so the user is never blocked.
+      const checkTagsInitialized = async () => {
         const supabase = getSupabaseClient();
         if (!supabase) { setNeedsTagging(false); return; }
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('tags')
+            .select('tags_initialized')
             .eq('id', user.id)
             .single();
           if (error) {
-            // Column likely doesn't exist yet — don't block the user
-            setNeedsTagging(true);
+            // Column may not exist yet (pre-migration) — don't block the user
+            setNeedsTagging(false);
             return;
           }
-          setNeedsTagging(!data?.tags || data.tags.length === 0);
+          setNeedsTagging(data?.tags_initialized !== true);
         } catch {
-          // Network or schema error — show tagging but don't block
-          setNeedsTagging(true);
+          // Network or schema error — don't block
+          setNeedsTagging(false);
         }
       };
-      checkTags();
+      checkTagsInitialized();
     }
   }, [user]);
 
@@ -97,15 +90,27 @@ export default function DashboardView({ user }: DashboardViewProps) {
     if (supabase) {
       // Save to user_metadata (always works, persists across sessions)
       await supabase.auth.updateUser({ data: { tags } });
-
-      // Also try saving to DB (best-effort, may fail if column doesn't exist)
+      // Also persist to DB with the initialized flag
       try {
-        await supabase.from('users').update({ tags }).eq('id', user.id);
+        await supabase.from('users').update({ tags, tags_initialized: true }).eq('id', user.id);
       } catch {
-        // Column doesn't exist yet — metadata save is sufficient
+        // Best-effort — auth metadata save is sufficient
       }
     }
     setNeedsTagging(false);
+  };
+
+  const handleTagsSkip = async () => {
+    // Immediately hide the screen; persist the skip flag to DB in the background
+    setNeedsTagging(false);
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      try {
+        await supabase.from('users').update({ tags_initialized: true }).eq('id', user.id);
+      } catch {
+        // Best-effort
+      }
+    }
   };
 
   // Fetch user connections
@@ -185,10 +190,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       {/* Interest tagging onboarding overlay */}
-      {needsTagging === true && !taggingSkipped && (
+      {needsTagging === true && (
         <InterestTagging
           onComplete={handleTagsComplete}
-          onSkip={() => setTaggingSkipped(true)}
+          onSkip={handleTagsSkip}
           canSkip={true}
         />
       )}
