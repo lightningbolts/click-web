@@ -1,8 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function Footer() {
+  const { user } = useAuth();
+
+  // Hide footer on authenticated dashboard — it has its own nav
+  if (user) return null;
+
   return (
     <footer className="relative z-50 px-6 md:px-12 py-12 border-t border-zinc-800 bg-zinc-950">
       <div className="max-w-6xl mx-auto">
@@ -32,4 +38,3 @@ export default function Footer() {
     </footer>
   );
 }
-

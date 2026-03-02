@@ -149,11 +149,13 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
 
                     return (
                         <div key={label} className={isExpanded ? 'col-span-2 sm:col-span-4' : ''}>
-                            <motion.button
+                            <motion.div
+                                role="button"
+                                tabIndex={0}
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
                                 onClick={() => onToggleTag(label)}
-                                className={`relative w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-sm font-medium ${isSelected
+                                className={`relative w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-sm font-medium cursor-pointer select-none ${isSelected
                                         ? 'bg-[#8338EC]/15 border-[#8338EC]/50 text-[#8338EC]'
                                         : hasSelectedSubs
                                             ? 'bg-[#8338EC]/5 border-[#8338EC]/20 text-zinc-200'
@@ -183,7 +185,7 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
-                            </motion.button>
+                            </motion.div>
 
                             {/* Subcategories */}
                             <AnimatePresence>
@@ -205,8 +207,8 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                                         onClick={() => onToggleTag(sub)}
                                                         disabled={!subSelected && selected.length >= maxTags}
                                                         className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${subSelected
-                                                                ? 'bg-[#8338EC]/20 border-[#8338EC]/40 text-[#8338EC]'
-                                                                : 'bg-white/[0.03] border-zinc-800 text-zinc-400 hover:text-zinc-300 hover:border-zinc-600 disabled:opacity-30'
+                                                            ? 'bg-[#8338EC]/20 border-[#8338EC]/40 text-[#8338EC]'
+                                                            : 'bg-white/[0.03] border-zinc-800 text-zinc-400 hover:text-zinc-300 hover:border-zinc-600 disabled:opacity-30'
                                                             }`}
                                                     >
                                                         {sub}

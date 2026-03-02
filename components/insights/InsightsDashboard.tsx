@@ -118,10 +118,25 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
   const [vibeMessages, setVibeMessages] = useState(mockVibeStream);
 
   const apiUrl = venueId ? `/api/insights/${venueId}` : null;
-  const { data, error, isLoading } = useSWR<InsightsResponse>(
+  const { data: apiData, error, isLoading } = useSWR<InsightsResponse>(
     user ? apiUrl : null,
     fetcher,
   );
+
+  // Demo fallback data when no venueId is provided
+  const demoData: InsightsResponse = {
+    totalConnections: 284,
+    hourlyDistribution: [2, 1, 0, 0, 0, 1, 3, 5, 12, 18, 24, 31, 28, 22, 19, 25, 34, 42, 48, 39, 27, 18, 9, 4],
+    dailyData: Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (29 - i));
+      return { date: d.toISOString().split('T')[0], count: Math.floor(Math.random() * 15) + 3 };
+    }),
+    peakHour: 18,
+    retentionRate: '42.3%',
+    busiestDay: 'Friday',
+  };
+
+  const data = apiData || (venueId ? null : demoData);
 
   // Simulate real-time updates
   useEffect(() => {
