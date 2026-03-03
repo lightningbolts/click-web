@@ -7,16 +7,16 @@ import { getSupabaseClient } from '@/lib/supabase';
 /**
  * Client-side auth callback handler.
  *
- * Why this exists: When Supabase PKCE is NOT enabled, password-recovery and
- * magic-link emails redirect with tokens in the **URL hash fragment**
- * (e.g. #access_token=...&type=recovery). Hash fragments are never sent to
- * the server, so the existing server-side /api/auth/callback route cannot
- * read them. This client page runs in the browser, extracts the tokens from
- * `window.location.hash`, establishes the session, and redirects onward.
+ * Handles all Supabase email auth redirect formats:
+ *  1. Error in query params  (?error=...&error_code=...)        → show error
+ *  2. PKCE flow             (?code=...)                        → server route
+ *  3. Token-hash flow       (?token_hash=...&type=...)         → server route
+ *  4. Legacy implicit flow  (#access_token=...&type=recovery)  → setSession
  *
- * When PKCE IS enabled Supabase uses a `code` query parameter instead, which
- * the server route handles fine. This page also handles that case as a
- * graceful fallback by redirecting to the server callback.
+ * Note: `otp_expired` errors originate at Supabase's server before reaching
+ * this page — they indicate the email link token expired/was already used.
+ * Fix in Supabase dashboard: Auth → Settings → increase OTP Expiry (default
+ * 3600 s). Also ensure the Site URL and Redirect URLs are set correctly.
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -30,18 +30,38 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // --- Check for query-param `code` (PKCE flow) ---
-      // If present, delegate to the server route which can exchange it.
       const params = new URLSearchParams(window.location.search);
+
+      // --- 1. Check for errors in query params (Supabase sends these on token failure) ---
+      const qError = params.get('error');
+      const qErrorCode = params.get('error_code');
+      const qErrorDesc = params.get('error_description');
+      if (qError || qErrorCode) {
+        const desc = qErrorDesc
+          ? decodeURIComponent(qErrorDesc.replace(/\+/g, ' '))
+          : 'Authentication failed. The link may have expired — please request a new one.';
+        setError(desc);
+        return;
+      }
+
+      // --- 2. PKCE flow: `code` query param → delegate to server route ---
       const code = params.get('code');
       if (code) {
-        // Forward to server callback to exchange the code and set cookies
         const next = params.get('next') || '/dashboard';
         window.location.href = `/api/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`;
         return;
       }
 
-      // --- Check for hash-fragment tokens (implicit / token-hash flow) ---
+      // --- 3. Token-hash flow (Supabase current default for email auth) ---
+      // Supabase redirects with ?token_hash=XX&type=recovery|signup|magiclink
+      const tokenHash = params.get('token_hash');
+      const tokenType = params.get('type');
+      if (tokenHash && tokenType) {
+        window.location.href = `/api/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(tokenType)}`;
+        return;
+      }
+
+      // --- 4. Legacy implicit flow: hash fragment tokens ---
       const hash = window.location.hash;
       if (!hash || hash.length < 2) {
         // No tokens at all — user navigated here directly
@@ -51,24 +71,23 @@ export default function AuthCallbackPage() {
 
       const hashParams = new URLSearchParams(hash.substring(1));
 
-      // Check for Supabase error in the hash
+      // Check for errors in the hash fragment
       const hashError = hashParams.get('error');
       const errorDescription = hashParams.get('error_description');
       if (hashError) {
         const desc = errorDescription
           ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
-          : 'Authentication failed.';
+          : 'Authentication failed. The link may have expired — please request a new one.';
         setError(desc);
         return;
       }
 
-      // Extract tokens
+      // Extract legacy implicit-flow tokens
       const accessToken = hashParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token');
       const type = hashParams.get('type');
 
       if (accessToken && refreshToken) {
-        // Set the session using the tokens from the hash
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
@@ -80,7 +99,6 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        // Route based on the auth type
         if (type === 'recovery') {
           router.replace('/reset-password');
         } else {

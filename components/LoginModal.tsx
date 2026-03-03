@@ -37,8 +37,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         return;
       }
 
+      // Point directly at the server-side API route so it can handle
+      // both ?code= (PKCE) and ?token_hash= (token-hash) without an
+      // extra client-page hop that can lose the PKCE code_verifier.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/api/auth/callback`,
       });
 
       if (error) {
@@ -81,6 +84,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             data: {
               full_name: fullName,
             },
+            // Direct the confirmation email to the server-side callback
+            // so it can exchange the code/token and set cookies properly.
+            emailRedirectTo: `${window.location.origin}/api/auth/callback`,
           },
         });
 
