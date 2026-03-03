@@ -5,6 +5,8 @@
 CREATE TABLE IF NOT EXISTS public.waitlist (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
+  source TEXT DEFAULT 'website',
+  referrer_user_id UUID DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

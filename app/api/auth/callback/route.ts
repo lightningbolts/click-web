@@ -5,40 +5,52 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const tokenHash = requestUrl.searchParams.get('token_hash');
+  const type = requestUrl.searchParams.get('type') as 'recovery' | 'signup' | 'magiclink' | null;
   const next = requestUrl.searchParams.get('next') || '/dashboard';
 
-  if (code) {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
         },
-      }
-    );
-    
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Safe to ignore from Server Components — middleware handles refresh.
+          }
+        },
+      },
+    }
+  );
+
+  if (code) {
+    // PKCE flow (OAuth, magic link, password reset with PKCE enabled)
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error('Auth error exchanging code:', error);
       return NextResponse.redirect(new URL('/?error=auth', request.url));
     }
+  } else if (tokenHash && type) {
+    // Token-hash flow (password recovery emails, email confirmation)
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (error) {
+      console.error('Auth error verifying OTP:', error);
+      return NextResponse.redirect(new URL('/?error=auth', request.url));
+    }
+    // Always send password recovery to the reset page regardless of `next`
+    if (type === 'recovery') {
+      return NextResponse.redirect(new URL('/reset-password', request.url));
+    }
   }
 
-  // URL to redirect to after sign in process completes
+  // Redirect to the requested page after successful auth
   return NextResponse.redirect(new URL(next, request.url));
 }
