@@ -14,6 +14,12 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      auth: {
+        // Keep consistent with middleware.ts and the browser client.
+        // Implicit flow tokens land in the hash fragment and cannot be
+        // pre-consumed by URL-defence email scanners.
+        flowType: 'implicit',
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll();
