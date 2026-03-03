@@ -25,8 +25,16 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   const connectionsRef = useRef(connections);
   useEffect(() => { connectionsRef.current = connections; }, [connections]);
 
-  // Filter connections with geo_location
-  const geoConnections = connections.filter(c => c.geo_location);
+  // Filter connections with valid geo_location (exclude NaN, null, and 0,0 sentinel values)
+  const geoConnections = connections.filter(c => {
+    if (!c.geo_location) return false;
+    const { latitude, longitude } = c.geo_location;
+    return (
+      typeof latitude === 'number' && typeof longitude === 'number' &&
+      isFinite(latitude) && isFinite(longitude) &&
+      !(latitude === 0 && longitude === 0)
+    );
+  });
   const hasGeoConnections = geoConnections.length > 0;
 
   // Initialize map
@@ -55,10 +63,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       // Handle map load
       mapInstance.on('load', () => {
         setMapLoaded(true);
-        
+
         // Resize to ensure proper rendering
         mapInstance.resize();
-        
+
         // Add markers
         geoConnections.forEach((connection) => {
           if (connection.geo_location) {
@@ -78,7 +86,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
               </button>
             </div>`;
 
-            const popup = new maplibregl.Popup({ 
+            const popup = new maplibregl.Popup({
               offset: 25,
               closeButton: false,
               maxWidth: '280px',
@@ -149,7 +157,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     };
 
     window.addEventListener('resize', handleResize);
-    
+
     // Initial resize after a short delay
     const resizeTimer = setTimeout(handleResize, 100);
 
@@ -194,13 +202,13 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
           </div>
         </div>
       )}
-      
+
       {/* Map container */}
       <div
         ref={mapContainer}
         className="absolute inset-0"
       />
-      
+
       {/* Connection count badge */}
       {mapLoaded && (
         <div className="absolute bottom-4 left-4 bg-zinc-900/90 backdrop-blur-sm px-4 py-2 rounded-xl border border-zinc-700">

@@ -137,18 +137,53 @@ export default function DashboardView({ user }: DashboardViewProps) {
             setConnectionRecords(mockConnections);
             setChapters(mockChapters);
           } else if (data && data.length > 0) {
-            const records: ConnectionRecord[] = data.map((conn: any) => ({
-              id: conn.id,
-              name: conn.other_user_name || conn.semantic_location || 'Connection',
-              dateMet: new Date(conn.created || conn.created_at),
-              location: conn.semantic_location || 'Unknown location',
-              context: conn.context || undefined,
-              status: conn.status || 'kept',
-              geo_location: conn.geo_location ? {
-                latitude: conn.geo_location.latitude,
-                longitude: conn.geo_location.longitude,
-              } : undefined,
-            }));
+            // Resolve other user names from the users table
+            const otherUserIds = data.flatMap((conn: any) =>
+              (conn.user_ids || []).filter((id: string) => id !== user.id)
+            ).filter((id: string, i: number, arr: string[]) => arr.indexOf(id) === i);
+
+            let userNameMap: Record<string, string> = {};
+            if (otherUserIds.length > 0) {
+              const { data: usersData } = await supabase
+                .from('users')
+                .select('id, name')
+                .in('id', otherUserIds);
+              if (usersData) {
+                userNameMap = Object.fromEntries(
+                  usersData.map((u: any) => [u.id, u.name])
+                );
+              }
+            }
+
+            const records: ConnectionRecord[] = data.map((conn: any) => {
+              // Resolve the other user's name
+              const otherUserId = (conn.user_ids || []).find((id: string) => id !== user.id);
+              const otherUserName = (otherUserId && userNameMap[otherUserId]) || null;
+
+              // Parse geo_location — DB stores { lat, lon }, filter out invalid coords
+              let geoLoc: { latitude: number; longitude: number } | undefined;
+              if (conn.geo_location) {
+                const lat = conn.geo_location.lat ?? conn.geo_location.latitude;
+                const lon = conn.geo_location.lon ?? conn.geo_location.longitude;
+                if (
+                  typeof lat === 'number' && typeof lon === 'number' &&
+                  isFinite(lat) && isFinite(lon) &&
+                  !(lat === 0 && lon === 0)
+                ) {
+                  geoLoc = { latitude: lat, longitude: lon };
+                }
+              }
+
+              return {
+                id: conn.id,
+                name: otherUserName || conn.semantic_location || 'Connection',
+                dateMet: new Date(conn.created || conn.created_at),
+                location: conn.semantic_location || 'Unknown location',
+                context: conn.context || undefined,
+                status: conn.status || 'kept',
+                geo_location: geoLoc,
+              };
+            });
 
             setConnectionRecords(records);
             setChapters(generateChaptersFromConnections(records));

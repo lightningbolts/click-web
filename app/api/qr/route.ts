@@ -1,40 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import crypto from 'crypto';
 
 /**
- * QR Code Connection API
- * Generates a connection protocol URL that can be scanned by the Click mobile app
- * 
- * The URL format is: {baseUrl}/connect/{userId}
- * This endpoint validates the user and returns the proper connection URL
+ * QR Code Connection API — Proximity Verification Layer 1
+ *
+ * GET  → Generate a time-bounded, single-use QR token (90s TTL)
+ * POST → Redeem a QR token (atomic, race-condition safe)
+ *
+ * Old format: click://connect/{userId}  (static, vulnerable to screenshots)
+ * New format: JSON with { token, userId, exp } (single-use, expires)
  */
 
+// Helper: create a Supabase SSR client from cookies
+async function createSupabaseSSRClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+}
+
+// Helper: create an admin Supabase client (bypasses RLS for token ops)
+function createAdminClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceRoleKey) {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      { auth: { persistSession: false } }
+    );
+  }
+  // Fallback to anon key if no service role key configured
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
+
+/**
+ * GET — Generate a QR token for the authenticated user
+ *
+ * Returns a JSON payload to encode in the QR code:
+ *   { token, userId, exp }
+ *
+ * The token is stored in `qr_tokens` with a 90-second TTL and can
+ * only be redeemed once via the POST endpoint.
+ */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    
-    // Create Supabase client
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      }
-    );
+    const supabase = await createSupabaseSSRClient();
 
-    // Get the current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
@@ -42,35 +74,64 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get the base URL from the request or environment
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-                   request.nextUrl.origin);
+    // Generate cryptographically random token
+    const token = crypto.randomBytes(32).toString('hex');
+    const now = Date.now();
+    const expiresAt = now + 90_000; // 90 seconds
 
-    // Generate the connection URL
-    // This URL is what the Click mobile app will scan to initiate a connection
+    // Store token in qr_tokens table
+    const adminClient = createAdminClient();
+    const { error: insertError } = await adminClient
+      .from('qr_tokens')
+      .insert({
+        token,
+        user_id: user.id,
+        created_at: now,
+        expires_at: expiresAt,
+        redeemed: false,
+      });
+
+    if (insertError) {
+      console.error('Failed to store QR token:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to generate QR code' },
+        { status: 500 }
+      );
+    }
+
+    // Build the QR payload
+    const qrPayload = {
+      token,
+      userId: user.id,
+      exp: expiresAt,
+    };
+
+    // Also generate legacy URLs for backward compat display
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
+        request.nextUrl.origin);
+
     const connectionUrl = `${baseUrl}/connect/${user.id}`;
-    
-    // Generate a short Click ID for display
     const clickId = `CLICK-${user.id.substring(0, 8).toUpperCase()}`;
 
-    // Return the connection data
     return NextResponse.json({
       success: true,
       data: {
+        // New token-based payload (encode this as the QR code content)
+        qrPayload: JSON.stringify(qrPayload),
+        token,
+        expiresAt,
+        // Legacy fields for display
         userId: user.id,
-        clickId: clickId,
-        connectionUrl: connectionUrl,
-        // Deep link format for the mobile app
+        clickId,
+        connectionUrl,
         deepLink: `click://connect/${user.id}`,
-        // Universal link format
         universalLink: connectionUrl,
-        // User info for display
         userName: user.user_metadata?.full_name || null,
         userEmail: user.email,
       }
     });
-    
+
   } catch (error) {
     console.error('QR API Error:', error);
     return NextResponse.json(
@@ -81,47 +142,94 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST endpoint to verify a scanned QR code and initiate connection
- * This would be called by the mobile app when scanning another user's QR code
+ * POST — Redeem a QR token and validate proximity
+ *
+ * Body: { token, scannerLocation?: { lat, lon } }
+ *   OR legacy: { targetUserId }
+ *
+ * For token-based: atomically redeems the token via the `redeem_qr_token` RPC.
+ * For legacy: validates the target user exists (backward compat).
+ *
+ * Returns:
+ *   { userId, userName, tokenAgeMs } on success
+ *   { error: "expired" | "already_used" | "not_found" } on failure
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
+    const supabase = await createSupabaseSSRClient();
     const body = await request.json();
-    const { targetUserId } = body;
 
-    if (!targetUserId) {
-      return NextResponse.json(
-        { error: 'Missing targetUserId' },
-        { status: 400 }
-      );
-    }
-
-    // Create Supabase client
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      }
-    );
-
-    // Get the current user (the one scanning)
+    // Get the current user (the scanner)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }
+      );
+    }
+
+    // ── Token-based redemption (new flow) ──
+    if (body.token) {
+      const { token, scannerLocation } = body;
+      const adminClient = createAdminClient();
+
+      // Atomically redeem the token via RPC
+      const { data: rpcResult, error: rpcError } = await adminClient
+        .rpc('redeem_qr_token', { p_token: token });
+
+      if (rpcError) {
+        console.error('Token redemption RPC error:', rpcError);
+        return NextResponse.json(
+          { error: 'Token validation failed' },
+          { status: 500 }
+        );
+      }
+
+      const result = rpcResult as { success: boolean; error?: string; user_id?: string; token_age_ms?: number };
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error || 'not_found' },
+          { status: 400 }
+        );
+      }
+
+      const targetUserId = result.user_id!;
+      const tokenAgeMs = result.token_age_ms || 0;
+
+      // Prevent self-connection
+      if (user.id === targetUserId) {
+        return NextResponse.json(
+          { error: 'Cannot connect with yourself' },
+          { status: 400 }
+        );
+      }
+
+      // Look up target user name
+      const { data: targetUser } = await adminClient
+        .from('users')
+        .select('id, name')
+        .eq('id', targetUserId)
+        .maybeSingle();
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          targetUserId,
+          targetUserName: targetUser?.name || 'Click User',
+          initiatorId: user.id,
+          tokenAgeMs,
+          message: 'Token redeemed — ready to create connection',
+        }
+      });
+    }
+
+    // ── Legacy flow (old click://connect/{userId} format) ──
+    const { targetUserId } = body;
+    if (!targetUserId) {
+      return NextResponse.json(
+        { error: 'Missing token or targetUserId' },
+        { status: 400 }
       );
     }
 
@@ -147,18 +255,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return success - the actual connection creation is handled by the mobile app
-    // which has access to geolocation data
     return NextResponse.json({
       success: true,
       data: {
-        targetUserId: targetUserId,
+        targetUserId,
         targetUserName: targetUser.name || 'Click User',
         initiatorId: user.id,
+        tokenAgeMs: null, // Legacy — no token timing data
         message: 'Ready to create connection',
       }
     });
-    
+
   } catch (error) {
     console.error('QR Verify Error:', error);
     return NextResponse.json(

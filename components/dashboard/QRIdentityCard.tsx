@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { QrCode, Copy, Check, Share2, Download, Loader2 } from 'lucide-react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { QrCode, Copy, Check, Share2, Download, Loader2, RefreshCw, Clock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface QRIdentityCardProps {
@@ -12,86 +12,135 @@ interface QRIdentityCardProps {
 }
 
 interface QRData {
-  connectionUrl: string;
+  qrPayload: string;       // JSON token payload — encode this in the QR
+  connectionUrl: string;   // For display and fallback
   clickId: string;
-  deepLink: string;
+  expiresAt: number;       // ms timestamp
 }
 
+const TOKEN_TTL_MS = 90_000; // 90 seconds
+
 /**
- * QRIdentityCard - Displays the user's static "Click ID" QR code
- * For scanning without the mobile app - part of the Digital Memory Box
+ * QRIdentityCard - Displays a time-bounded, single-use Click QR token
+ *
+ * Auto-refreshes every 90 seconds before the token expires.
+ * The QR encodes a JSON payload: { token, userId, exp }
+ * which the mobile scanner redeems server-side for proximity verification.
  */
 export default function QRIdentityCard({ userId, userName, userEmail }: QRIdentityCardProps) {
   const [copied, setCopied] = useState(false);
   const [qrData, setQrData] = useState<QRData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(TOKEN_TTL_MS / 1000);
   const qrRef = useRef<HTMLDivElement>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch QR data from the API
-  useEffect(() => {
-    const fetchQRData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/qr');
-        const data = await response.json();
-        
-        if (data.success && data.data) {
-          setQrData({
-            connectionUrl: data.data.connectionUrl,
-            clickId: data.data.clickId,
-            deepLink: data.data.deepLink,
-          });
-        } else {
-          // Fallback to client-side generation using current origin
-          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-          setQrData({
-            connectionUrl: `${baseUrl}/connect/${userId}`,
-            clickId: `CLICK-${userId.substring(0, 8).toUpperCase()}`,
-            deepLink: `click://connect/${userId}`,
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch QR data:', err);
-        // Fallback to client-side generation
+  const fetchToken = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/qr');
+      const data = await response.json();
+
+      if (data.success && data.data?.qrPayload) {
+        setQrData({
+          qrPayload: data.data.qrPayload,
+          connectionUrl: data.data.connectionUrl,
+          clickId: data.data.clickId,
+          expiresAt: data.data.expiresAt,
+        });
+        setSecondsLeft(Math.round(TOKEN_TTL_MS / 1000));
+      } else {
+        // Fallback: legacy static URL (no proximity verification)
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
         setQrData({
+          qrPayload: `${baseUrl}/connect/${userId}`,
           connectionUrl: `${baseUrl}/connect/${userId}`,
           clickId: `CLICK-${userId.substring(0, 8).toUpperCase()}`,
-          deepLink: `click://connect/${userId}`,
+          expiresAt: Date.now() + TOKEN_TTL_MS,
         });
-      } finally {
-        setLoading(false);
+        setSecondsLeft(Math.round(TOKEN_TTL_MS / 1000));
       }
-    };
-
-    fetchQRData();
+    } catch (err) {
+      console.error('Failed to fetch QR token:', err);
+      setError('Could not generate QR code. Check your connection.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [userId]);
 
-  // Fallback values while loading
+  // Initial load
+  useEffect(() => {
+    fetchToken();
+  }, [fetchToken]);
+
+  // Auto-refresh 5 seconds before expiry
+  useEffect(() => {
+    if (!qrData) return;
+
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+
+    const msUntilRefresh = TOKEN_TTL_MS - 5_000;
+    refreshTimerRef.current = setTimeout(() => {
+      fetchToken();
+    }, msUntilRefresh);
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [qrData, fetchToken]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!qrData || loading) return;
+
+    const interval = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [qrData, loading]);
+
   const clickId = qrData?.clickId || `CLICK-${userId.substring(0, 8).toUpperCase()}`;
-  const qrContent = qrData?.connectionUrl || '';
+  const qrContent = qrData?.qrPayload || '';
+
+  // Color-code the timer: green → yellow → red
+  const timerColor =
+    secondsLeft > 45 ? '#22c55e' :
+      secondsLeft > 20 ? '#f59e0b' :
+        '#ef4444';
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(clickId);
+      await navigator.clipboard.writeText(qrData?.connectionUrl || clickId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      // ignore
     }
   };
 
   const handleShare = async () => {
-    if (navigator.share && qrContent) {
+    if (navigator.share && qrData?.connectionUrl) {
       try {
         await navigator.share({
           title: 'My Click ID',
           text: `Connect with me on Click! My ID: ${clickId}`,
-          url: qrContent,
+          url: qrData.connectionUrl,
         });
-      } catch (err) {
-        console.error('Error sharing:', err);
+      } catch {
+        handleCopy();
       }
     } else {
       handleCopy();
@@ -99,7 +148,6 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
   };
 
   const handleDownload = () => {
-    // Get the SVG element and convert to image for download
     const svg = qrRef.current?.querySelector('svg');
     if (!svg) return;
 
@@ -107,7 +155,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
-    
+
     img.onload = () => {
       canvas.width = 256;
       canvas.height = 256;
@@ -115,14 +163,13 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         ctx.fillStyle = '#121212';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 28, 28, 200, 200);
-        
         const link = document.createElement('a');
         link.download = `click-qr-${clickId}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
       }
     };
-    
+
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
@@ -135,7 +182,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
       {/* Card background with gradient border */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC] via-[#3A86FF] to-[#8338EC] opacity-20" />
       <div className="absolute inset-[1px] bg-zinc-900 rounded-3xl" />
-      
+
       {/* Content */}
       <div className="relative p-6 space-y-6">
         {/* Header */}
@@ -146,7 +193,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             </div>
             <div>
               <h3 className="font-bold text-white">Your Click ID</h3>
-              <p className="text-xs text-zinc-500">Scan to connect instantly</p>
+              <p className="text-xs text-zinc-500">Single-use · expires in 90s</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -164,6 +211,14 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             >
               <Download className="w-4 h-4 text-zinc-400" />
             </button>
+            <button
+              onClick={() => fetchToken(true)}
+              disabled={refreshing}
+              className="p-2 hover:bg-white/5 rounded-lg transition-colors disabled:opacity-40"
+              title="Refresh token"
+            >
+              <RefreshCw className={`w-4 h-4 text-zinc-400 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
 
@@ -172,32 +227,59 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
           <div className="relative">
             {/* Glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/30 to-[#3A86FF]/30 blur-xl" />
-            
+
             {/* QR Container */}
             <div ref={qrRef} className="relative bg-[#121212] p-4 rounded-2xl border border-white/10">
-              {loading ? (
-                <div className="w-[200px] h-[200px] flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin" />
-                </div>
-              ) : qrContent ? (
-                <QRCodeSVG
-                  value={qrContent}
-                  size={200}
-                  level="M"
-                  bgColor="#121212"
-                  fgColor="#8338EC"
-                  marginSize={0}
-                  title={`Click ID QR Code for ${userName || userEmail || userId}`}
-                />
-              ) : (
-                <div className="w-[200px] h-[200px] flex items-center justify-center text-zinc-500 text-sm">
-                  Unable to generate QR code
-                </div>
-              )}
-              
-              {/* Center logo overlay - only show when QR is rendered */}
-              {!loading && qrContent && (
-                <div className="absolute inset-0 flex items-center justify-center">
+              <AnimatePresence mode="wait">
+                {(loading || refreshing) ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-3"
+                  >
+                    <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin" />
+                    <p className="text-xs text-zinc-500">Generating secure token…</p>
+                  </motion.div>
+                ) : error ? (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-center"
+                  >
+                    <p className="text-xs text-red-400">{error}</p>
+                    <button
+                      onClick={() => fetchToken()}
+                      className="text-xs text-[#8338EC] hover:underline"
+                    >
+                      Try again
+                    </button>
+                  </motion.div>
+                ) : qrContent ? (
+                  <motion.div
+                    key={qrContent}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <QRCodeSVG
+                      value={qrContent}
+                      size={200}
+                      level="M"
+                      bgColor="#121212"
+                      fgColor="#8338EC"
+                      marginSize={0}
+                      title={`Click QR Code for ${userName || userEmail || userId}`}
+                    />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+
+              {/* Center logo overlay */}
+              {!loading && !refreshing && qrContent && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-[#121212] px-2 py-1 rounded-lg">
                     <span className="text-lg font-bold text-white tracking-wide">Click</span>
                   </div>
@@ -207,10 +289,17 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
           </div>
         </div>
 
-        {/* Connection URL Display */}
-        {qrContent && (
-          <div className="text-center">
-            <p className="text-xs text-zinc-600 break-all">{qrContent}</p>
+        {/* Countdown timer */}
+        {!loading && !error && qrContent && (
+          <div className="flex items-center justify-center gap-2">
+            <Clock className="w-3.5 h-3.5" style={{ color: timerColor }} />
+            <span
+              className="text-xs font-mono font-medium tabular-nums transition-colors"
+              style={{ color: timerColor }}
+            >
+              {secondsLeft > 0 ? `${secondsLeft}s` : 'Refreshing…'}
+            </span>
+            <span className="text-xs text-zinc-600">· refreshes automatically</span>
           </div>
         )}
 
@@ -256,11 +345,11 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8338EC]">2.</span>
-              <span>They scan it with their phone camera</span>
+              <span>They scan it with the Click app — it expires in 90s</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8338EC]">3.</span>
-              <span>Instant connection - no app needed to scan!</span>
+              <span>Each code is single-use, protecting against screenshots</span>
             </li>
           </ul>
         </div>
