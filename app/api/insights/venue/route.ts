@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       .from("users")
       .select("role")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     console.log("User ID:", user.id);
     console.log("User Email:", user.email);

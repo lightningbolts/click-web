@@ -69,13 +69,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
             .from('users')
             .select('tags_initialized')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
           if (error) {
-            // Column may not exist yet (pre-migration) — don't block the user
+            // Schema/network error — don't block the user
             setNeedsTagging(false);
             return;
           }
-          setNeedsTagging(data?.tags_initialized !== true);
+          // data is null when no public.users row exists yet (trigger backfill pending)
+          setNeedsTagging(data != null && data.tags_initialized !== true);
         } catch {
           // Network or schema error — don't block
           setNeedsTagging(false);

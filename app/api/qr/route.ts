@@ -135,10 +135,10 @@ export async function POST(request: NextRequest) {
 
     // Verify the target user exists
     const { data: targetUser, error: targetError } = await supabase
-      .from('profiles')
-      .select('id, full_name')
+      .from('users')
+      .select('id, name')
       .eq('id', targetUserId)
-      .single();
+      .maybeSingle();
 
     if (targetError || !targetUser) {
       return NextResponse.json(
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         targetUserId: targetUserId,
-        targetUserName: targetUser.full_name || 'Click User',
+        targetUserName: targetUser.name || 'Click User',
         initiatorId: user.id,
         message: 'Ready to create connection',
       }
