@@ -25,27 +25,24 @@ export default function ResetPassword() {
       return;
     }
 
-    // Check for error params in URL query string first.
-    // The API callback route redirects here with ?error= when exchangeCodeForSession
-    // or verifyOtp fails, so we must check query params before the hash.
+    // ── 1. Check for error params in URL query string ──
+    // The API callback route redirects here with ?error= when exchange fails.
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const qError = searchParams.get('error');
       const qErrorDesc = searchParams.get('error_description');
       if (qError) {
-        setLinkExpired(qError === 'exchange_failed' || qError === 'otp_failed');
+        setLinkExpired(qError === 'exchange_failed' || qError === 'otp_failed' || qError === 'access_denied');
         setError(
           qErrorDesc
-            ? decodeURIComponent(qErrorDesc)
+            ? decodeURIComponent(qErrorDesc.replace(/\+/g, ' '))
             : 'This reset link is invalid or has expired.'
         );
         setSessionReady(false);
         return;
       }
-    }
 
-    // Check for error params in URL hash (Supabase puts errors there)
-    if (typeof window !== 'undefined') {
+      // ── 2. Check for error params in URL hash (Supabase puts errors there) ──
       const hash = window.location.hash;
       if (hash) {
         const hashParams = new URLSearchParams(hash.substring(1));
@@ -64,24 +61,57 @@ export default function ResetPassword() {
           return;
         }
       }
+
+      // ── 3. PKCE flow: `code` query param → delegate to server route ──
+      // The server callback will exchange the code (with cookie-stored
+      // code_verifier) and redirect back here.
+      const code = searchParams.get('code');
+      if (code) {
+        window.location.href = `/api/auth/callback?code=${encodeURIComponent(code)}&next=/reset-password`;
+        return; // navigation in progress
+      }
+
+      // ── 4. Implicit flow: hash fragment tokens ──
+      // With implicit flow Supabase redirects with #access_token=...&refresh_token=...
+      // The SDK's `detectSessionInUrl: true` should auto-consume these, but
+      // we also handle them explicitly in case of a race condition.
+      if (hash && hash.length > 1) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          }).then(({ error: sessionError }) => {
+            if (sessionError) {
+              console.error('Error setting session from hash:', sessionError);
+              setError(sessionError.message);
+              setSessionReady(false);
+            } else {
+              // Clean the hash so the tokens aren't visible / replayable
+              window.history.replaceState(null, '', window.location.pathname);
+              setSessionReady(true);
+            }
+          });
+          return; // async setSession in progress
+        }
+      }
     }
 
-    // Listen for PASSWORD_RECOVERY event — fires when Supabase
-    // consumes a valid recovery token and establishes a session.
+    // ── 5. Listen for PASSWORD_RECOVERY / SIGNED_IN events ──
+    // Fires when Supabase consumes a valid recovery token and establishes a session.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (event === 'PASSWORD_RECOVERY' && session) {
-          setSessionReady(true);
-        } else if (event === 'SIGNED_IN' && session) {
-          // Also accept SIGNED_IN — some flows emit this instead
+        if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
           setSessionReady(true);
         }
       }
     );
 
-    // Also try getSession() in case the session was already set
-    // (e.g., server callback already exchanged the code and set cookies,
-    //  or the implicit-flow hash was already consumed by detectSessionInUrl).
+    // ── 6. Check existing session, then poll as a fallback ──
+    // The session may already exist (e.g., server callback set cookies,
+    // or detectSessionInUrl already consumed the hash).
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSessionReady(true);
