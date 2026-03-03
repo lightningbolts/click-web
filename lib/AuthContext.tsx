@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    // Listen for changes on auth state (including USER_UPDATED events)
+    // Listen for changes on auth state (including USER_UPDATED and PASSWORD_RECOVERY events)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
@@ -58,6 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Log auth events for debugging
       if (event === 'USER_UPDATED') {
         console.log('User data updated:', session?.user?.user_metadata);
+      }
+
+      // Auto-redirect to reset-password page on PASSWORD_RECOVERY event
+      if (event === 'PASSWORD_RECOVERY') {
+        // Only redirect if not already on the reset-password page
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/reset-password')) {
+          window.location.href = '/reset-password';
+        }
       }
     });
 
@@ -68,7 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        // Attempt to sign out from Supabase
+        // Sign out on server side first (clears cookies)
+        await Promise.race([
+          fetch('/api/auth/signout', { method: 'POST' }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+        ]);
+        // Then sign out on client side
         await Promise.race([
           supabase.auth.signOut(),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))

@@ -29,15 +29,18 @@ export async function DELETE(request: Request) {
       }
     );
     
+    // Use getUser() instead of getSession() for secure server-side auth verification.
+    // getSession() only reads cookies without validating with the Supabase Auth server.
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
     if (!serviceRoleKey || !supabaseUrl) {
@@ -56,7 +59,7 @@ export async function DELETE(request: Request) {
     });
 
     const { error } = await adminAuthClient.auth.admin.deleteUser(
-      session.user.id
+      user.id
     );
 
     if (error) {

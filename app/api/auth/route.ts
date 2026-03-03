@@ -1,17 +1,32 @@
-import { getSupabaseClient } from '@/lib/supabase';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password, action } = await request.json();
 
-    // Check if Supabase is configured
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      return NextResponse.json({
-        error: 'Authentication is not configured yet. Please set up Supabase.'
-      }, { status: 503 });
-    }
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            } catch {
+              // Safe to ignore from Server Components — middleware handles refresh.
+            }
+          },
+        },
+      }
+    );
 
     if (action === 'signup') {
       const { data, error } = await supabase.auth.signUp({
