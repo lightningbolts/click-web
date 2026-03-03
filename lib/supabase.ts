@@ -17,7 +17,17 @@ export function getSupabaseClient(): SupabaseClient | null {
     return null;
   }
 
-  supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  // Use implicit flow: recovery tokens land in the URL hash fragment, not as
+  // a ?code= query param.  Hash fragments are never sent to the server, so
+  // there is no code_verifier lookup against localStorage — which means the
+  // link works even when opened in a different browser or an incognito tab.
+  supabaseInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      flowType: 'implicit',
+      detectSessionInUrl: true,
+      persistSession: true,
+    },
+  });
 
   return supabaseInstance;
 }

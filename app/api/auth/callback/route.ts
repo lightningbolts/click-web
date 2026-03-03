@@ -36,7 +36,9 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       console.error('Auth error exchanging code:', error);
-      const errUrl = new URL('/auth/callback', request.url);
+      const isRecovery = next.includes('reset') || type === 'recovery';
+      const errPath = isRecovery ? '/reset-password' : '/auth/callback';
+      const errUrl = new URL(errPath, request.url);
       errUrl.searchParams.set('error', 'exchange_failed');
       errUrl.searchParams.set('error_description', error.message);
       return NextResponse.redirect(errUrl);
@@ -46,7 +48,10 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     if (error) {
       console.error('Auth error verifying OTP:', error);
-      const errUrl = new URL('/auth/callback', request.url);
+      // Recovery failures go to /reset-password so the user sees
+      // a contextually correct "Link Expired" page with a retry CTA.
+      const errPath = type === 'recovery' ? '/reset-password' : '/auth/callback';
+      const errUrl = new URL(errPath, request.url);
       errUrl.searchParams.set('error', 'otp_failed');
       errUrl.searchParams.set('error_description', error.message);
       return NextResponse.redirect(errUrl);

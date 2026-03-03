@@ -25,6 +25,25 @@ export default function ResetPassword() {
       return;
     }
 
+    // Check for error params in URL query string first.
+    // The API callback route redirects here with ?error= when exchangeCodeForSession
+    // or verifyOtp fails, so we must check query params before the hash.
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const qError = searchParams.get('error');
+      const qErrorDesc = searchParams.get('error_description');
+      if (qError) {
+        setLinkExpired(qError === 'exchange_failed' || qError === 'otp_failed');
+        setError(
+          qErrorDesc
+            ? decodeURIComponent(qErrorDesc)
+            : 'This reset link is invalid or has expired.'
+        );
+        setSessionReady(false);
+        return;
+      }
+    }
+
     // Check for error params in URL hash (Supabase puts errors there)
     if (typeof window !== 'undefined') {
       const hash = window.location.hash;
@@ -61,16 +80,30 @@ export default function ResetPassword() {
     );
 
     // Also try getSession() in case the session was already set
-    // (e.g., server callback already exchanged the code and set cookies)
+    // (e.g., server callback already exchanged the code and set cookies,
+    //  or the implicit-flow hash was already consumed by detectSessionInUrl).
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSessionReady(true);
       } else {
-        // Give the auth state change listener 3 seconds to fire,
-        // then show an error if no session materialized.
-        setTimeout(() => {
-          setSessionReady((prev) => (prev === null ? false : prev));
-        }, 3000);
+        // Poll every 500 ms for up to 8 s (16 attempts) to accommodate slow
+        // networks and cold-start Vercel edge functions.
+        let attempts = 0;
+        const maxAttempts = 16;
+
+        const poll = setInterval(async () => {
+          attempts++;
+          const { data: { session: polledSession } } = await supabase.auth.getSession();
+          if (polledSession) {
+            clearInterval(poll);
+            setSessionReady(true);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            setSessionReady((prev) => (prev === null ? false : prev));
+          }
+        }, 500);
+
+        return () => clearInterval(poll);
       }
     });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
@@ -14,11 +15,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  signOut: async () => {},
-  refreshUser: async () => {},
+  signOut: async () => { },
+  refreshUser: async () => { },
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,17 +56,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
-      
+
       // Log auth events for debugging
       if (event === 'USER_UPDATED') {
         console.log('User data updated:', session?.user?.user_metadata);
       }
 
-      // Auto-redirect to reset-password page on PASSWORD_RECOVERY event
+      // Use router.replace instead of window.location.href so the client-side
+      // Supabase session established by this PASSWORD_RECOVERY event is not
+      // destroyed by a full-page reload before the reset form can use it.
       if (event === 'PASSWORD_RECOVERY') {
-        // Only redirect if not already on the reset-password page
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/reset-password')) {
-          window.location.href = '/reset-password';
+        if (!window.location.pathname.startsWith('/reset-password')) {
+          router.replace('/reset-password');
         }
       }
     });

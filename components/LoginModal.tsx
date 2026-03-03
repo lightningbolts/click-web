@@ -37,11 +37,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         return;
       }
 
-      // Point directly at the server-side API route so it can handle
-      // both ?code= (PKCE) and ?token_hash= (token-hash) without an
-      // extra client-page hop that can lose the PKCE code_verifier.
+      // With implicit flow the recovery token arrives in the URL hash
+      // fragment.  Browsers never send hash fragments to the server, so we
+      // must redirect to the client-side /auth/callback page which reads
+      // window.location.hash and hands the session to Supabase.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
 
       if (error) {
@@ -97,7 +98,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             setError(error.message);
           }
         } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-           setError('An account with this email already exists.');
+          setError('An account with this email already exists.');
         } else {
           setSuccess('Account created! Check your email to verify.');
           setTimeout(() => {
@@ -158,10 +159,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
               {/* Header */}
               <h2 className="text-3xl font-bold mb-2">
-                {isForgotPassword 
-                  ? 'Reset Password' 
-                  : isSignup 
-                    ? 'Create Account' 
+                {isForgotPassword
+                  ? 'Reset Password'
+                  : isSignup
+                    ? 'Create Account'
                     : 'Welcome Back'}
               </h2>
               <p className="text-zinc-400 mb-8">
@@ -276,12 +277,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   disabled={isLoading}
                   className="w-full py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading 
-                    ? 'Loading...' 
-                    : isForgotPassword 
-                      ? 'Send Reset Link' 
-                      : isSignup 
-                        ? 'Create Account' 
+                  {isLoading
+                    ? 'Loading...'
+                    : isForgotPassword
+                      ? 'Send Reset Link'
+                      : isSignup
+                        ? 'Create Account'
                         : 'Sign In'}
                 </motion.button>
               </form>
@@ -300,10 +301,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   }}
                   className="text-zinc-400 hover:text-[#8338EC] transition-colors text-sm"
                 >
-                  {isForgotPassword 
-                    ? 'Back to Sign In' 
-                    : isSignup 
-                      ? 'Already have an account? Sign in' 
+                  {isForgotPassword
+                    ? 'Back to Sign In'
+                    : isSignup
+                      ? 'Already have an account? Sign in'
                       : "Don't have an account? Sign up"}
                 </button>
               </div>
