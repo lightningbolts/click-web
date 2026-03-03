@@ -1,186 +1,150 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHITECTURE NOTE — why this is structured this way
+// ─────────────────────────────────────────────────────────────────────────────
+// Corporate email security scanners (Proofpoint / urldefense, Mimecast, etc.)
+// pre-fetch every link inside every email via HTTP GET to scan for malware.
+// Because Supabase tokens are one-time-use, the scanner burns the token before
+// the real user ever clicks.
+//
+// The ONLY scanner-proof approach:
+//   1. The email template links to YOUR domain, not supabase.co/auth/v1/verify.
+//      Template: {{ .SiteURL }}/reset-password?token_hash={{ .TokenHash }}&type=recovery
+//   2. The page receives token_hash as a URL param and shows a password form.
+//   3. verifyOtp() is called ONLY when the user submits the form (client-side JS).
+//      Scanners do not execute JavaScript — they cannot trigger form submission.
+//   4. After verifyOtp() succeeds, updateUser() is called immediately in the
+//      same interaction, before the session can expire.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type PageState = 'form' | 'loading' | 'success' | 'error';
+
 export default function ResetPassword() {
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [pageState, setPageState] = useState<PageState>('form');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  // Session readiness: null = checking, true = ready, false = no session
-  const [sessionReady, setSessionReady] = useState<boolean | null>(null);
-  const [linkExpired, setLinkExpired] = useState(false);
+
+  // The token_hash and type come from the Supabase email template:
+  //   {{ .SiteURL }}/reset-password?token_hash={{ .TokenHash }}&type=recovery
+  const [tokenHash, setTokenHash] = useState<string | null>(null);
+  const [tokenType, setTokenType] = useState<string>('recovery');
 
   useEffect(() => {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      setError('Authentication is not available');
-      setSessionReady(false);
+    if (typeof window === 'undefined') return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+
+    // ── Error params: Supabase redirects here with ?error= on failure ──
+    const qError = searchParams.get('error');
+    const qErrCode = searchParams.get('error_code');
+    const qErrDesc = searchParams.get('error_description');
+
+    // Also check hash (Supabase puts errors in hash with implicit flow)
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const hError = hashParams.get('error');
+    const hErrCode = hashParams.get('error_code');
+    const hErrDesc = hashParams.get('error_description');
+
+    const anyError = qError || qErrCode || hError || hErrCode;
+    const errDesc = qErrDesc || hErrDesc;
+
+    if (anyError) {
+      const msg = errDesc
+        ? decodeURIComponent(errDesc.replace(/\+/g, ' '))
+        : 'This reset link is invalid or has expired.';
+      setError(msg);
+      setPageState('error');
       return;
     }
 
-    // ── 1. Check for error params in URL query string ──
-    // The API callback route redirects here with ?error= when exchange fails.
-    if (typeof window !== 'undefined') {
-      const searchParams = new URLSearchParams(window.location.search);
-      const qError = searchParams.get('error');
-      const qErrorDesc = searchParams.get('error_description');
-      if (qError) {
-        setLinkExpired(qError === 'exchange_failed' || qError === 'otp_failed' || qError === 'access_denied');
-        setError(
-          qErrorDesc
-            ? decodeURIComponent(qErrorDesc.replace(/\+/g, ' '))
-            : 'This reset link is invalid or has expired.'
-        );
-        setSessionReady(false);
-        return;
-      }
+    // ── Happy path: extract token_hash and type ──
+    const hash = searchParams.get('token_hash');
+    const type = searchParams.get('type') ?? 'recovery';
 
-      // ── 2. Check for error params in URL hash (Supabase puts errors there) ──
-      const hash = window.location.hash;
-      if (hash) {
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const hashError = hashParams.get('error');
-        const errorCode = hashParams.get('error_code');
-        const errorDesc = hashParams.get('error_description');
-        if (hashError || errorCode) {
-          const desc = errorDesc
-            ? decodeURIComponent(errorDesc.replace(/\+/g, ' '))
-            : 'Authentication failed.';
-          if (errorCode === 'otp_expired') {
-            setLinkExpired(true);
-          }
-          setError(desc);
-          setSessionReady(false);
-          return;
-        }
-      }
-
-      // ── 3. PKCE flow: `code` query param → delegate to server route ──
-      // The server callback will exchange the code (with cookie-stored
-      // code_verifier) and redirect back here.
-      const code = searchParams.get('code');
-      if (code) {
-        window.location.href = `/api/auth/callback?code=${encodeURIComponent(code)}&next=/reset-password`;
-        return; // navigation in progress
-      }
-
-      // ── 4. Implicit flow: hash fragment tokens ──
-      // With implicit flow Supabase redirects with #access_token=...&refresh_token=...
-      // The SDK's `detectSessionInUrl: true` should auto-consume these, but
-      // we also handle them explicitly in case of a race condition.
-      if (hash && hash.length > 1) {
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        if (accessToken && refreshToken) {
-          supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          }).then(({ error: sessionError }) => {
-            if (sessionError) {
-              console.error('Error setting session from hash:', sessionError);
-              setError(sessionError.message);
-              setSessionReady(false);
-            } else {
-              // Clean the hash so the tokens aren't visible / replayable
-              window.history.replaceState(null, '', window.location.pathname);
-              setSessionReady(true);
-            }
-          });
-          return; // async setSession in progress
-        }
-      }
+    if (hash) {
+      setTokenHash(hash);
+      setTokenType(type);
+    } else {
+      // No token_hash — the user landed here without a valid link
+      setError('No reset token found. Please request a new password reset link.');
+      setPageState('error');
     }
-
-    // ── 5. Listen for PASSWORD_RECOVERY / SIGNED_IN events ──
-    // Fires when Supabase consumes a valid recovery token and establishes a session.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
-          setSessionReady(true);
-        }
-      }
-    );
-
-    // ── 6. Check existing session, then poll as a fallback ──
-    // The session may already exist (e.g., server callback set cookies,
-    // or detectSessionInUrl already consumed the hash).
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
-      } else {
-        // Poll every 500 ms for up to 8 s (16 attempts) to accommodate slow
-        // networks and cold-start Vercel edge functions.
-        let attempts = 0;
-        const maxAttempts = 16;
-
-        const poll = setInterval(async () => {
-          attempts++;
-          const { data: { session: polledSession } } = await supabase.auth.getSession();
-          if (polledSession) {
-            clearInterval(poll);
-            setSessionReady(true);
-          } else if (attempts >= maxAttempts) {
-            clearInterval(poll);
-            setSessionReady((prev) => (prev === null ? false : prev));
-          }
-        }, 500);
-
-        return () => clearInterval(poll);
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    setSuccess('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      setIsLoading(false);
+      setError('Passwords do not match.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
       return;
     }
 
-    try {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        setError('Authentication is not available');
-        setIsLoading(false);
-        return;
-      }
+    setError('');
+    setPageState('loading');
 
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-      });
-
-      if (error) {
-        setError(error.message);
-      } else {
-        setSuccess('Password updated successfully! Redirecting...');
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 2000);
-      }
-    } catch (err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsLoading(false);
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError('Authentication is not available. Please try again.');
+      setPageState('form');
+      return;
     }
-  };
 
-  // ── Expired / invalid link state ──
-  if (linkExpired || sessionReady === false) {
+    if (!tokenHash) {
+      setError('Reset token is missing. Please request a new link.');
+      setPageState('error');
+      return;
+    }
+
+    // ── Step 1: Exchange the token_hash for a session ──
+    // This is the ONLY place verifyOtp is called — inside a form submit handler.
+    // It runs in the user's browser via JavaScript. Email scanners making HTTP
+    // GET requests to the page URL never reach this code path.
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: tokenType as 'recovery',
+    });
+
+    if (verifyError) {
+      const expired =
+        verifyError.message.toLowerCase().includes('expired') ||
+        verifyError.message.toLowerCase().includes('invalid');
+      setError(
+        expired
+          ? 'This reset link has expired. Please request a new one from the login page.'
+          : verifyError.message
+      );
+      setPageState('error');
+      return;
+    }
+
+    // ── Step 2: Update the password using the freshly established session ──
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+
+    if (updateError) {
+      setError(updateError.message);
+      setPageState('form');
+      return;
+    }
+
+    setPageState('success');
+    setTimeout(() => router.push('/dashboard'), 2000);
+  }, [password, confirmPassword, tokenHash, tokenType, router]);
+
+  // ── Error / expired state ──
+  if (pageState === 'error') {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4">
         <motion.div
@@ -209,8 +173,8 @@ export default function ResetPassword() {
     );
   }
 
-  // ── Loading / waiting for session state ──
-  if (sessionReady === null) {
+  // ── Success state ──
+  if (pageState === 'success') {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4">
         <motion.div
@@ -218,17 +182,17 @@ export default function ResetPassword() {
           animate={{ opacity: 1, y: 0 }}
           className="glass max-w-md w-full p-8 rounded-3xl border border-zinc-800 text-center"
         >
-          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mx-auto mb-6 animate-pulse">
-            <Lock className="w-6 h-6 text-[#8338EC]" />
+          <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto mb-6">
+            <Lock className="w-6 h-6 text-green-400" />
           </div>
-          <h2 className="text-xl font-bold mb-2">Verifying Reset Link…</h2>
-          <p className="text-zinc-400">Please wait while we verify your credentials.</p>
+          <h2 className="text-3xl font-bold mb-2">Password Updated</h2>
+          <p className="text-zinc-400">Redirecting you to your dashboard…</p>
         </motion.div>
       </div>
     );
   }
 
-  // ── Session ready — show password form ──
+  // ── Password form (default state + loading state) ──
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4">
       <motion.div
@@ -243,9 +207,7 @@ export default function ResetPassword() {
         </div>
 
         <h2 className="text-3xl font-bold mb-2 text-center">Set New Password</h2>
-        <p className="text-zinc-400 mb-8 text-center">
-          Enter your new password below.
-        </p>
+        <p className="text-zinc-400 mb-8 text-center">Enter your new password below.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -259,7 +221,8 @@ export default function ResetPassword() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+              disabled={pageState === 'loading'}
+              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors disabled:opacity-50"
               placeholder="••••••••"
             />
           </div>
@@ -275,7 +238,8 @@ export default function ResetPassword() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+              disabled={pageState === 'loading'}
+              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors disabled:opacity-50"
               placeholder="••••••••"
             />
           </div>
@@ -286,20 +250,14 @@ export default function ResetPassword() {
             </div>
           )}
 
-          {success && (
-            <div className="p-3 bg-[#8338EC]/10 border border-[#8338EC]/20 rounded-xl text-[#8338EC] text-sm">
-              {success}
-            </div>
-          )}
-
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             type="submit"
-            disabled={isLoading}
+            disabled={pageState === 'loading'}
             className="w-full py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Updating...' : 'Update Password'}
+            {pageState === 'loading' ? 'Updating…' : 'Update Password'}
           </motion.button>
         </form>
       </motion.div>
