@@ -17,6 +17,7 @@ import {
 
 export interface ConnectionRecord {
   id: string;
+  otherUserId?: string;
   name: string;
   dateMet: Date;
   location: string;

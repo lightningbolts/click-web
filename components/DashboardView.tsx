@@ -56,6 +56,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
   const [chatListTab, setChatListTab] = useState<'active' | 'archived'>('active');
   const [archivedConnectionIds, setArchivedConnectionIds] = useState<Set<string>>(new Set());
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
   const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,6 +183,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
               return {
                 id: conn.id,
+                otherUserId,
                 name: otherUserName || conn.semantic_location || 'Connection',
                 dateMet: new Date(conn.created || conn.created_at),
                 location: conn.semantic_location || 'Unknown location',
@@ -288,6 +290,32 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [user?.id, archiveStorageKey, writeArchivedToLocalStorage]);
 
   useEffect(() => {
+    if (!user?.id) return;
+
+    const loadBlocks = async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+      try {
+        const { data, error } = await supabase
+          .from('user_blocks')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+
+        if (error) {
+          console.error('Error loading blocks:', error.message || error);
+          return;
+        }
+
+        setBlockedUserIds(new Set((data ?? []).map((row: any) => row.blocked_id)));
+      } catch (err) {
+        console.error('Unexpected block load error:', err);
+      }
+    };
+
+    loadBlocks();
+  }, [user?.id]);
+
+  useEffect(() => {
     const handleGlobalClick = () => setMenuConnectionId(null);
     document.addEventListener('click', handleGlobalClick);
     return () => document.removeEventListener('click', handleGlobalClick);
@@ -307,7 +335,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     });
   }, [writeArchivedToLocalStorage]);
 
-  const archiveConnection = useCallback(async (connectionId: string) => {
+  const archiveConnection = useCallback(async (connectionId: string): Promise<boolean> => {
     updateArchivedIds((prev) => {
       const next = new Set(prev);
       next.add(connectionId);
@@ -316,7 +344,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setMenuConnectionId(null);
 
     const supabase = getSupabaseClient();
-    if (!supabase || !user?.id) return;
+    if (!supabase || !user?.id) return true;
     try {
       const { error } = await supabase
         .from('connection_archives')
@@ -324,13 +352,16 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       if (error && error.code !== '23505') {
         console.error('Error archiving connection:', error.message || error);
+        return false;
       }
+      return true;
     } catch (err) {
       console.error('Unexpected archive error:', err);
+      return false;
     }
   }, [updateArchivedIds, user?.id]);
 
-  const unarchiveConnection = useCallback(async (connectionId: string) => {
+  const unarchiveConnection = useCallback(async (connectionId: string): Promise<boolean> => {
     updateArchivedIds((prev) => {
       const next = new Set(prev);
       next.delete(connectionId);
@@ -340,7 +371,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setChatListTab('active');
 
     const supabase = getSupabaseClient();
-    if (!supabase || !user?.id) return;
+    if (!supabase || !user?.id) return true;
     try {
       const { error } = await supabase
         .from('connection_archives')
@@ -350,14 +381,125 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       if (error) {
         console.error('Error unarchiving connection:', error.message || error);
+        return false;
       }
+      return true;
     } catch (err) {
       console.error('Unexpected unarchive error:', err);
+      return false;
     }
   }, [updateArchivedIds, user?.id]);
 
   const openActionMenu = useCallback((connectionId: string) => {
     setMenuConnectionId((prev) => (prev === connectionId ? null : connectionId));
+  }, []);
+
+  const removeConnection = useCallback(async (connectionId: string): Promise<boolean> => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return false;
+
+    const prev = connectionRecords;
+    setConnectionRecords((records) => records.filter((record) => record.id !== connectionId));
+    updateArchivedIds((ids) => {
+      const next = new Set(ids);
+      next.delete(connectionId);
+      return next;
+    });
+
+    try {
+      const { error } = await supabase
+        .from('connections')
+        .delete()
+        .eq('id', connectionId);
+
+      if (error) {
+        throw error;
+      }
+      setMenuConnectionId(null);
+      return true;
+    } catch (err) {
+      console.error('Error removing connection:', err);
+      setConnectionRecords(prev);
+      return false;
+    }
+  }, [connectionRecords, updateArchivedIds]);
+
+  const reportConnection = useCallback(async (connectionId: string, reason: string): Promise<boolean> => {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return false;
+
+    try {
+      const response = await fetch('/api/safety/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId, reason: trimmedReason }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || 'Failed to submit report');
+      }
+      setMenuConnectionId(null);
+      return true;
+    } catch (err) {
+      console.error('Error reporting connection:', err);
+      return false;
+    }
+  }, []);
+
+  const blockUser = useCallback(async (connection: ConnectionRecord): Promise<boolean> => {
+    if (!connection.otherUserId) return false;
+
+    try {
+      const response = await fetch('/api/safety/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked_id: connection.otherUserId }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || 'Failed to block user');
+      }
+
+      setBlockedUserIds((prev) => {
+        const next = new Set(prev);
+        next.add(connection.otherUserId!);
+        return next;
+      });
+
+      const removed = await removeConnection(connection.id);
+      return removed;
+    } catch (err) {
+      console.error('Error blocking user:', err);
+      return false;
+    }
+  }, [removeConnection]);
+
+  const unblockUser = useCallback(async (connection: ConnectionRecord): Promise<boolean> => {
+    if (!connection.otherUserId) return false;
+
+    try {
+      const response = await fetch(`/api/safety/block?blocked_id=${encodeURIComponent(connection.otherUserId)}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || 'Failed to unblock user');
+      }
+
+      setBlockedUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(connection.otherUserId!);
+        return next;
+      });
+      setMenuConnectionId(null);
+      return true;
+    } catch (err) {
+      console.error('Error unblocking user:', err);
+      return false;
+    }
   }, []);
 
   const startLongPress = useCallback((connectionId: string) => {
@@ -586,6 +728,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     connection={selectedConnection}
                     currentUserId={user.id}
                     otherUserName={selectedConnection.name}
+                    isArchived={archivedConnectionIds.has(selectedConnection.id)}
+                    isBlocked={selectedConnection.otherUserId ? blockedUserIds.has(selectedConnection.otherUserId) : false}
+                    onArchive={() => archiveConnection(selectedConnection.id)}
+                    onUnarchive={() => unarchiveConnection(selectedConnection.id)}
+                    onRemove={() => removeConnection(selectedConnection.id)}
+                    onReport={(reason) => reportConnection(selectedConnection.id, reason)}
+                    onBlock={() => blockUser(selectedConnection)}
+                    onUnblock={() => unblockUser(selectedConnection)}
                     onClose={() => setSelectedConnection(null)}
                   />
                 ) : (

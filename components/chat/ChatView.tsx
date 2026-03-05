@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import MessageBubble from './MessageBubble';
@@ -13,6 +13,14 @@ interface ChatViewProps {
   currentUserId: string;
   /** Display name for the other participant */
   otherUserName: string;
+  isArchived: boolean;
+  isBlocked: boolean;
+  onArchive: () => Promise<boolean> | boolean;
+  onUnarchive: () => Promise<boolean> | boolean;
+  onRemove: () => Promise<boolean> | boolean;
+  onReport: (reason: string) => Promise<boolean> | boolean;
+  onBlock: () => Promise<boolean> | boolean;
+  onUnblock: () => Promise<boolean> | boolean;
   onClose: () => void;
 }
 
@@ -27,7 +35,20 @@ interface ChatViewProps {
  *  4. Send, edit, delete via POST/PATCH/DELETE to /api/chat/messages.
  *  5. React via POST /api/chat/reactions (toggle).
  */
-export default function ChatView({ connection, currentUserId, otherUserName, onClose }: ChatViewProps) {
+export default function ChatView({
+  connection,
+  currentUserId,
+  otherUserName,
+  isArchived,
+  isBlocked,
+  onArchive,
+  onUnarchive,
+  onRemove,
+  onReport,
+  onBlock,
+  onUnblock,
+  onClose,
+}: ChatViewProps) {
   const [chatId, setChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +61,12 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
   const [editText, setEditText] = useState('');
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [typingIndicator, setTypingIndicator] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingDeleteMessageId, setPendingDeleteMessageId] = useState<string | null>(null);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -48,6 +75,12 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const PAGE_SIZE = 40;
+
+  useEffect(() => {
+    if (!actionToast) return;
+    const timeout = setTimeout(() => setActionToast(null), 2200);
+    return () => clearTimeout(timeout);
+  }, [actionToast]);
 
   // ─────────────────────────── auth header helper ─────────────────────────
 
@@ -201,15 +234,24 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
 
               if (eventType === 'INSERT' && newRow.message_id === m.id) {
                 const list = reactions[newRow.reaction_type] ?? [];
-                if (!list.some((r: any) => r.id === newRow.id)) {
+                if (!list.some((r: any) => r.id === newRow.id || (r.user_id === newRow.user_id && r.reaction_type === newRow.reaction_type))) {
                   reactions[newRow.reaction_type] = [...list, newRow];
                 }
               } else if (eventType === 'DELETE' && oldRow.message_id === m.id) {
-                const list = (reactions[oldRow.reaction_type] ?? []).filter(
-                  (r: any) => r.id !== oldRow.id
-                );
-                if (list.length > 0) reactions[oldRow.reaction_type] = list;
-                else delete reactions[oldRow.reaction_type];
+                const reactionType = oldRow.reaction_type as string | undefined;
+                if (reactionType) {
+                  const list = (reactions[reactionType] ?? []).filter(
+                    (r: any) => r.id !== oldRow.id
+                  );
+                  if (list.length > 0) reactions[reactionType] = list;
+                  else delete reactions[reactionType];
+                } else {
+                  Object.keys(reactions).forEach((emoji) => {
+                    const list = (reactions[emoji] ?? []).filter((r: any) => r.id !== oldRow.id);
+                    if (list.length > 0) reactions[emoji] = list;
+                    else delete reactions[emoji];
+                  });
+                }
               }
 
               return { ...m, reactions };
@@ -303,38 +345,103 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
   const submitEdit = useCallback(async () => {
     if (!editingId || !editText.trim()) return;
 
+    const previous = messages.find((m) => m.id === editingId);
+    if (!previous) return;
+
+    const newContent = editText.trim();
+    const editedAt = Date.now();
+
+    setMessages((prev) => prev.map((m) => (
+      m.id === editingId ? { ...m, content: newContent, time_edited: editedAt } : m
+    )));
+    setEditingId(null);
+    setEditText('');
+
     const headers = await getAuthHeaders();
     const res = await fetch('/api/chat/messages', {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({ messageId: editingId, content: editText.trim() }),
+      body: JSON.stringify({ messageId: editingId, content: newContent }),
     });
-    if (res.ok) {
-      // Realtime will handle UI update via UPDATE event
+
+    if (!res.ok) {
+      setMessages((prev) => prev.map((m) => (
+        m.id === previous.id ? previous : m
+      )));
     }
-    setEditingId(null);
-    setEditText('');
-  }, [editingId, editText]);
+  }, [editingId, editText, getAuthHeaders, messages]);
 
   // ─────────────────────────── delete message ──────────────────────────────
 
   const deleteMessage = useCallback(async (messageId: string) => {
+    const index = messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return;
+    const removed = messages[index];
+
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
     const headers = await getAuthHeaders();
-    await fetch(`/api/chat/messages?messageId=${messageId}`, { method: 'DELETE', headers });
-    // Realtime DELETE event will remove from UI
-  }, [getAuthHeaders]);
+    const res = await fetch(`/api/chat/messages?messageId=${messageId}`, { method: 'DELETE', headers });
+    if (!res.ok) {
+      setMessages((prev) => {
+        const next = [...prev];
+        next.splice(index, 0, removed);
+        return next;
+      });
+    }
+  }, [getAuthHeaders, messages]);
 
   // ─────────────────────────── react ───────────────────────────────────────
 
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
+    const current = messages.find((m) => m.id === messageId);
+    if (!current) return;
+
+    const currentList = current.reactions?.[emoji] ?? [];
+    const alreadyMine = currentList.some((reaction) => reaction.user_id === currentUserId);
+
+    setMessages((prev) => prev.map((message) => {
+      if (message.id !== messageId) return message;
+      const reactions = { ...(message.reactions ?? {}) };
+      const list = reactions[emoji] ?? [];
+
+      if (alreadyMine) {
+        const filtered = list.filter((reaction) => reaction.user_id !== currentUserId);
+        if (filtered.length > 0) reactions[emoji] = filtered;
+        else delete reactions[emoji];
+      } else {
+        reactions[emoji] = [...list, {
+          id: `temp-${messageId}-${emoji}-${Date.now()}`,
+          message_id: messageId,
+          user_id: currentUserId,
+          reaction_type: emoji,
+          created_at: Date.now(),
+        }];
+      }
+
+      return { ...message, reactions };
+    }));
+
     const headers = await getAuthHeaders();
-    await fetch('/api/chat/reactions', {
+    const res = await fetch('/api/chat/reactions', {
       method: 'POST',
       headers,
       body: JSON.stringify({ messageId, reactionType: emoji }),
     });
-    // Realtime handles UI
-  }, [getAuthHeaders]);
+
+    if (!res.ok) {
+      setMessages((prev) => prev.map((message) => (
+        message.id === messageId ? current : message
+      )));
+    }
+  }, [currentUserId, getAuthHeaders, messages]);
+
+  const confirmDeleteMessage = useCallback(async () => {
+    if (!pendingDeleteMessageId) return;
+    await deleteMessage(pendingDeleteMessageId);
+    setPendingDeleteMessageId(null);
+    setShowDeleteConfirm(false);
+  }, [deleteMessage, pendingDeleteMessageId]);
 
   // ─────────────────────────── render ──────────────────────────────────────
 
@@ -377,6 +484,107 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
             bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC] text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-[#8338EC] animate-pulse" />
             Connected
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowHeaderMenu((prev) => !prev)}
+              className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+              aria-label="Chat actions"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
+
+            {showHeaderMenu && (
+              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden z-30">
+                {isArchived ? (
+                  <button
+                    onClick={async () => {
+                      const success = await onUnarchive();
+                      setActionToast(success
+                        ? { type: 'success', message: 'Conversation unarchived' }
+                        : { type: 'error', message: 'Could not unarchive conversation' }
+                      );
+                      setShowHeaderMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                  >
+                    Unarchive
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const success = await onArchive();
+                      setActionToast(success
+                        ? { type: 'success', message: 'Conversation archived' }
+                        : { type: 'error', message: 'Could not archive conversation' }
+                      );
+                      setShowHeaderMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2"
+                  >
+                    <Archive className="w-4 h-4" /> Archive
+                  </button>
+                )}
+
+                <button
+                  onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800 flex items-center gap-2"
+                >
+                  <Flag className="w-4 h-4" /> Report
+                </button>
+
+                {isBlocked ? (
+                  <button
+                    onClick={async () => {
+                      const success = await onUnblock();
+                      setActionToast(success
+                        ? { type: 'success', message: 'User unblocked' }
+                        : { type: 'error', message: 'Could not unblock user' }
+                      );
+                      setShowHeaderMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                  >
+                    <ShieldOff className="w-4 h-4" /> Unblock
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      const success = await onBlock();
+                      setActionToast(success
+                        ? { type: 'success', message: 'User blocked and connection removed' }
+                        : { type: 'error', message: 'Could not block user' }
+                      );
+                      if (success) {
+                        setTimeout(() => onClose(), 700);
+                      }
+                      setShowHeaderMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                  >
+                    <Shield className="w-4 h-4" /> Block
+                  </button>
+                )}
+
+                <button
+                  onClick={async () => {
+                    setShowHeaderMenu(false);
+                    const success = await onRemove();
+                    setActionToast(success
+                      ? { type: 'success', message: 'Connection removed' }
+                      : { type: 'error', message: 'Could not remove connection' }
+                    );
+                    if (success) {
+                      setTimeout(() => onClose(), 700);
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                >
+                  <UserMinus className="w-4 h-4" /> Remove connection
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -485,7 +693,10 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
                   senderInitial={otherInitial}
                   onReact={handleReact}
                   onEdit={startEdit}
-                  onDelete={deleteMessage}
+                  onDelete={(messageId) => {
+                    setPendingDeleteMessageId(messageId);
+                    setShowDeleteConfirm(true);
+                  }}
                 />
               )
             ))}
@@ -582,6 +793,122 @@ export default function ChatView({ connection, currentUserId, otherUserName, onC
           Press Enter to send · Shift+Enter for new line
         </p>
       </div>
+
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-[92%] max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5"
+            >
+              <h3 className="text-base font-semibold text-white">Delete message?</h3>
+              <p className="mt-2 text-sm text-zinc-400">This message will be removed permanently.</p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setPendingDeleteMessageId(null);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteMessage}
+                  className="px-3 py-2 rounded-xl bg-red-600 text-white hover:bg-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showReportDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-[92%] max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-5"
+            >
+              <h3 className="text-base font-semibold text-white">Report connection</h3>
+              <p className="mt-2 text-sm text-zinc-400">Describe what happened. This helps moderation review quickly.</p>
+              <textarea
+                value={reportReason}
+                onChange={(event) => setReportReason(event.target.value)}
+                rows={4}
+                className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                placeholder="Reason for report"
+              />
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowReportDialog(false);
+                    setReportReason('');
+                  }}
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const reason = reportReason.trim();
+                    if (!reason) return;
+                    const success = await onReport(reason);
+                    setActionToast(success
+                      ? { type: 'success', message: 'Report submitted' }
+                      : { type: 'error', message: 'Could not submit report' }
+                    );
+                    if (success) {
+                      setShowReportDialog(false);
+                      setReportReason('');
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-amber-600 text-white hover:bg-amber-500"
+                >
+                  Submit report
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {actionToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div
+              className={`rounded-xl border px-4 py-2.5 text-sm shadow-xl backdrop-blur-sm ${
+                actionToast.type === 'success'
+                  ? 'bg-emerald-600/90 border-emerald-400/40 text-white'
+                  : 'bg-red-600/90 border-red-400/40 text-white'
+              }`}
+            >
+              {actionToast.message}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

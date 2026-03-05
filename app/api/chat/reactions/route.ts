@@ -39,21 +39,25 @@ export async function POST(req: NextRequest) {
   const { user, supabase } = await getAuthUser(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Check if the reaction already exists
-  const { data: existing } = await supabase
+  // Check if reactions already exist for this user/message/emoji
+  const { data: existing, error: existingError } = await supabase
     .from('message_reactions')
     .select('id')
     .eq('message_id', messageId)
     .eq('user_id', user.id)
     .eq('reaction_type', reactionType)
-    .maybeSingle();
+    .limit(50);
 
-  if (existing) {
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 500 });
+  }
+
+  if ((existing ?? []).length > 0) {
     // Toggle off – delete
     const { error } = await supabase
       .from('message_reactions')
       .delete()
-      .eq('id', existing.id);
+      .in('id', (existing ?? []).map((row: { id: string }) => row.id));
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ action: 'removed' });
