@@ -828,7 +828,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         </p>
                       </div>
                     ) : (
-                      <div className="glass rounded-3xl border border-zinc-800 overflow-hidden divide-y divide-zinc-800/50">
+                      <div className="glass rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
                         {visibleChatConnections.map((conn) => {
                           const isArchived = archivedConnectionIds.has(conn.id);
                           return (
