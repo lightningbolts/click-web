@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +11,8 @@ import {
   QrCode,
   BookOpen,
   Sparkles,
-  MessageCircle
+  MessageCircle,
+  MoreHorizontal
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import { ChatView } from '@/components/chat';
@@ -53,6 +54,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [chapters, setChapters] = useState<TimelineChapter[]>([]);
   /** The connection whose chat is currently open, or null */
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
+  const [chatListTab, setChatListTab] = useState<'active' | 'archived'>('active');
+  const [archivedConnectionIds, setArchivedConnectionIds] = useState<Set<string>>(new Set());
+  const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
+  const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
@@ -214,6 +220,177 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+
+  const archiveStorageKey = user?.id ? `click:archived-connections:${user.id}` : null;
+
+  const writeArchivedToLocalStorage = useCallback((ids: Set<string>) => {
+    if (!archiveStorageKey || typeof window === 'undefined') return;
+    localStorage.setItem(archiveStorageKey, JSON.stringify(Array.from(ids)));
+  }, [archiveStorageKey]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const loadArchived = async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        if (archiveStorageKey && typeof window !== 'undefined') {
+          const raw = localStorage.getItem(archiveStorageKey);
+          if (raw) {
+            try {
+              setArchivedConnectionIds(new Set(JSON.parse(raw)));
+            } catch {
+              setArchivedConnectionIds(new Set());
+            }
+          }
+        }
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('connection_archives')
+          .select('connection_id')
+          .eq('user_id', user.id);
+
+        if (error) {
+          if (archiveStorageKey && typeof window !== 'undefined') {
+            const raw = localStorage.getItem(archiveStorageKey);
+            if (raw) {
+              try {
+                setArchivedConnectionIds(new Set(JSON.parse(raw)));
+              } catch {
+                setArchivedConnectionIds(new Set());
+              }
+            }
+          }
+          return;
+        }
+
+        const ids = new Set<string>((data ?? []).map((row: any) => row.connection_id));
+        setArchivedConnectionIds(ids);
+        writeArchivedToLocalStorage(ids);
+      } catch {
+        if (archiveStorageKey && typeof window !== 'undefined') {
+          const raw = localStorage.getItem(archiveStorageKey);
+          if (raw) {
+            try {
+              setArchivedConnectionIds(new Set(JSON.parse(raw)));
+            } catch {
+              setArchivedConnectionIds(new Set());
+            }
+          }
+        }
+      }
+    };
+
+    loadArchived();
+  }, [user?.id, archiveStorageKey, writeArchivedToLocalStorage]);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setMenuConnectionId(null);
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
+  }, []);
+
+  const updateArchivedIds = useCallback((updater: (prev: Set<string>) => Set<string>) => {
+    setArchivedConnectionIds((prev) => {
+      const next = updater(prev);
+      writeArchivedToLocalStorage(next);
+      return next;
+    });
+  }, [writeArchivedToLocalStorage]);
+
+  const archiveConnection = useCallback(async (connectionId: string) => {
+    updateArchivedIds((prev) => {
+      const next = new Set(prev);
+      next.add(connectionId);
+      return next;
+    });
+    setMenuConnectionId(null);
+
+    const supabase = getSupabaseClient();
+    if (!supabase || !user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('connection_archives')
+        .insert({ user_id: user.id, connection_id: connectionId });
+
+      if (error && error.code !== '23505') {
+        console.error('Error archiving connection:', error.message || error);
+      }
+    } catch (err) {
+      console.error('Unexpected archive error:', err);
+    }
+  }, [updateArchivedIds, user?.id]);
+
+  const unarchiveConnection = useCallback(async (connectionId: string) => {
+    updateArchivedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(connectionId);
+      return next;
+    });
+    setMenuConnectionId(null);
+    setChatListTab('active');
+
+    const supabase = getSupabaseClient();
+    if (!supabase || !user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('connection_archives')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('connection_id', connectionId);
+
+      if (error) {
+        console.error('Error unarchiving connection:', error.message || error);
+      }
+    } catch (err) {
+      console.error('Unexpected unarchive error:', err);
+    }
+  }, [updateArchivedIds, user?.id]);
+
+  const openActionMenu = useCallback((connectionId: string) => {
+    setMenuConnectionId((prev) => (prev === connectionId ? null : connectionId));
+  }, []);
+
+  const startLongPress = useCallback((connectionId: string) => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      setSuppressClickConnectionId(connectionId);
+      setMenuConnectionId(connectionId);
+    }, 450);
+  }, []);
+
+  const endLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const chatCandidates = useMemo(
+    () => connectionRecords.filter((c) => c.status === 'kept' || c.status === 'pending'),
+    [connectionRecords]
+  );
+
+  const activeConnections = useMemo(
+    () => chatCandidates.filter((c) => !archivedConnectionIds.has(c.id)),
+    [chatCandidates, archivedConnectionIds]
+  );
+
+  const archivedConnections = useMemo(
+    () => chatCandidates.filter((c) => archivedConnectionIds.has(c.id)),
+    [chatCandidates, archivedConnectionIds]
+  );
+
+  const visibleChatConnections = chatListTab === 'active' ? activeConnections : archivedConnections;
 
   const tabs: { id: DashboardTab; label: string; icon: any }[] = [
     { id: 'memory', label: 'Memory Box', icon: BookOpen },
@@ -424,41 +601,133 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       </div>
                     </div>
 
-                    {connectionRecords.length === 0 ? (
+                    <div className="inline-flex rounded-xl border border-zinc-800 bg-zinc-900/50 p-1">
+                      <button
+                        onClick={() => setChatListTab('active')}
+                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                          chatListTab === 'active'
+                            ? 'bg-[#8338EC]/20 text-[#C3A6FF] border border-[#8338EC]/30'
+                            : 'text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        Active ({activeConnections.length})
+                      </button>
+                      <button
+                        onClick={() => setChatListTab('archived')}
+                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                          chatListTab === 'archived'
+                            ? 'bg-[#8338EC]/20 text-[#C3A6FF] border border-[#8338EC]/30'
+                            : 'text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        Archived ({archivedConnections.length})
+                      </button>
+                    </div>
+
+                    {visibleChatConnections.length === 0 ? (
                       <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
                         <MessageCircle className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold mb-2">No Conversations Yet</h3>
+                        <h3 className="text-xl font-semibold mb-2">
+                          {chatListTab === 'active' ? 'No Active Conversations' : 'No Archived Conversations'}
+                        </h3>
                         <p className="text-zinc-400">
-                          Start meeting people and your chats will appear here!
+                          {chatListTab === 'active'
+                            ? 'Start meeting people and your chats will appear here!'
+                            : 'Archived chats will appear here.'}
                         </p>
                       </div>
                     ) : (
                       <div className="glass rounded-3xl border border-zinc-800 overflow-hidden divide-y divide-zinc-800/50">
-                        {connectionRecords.filter(c => c.status === 'kept' || c.status === 'pending').map((conn) => (
-                          <motion.button
-                            key={conn.id}
-                            whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
-                            whileTap={{ scale: 0.995 }}
-                            onClick={() => setSelectedConnection(conn)}
-                            className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors"
-                          >
-                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-sm font-bold shrink-0">
-                              {conn.name.charAt(0).toUpperCase()}
+                        {visibleChatConnections.map((conn) => {
+                          const isArchived = archivedConnectionIds.has(conn.id);
+                          return (
+                            <div key={conn.id} className="relative">
+                              <motion.button
+                                whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
+                                whileTap={{ scale: 0.995 }}
+                                onClick={() => {
+                                  if (suppressClickConnectionId === conn.id) {
+                                    setSuppressClickConnectionId(null);
+                                    return;
+                                  }
+                                  setSelectedConnection(conn);
+                                }}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  setMenuConnectionId(conn.id);
+                                }}
+                                onTouchStart={() => startLongPress(conn.id)}
+                                onTouchEnd={endLongPress}
+                                onTouchCancel={endLongPress}
+                                className="w-full flex items-center gap-4 px-5 py-4 pr-16 text-left transition-colors"
+                              >
+                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-sm font-bold shrink-0">
+                                  {conn.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-white truncate">{conn.name}</p>
+                                  <p className="text-xs text-zinc-500 truncate">
+                                    {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </p>
+                                </div>
+                                {conn.context && (
+                                  <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC]/10 text-[#8338EC] border border-[#8338EC]/20">
+                                    {conn.context}
+                                  </span>
+                                )}
+                                {isArchived ? (
+                                  <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-zinc-700/30 text-zinc-300 border border-zinc-600/40">
+                                    Archived
+                                  </span>
+                                ) : null}
+                                <MessageCircle className="w-4 h-4 text-zinc-600 shrink-0" />
+                              </motion.button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openActionMenu(conn.id);
+                                }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/70"
+                                aria-label={`Open actions for ${conn.name}`}
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+
+                              {menuConnectionId === conn.id && (
+                                <div
+                                  className="absolute right-4 top-[calc(50%+1.8rem)] z-20 min-w-[140px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() => {
+                                      setSelectedConnection(conn);
+                                      setMenuConnectionId(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-zinc-800"
+                                  >
+                                    Open chat
+                                  </button>
+                                  {isArchived ? (
+                                    <button
+                                      onClick={() => unarchiveConnection(conn.id)}
+                                      className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                    >
+                                      Unarchive
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => archiveConnection(conn.id)}
+                                      className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                                    >
+                                      Archive
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-white truncate">{conn.name}</p>
-                              <p className="text-xs text-zinc-500 truncate">
-                                {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </p>
-                            </div>
-                            {conn.context && (
-                              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC]/10 text-[#8338EC] border border-[#8338EC]/20">
-                                {conn.context}
-                              </span>
-                            )}
-                            <MessageCircle className="w-4 h-4 text-zinc-600 shrink-0" />
-                          </motion.button>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
