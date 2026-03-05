@@ -154,11 +154,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
             if (otherUserIds.length > 0) {
               const { data: usersData } = await supabase
                 .from('users')
-                .select('id, name')
+                .select('id, name, full_name, email')
                 .in('id', otherUserIds);
               if (usersData) {
                 userNameMap = Object.fromEntries(
-                  usersData.map((u: any) => [u.id, u.name])
+                  usersData.map((u: any) => {
+                    const resolvedName =
+                      (typeof u.full_name === 'string' && u.full_name.trim()) ||
+                      (typeof u.name === 'string' && u.name.trim()) ||
+                      (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
+                      '';
+                    return [u.id, resolvedName];
+                  })
                 );
               }
             }
@@ -182,10 +189,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 }
               }
 
+              const displayName =
+                (typeof otherUserName === 'string' && otherUserName.trim()) ||
+                'Connection';
+
               return {
                 id: conn.id,
                 otherUserId,
-                name: otherUserName || conn.semantic_location || 'Connection',
+                name: displayName,
                 dateMet: new Date(conn.created || conn.created_at),
                 location: conn.semantic_location || 'Unknown location',
                 context: conn.context || undefined,
