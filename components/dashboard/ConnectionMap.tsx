@@ -11,6 +11,66 @@ interface ConnectionMapProps {
   onConnectionClick?: (connection: ConnectionRecord) => void;
 }
 
+type PositionedConnection = {
+  connection: ConnectionRecord;
+  markerLongitude: number;
+  markerLatitude: number;
+};
+
+const coordinateBucket = (latitude: number, longitude: number): string => {
+  const latBucket = latitude.toFixed(6);
+  const lonBucket = longitude.toFixed(6);
+  return `${latBucket},${lonBucket}`;
+};
+
+const spreadOverlappingConnections = (input: ConnectionRecord[]): PositionedConnection[] => {
+  const grouped = new Map<string, ConnectionRecord[]>();
+
+  input.forEach((connection) => {
+    if (!connection.geo_location) return;
+    const key = coordinateBucket(connection.geo_location.latitude, connection.geo_location.longitude);
+    const existing = grouped.get(key) ?? [];
+    grouped.set(key, [...existing, connection]);
+  });
+
+  const positioned: PositionedConnection[] = [];
+
+  grouped.forEach((group) => {
+    if (group.length === 0) return;
+
+    const base = group[0].geo_location;
+    if (!base) return;
+
+    if (group.length === 1) {
+      positioned.push({
+        connection: group[0],
+        markerLatitude: base.latitude,
+        markerLongitude: base.longitude,
+      });
+      return;
+    }
+
+    const latRad = (base.latitude * Math.PI) / 180;
+    const metersPerDegLat = 111_320;
+    const metersPerDegLon = Math.max(111_320 * Math.cos(latRad), 1e-6);
+    const ringRadiusMeters = 14;
+
+    group.forEach((connection, index) => {
+      const angle = (2 * Math.PI * index) / group.length;
+      const deltaLat = (Math.sin(angle) * ringRadiusMeters) / metersPerDegLat;
+      const deltaLon = (Math.cos(angle) * ringRadiusMeters) / metersPerDegLon;
+
+      positioned.push({
+        connection,
+        markerLatitude: base.latitude + deltaLat,
+        markerLongitude: base.longitude + deltaLon,
+      });
+    });
+  });
+
+  return positioned;
+};
+
 /**
  * ConnectionMap - MapLibre GL map component for displaying connection locations
  * Separated into its own component for better isolation and rendering
@@ -35,6 +95,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       !(latitude === 0 && longitude === 0)
     );
   });
+  const positionedConnections = spreadOverlappingConnections(geoConnections);
   const hasGeoConnections = geoConnections.length > 0;
 
   // Initialize map
@@ -68,7 +129,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         mapInstance.resize();
 
         // Add markers
-        geoConnections.forEach((connection) => {
+        positionedConnections.forEach(({ connection, markerLatitude, markerLongitude }) => {
           if (connection.geo_location) {
             const el = document.createElement('div');
             el.className = 'connection-marker';
@@ -93,7 +154,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             }).setHTML(popupContent);
 
             const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-              .setLngLat([connection.geo_location.longitude, connection.geo_location.latitude])
+              .setLngLat([markerLongitude, markerLatitude])
               .setPopup(popup)
               .addTo(mapInstance);
 
@@ -146,7 +207,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       }
       setMapLoaded(false);
     };
-  }, []);
+  }, [positionedConnections]);
 
   // Handle resize
   useEffect(() => {

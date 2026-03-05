@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Sparkles, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 
 // ─── Shared interest taxonomy ───
 export interface InterestCategory {
@@ -12,22 +12,30 @@ export interface InterestCategory {
 }
 
 export const INTEREST_CATEGORIES: InterestCategory[] = [
-    { emoji: '🎵', label: 'Music', subs: ['Live Shows', 'DJing', 'Producing', 'Guitar', 'Piano', 'Singing'] },
-    { emoji: '🥾', label: 'Hiking', subs: ['Day Hikes', 'Backpacking', 'Trail Running', 'Rock Climbing'] },
+    { emoji: '🎵', label: 'Music', subs: ['Live Shows', 'DJing', 'Producing', 'Guitar', 'Piano', 'Singing', 'Alto Sax', 'Tenor Sax', 'Drums', 'Violin', 'Bass', 'Songwriting'] },
+    { emoji: '🎼', label: 'Instruments', subs: ['Alto Sax', 'Tenor Sax', 'Trumpet', 'Clarinet', 'Cello', 'Flute', 'Ukulele', 'Synth', 'Beat Making'] },
+    { emoji: '🥾', label: 'Hiking', subs: ['Day Hikes', 'Backpacking', 'Trail Running', 'Rock Climbing', 'Scrambling', 'Nature Walks'] },
     { emoji: '☕', label: 'Coffee', subs: ['Espresso', 'Pour Over', 'Cafe Hopping', 'Latte Art', 'Home Brewing'] },
-    { emoji: '🎮', label: 'Gaming', subs: ['PC', 'Console', 'Indie', 'Board Games', 'VR', 'Competitive'] },
+    { emoji: '🎮', label: 'Gaming', subs: ['PC', 'Console', 'Indie', 'Board Games', 'VR', 'Competitive', 'Co-op', 'RPG', 'Strategy'] },
     { emoji: '📚', label: 'Reading', subs: ['Fiction', 'Non-Fiction', 'Sci-Fi', 'Fantasy', 'Book Clubs', 'Poetry'] },
-    { emoji: '💪', label: 'Fitness', subs: ['Gym', 'Yoga', 'CrossFit', 'Running', 'Swimming', 'Martial Arts'] },
-    { emoji: '💻', label: 'Tech', subs: ['AI/ML', 'Web Dev', 'Mobile Dev', 'Cybersecurity', 'Hardware', 'Open Source'] },
-    { emoji: '🎨', label: 'Art', subs: ['Painting', 'Sketching', 'Digital Art', 'Sculpture', 'Ceramics', 'Street Art'] },
+    { emoji: '💪', label: 'Fitness', subs: ['Gym', 'Yoga', 'CrossFit', 'Running', 'Swimming', 'Martial Arts', 'Pilates', 'Cycling'] },
+    { emoji: '💻', label: 'Tech', subs: ['AI/ML', 'Web Dev', 'Mobile Dev', 'Cybersecurity', 'Hardware', 'Open Source', 'Cloud', 'Data Science'] },
+    { emoji: '🎨', label: 'Art', subs: ['Painting', 'Sketching', 'Digital Art', 'Sculpture', 'Ceramics', 'Street Art', 'Calligraphy', 'Graphic Design'] },
     { emoji: '🎬', label: 'Film', subs: ['Indie Film', 'Horror', 'Documentaries', 'Animation', 'Film Making'] },
-    { emoji: '🍕', label: 'Food', subs: ['Cooking', 'Baking', 'Food Trucks', 'Fine Dining', 'Vegan', 'BBQ'] },
-    { emoji: '✈️', label: 'Travel', subs: ['Backpacking', 'Road Trips', 'City Breaks', 'Solo Travel', 'Camping'] },
-    { emoji: '👨‍💻', label: 'Coding', subs: ['Python', 'JavaScript', 'Rust', 'Hackathons', 'Side Projects'] },
-    { emoji: '⚽', label: 'Sports', subs: ['Basketball', 'Soccer', 'Tennis', 'Volleyball', 'Skiing', 'Surfing'] },
+    { emoji: '🍕', label: 'Food', subs: ['Cooking', 'Baking', 'Food Trucks', 'Fine Dining', 'Vegan', 'BBQ', 'Sushi', 'Meal Prep'] },
+    { emoji: '✈️', label: 'Travel', subs: ['Backpacking', 'Road Trips', 'City Breaks', 'Solo Travel', 'Camping', 'Digital Nomad', 'Hostels'] },
+    { emoji: '👨‍💻', label: 'Coding', subs: ['Python', 'JavaScript', 'Rust', 'Hackathons', 'Side Projects', 'Kotlin', 'TypeScript', 'Game Dev'] },
+    { emoji: '⚽', label: 'Sports', subs: ['Basketball', 'Soccer', 'Baseball', 'Football', 'Tennis', 'Volleyball', 'Skiing', 'Surfing'] },
+    { emoji: '🏈', label: 'Team Sports', subs: ['Baseball', 'Football', 'Softball', 'Flag Football', 'Rugby', 'Ultimate Frisbee'] },
+    { emoji: '🏃', label: 'Outdoor Sports', subs: ['Running', 'Cycling', 'Triathlon', 'Climbing', 'Skiing', 'Snowboarding', 'Surfing'] },
     { emoji: '🤝', label: 'Volunteering', subs: ['Environment', 'Education', 'Community', 'Animal Welfare', 'Mentoring'] },
     { emoji: '🚀', label: 'Startups', subs: ['Founding', 'VC/Finance', 'Product', 'Growth', 'Social Impact'] },
-    { emoji: '📸', label: 'Photography', subs: ['Street', 'Portrait', 'Landscape', 'Film Photography', 'Drone'] },
+    { emoji: '📸', label: 'Photography', subs: ['Street', 'Portrait', 'Landscape', 'Film Photography', 'Drone', 'Concert Photography', 'Editing'] },
+    { emoji: '🧘', label: 'Wellness', subs: ['Meditation', 'Mindfulness', 'Breathwork', 'Journaling', 'Mental Health'] },
+    { emoji: '🗣️', label: 'Languages', subs: ['Spanish', 'French', 'Mandarin', 'Japanese', 'Korean', 'Language Exchange'] },
+    { emoji: '🎭', label: 'Performing Arts', subs: ['Theater', 'Improv', 'Acting', 'Stand-up Comedy', 'Dance'] },
+    { emoji: '🐶', label: 'Animals', subs: ['Dogs', 'Cats', 'Birds', 'Animal Rescue', 'Pet Training'] },
+    { emoji: '🧩', label: 'Puzzles & Strategy', subs: ['Chess', 'Sudoku', 'Escape Rooms', 'Crosswords', 'Go'] },
 ];
 
 const MIN_TAGS = 3;
@@ -47,6 +55,7 @@ interface InterestTaggingProps {
 export default function InterestTagging({ onComplete, onSkip, canSkip = true, initialTags = [] }: InterestTaggingProps) {
     const [selected, setSelected] = useState<string[]>(initialTags);
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+    const [customInterestInput, setCustomInterestInput] = useState('');
 
     const toggleTag = (tag: string) => {
         if (selected.includes(tag)) {
@@ -59,6 +68,29 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
     const toggleExpand = (label: string) => {
         setExpandedCategory(expandedCategory === label ? null : label);
     };
+
+    const addCustomInterest = () => {
+        const raw = customInterestInput.trim();
+        if (!raw) return;
+        if (selected.length >= MAX_TAGS) return;
+
+        const normalized = raw.toLowerCase();
+        const exists = selected.some((s) => s.toLowerCase() === normalized);
+        if (!exists) {
+            setSelected([...selected, raw]);
+        }
+        setCustomInterestInput('');
+    };
+
+    const removeCustomInterest = (tag: string) => {
+        setSelected(selected.filter((s) => s !== tag));
+    };
+
+    const predefinedTags = new Set(
+        INTEREST_CATEGORIES.flatMap((category) => [category.label, ...category.subs])
+            .map((tag) => tag.toLowerCase())
+    );
+    const customSelectedTags = selected.filter((tag) => !predefinedTags.has(tag.toLowerCase()));
 
     return (
         <motion.div
@@ -104,6 +136,51 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         onToggleExpand={toggleExpand}
                         maxTags={MAX_TAGS}
                     />
+
+                    <div className="mt-5 space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-zinc-500">Custom interests</p>
+                        <div className="flex gap-2">
+                            <input
+                                value={customInterestInput}
+                                onChange={(e) => setCustomInterestInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addCustomInterest();
+                                    }
+                                }}
+                                placeholder="Add your own interest"
+                                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#8338EC]"
+                            />
+                            <button
+                                onClick={addCustomInterest}
+                                disabled={selected.length >= MAX_TAGS || customInterestInput.trim().length === 0}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#8338EC]/40 px-3 py-2 text-sm text-[#caa8ff] hover:bg-[#8338EC]/15 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <Plus className="w-4 h-4" /> Add
+                            </button>
+                        </div>
+
+                        {customSelectedTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                {customSelectedTags.map((tag) => (
+                                    <span
+                                        key={tag}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2 py-1 text-xs text-[#9bc8ff]"
+                                    >
+                                        {tag}
+                                        <button
+                                            onClick={() => removeCustomInterest(tag)}
+                                            className="rounded p-0.5 hover:bg-white/10"
+                                            aria-label={`Remove ${tag}`}
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <div className="space-y-3 mt-8">
                         <button
