@@ -18,34 +18,69 @@ type PositionedConnection = {
   groupedConnections: ConnectionRecord[];
 };
 
-const coordinateBucket = (latitude: number, longitude: number): string => {
-  const latBucket = latitude.toFixed(7);
-  const lonBucket = longitude.toFixed(7);
-  return `${latBucket},${lonBucket}`;
-};
+const FEET_TO_METERS = 0.3048;
+const GROUPING_DISTANCE_METERS = 10 * FEET_TO_METERS;
 
 const spreadOverlappingConnections = (input: ConnectionRecord[]): PositionedConnection[] => {
-  const grouped = new Map<string, ConnectionRecord[]>();
+  const withLocation = input.filter((connection) => connection.geo_location);
 
-  input.forEach((connection) => {
-    if (!connection.geo_location) return;
-    const key = coordinateBucket(connection.geo_location.latitude, connection.geo_location.longitude);
-    const existing = grouped.get(key) ?? [];
-    grouped.set(key, [...existing, connection]);
+  const distanceMeters = (a: ConnectionRecord, b: ConnectionRecord): number => {
+    if (!a.geo_location || !b.geo_location) return Number.POSITIVE_INFINITY;
+
+    const lat1 = (a.geo_location.latitude * Math.PI) / 180;
+    const lon1 = (a.geo_location.longitude * Math.PI) / 180;
+    const lat2 = (b.geo_location.latitude * Math.PI) / 180;
+    const lon2 = (b.geo_location.longitude * Math.PI) / 180;
+
+    const dLat = lat2 - lat1;
+    const dLon = lon2 - lon1;
+    const haversine =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    return 2 * 6371000 * Math.asin(Math.sqrt(haversine));
+  };
+
+  const sorted = withLocation
+    .slice()
+    .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
+
+  const clusters: ConnectionRecord[][] = [];
+
+  // Greedy clustering around each group's anchor point (first member) prevents
+  // transitive chain-merges that can move grouped dots far from expected locations.
+  sorted.forEach((connection) => {
+    const targetCluster = clusters.find((cluster) => {
+      const anchor = cluster[0];
+      return distanceMeters(connection, anchor) <= GROUPING_DISTANCE_METERS;
+    });
+
+    if (targetCluster) {
+      targetCluster.push(connection);
+    } else {
+      clusters.push([connection]);
+    }
   });
 
   const positioned: PositionedConnection[] = [];
 
-  grouped.forEach((group) => {
+  clusters.forEach((group) => {
     if (group.length === 0) return;
 
-    const base = group[0].geo_location;
-    if (!base) return;
+    const valid = group.filter((connection) => connection.geo_location);
+    if (valid.length === 0) return;
+
+    const centroidLatitude = valid.reduce((sum, connection) => sum + (connection.geo_location?.latitude ?? 0), 0) / valid.length;
+    const centroidLongitude = valid.reduce((sum, connection) => sum + (connection.geo_location?.longitude ?? 0), 0) / valid.length;
+
+    const displayConnection = group
+      .slice()
+      .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime())[0];
 
     positioned.push({
-      connection: group[0],
-      markerLatitude: base.latitude,
-      markerLongitude: base.longitude,
+      connection: displayConnection,
+      markerLatitude: centroidLatitude,
+      markerLongitude: centroidLongitude,
       groupedConnections: group,
     });
   });
@@ -113,9 +148,17 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         // Add markers
         positionedConnections.forEach(({ connection, markerLatitude, markerLongitude, groupedConnections }) => {
           if (connection.geo_location) {
+            // Zero-size anchor div: MapLibre positions this 0×0 point exactly at the
+            // coordinate (no offsetWidth/offsetHeight measurement needed), so the dot
+            // never drifts at any zoom level.
+            const anchor = document.createElement('div');
+            anchor.style.cssText = 'position: relative; width: 0; height: 0;';
+
             const el = document.createElement('div');
             el.className = 'connection-marker';
-            el.style.cssText = 'width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #8338EC, #3A86FF); border: 3px solid white; cursor: pointer; box-shadow: 0 0 16px rgba(131, 56, 236, 0.6); transition: box-shadow 0.2s ease, width 0.2s ease, height 0.2s ease;';
+            // translate(-50%, -50%) centers the dot on the anchor point regardless of
+            // its size, which also means the grow-on-hover effect stays perfectly centered.
+            el.style.cssText = 'position: absolute; transform: translate(-50%, -50%); width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #8338EC, #3A86FF); border: 3px solid white; cursor: pointer; box-shadow: 0 0 16px rgba(131, 56, 236, 0.6); transition: box-shadow 0.2s ease, width 0.2s ease, height 0.2s ease;';
             el.onmouseenter = () => { el.style.width = '34px'; el.style.height = '34px'; el.style.boxShadow = '0 0 24px rgba(131, 56, 236, 0.8)'; };
             el.onmouseleave = () => { el.style.width = '28px'; el.style.height = '28px'; el.style.boxShadow = '0 0 16px rgba(131, 56, 236, 0.6)'; };
 
@@ -123,9 +166,12 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
               const badge = document.createElement('div');
               badge.style.cssText = 'position:absolute; right:-8px; top:-8px; min-width:18px; height:18px; padding:0 4px; border-radius:9999px; background:#18181b; color:#C3A6FF; border:1px solid #8338EC; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; line-height:1;';
               badge.textContent = String(groupedConnections.length);
-              el.style.position = 'relative';
+              // el is already position:absolute so it creates a positioning context
+              // for the badge — no need to override position here.
               el.appendChild(badge);
             }
+
+            anchor.appendChild(el);
 
             const groupedRows = groupedConnections
               .map((conn) => {
@@ -158,7 +204,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
               maxWidth: '280px',
             }).setHTML(popupContent);
 
-            const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            const marker = new maplibregl.Marker({ element: anchor })
               .setLngLat([markerLongitude, markerLatitude])
               .setPopup(popup)
               .addTo(mapInstance);
