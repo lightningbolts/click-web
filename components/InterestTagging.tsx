@@ -39,7 +39,6 @@ export const INTEREST_CATEGORIES: InterestCategory[] = [
 ];
 
 const MIN_TAGS = 3;
-const MAX_TAGS = 12;
 
 interface InterestTaggingProps {
     onComplete: (tags: string[]) => void;
@@ -60,7 +59,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
     const toggleTag = (tag: string) => {
         if (selected.includes(tag)) {
             setSelected(selected.filter((s) => s !== tag));
-        } else if (selected.length < MAX_TAGS) {
+        } else {
             setSelected([...selected, tag]);
         }
     };
@@ -72,8 +71,6 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
     const addCustomInterest = () => {
         const raw = customInterestInput.trim();
         if (!raw) return;
-        if (selected.length >= MAX_TAGS) return;
-
         const normalized = raw.toLowerCase();
         const exists = selected.some((s) => s.toLowerCase() === normalized);
         if (!exists) {
@@ -118,13 +115,13 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         </div>
                         <h2 className="text-3xl font-bold text-white mb-2">What are you into?</h2>
                         <p className="text-zinc-400 text-sm">
-                            Pick {MIN_TAGS}–{MAX_TAGS} interests. Tap a category to see subcategories.
+                            Pick at least {MIN_TAGS} interests. Tap a category to see subcategories.
                         </p>
                     </div>
 
                     <div className="text-center mb-5">
                         <span className={`text-xs font-medium ${selected.length >= MIN_TAGS ? 'text-[#8338EC]' : 'text-zinc-500'}`}>
-                            {selected.length} / {MAX_TAGS} selected
+                            {selected.length} selected
                             {selected.length < MIN_TAGS && ` (min ${MIN_TAGS})`}
                         </span>
                     </div>
@@ -134,7 +131,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         expandedCategory={expandedCategory}
                         onToggleTag={toggleTag}
                         onToggleExpand={toggleExpand}
-                        maxTags={MAX_TAGS}
+                        maxTags={undefined}
                     />
 
                     <div className="mt-5 space-y-2">
@@ -154,7 +151,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                             />
                             <button
                                 onClick={addCustomInterest}
-                                disabled={selected.length >= MAX_TAGS || customInterestInput.trim().length === 0}
+                                    disabled={customInterestInput.trim().length === 0}
                                 className="inline-flex items-center gap-1 rounded-lg border border-[#8338EC]/40 px-3 py-2 text-sm text-[#caa8ff] hover:bg-[#8338EC]/15 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 <Plus className="w-4 h-4" /> Add
@@ -212,7 +209,7 @@ interface InterestGridProps {
     expandedCategory: string | null;
     onToggleTag: (tag: string) => void;
     onToggleExpand: (category: string) => void;
-    maxTags: number;
+    maxTags?: number;
 }
 
 export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggleExpand, maxTags }: InterestGridProps) {
@@ -282,7 +279,7 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                                         key={sub}
                                                         whileTap={{ scale: 0.95 }}
                                                         onClick={() => onToggleTag(sub)}
-                                                        disabled={!subSelected && selected.length >= maxTags}
+                                                        disabled={maxTags != null && !subSelected && selected.length >= maxTags}
                                                         className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${subSelected
                                                             ? 'bg-[#8338EC]/20 border-[#8338EC]/40 text-[#8338EC]'
                                                             : 'bg-white/[0.03] border-zinc-800 text-zinc-400 hover:text-zinc-300 hover:border-zinc-600 disabled:opacity-30'

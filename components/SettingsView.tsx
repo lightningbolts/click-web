@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
-import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
 
@@ -32,6 +32,7 @@ export default function SettingsView() {
   const [tagsLoading, setTagsLoading] = useState(false);
   const [tagsMessage, setTagsMessage] = useState({ type: '', text: '' });
   const [tagsDirty, setTagsDirty] = useState(false);
+  const [customInterestInput, setCustomInterestInput] = useState('');
 
   // Reset initialization when user changes
   useEffect(() => {
@@ -52,10 +53,31 @@ export default function SettingsView() {
   const toggleTag = (tag: string) => {
     const next = tags.includes(tag)
       ? tags.filter((t) => t !== tag)
-      : tags.length < 12 ? [...tags, tag] : tags;
+      : [...tags, tag];
     setTags(next);
     setTagsDirty(true);
   };
+
+  const addCustomInterest = () => {
+    const raw = customInterestInput.trim();
+    if (!raw) return;
+    const exists = tags.some((t) => t.toLowerCase() === raw.toLowerCase());
+    if (!exists) {
+      setTags([...tags, raw]);
+      setTagsDirty(true);
+    }
+    setCustomInterestInput('');
+  };
+
+  const removeCustomInterest = (tag: string) => {
+    setTags(tags.filter((t) => t !== tag));
+    setTagsDirty(true);
+  };
+
+  const predefinedTags = new Set(
+    INTEREST_CATEGORIES.flatMap((category) => [category.label, ...category.subs]).map((t) => t.toLowerCase())
+  );
+  const customSelectedTags = tags.filter((tag) => !predefinedTags.has(tag.toLowerCase()));
 
   const handleSaveTags = async () => {
     const supabase = getSupabaseClient();
@@ -257,7 +279,7 @@ export default function SettingsView() {
           <div>
             <h3 className="text-xl font-bold">My Interests</h3>
             <p className="text-zinc-400 text-sm">
-              Tap a category to select it. Use the ▾ arrow for subcategories.
+              Select categories/subcategories and add your own custom interests.
             </p>
           </div>
         </div>
@@ -281,8 +303,53 @@ export default function SettingsView() {
           expandedCategory={expandedCategory}
           onToggleTag={toggleTag}
           onToggleExpand={(cat) => setExpandedCategory(expandedCategory === cat ? null : cat)}
-          maxTags={12}
+          maxTags={undefined}
         />
+
+        <div className="mt-5 space-y-2">
+          <p className="text-xs uppercase tracking-wide text-zinc-500">Custom interests</p>
+          <div className="flex gap-2">
+            <input
+              value={customInterestInput}
+              onChange={(e) => setCustomInterestInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addCustomInterest();
+                }
+              }}
+              placeholder="Add your own interest"
+              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#8338EC]"
+            />
+            <button
+              onClick={addCustomInterest}
+              disabled={customInterestInput.trim().length === 0}
+              className="inline-flex items-center gap-1 rounded-lg border border-[#8338EC]/40 px-3 py-2 text-sm text-[#caa8ff] hover:bg-[#8338EC]/15 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
+
+          {customSelectedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {customSelectedTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2 py-1 text-xs text-[#9bc8ff]"
+                >
+                  {tag}
+                  <button
+                    onClick={() => removeCustomInterest(tag)}
+                    className="rounded p-0.5 hover:bg-white/10"
+                    aria-label={`Remove ${tag}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         {tagsMessage.text && (
           <div className={`mt-4 p-3 rounded-xl text-sm ${tagsMessage.type === 'error'
