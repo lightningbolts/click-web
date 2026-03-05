@@ -6,12 +6,12 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import LoadingScreen from '@/components/LoadingScreen';
 import DashboardView from '@/components/DashboardView';
+import LoginModal from '@/components/LoginModal';
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [signupFirst, setSignupFirst] = useState(false);
 
   // Show loading screen while checking auth
   if (loading) {
@@ -23,30 +23,11 @@ export default function Home() {
     return <DashboardView user={user} />;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setIsSubmitted(true);
-      }
-    } catch (error) {
-      console.error('Error joining waitlist:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const openSignup = () => { setSignupFirst(true); setShowAuth(true); };
+  const openLogin  = () => { setSignupFirst(false); setShowAuth(true); };
 
   return (
+    <>
     <div className="min-h-screen bg-zinc-950 text-white overflow-hidden">
       {/* Background gradient effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -92,45 +73,30 @@ export default function Home() {
               Stop collecting followers. Start building real connections with the digital handshake.
             </p>
 
-            {/* Email Waitlist Form */}
-            <motion.form
+            {/* CTA Buttons */}
+            <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.6 }}
-              onSubmit={handleSubmit}
-              className="max-w-md mx-auto px-4"
+              className="flex flex-col sm:flex-row gap-3 justify-center items-center max-w-md mx-auto px-4"
             >
-              {!isSubmitted ? (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    required
-                    className="w-full sm:flex-1 glass px-6 py-3 text-white placeholder-zinc-500 focus:outline-none rounded-full text-sm sm:text-base"
-                  />
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full sm:w-auto px-8 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-full font-semibold transition-all glow-violet disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
-                  >
-                    {isLoading ? 'Joining...' : 'Join the Waitlist'}
-                  </motion.button>
-                </div>
-              ) : (
-                <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="glass p-6 rounded-2xl"
-                >
-                  <p className="text-[#8338EC] font-semibold">✨ You're on the list!</p>
-                  <p className="text-zinc-400 text-sm mt-2">We'll notify you when we launch.</p>
-                </motion.div>
-              )}
-            </motion.form>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={openSignup}
+                className="w-full sm:w-auto px-8 py-3.5 bg-[#8338EC] hover:bg-[#9d4eff] rounded-full font-semibold transition-all glow-violet text-sm sm:text-base whitespace-nowrap"
+              >
+                Create Account
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={openLogin}
+                className="w-full sm:w-auto px-8 py-3.5 glass rounded-full font-semibold border border-zinc-700 hover:border-[#8338EC]/50 transition-all text-sm sm:text-base whitespace-nowrap"
+              >
+                Sign In
+              </motion.button>
+            </motion.div>
           </motion.div>
         </div>
       </section>
@@ -447,6 +413,14 @@ export default function Home() {
         </div>
       </section>
     </div>
+
+      {/* Auth modal - opens in sign-up or sign-in mode depending on which button was clicked */}
+      <LoginModal
+        isOpen={showAuth}
+        onClose={() => setShowAuth(false)}
+        initialIsSignup={signupFirst}
+      />
+    </>
   );
 }
 

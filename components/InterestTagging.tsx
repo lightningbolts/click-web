@@ -215,14 +215,15 @@ interface InterestGridProps {
 export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggleExpand, maxTags }: InterestGridProps) {
     return (
         <div className="space-y-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 2-column grid — keeps labels fully readable at all viewport sizes */}
+            <div className="grid grid-cols-2 gap-2">
                 {INTEREST_CATEGORIES.map(({ emoji, label, subs }) => {
                     const isSelected = selected.includes(label);
                     const hasSelectedSubs = subs.some(s => selected.includes(s));
                     const isExpanded = expandedCategory === label;
 
                     return (
-                        <div key={label} className={isExpanded ? 'col-span-2 sm:col-span-4' : ''}>
+                        <div key={label} className={isExpanded ? 'col-span-2' : ''}>
                             <motion.div
                                 role="button"
                                 tabIndex={0}

@@ -2,18 +2,20 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Open directly in sign-up mode (default: false = sign-in mode) */
+  initialIsSignup?: boolean;
 }
 
-export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
+export default function LoginModal({ isOpen, onClose, initialIsSignup = false }: LoginModalProps) {
   const router = useRouter();
-  const [isSignup, setIsSignup] = useState(false);
+  const [isSignup, setIsSignup] = useState(initialIsSignup);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +24,16 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Reset to the intended mode each time the modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setIsSignup(initialIsSignup);
+      setIsForgotPassword(false);
+      setError('');
+      setSuccess('');
+    }
+  }, [isOpen, initialIsSignup]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
