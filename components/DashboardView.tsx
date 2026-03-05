@@ -59,6 +59,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
   const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
+  const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Interest tagging onboarding gate
@@ -225,6 +226,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const archiveStorageKey = user?.id ? `click:archived-connections:${user.id}` : null;
 
+  const isMissingArchiveTableError = useCallback((error: any) => {
+    const code = error?.code;
+    const message = String(error?.message || '').toLowerCase();
+    return code === 'PGRST205' ||
+      message.includes('connection_archives') ||
+      message.includes('schema cache');
+  }, []);
+
   const writeArchivedToLocalStorage = useCallback((ids: Set<string>) => {
     if (!archiveStorageKey || typeof window === 'undefined') return;
     localStorage.setItem(archiveStorageKey, JSON.stringify(Array.from(ids)));
@@ -250,12 +259,29 @@ export default function DashboardView({ user }: DashboardViewProps) {
       }
 
       try {
+        if (!archiveTableAvailable) {
+          if (archiveStorageKey && typeof window !== 'undefined') {
+            const raw = localStorage.getItem(archiveStorageKey);
+            if (raw) {
+              try {
+                setArchivedConnectionIds(new Set(JSON.parse(raw)));
+              } catch {
+                setArchivedConnectionIds(new Set());
+              }
+            }
+          }
+          return;
+        }
+
         const { data, error } = await supabase
           .from('connection_archives')
           .select('connection_id')
           .eq('user_id', user.id);
 
         if (error) {
+          if (isMissingArchiveTableError(error)) {
+            setArchiveTableAvailable(false);
+          }
           if (archiveStorageKey && typeof window !== 'undefined') {
             const raw = localStorage.getItem(archiveStorageKey);
             if (raw) {
@@ -287,7 +313,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     };
 
     loadArchived();
-  }, [user?.id, archiveStorageKey, writeArchivedToLocalStorage]);
+  }, [archiveStorageKey, archiveTableAvailable, isMissingArchiveTableError, user?.id, writeArchivedToLocalStorage]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -316,7 +342,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [user?.id]);
 
   useEffect(() => {
-    const handleGlobalClick = () => setMenuConnectionId(null);
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('[data-connection-menu]') || target.closest('[data-connection-menu-trigger]')) {
+        return;
+      }
+      setMenuConnectionId(null);
+    };
     document.addEventListener('click', handleGlobalClick);
     return () => document.removeEventListener('click', handleGlobalClick);
   }, []);
@@ -344,13 +377,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setMenuConnectionId(null);
 
     const supabase = getSupabaseClient();
-    if (!supabase || !user?.id) return true;
+    if (!supabase || !user?.id || !archiveTableAvailable) return true;
     try {
       const { error } = await supabase
         .from('connection_archives')
         .insert({ user_id: user.id, connection_id: connectionId });
 
       if (error && error.code !== '23505') {
+        if (isMissingArchiveTableError(error)) {
+          setArchiveTableAvailable(false);
+          return true;
+        }
         console.error('Error archiving connection:', error.message || error);
         return false;
       }
@@ -359,7 +396,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       console.error('Unexpected archive error:', err);
       return false;
     }
-  }, [updateArchivedIds, user?.id]);
+  }, [archiveTableAvailable, isMissingArchiveTableError, updateArchivedIds, user?.id]);
 
   const unarchiveConnection = useCallback(async (connectionId: string): Promise<boolean> => {
     updateArchivedIds((prev) => {
@@ -371,7 +408,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setChatListTab('active');
 
     const supabase = getSupabaseClient();
-    if (!supabase || !user?.id) return true;
+    if (!supabase || !user?.id || !archiveTableAvailable) return true;
     try {
       const { error } = await supabase
         .from('connection_archives')
@@ -380,6 +417,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
         .eq('connection_id', connectionId);
 
       if (error) {
+        if (isMissingArchiveTableError(error)) {
+          setArchiveTableAvailable(false);
+          return true;
+        }
         console.error('Error unarchiving connection:', error.message || error);
         return false;
       }
@@ -388,7 +429,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       console.error('Unexpected unarchive error:', err);
       return false;
     }
-  }, [updateArchivedIds, user?.id]);
+  }, [archiveTableAvailable, isMissingArchiveTableError, updateArchivedIds, user?.id]);
 
   const openActionMenu = useCallback((connectionId: string) => {
     setMenuConnectionId((prev) => (prev === connectionId ? null : connectionId));
@@ -838,6 +879,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                   e.stopPropagation();
                                   openActionMenu(conn.id);
                                 }}
+                                data-connection-menu-trigger
                                 className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/70"
                                 aria-label={`Open actions for ${conn.name}`}
                               >
@@ -846,6 +888,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
                               {menuConnectionId === conn.id && (
                                 <div
+                                  data-connection-menu
                                   className="absolute right-4 top-[calc(50%+1.8rem)] z-20 min-w-[140px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -873,6 +916,47 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       Archive
                                     </button>
                                   )}
+                                  <button
+                                    onClick={async () => {
+                                      const reason = window.prompt('Report reason');
+                                      if (!reason) return;
+                                      await reportConnection(conn.id, reason);
+                                      setMenuConnectionId(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800"
+                                  >
+                                    Report
+                                  </button>
+                                  {conn.otherUserId && blockedUserIds.has(conn.otherUserId) ? (
+                                    <button
+                                      onClick={async () => {
+                                        await unblockUser(conn);
+                                        setMenuConnectionId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-sm text-emerald-300 hover:bg-zinc-800"
+                                    >
+                                      Unblock
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={async () => {
+                                        await blockUser(conn);
+                                        setMenuConnectionId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-zinc-800"
+                                    >
+                                      Block
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={async () => {
+                                      await removeConnection(conn.id);
+                                      setMenuConnectionId(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800"
+                                  >
+                                    Remove connection
+                                  </button>
                                 </div>
                               )}
                             </div>
