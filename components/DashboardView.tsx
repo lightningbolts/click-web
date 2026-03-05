@@ -152,21 +152,51 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
             let userNameMap: Record<string, string> = {};
             if (otherUserIds.length > 0) {
-              const { data: usersData } = await supabase
-                .from('users')
-                .select('id, name, full_name, email')
-                .in('id', otherUserIds);
-              if (usersData) {
-                userNameMap = Object.fromEntries(
-                  usersData.map((u: any) => {
-                    const resolvedName =
-                      (typeof u.full_name === 'string' && u.full_name.trim()) ||
-                      (typeof u.name === 'string' && u.name.trim()) ||
-                      (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
-                      '';
-                    return [u.id, resolvedName];
-                  })
-                );
+              // Resolve names through the server so we can fall back to auth metadata
+              // when profile rows are incomplete.
+              try {
+                const nameRes = await fetch('/api/users/display-names', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userIds: otherUserIds }),
+                });
+                if (nameRes.ok) {
+                  const payload = await nameRes.json();
+                  userNameMap = payload?.names ?? {};
+                }
+              } catch {
+                // Fall through to direct DB lookup below.
+              }
+
+              if (Object.keys(userNameMap).length === 0) {
+                // Fallback path if the server helper is unavailable.
+                let usersData: any[] | null = null;
+                const { data: d1, error: e1 } = await supabase
+                  .from('users')
+                  .select('id, name, full_name, email')
+                  .in('id', otherUserIds);
+                if (!e1 && d1) {
+                  usersData = d1;
+                } else {
+                  const { data: d2 } = await supabase
+                    .from('users')
+                    .select('id, name, email')
+                    .in('id', otherUserIds);
+                  usersData = d2;
+                }
+
+                if (usersData) {
+                  userNameMap = Object.fromEntries(
+                    usersData.map((u: any) => {
+                      const resolvedName =
+                        (typeof u.full_name === 'string' && u.full_name.trim()) ||
+                        (typeof u.name === 'string' && u.name.trim()) ||
+                        (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
+                        '';
+                      return [u.id, resolvedName];
+                    })
+                  );
+                }
               }
             }
 
@@ -178,8 +208,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
               // Parse geo_location — DB stores { lat, lon }, filter out invalid coords
               let geoLoc: { latitude: number; longitude: number } | undefined;
               if (conn.geo_location) {
-                const lat = conn.geo_location.lat ?? conn.geo_location.latitude;
-                const lon = conn.geo_location.lon ?? conn.geo_location.longitude;
+                const rawLat = conn.geo_location.lat ?? conn.geo_location.latitude;
+                const rawLon = conn.geo_location.lon ?? conn.geo_location.longitude ?? conn.geo_location.lng ?? conn.geo_location.long;
+                const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+                const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
                 if (
                   typeof lat === 'number' && typeof lon === 'number' &&
                   isFinite(lat) && isFinite(lon) &&
@@ -773,7 +805,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="h-[calc(100vh-180px)]"
+                className="h-[calc(100dvh-180px)]"
               >
                 {selectedConnection ? (
                   <ChatView

@@ -752,7 +752,7 @@ export default function ChatView({
       </div>
 
       {/* ── Input area ── */}
-      <div className="glass rounded-2xl mt-4 px-4 py-3 shrink-0">
+      <div className="glass rounded-2xl mt-2 px-4 py-2 shrink-0">
         <div className="flex items-end gap-3">
           <div className="flex-1 flex items-center bg-zinc-900/60 border border-zinc-700/50 
             rounded-xl px-4 py-[7px] focus-within:border-[#8338EC]/50 transition-colors">
@@ -789,7 +789,7 @@ export default function ChatView({
             }
           </motion.button>
         </div>
-        <p className="text-[10px] text-zinc-600 mt-2 text-left">
+        <p className="text-[10px] text-zinc-600 mt-1 text-left hidden sm:block">
           Press Enter to send · Shift+Enter for new line
         </p>
       </div>

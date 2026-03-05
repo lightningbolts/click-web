@@ -205,6 +205,12 @@ export const mockChapters: TimelineChapter[] = [
  * Handles data from Supabase following the connection schema
  */
 export function transformConnection(rawConnection: any, otherUserName?: string): ConnectionRecord {
+  const rawLat = rawConnection?.geo_location?.lat ?? rawConnection?.geo_location?.latitude;
+  const rawLon = rawConnection?.geo_location?.lon ?? rawConnection?.geo_location?.longitude ?? rawConnection?.geo_location?.lng ?? rawConnection?.geo_location?.long;
+  const latitude = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+  const longitude = typeof rawLon === 'number' ? rawLon : Number(rawLon);
+  const hasValidGeo = Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0);
+
   return {
     id: rawConnection.id,
     name: otherUserName || rawConnection.semantic_location || 'Unknown',
@@ -213,10 +219,12 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
     context: rawConnection.context,
     status: rawConnection.status || 'kept',
     // Include geo_location from the connection schema
-    geo_location: rawConnection.geo_location ? {
-      latitude: rawConnection.geo_location.latitude,
-      longitude: rawConnection.geo_location.longitude,
-    } : undefined,
+    geo_location: hasValidGeo
+      ? {
+          latitude,
+          longitude,
+        }
+      : undefined,
   };
 }
 
