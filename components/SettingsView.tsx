@@ -25,6 +25,7 @@ export default function SettingsView() {
   const [deleteError, setDeleteError] = useState('');
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
   // Interest tags state
   const [tags, setTags] = useState<string[]>([]);
@@ -190,6 +191,16 @@ export default function SettingsView() {
   };
 
   const handleDeleteAccount = async () => {
+    const expectedFullName = (fullName || user?.user_metadata?.full_name || '').trim();
+    if (!expectedFullName) {
+      setDeleteError('Set your full name in Profile Settings before deleting your account.');
+      return;
+    }
+    if (deleteConfirmName.trim() !== expectedFullName) {
+      setDeleteError('Full name does not match. Please type your full name exactly to confirm deletion.');
+      return;
+    }
+
     setDeleteLoading(true);
     setDeleteError('');
 
@@ -452,7 +463,11 @@ export default function SettingsView() {
 
         {!showDeleteConfirm ? (
           <button
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => {
+              setShowDeleteConfirm(true);
+              setDeleteConfirmName('');
+              setDeleteError('');
+            }}
             className="flex items-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl font-semibold transition-colors"
           >
             <Trash2 className="w-4 h-4" />
@@ -465,6 +480,28 @@ export default function SettingsView() {
               This action cannot be undone. This will permanently delete your account and remove your data from our servers.
             </p>
 
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2 text-zinc-200">
+                Type your full name to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmName}
+                onChange={(e) => {
+                  setDeleteConfirmName(e.target.value);
+                  if (deleteError) setDeleteError('');
+                }}
+                placeholder={(fullName || user?.user_metadata?.full_name || '').trim() || 'Set full name above first'}
+                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-red-500/70 transition-colors"
+                disabled={deleteLoading}
+              />
+              {(fullName || user?.user_metadata?.full_name || '').trim() && (
+                <p className="text-xs text-zinc-500 mt-2">
+                  Must match exactly: {(fullName || user?.user_metadata?.full_name || '').trim()}
+                </p>
+              )}
+            </div>
+
             {deleteError && (
               <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
                 {deleteError}
@@ -474,7 +511,7 @@ export default function SettingsView() {
             <div className="flex gap-3">
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteLoading}
+                disabled={deleteLoading || !(fullName || user?.user_metadata?.full_name || '').trim() || deleteConfirmName.trim() !== (fullName || user?.user_metadata?.full_name || '').trim()}
                 className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
               >
                 {deleteLoading ? 'Deleting...' : 'Yes, Delete My Account'}

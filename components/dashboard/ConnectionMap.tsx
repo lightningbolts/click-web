@@ -15,11 +15,12 @@ type PositionedConnection = {
   connection: ConnectionRecord;
   markerLongitude: number;
   markerLatitude: number;
+  groupedConnections: ConnectionRecord[];
 };
 
 const coordinateBucket = (latitude: number, longitude: number): string => {
-  const latBucket = latitude.toFixed(6);
-  const lonBucket = longitude.toFixed(6);
+  const latBucket = latitude.toFixed(7);
+  const lonBucket = longitude.toFixed(7);
   return `${latBucket},${lonBucket}`;
 };
 
@@ -41,30 +42,11 @@ const spreadOverlappingConnections = (input: ConnectionRecord[]): PositionedConn
     const base = group[0].geo_location;
     if (!base) return;
 
-    if (group.length === 1) {
-      positioned.push({
-        connection: group[0],
-        markerLatitude: base.latitude,
-        markerLongitude: base.longitude,
-      });
-      return;
-    }
-
-    const latRad = (base.latitude * Math.PI) / 180;
-    const metersPerDegLat = 111_320;
-    const metersPerDegLon = Math.max(111_320 * Math.cos(latRad), 1e-6);
-    const ringRadiusMeters = 14;
-
-    group.forEach((connection, index) => {
-      const angle = (2 * Math.PI * index) / group.length;
-      const deltaLat = (Math.sin(angle) * ringRadiusMeters) / metersPerDegLat;
-      const deltaLon = (Math.cos(angle) * ringRadiusMeters) / metersPerDegLon;
-
-      positioned.push({
-        connection,
-        markerLatitude: base.latitude + deltaLat,
-        markerLongitude: base.longitude + deltaLon,
-      });
+    positioned.push({
+      connection: group[0],
+      markerLatitude: base.latitude,
+      markerLongitude: base.longitude,
+      groupedConnections: group,
     });
   });
 
@@ -129,7 +111,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         mapInstance.resize();
 
         // Add markers
-        positionedConnections.forEach(({ connection, markerLatitude, markerLongitude }) => {
+        positionedConnections.forEach(({ connection, markerLatitude, markerLongitude, groupedConnections }) => {
           if (connection.geo_location) {
             const el = document.createElement('div');
             el.className = 'connection-marker';
@@ -137,14 +119,37 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             el.onmouseenter = () => { el.style.width = '34px'; el.style.height = '34px'; el.style.boxShadow = '0 0 24px rgba(131, 56, 236, 0.8)'; };
             el.onmouseleave = () => { el.style.width = '28px'; el.style.height = '28px'; el.style.boxShadow = '0 0 16px rgba(131, 56, 236, 0.6)'; };
 
-            const popupContent = `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-              <strong style="color: #8338EC; font-size: 14px; display: block; margin-bottom: 4px;">${connection.name}</strong>
+            if (groupedConnections.length > 1) {
+              const badge = document.createElement('div');
+              badge.style.cssText = 'position:absolute; right:-8px; top:-8px; min-width:18px; height:18px; padding:0 4px; border-radius:9999px; background:#18181b; color:#C3A6FF; border:1px solid #8338EC; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; line-height:1;';
+              badge.textContent = String(groupedConnections.length);
+              el.style.position = 'relative';
+              el.appendChild(badge);
+            }
+
+            const groupedRows = groupedConnections
+              .map((conn) => {
+                const date = conn.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                return `<div style="padding:8px 0; border-bottom:1px solid rgba(63,63,70,0.35);">
+                  <strong style="color:#8338EC; font-size:13px; display:block; margin-bottom:2px;">${conn.name}</strong>
+                  <span style="color:#a1a1aa; font-size:11px; display:block;">${conn.location}</span>
+                  <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${date}</span>
+                  ${conn.context ? `<span style="color:#8338EC; font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(131,56,236,0.2); border-radius:9999px;">${conn.context}</span>` : ''}
+                  <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:linear-gradient(135deg, #8338EC, #6520c0); color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
+                    Chat →
+                  </button>
+                </div>`;
+              })
+              .join('');
+
+            const single = groupedConnections.length === 1;
+            const popupContent = `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-height: 260px; overflow-y: auto;">
+              ${single ? `<strong style="color: #8338EC; font-size: 14px; display: block; margin-bottom: 4px;">${connection.name}</strong>
               <span style="color: #a1a1aa; font-size: 12px; display: block;">${connection.location}</span>
               <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
               ${connection.context ? `<span style="color: #8338EC; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${connection.context}</span>` : ''}
-              <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #8338EC, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">
-                Chat →
-              </button>
+              <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #8338EC, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
+              : `<strong style="color:#8338EC; font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connections at this location</strong>${groupedRows}`}
             </div>`;
 
             const popup = new maplibregl.Popup({
@@ -207,7 +212,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       }
       setMapLoaded(false);
     };
-  }, [positionedConnections]);
+  }, [positionedConnections, hasGeoConnections, geoConnections]);
 
   // Handle resize
   useEffect(() => {
