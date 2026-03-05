@@ -238,13 +238,11 @@ export async function POST(request: NextRequest) {
       gpsAvailable,
     });
 
-    // Compute geo_location: averaged midpoint if both available, single if one, default if none
+    // Compute geo_location without midpoint averaging to preserve real observed points.
+    // If both are available, prefer initiator location1.
     let geoLocation: { lat: number; lon: number };
     if (loc1Valid && loc2Valid) {
-      geoLocation = {
-        lat: (location1.lat + location2.lat) / 2,
-        lon: (location1.lon + location2.lon) / 2,
-      };
+      geoLocation = { lat: location1.lat, lon: location1.lon };
     } else if (loc1Valid) {
       geoLocation = { lat: location1.lat, lon: location1.lon };
     } else if (loc2Valid) {
