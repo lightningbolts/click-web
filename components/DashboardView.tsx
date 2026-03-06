@@ -43,6 +43,12 @@ interface DashboardViewProps {
   user: any;
 }
 
+interface ChatListMetadata {
+  preview: string | null;
+  lastMessageAt: number | null;
+  chatUpdatedAt: number | null;
+}
+
 /**
  * DashboardView - The Digital Memory Box experience
  * Combines connections, timeline, map, QR identity, and settings
@@ -60,6 +66,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
   const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
+  const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useState<Record<string, ChatListMetadata>>({});
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Interest tagging onboarding gate
@@ -93,6 +100,101 @@ export default function DashboardView({ user }: DashboardViewProps) {
       checkTagsInitialized();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id || connectionRecords.length === 0) {
+      setChatMetadataByConnectionId({});
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setChatMetadataByConnectionId({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadChatMetadata = async () => {
+      const connectionIds = connectionRecords
+        .filter((connection) => connection.status === 'kept' || connection.status === 'pending')
+        .map((connection) => connection.id);
+
+      if (connectionIds.length === 0) {
+        if (!cancelled) setChatMetadataByConnectionId({});
+        return;
+      }
+
+      try {
+        const { data: chats, error: chatError } = await supabase
+          .from('chats')
+          .select('id, connection_id, updated_at')
+          .in('connection_id', connectionIds);
+
+        if (chatError) {
+          console.error('Error fetching chats for dashboard list:', chatError.message || chatError);
+          if (!cancelled) setChatMetadataByConnectionId({});
+          return;
+        }
+
+        if (!chats || chats.length === 0) {
+          if (!cancelled) setChatMetadataByConnectionId({});
+          return;
+        }
+
+        const latestMessages = await Promise.all(
+          chats.map(async (chat: any) => {
+            const { data: message, error: messageError } = await supabase
+              .from('messages')
+              .select('content, time_created')
+              .eq('chat_id', chat.id)
+              .order('time_created', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (messageError) {
+              console.error(`Error fetching latest message for chat ${chat.id}:`, messageError.message || messageError);
+              return {
+                connectionId: chat.connection_id as string,
+                preview: null,
+                lastMessageAt: null,
+                chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
+              };
+            }
+
+            return {
+              connectionId: chat.connection_id as string,
+              preview: typeof message?.content === 'string' ? message.content : null,
+              lastMessageAt: typeof message?.time_created === 'number' ? message.time_created : null,
+              chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
+            };
+          })
+        );
+
+        if (cancelled) return;
+
+        setChatMetadataByConnectionId(
+          latestMessages.reduce<Record<string, ChatListMetadata>>((acc, entry) => {
+            acc[entry.connectionId] = {
+              preview: entry.preview,
+              lastMessageAt: entry.lastMessageAt,
+              chatUpdatedAt: entry.chatUpdatedAt,
+            };
+            return acc;
+          }, {})
+        );
+      } catch (error) {
+        console.error('Unexpected chat metadata load error:', error);
+        if (!cancelled) setChatMetadataByConnectionId({});
+      }
+    };
+
+    loadChatMetadata();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionRecords, selectedConnection, user?.id]);
 
   const handleTagsComplete = async (tags: string[]) => {
     const supabase = getSupabaseClient();
@@ -602,8 +704,23 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const chatCandidates = useMemo(
-    () => connectionRecords.filter((c) => c.status === 'kept' || c.status === 'pending'),
-    [connectionRecords]
+    () => connectionRecords
+      .filter((c) => c.status === 'kept' || c.status === 'pending')
+      .map((connection) => {
+        const metadata = chatMetadataByConnectionId[connection.id];
+        return {
+          ...connection,
+          chatPreview: metadata?.preview ?? null,
+          chatLastMessageAt: metadata?.lastMessageAt ?? null,
+          chatUpdatedAt: metadata?.chatUpdatedAt ?? null,
+        };
+      })
+      .sort((left, right) => {
+        const leftTimestamp = left.chatLastMessageAt ?? left.chatUpdatedAt ?? left.dateMet.getTime();
+        const rightTimestamp = right.chatLastMessageAt ?? right.chatUpdatedAt ?? right.dateMet.getTime();
+        return rightTimestamp - leftTimestamp;
+      }),
+    [chatMetadataByConnectionId, connectionRecords]
   );
 
   const activeConnections = useMemo(
@@ -617,6 +734,29 @@ export default function DashboardView({ user }: DashboardViewProps) {
   );
 
   const visibleChatConnections = chatListTab === 'active' ? activeConnections : archivedConnections;
+
+  const formatChatActivity = useCallback((timestamp?: number | null) => {
+    if (!timestamp) return null;
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = timestamp - now.getTime();
+    const diffMinutes = Math.round(diffMs / 60000);
+    const diffHours = Math.round(diffMs / 3600000);
+    const diffDays = Math.round(diffMs / 86400000);
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+    if (Math.abs(diffMinutes) < 1) return 'just now';
+    if (Math.abs(diffMinutes) < 60) return rtf.format(diffMinutes, 'minute');
+    if (Math.abs(diffHours) < 24) return rtf.format(diffHours, 'hour');
+    if (Math.abs(diffDays) < 6) return rtf.format(diffDays, 'day');
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}),
+    });
+  }, []);
 
   const tabs: { id: DashboardTab; label: string; icon: any }[] = [
     { id: 'memory', label: 'Memory Box', icon: BookOpen },
@@ -835,178 +975,239 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       </div>
                     </div>
 
-                    <div className="inline-flex rounded-xl border border-zinc-800 bg-zinc-900/50 p-1">
-                      <button
+                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <motion.button
                         onClick={() => setChatListTab('active')}
-                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                        whileTap={{ scale: 0.985 }}
+                        className={`relative px-4 py-2 rounded-xl text-sm transition-colors duration-200 ${
                           chatListTab === 'active'
-                            ? 'bg-[#8338EC]/20 text-[#C3A6FF] border border-[#8338EC]/30'
+                            ? 'text-white'
                             : 'text-zinc-400 hover:text-white'
                         }`}
                       >
-                        Active ({activeConnections.length})
-                      </button>
-                      <button
+                        {chatListTab === 'active' ? (
+                          <motion.span
+                            layoutId="chatListTabPill"
+                            className="absolute inset-0 rounded-xl border border-[#8338EC]/35 bg-[linear-gradient(135deg,rgba(131,56,236,0.28),rgba(58,134,255,0.18))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(131,56,236,0.16)]"
+                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                          />
+                        ) : null}
+                        <span className="relative z-10 flex items-center gap-2">
+                          <span>Active</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${chatListTab === 'active' ? 'bg-white/12 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {activeConnections.length}
+                          </span>
+                        </span>
+                      </motion.button>
+                      <motion.button
                         onClick={() => setChatListTab('archived')}
-                        className={`px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                        whileTap={{ scale: 0.985 }}
+                        className={`relative px-4 py-2 rounded-xl text-sm transition-colors duration-200 ${
                           chatListTab === 'archived'
-                            ? 'bg-[#8338EC]/20 text-[#C3A6FF] border border-[#8338EC]/30'
+                            ? 'text-white'
                             : 'text-zinc-400 hover:text-white'
                         }`}
                       >
-                        Archived ({archivedConnections.length})
-                      </button>
+                        {chatListTab === 'archived' ? (
+                          <motion.span
+                            layoutId="chatListTabPill"
+                            className="absolute inset-0 rounded-xl border border-zinc-600/50 bg-[linear-gradient(135deg,rgba(131,56,236,0.18),rgba(86,86,101,0.30))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(24,24,27,0.28)]"
+                            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                          />
+                        ) : null}
+                        <span className="relative z-10 flex items-center gap-2">
+                          <span>Archived</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${chatListTab === 'archived' ? 'bg-white/10 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                            {archivedConnections.length}
+                          </span>
+                        </span>
+                      </motion.button>
                     </div>
 
-                    {visibleChatConnections.length === 0 ? (
-                      <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
-                        <MessageCircle className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold mb-2">
-                          {chatListTab === 'active' ? 'No Active Conversations' : 'No Archived Conversations'}
-                        </h3>
-                        <p className="text-zinc-400">
-                          {chatListTab === 'active'
-                            ? 'Start meeting people and your chats will appear here!'
-                            : 'Archived chats will appear here.'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="glass rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
-                        {visibleChatConnections.map((conn) => {
-                          const isArchived = archivedConnectionIds.has(conn.id);
-                          return (
-                            <div key={conn.id} className="relative">
-                              <motion.button
-                                whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
-                                whileTap={{ scale: 0.995 }}
-                                onClick={() => {
-                                  if (suppressClickConnectionId === conn.id) {
-                                    setSuppressClickConnectionId(null);
-                                    return;
-                                  }
-                                  setSelectedConnection(conn);
-                                }}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  setMenuConnectionId(conn.id);
-                                }}
-                                onTouchStart={() => startLongPress(conn.id)}
-                                onTouchEnd={endLongPress}
-                                onTouchCancel={endLongPress}
-                                className="w-full flex items-center gap-4 px-5 py-4 pr-16 text-left transition-colors"
-                              >
-                                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-sm font-bold shrink-0">
-                                  {conn.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-white truncate">{conn.name}</p>
-                                  <p className="text-xs text-zinc-500 truncate">
-                                    {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                  </p>
-                                </div>
-                                {conn.context && (
-                                  <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC]/10 text-[#8338EC] border border-[#8338EC]/20">
-                                    {conn.context}
-                                  </span>
-                                )}
-                                {isArchived ? (
-                                  <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-zinc-700/30 text-zinc-300 border border-zinc-600/40">
-                                    Archived
-                                  </span>
-                                ) : null}
-                                <MessageCircle className="w-4 h-4 text-zinc-600 shrink-0" />
-                              </motion.button>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openActionMenu(conn.id);
-                                }}
-                                data-connection-menu-trigger
-                                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/70"
-                                aria-label={`Open actions for ${conn.name}`}
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
-
-                              {menuConnectionId === conn.id && (
-                                <div
-                                  data-connection-menu
-                                  className="absolute right-4 top-[calc(50%+1.8rem)] z-20 min-w-[140px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
-                                  onClick={(e) => e.stopPropagation()}
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={chatListTab}
+                        initial={{ opacity: 0, y: 18, filter: 'blur(10px)' }}
+                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, y: -14, filter: 'blur(6px)' }}
+                        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        className="will-change-transform"
+                      >
+                        {visibleChatConnections.length === 0 ? (
+                          <div className="glass rounded-3xl border border-zinc-800 p-12 text-center">
+                            <MessageCircle className="mx-auto mb-4 h-16 w-16 text-zinc-600" />
+                            <h3 className="mb-2 text-xl font-semibold">
+                              {chatListTab === 'active' ? 'No Active Conversations' : 'No Archived Conversations'}
+                            </h3>
+                            <p className="text-zinc-400">
+                              {chatListTab === 'active'
+                                ? 'Start meeting people and your chats will appear here!'
+                                : 'Archived chats will appear here.'}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="glass overflow-hidden rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
+                            {visibleChatConnections.map((conn, index) => {
+                              const isArchived = archivedConnectionIds.has(conn.id);
+                              const previewText = conn.chatPreview?.trim() || 'No messages yet';
+                              const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
+                              return (
+                                <motion.div
+                                  key={conn.id}
+                                  initial={{ opacity: 0, y: 12 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.2, delay: index * 0.025 }}
+                                  className="relative"
                                 >
-                                  <button
+                                  <motion.button
+                                    whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
+                                    whileTap={{ scale: 0.995 }}
                                     onClick={() => {
+                                      if (suppressClickConnectionId === conn.id) {
+                                        setSuppressClickConnectionId(null);
+                                        return;
+                                      }
                                       setSelectedConnection(conn);
-                                      setMenuConnectionId(null);
                                     }}
-                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-zinc-800"
+                                    onContextMenu={(e) => {
+                                      e.preventDefault();
+                                      setMenuConnectionId(conn.id);
+                                    }}
+                                    onTouchStart={() => startLongPress(conn.id)}
+                                    onTouchEnd={endLongPress}
+                                    onTouchCancel={endLongPress}
+                                    className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors"
                                   >
-                                    Open chat
-                                  </button>
-                                  {isArchived ? (
-                                    <button
-                                      onClick={() => unarchiveConnection(conn.id)}
-                                      className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
-                                    >
-                                      Unarchive
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => archiveConnection(conn.id)}
-                                      className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-                                    >
-                                      Archive
-                                    </button>
-                                  )}
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold">
+                                      {conn.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate pr-2 font-semibold text-white">{conn.name}</p>
+                                      <p className="mt-0.5 truncate pr-2 text-sm text-zinc-300">
+                                        {previewText}
+                                      </p>
+                                      <p className="mt-1 truncate pr-2 text-xs text-zinc-500">
+                                        {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                      </p>
+                                    </div>
+                                    <div className="flex shrink-0 items-center self-stretch pl-2 pr-12">
+                                      <div className="flex min-w-0 flex-col items-end justify-center gap-2 self-stretch">
+                                        {activityLabel ? (
+                                          <span className="shrink-0 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-2 py-0.5 text-[11px] text-zinc-400">
+                                            {activityLabel}
+                                          </span>
+                                        ) : null}
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                          {conn.context && (
+                                            <span className="shrink-0 rounded-full border border-[#8338EC]/20 bg-[#8338EC]/10 px-2 py-0.5 text-[10px] text-[#8338EC]">
+                                              {conn.context}
+                                            </span>
+                                          )}
+                                          {isArchived ? (
+                                            <span className="shrink-0 rounded-full border border-zinc-600/40 bg-zinc-700/30 px-2 py-0.5 text-[10px] text-zinc-300">
+                                              Archived
+                                            </span>
+                                          ) : null}
+                                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-900/80 text-zinc-600">
+                                            <MessageCircle className="h-4 w-4 shrink-0" />
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </motion.button>
+
                                   <button
-                                    onClick={async () => {
-                                      const reason = window.prompt('Report reason');
-                                      if (!reason) return;
-                                      await reportConnection(conn.id, reason);
-                                      setMenuConnectionId(null);
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openActionMenu(conn.id);
                                     }}
-                                    className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800"
+                                    data-connection-menu-trigger
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800/70 hover:text-white"
+                                    aria-label={`Open actions for ${conn.name}`}
                                   >
-                                    Report
+                                    <MoreHorizontal className="h-4 w-4" />
                                   </button>
-                                  {conn.otherUserId && blockedUserIds.has(conn.otherUserId) ? (
-                                    <button
-                                      onClick={async () => {
-                                        await unblockUser(conn);
-                                        setMenuConnectionId(null);
-                                      }}
-                                      className="w-full text-left px-3 py-2 text-sm text-emerald-300 hover:bg-zinc-800"
+
+                                  {menuConnectionId === conn.id && (
+                                    <div
+                                      data-connection-menu
+                                      className="absolute right-4 top-[calc(50%+1.8rem)] z-20 min-w-[140px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl"
+                                      onClick={(e) => e.stopPropagation()}
                                     >
-                                      Unblock
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={async () => {
-                                        await blockUser(conn);
-                                        setMenuConnectionId(null);
-                                      }}
-                                      className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-zinc-800"
-                                    >
-                                      Block
-                                    </button>
+                                      <button
+                                        onClick={() => {
+                                          setSelectedConnection(conn);
+                                          setMenuConnectionId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-zinc-800"
+                                      >
+                                        Open chat
+                                      </button>
+                                      {isArchived ? (
+                                        <button
+                                          onClick={() => unarchiveConnection(conn.id)}
+                                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                        >
+                                          Unarchive
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => archiveConnection(conn.id)}
+                                          className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                                        >
+                                          Archive
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={async () => {
+                                          const reason = window.prompt('Report reason');
+                                          if (!reason) return;
+                                          await reportConnection(conn.id, reason);
+                                          setMenuConnectionId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800"
+                                      >
+                                        Report
+                                      </button>
+                                      {conn.otherUserId && blockedUserIds.has(conn.otherUserId) ? (
+                                        <button
+                                          onClick={async () => {
+                                            await unblockUser(conn);
+                                            setMenuConnectionId(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-sm text-emerald-300 hover:bg-zinc-800"
+                                        >
+                                          Unblock
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={async () => {
+                                            await blockUser(conn);
+                                            setMenuConnectionId(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-zinc-800"
+                                        >
+                                          Block
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={async () => {
+                                          await removeConnection(conn.id);
+                                          setMenuConnectionId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800"
+                                      >
+                                        Remove connection
+                                      </button>
+                                    </div>
                                   )}
-                                  <button
-                                    onClick={async () => {
-                                      await removeConnection(conn.id);
-                                      setMenuConnectionId(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800"
-                                  >
-                                    Remove connection
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
                 )}
               </motion.div>

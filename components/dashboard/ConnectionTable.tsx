@@ -29,6 +29,9 @@ export interface ConnectionRecord {
     latitude: number;
     longitude: number;
   };
+  chatPreview?: string | null;
+  chatLastMessageAt?: number | null;
+  chatUpdatedAt?: number | null;
 }
 
 interface ConnectionTableProps {
