@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff, Phone, Video } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import MessageBubble from './MessageBubble';
@@ -21,6 +21,7 @@ interface ChatViewProps {
   onReport: (reason: string) => Promise<boolean> | boolean;
   onBlock: () => Promise<boolean> | boolean;
   onUnblock: () => Promise<boolean> | boolean;
+  onStartCall: (videoEnabled: boolean) => void;
   onClose: () => void;
 }
 
@@ -47,6 +48,7 @@ export default function ChatView({
   onReport,
   onBlock,
   onUnblock,
+  onStartCall,
   onClose,
 }: ChatViewProps) {
   const [chatId, setChatId] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export default function ChatView({
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showCallMenu, setShowCallMenu] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -488,7 +491,48 @@ export default function ChatView({
 
           <div className="relative">
             <button
-              onClick={() => setShowHeaderMenu((prev) => !prev)}
+              onClick={() => {
+                setShowCallMenu((prev) => !prev);
+                setShowHeaderMenu(false);
+              }}
+              className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+              aria-label="Call options"
+            >
+              <Phone className="w-5 h-5" />
+            </button>
+
+            {showCallMenu && (
+              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden z-30">
+                <button
+                  onClick={() => {
+                    setShowCallMenu(false);
+                    onStartCall(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                >
+                  <Phone className="h-4 w-4" />
+                  Voice call
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCallMenu(false);
+                    onStartCall(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                >
+                  <Video className="h-4 w-4" />
+                  Video call
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowHeaderMenu((prev) => !prev);
+                setShowCallMenu(false);
+              }}
               className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
               aria-label="Chat actions"
             >

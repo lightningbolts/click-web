@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   MapPin,
   Settings,
@@ -30,6 +31,11 @@ import {
 } from '@/components/dashboard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
+import CallOverlay, {
+  type WebActiveCallState,
+  type WebCallInvite,
+  type WebCallOverlayState,
+} from '@/components/chat/CallOverlay';
 import {
   mockConnections,
   mockChapters,
@@ -48,6 +54,17 @@ interface ChatListMetadata {
   lastMessageAt: number | null;
   chatUpdatedAt: number | null;
 }
+
+const IDLE_CALL_OVERLAY: WebCallOverlayState = { mode: 'idle' };
+
+const IDLE_ACTIVE_CALL: WebActiveCallState = {
+  status: 'idle',
+  invite: null,
+  microphoneEnabled: true,
+  cameraEnabled: false,
+  remoteVideoTrack: null,
+  localVideoTrack: null,
+};
 
 /**
  * DashboardView - The Digital Memory Box experience
@@ -68,9 +85,473 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
   const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useState<Record<string, ChatListMetadata>>({});
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [callOverlayState, setCallOverlayState] = useState<WebCallOverlayState>(IDLE_CALL_OVERLAY);
+  const [activeCallState, setActiveCallState] = useState<WebActiveCallState>(IDLE_ACTIVE_CALL);
+  const outboundCallChannelsRef = useRef<Map<string, any>>(new Map());
+  const activeInviteRef = useRef<WebCallInvite | null>(null);
+  const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roomRef = useRef<Room | null>(null);
+  const remoteAudioElementsRef = useRef<HTMLElement[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const ringtoneIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
+
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return { 'Content-Type': 'application/json' };
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    };
+  }, []);
+
+  const clearCallTimeout = useCallback(() => {
+    if (callTimeoutRef.current) {
+      clearTimeout(callTimeoutRef.current);
+      callTimeoutRef.current = null;
+    }
+  }, []);
+
+  const stopRingtone = useCallback(() => {
+    if (ringtoneIntervalRef.current) {
+      clearInterval(ringtoneIntervalRef.current);
+      ringtoneIntervalRef.current = null;
+    }
+  }, []);
+
+  const playRingtone = useCallback((kind: 'incoming' | 'outgoing') => {
+    stopRingtone();
+    if (typeof window === 'undefined') return;
+
+    const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtor) return;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioCtor();
+    }
+
+    const context = audioContextRef.current;
+    const frequencies = kind === 'incoming' ? [740, 620] : [680, 540];
+    const durationMs = kind === 'incoming' ? 300 : 180;
+    const intervalMs = kind === 'incoming' ? 1500 : 1100;
+
+    const playBeep = () => {
+      if (!context) return;
+      const now = context.currentTime;
+      frequencies.forEach((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.value = frequency;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        gain.gain.setValueAtTime(0.0001, now + index * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + index * 0.08 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.08 + durationMs / 1000);
+        oscillator.start(now + index * 0.08);
+        oscillator.stop(now + index * 0.08 + durationMs / 1000 + 0.03);
+      });
+    };
+
+    void context.resume().catch(() => undefined);
+    playBeep();
+    ringtoneIntervalRef.current = setInterval(playBeep, intervalMs);
+  }, [stopRingtone]);
+
+  const getOutboundChannel = useCallback(async (userId: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return null;
+
+    const existing = outboundCallChannelsRef.current.get(userId);
+    if (existing) return existing;
+
+    const channel = supabase.channel(`calls:user:${userId}`);
+    await new Promise<void>((resolve) => {
+      channel.subscribe(() => resolve());
+    });
+    outboundCallChannelsRef.current.set(userId, channel);
+    return channel;
+  }, []);
+
+  const sendSignal = useCallback(async (targetUserId: string, event: string, payload: object) => {
+    const channel = await getOutboundChannel(targetUserId);
+    if (!channel) return false;
+    const response = await channel.send({ type: 'broadcast', event, payload });
+    return response === 'ok';
+  }, [getOutboundChannel]);
+
+  const cleanupRemoteAudio = useCallback(() => {
+    remoteAudioElementsRef.current.forEach((element) => element.remove());
+    remoteAudioElementsRef.current = [];
+  }, []);
+
+  const resetCallState = useCallback((reason?: string, preserveInvite = true) => {
+    setActiveCallState((current) => ({
+      ...IDLE_ACTIVE_CALL,
+      status: reason ? 'ended' : 'idle',
+      invite: preserveInvite ? current.invite : null,
+      reason,
+    }));
+  }, []);
+
+  const disconnectRoom = useCallback((reason?: string) => {
+    const room = roomRef.current;
+    roomRef.current = null;
+    if (room) {
+      try {
+        room.disconnect();
+      } catch {}
+      room.removeAllListeners();
+    }
+    cleanupRemoteAudio();
+    resetCallState(reason, true);
+  }, [cleanupRemoteAudio, resetCallState]);
+
+  const endWithReason = useCallback((invite: WebCallInvite | null, reason: string) => {
+    activeInviteRef.current = invite;
+    clearCallTimeout();
+    stopRingtone();
+    setCallOverlayState({ mode: 'ended', invite, reason });
+    if (roomRef.current) {
+      disconnectRoom(reason);
+    } else {
+      setActiveCallState((current) => ({
+        ...IDLE_ACTIVE_CALL,
+        status: 'ended',
+        invite: invite ?? current.invite,
+        reason,
+      }));
+    }
+  }, [clearCallTimeout, disconnectRoom, stopRingtone]);
+
+  const joinCall = useCallback(async (invite: WebCallInvite) => {
+    if (!user?.id) {
+      endWithReason(invite, 'You need to be signed in to start a call');
+      return;
+    }
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/livekit/token', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          roomName: invite.roomName,
+          participantName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Click User',
+          userId: user.id,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to create call token');
+      }
+
+      setCallOverlayState(IDLE_CALL_OVERLAY);
+      setActiveCallState({
+        ...IDLE_ACTIVE_CALL,
+        status: 'connecting',
+        invite,
+        microphoneEnabled: true,
+        cameraEnabled: invite.videoEnabled,
+      });
+
+      const room = new Room({ adaptiveStream: true, dynacast: true });
+      roomRef.current = room;
+
+      room.on(RoomEvent.TrackSubscribed, (track: any) => {
+        if (track.kind === 'video') {
+          setActiveCallState((current) => ({ ...current, remoteVideoTrack: track }));
+        }
+
+        if (track.kind === 'audio') {
+          const element = track.attach();
+          element.autoplay = true;
+          element.style.display = 'none';
+          document.body.appendChild(element);
+          remoteAudioElementsRef.current.push(element);
+        }
+      });
+
+      room.on(RoomEvent.TrackUnsubscribed, (track: any) => {
+        if (track.kind === 'video') {
+          setActiveCallState((current) => ({ ...current, remoteVideoTrack: null }));
+        }
+      });
+
+      room.on(RoomEvent.LocalTrackPublished, (publication: any) => {
+        if (publication.track?.source === Track.Source.Camera) {
+          setActiveCallState((current) => ({ ...current, localVideoTrack: publication.track }));
+        }
+      });
+
+      room.on(RoomEvent.LocalTrackUnpublished, (publication: any) => {
+        if (publication.track?.source === Track.Source.Camera) {
+          setActiveCallState((current) => ({ ...current, localVideoTrack: null }));
+        }
+      });
+
+      room.on(RoomEvent.ParticipantDisconnected, () => {
+        if (room.remoteParticipants.size === 0) {
+          endWithReason(invite, 'Call ended');
+        }
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        endWithReason(invite, 'Call ended');
+      });
+
+      await room.connect(payload.wsUrl, payload.token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      if (invite.videoEnabled) {
+        await room.localParticipant.setCameraEnabled(true);
+      }
+
+      const localCameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
+      setActiveCallState((current) => ({
+        ...current,
+        status: 'connected',
+        localVideoTrack: localCameraTrack,
+        cameraEnabled: invite.videoEnabled,
+        microphoneEnabled: true,
+      }));
+    } catch (error: any) {
+      const peerId = user.id === invite.callerId ? invite.calleeId : invite.callerId;
+      await sendSignal(peerId, 'cancel', {
+        callId: invite.callId,
+        connectionId: invite.connectionId,
+        senderId: user.id,
+        reason: 'cancelled',
+      });
+      endWithReason(invite, error?.message || 'Failed to create call token');
+    }
+  }, [endWithReason, getAuthHeaders, sendSignal, user]);
+
+  const startOutgoingCall = useCallback(async (connection: ConnectionRecord, videoEnabled: boolean) => {
+    if (!user?.id || !connection.otherUserId) {
+      endWithReason(null, 'Unable to start a call for this connection');
+      return;
+    }
+
+    if (callOverlayState.mode !== 'idle' || activeCallState.status !== 'idle') {
+      return;
+    }
+
+    const now = Date.now();
+    const invite: WebCallInvite = {
+      callId: `call-${now}-${Math.floor(Math.random() * 9000 + 1000)}`,
+      connectionId: connection.id,
+      roomName: `click-${connection.id}-${now}`,
+      callerId: user.id,
+      callerName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Click User',
+      calleeId: connection.otherUserId,
+      calleeName: connection.name,
+      videoEnabled,
+      createdAt: now,
+    };
+
+    activeInviteRef.current = invite;
+    setCallOverlayState({ mode: 'outgoing', invite });
+    setActiveCallState({ ...IDLE_ACTIVE_CALL, invite });
+    playRingtone('outgoing');
+    await sendSignal(connection.otherUserId, 'invite', invite);
+
+    clearCallTimeout();
+    callTimeoutRef.current = setTimeout(() => {
+      void sendSignal(connection.otherUserId!, 'cancel', {
+        callId: invite.callId,
+        connectionId: invite.connectionId,
+        senderId: invite.callerId,
+        reason: 'missed',
+      });
+      endWithReason(invite, 'No answer');
+    }, 30_000);
+  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, endWithReason, playRingtone, sendSignal, user]);
+
+  const acceptIncomingCall = useCallback(async () => {
+    if (callOverlayState.mode !== 'incoming') return;
+    const invite = callOverlayState.invite;
+    activeInviteRef.current = invite;
+    clearCallTimeout();
+    stopRingtone();
+    setCallOverlayState({ mode: 'connecting', invite });
+    await sendSignal(invite.callerId, 'response', {
+      callId: invite.callId,
+      connectionId: invite.connectionId,
+      responderId: user.id,
+      accepted: true,
+      busy: false,
+    });
+    await joinCall(invite);
+  }, [callOverlayState, clearCallTimeout, joinCall, sendSignal, stopRingtone, user?.id]);
+
+  const declineIncomingCall = useCallback(async () => {
+    if (callOverlayState.mode !== 'incoming') return;
+    const invite = callOverlayState.invite;
+    clearCallTimeout();
+    stopRingtone();
+    await sendSignal(invite.callerId, 'response', {
+      callId: invite.callId,
+      connectionId: invite.connectionId,
+      responderId: user?.id,
+      accepted: false,
+      busy: false,
+    });
+    activeInviteRef.current = null;
+    setCallOverlayState(IDLE_CALL_OVERLAY);
+    setActiveCallState(IDLE_ACTIVE_CALL);
+  }, [callOverlayState, clearCallTimeout, sendSignal, stopRingtone, user?.id]);
+
+  const cancelPendingCall = useCallback(async () => {
+    const invite = activeInviteRef.current;
+    if (!invite) return;
+    clearCallTimeout();
+    stopRingtone();
+
+    if (callOverlayState.mode === 'outgoing' || callOverlayState.mode === 'connecting') {
+      await sendSignal(invite.calleeId, 'cancel', {
+        callId: invite.callId,
+        connectionId: invite.connectionId,
+        senderId: user?.id,
+        reason: 'cancelled',
+      });
+    } else if (callOverlayState.mode === 'incoming') {
+      await sendSignal(invite.callerId, 'response', {
+        callId: invite.callId,
+        connectionId: invite.connectionId,
+        responderId: user?.id,
+        accepted: false,
+        busy: false,
+      });
+    }
+
+    activeInviteRef.current = null;
+    setCallOverlayState(IDLE_CALL_OVERLAY);
+    setActiveCallState(IDLE_ACTIVE_CALL);
+  }, [callOverlayState.mode, clearCallTimeout, sendSignal, stopRingtone, user?.id]);
+
+  const dismissEndedCall = useCallback(() => {
+    activeInviteRef.current = null;
+    setCallOverlayState(IDLE_CALL_OVERLAY);
+    setActiveCallState(IDLE_ACTIVE_CALL);
+  }, []);
+
+  const endActiveCall = useCallback(() => {
+    stopRingtone();
+    disconnectRoom();
+    activeInviteRef.current = null;
+    setCallOverlayState(IDLE_CALL_OVERLAY);
+    setActiveCallState(IDLE_ACTIVE_CALL);
+  }, [disconnectRoom, stopRingtone]);
+
+  const toggleMicrophone = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const next = !activeCallState.microphoneEnabled;
+    await room.localParticipant.setMicrophoneEnabled(next);
+    setActiveCallState((current) => ({ ...current, microphoneEnabled: next }));
+  }, [activeCallState.microphoneEnabled]);
+
+  const toggleCamera = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room || !activeCallState.invite?.videoEnabled) return;
+    const next = !activeCallState.cameraEnabled;
+    await room.localParticipant.setCameraEnabled(next);
+    const localCameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
+    setActiveCallState((current) => ({ ...current, cameraEnabled: next, localVideoTrack: localCameraTrack }));
+  }, [activeCallState.cameraEnabled, activeCallState.invite?.videoEnabled]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel(`calls:user:${user.id}`)
+      .on('broadcast', { event: 'invite' }, async ({ payload }) => {
+        const invite = payload as WebCallInvite;
+        const isBusy = callOverlayState.mode !== 'idle' || activeCallState.status !== 'idle';
+        if (isBusy) {
+          await sendSignal(invite.callerId, 'response', {
+            callId: invite.callId,
+            connectionId: invite.connectionId,
+            responderId: user.id,
+            accepted: false,
+            busy: true,
+          });
+          return;
+        }
+
+        activeInviteRef.current = invite;
+        setCallOverlayState({ mode: 'incoming', invite });
+        setActiveCallState({ ...IDLE_ACTIVE_CALL, invite });
+        playRingtone('incoming');
+
+        const matchingConnection = connectionRecords.find((connection) => connection.id === invite.connectionId);
+        if (matchingConnection) {
+          setSelectedConnection(matchingConnection);
+          setActiveTab('chat');
+        }
+      })
+      .on('broadcast', { event: 'response' }, ({ payload }) => {
+        const response = payload as { callId: string; accepted: boolean; busy?: boolean };
+        const invite = activeInviteRef.current;
+        if (!invite || invite.callId !== response.callId || callOverlayState.mode !== 'outgoing') {
+          return;
+        }
+
+        clearCallTimeout();
+        stopRingtone();
+
+        if (response.accepted) {
+          setCallOverlayState({ mode: 'connecting', invite });
+          void joinCall(invite);
+        } else if (response.busy) {
+          endWithReason(invite, `${invite.calleeName} is busy`);
+        } else {
+          endWithReason(invite, `${invite.calleeName} declined the call`);
+        }
+      })
+      .on('broadcast', { event: 'cancel' }, ({ payload }) => {
+        const cancel = payload as { callId: string; reason: string };
+        const invite = activeInviteRef.current;
+        if (!invite || invite.callId !== cancel.callId) return;
+
+        clearCallTimeout();
+        stopRingtone();
+
+        if (callOverlayState.mode === 'incoming' || callOverlayState.mode === 'outgoing' || callOverlayState.mode === 'connecting') {
+          activeInviteRef.current = null;
+          if (cancel.reason === 'missed') {
+            setCallOverlayState({ mode: 'ended', invite, reason: 'No answer' });
+          } else {
+            setCallOverlayState(IDLE_CALL_OVERLAY);
+            setActiveCallState(IDLE_ACTIVE_CALL);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, endWithReason, joinCall, playRingtone, sendSignal, stopRingtone, user?.id]);
+
+  useEffect(() => {
+    return () => {
+      stopRingtone();
+      clearCallTimeout();
+      disconnectRoom();
+      const supabase = getSupabaseClient();
+      outboundCallChannelsRef.current.forEach((channel) => {
+        supabase?.removeChannel(channel);
+      });
+      outboundCallChannelsRef.current.clear();
+    };
+  }, [clearCallTimeout, disconnectRoom, stopRingtone]);
 
   useEffect(() => {
     if (user) {
@@ -969,6 +1450,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         onReport={(reason) => reportConnection(selectedConnection.id, reason)}
                         onBlock={() => blockUser(selectedConnection)}
                         onUnblock={() => unblockUser(selectedConnection)}
+                        onStartCall={(videoEnabled) => startOutgoingCall(selectedConnection, videoEnabled)}
                         onClose={() => setSelectedConnection(null)}
                       />
                     </motion.div>
@@ -1253,6 +1735,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
           </AnimatePresence>
         </div>
       </div>
+
+      <CallOverlay
+        currentUserId={user.id}
+        overlayState={callOverlayState}
+        activeCall={activeCallState}
+        onAccept={acceptIncomingCall}
+        onDecline={declineIncomingCall}
+        onCancel={cancelPendingCall}
+        onDismissEnded={dismissEndedCall}
+        onEndCall={endActiveCall}
+        onToggleMicrophone={toggleMicrophone}
+        onToggleCamera={toggleCamera}
+      />
 
     </div>
   );
