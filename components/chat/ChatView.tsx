@@ -502,13 +502,13 @@ export default function ChatView({
             </button>
 
             {showCallMenu && (
-              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden z-30">
+              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden z-30">
                 <button
                   onClick={() => {
                     setShowCallMenu(false);
                     onStartCall(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
                 >
                   <Phone className="h-4 w-4" />
                   Voice call
@@ -518,7 +518,7 @@ export default function ChatView({
                     setShowCallMenu(false);
                     onStartCall(true);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white hover:bg-zinc-800"
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
                 >
                   <Video className="h-4 w-4" />
                   Video call
