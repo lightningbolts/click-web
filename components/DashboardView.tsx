@@ -188,6 +188,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
     remoteAudioElementsRef.current = [];
   }, []);
 
+  const notifyPeerCallEnded = useCallback(async (invite: WebCallInvite | null, reason: 'ended' | 'cancelled' = 'ended') => {
+    if (!invite || !user?.id) return;
+    const peerId = user.id === invite.callerId ? invite.calleeId : invite.callerId;
+    await sendSignal(peerId, 'cancel', {
+      callId: invite.callId,
+      connectionId: invite.connectionId,
+      senderId: user.id,
+      reason,
+    });
+  }, [sendSignal, user?.id]);
+
   const resetCallState = useCallback((reason?: string, preserveInvite = true) => {
     setActiveCallState((current) => ({
       ...IDLE_ACTIVE_CALL,
@@ -357,7 +368,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setCallOverlayState({ mode: 'outgoing', invite });
     setActiveCallState({ ...IDLE_ACTIVE_CALL, invite });
     playRingtone('outgoing');
-    await sendSignal(connection.otherUserId, 'invite', invite);
+    const delivered = await sendSignal(connection.otherUserId, 'invite', invite);
+    if (!delivered) {
+      stopRingtone();
+      endWithReason(invite, 'Unable to reach this connection right now');
+      return;
+    }
 
     clearCallTimeout();
     callTimeoutRef.current = setTimeout(() => {
@@ -369,7 +385,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       });
       endWithReason(invite, 'No answer');
     }, 30_000);
-  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, endWithReason, playRingtone, sendSignal, user]);
+  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, endWithReason, playRingtone, sendSignal, stopRingtone, user]);
 
   const acceptIncomingCall = useCallback(async () => {
     if (callOverlayState.mode !== 'incoming') return;
@@ -439,13 +455,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setActiveCallState(IDLE_ACTIVE_CALL);
   }, []);
 
-  const endActiveCall = useCallback(() => {
+  const endActiveCall = useCallback(async () => {
+    const invite = activeInviteRef.current;
     stopRingtone();
+    await notifyPeerCallEnded(invite, 'ended');
     disconnectRoom();
     activeInviteRef.current = null;
     setCallOverlayState(IDLE_CALL_OVERLAY);
     setActiveCallState(IDLE_ACTIVE_CALL);
-  }, [disconnectRoom, stopRingtone]);
+  }, [disconnectRoom, notifyPeerCallEnded, stopRingtone]);
 
   const toggleMicrophone = useCallback(async () => {
     const room = roomRef.current;
@@ -523,10 +541,24 @@ export default function DashboardView({ user }: DashboardViewProps) {
         clearCallTimeout();
         stopRingtone();
 
+        if (activeCallState.status === 'connected') {
+          activeInviteRef.current = null;
+          disconnectRoom(cancel.reason === 'ended' ? 'Call ended' : undefined);
+          if (cancel.reason === 'ended') {
+            setCallOverlayState({ mode: 'ended', invite, reason: 'Call ended' });
+          } else {
+            setCallOverlayState(IDLE_CALL_OVERLAY);
+            setActiveCallState(IDLE_ACTIVE_CALL);
+          }
+          return;
+        }
+
         if (callOverlayState.mode === 'incoming' || callOverlayState.mode === 'outgoing' || callOverlayState.mode === 'connecting') {
           activeInviteRef.current = null;
           if (cancel.reason === 'missed') {
             setCallOverlayState({ mode: 'ended', invite, reason: 'No answer' });
+          } else if (cancel.reason === 'ended') {
+            setCallOverlayState({ mode: 'ended', invite, reason: 'Call ended' });
           } else {
             setCallOverlayState(IDLE_CALL_OVERLAY);
             setActiveCallState(IDLE_ACTIVE_CALL);
@@ -538,7 +570,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, endWithReason, joinCall, playRingtone, sendSignal, stopRingtone, user?.id]);
+  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, joinCall, playRingtone, sendSignal, stopRingtone, user?.id]);
 
   useEffect(() => {
     return () => {

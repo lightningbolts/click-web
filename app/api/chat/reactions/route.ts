@@ -5,28 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-async function getAuthUser(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false },
-  });
-
-  const authCookie =
-    req.cookies.get('sb-access-token') ||
-    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token');
-
-  const authHeader = req.headers.get('Authorization');
-  const token = authCookie?.value ?? authHeader?.replace('Bearer ', '');
-
-  if (!token) return { user: null, supabase };
-
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return { user: null, supabase };
-  return { user, supabase };
-}
+import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -36,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messageId and reactionType are required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Check if reactions already exist for this user/message/emoji

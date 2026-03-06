@@ -308,7 +308,7 @@ export default function ChatView({
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ chatId, content }),
+        body: JSON.stringify({ chatId, connectionId: connection.id, content }),
       });
       if (!res.ok) throw new Error('Send failed');
       // Realtime will push the new message via subscription

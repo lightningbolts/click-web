@@ -15,27 +15,50 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 
-async function getAuthUser(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false },
-  });
+async function getOrCreateChat(supabase: SupabaseClient, connectionId: string) {
+  const { data: existing, error: findErr } = await supabase
+    .from('chats')
+    .select('*')
+    .eq('connection_id', connectionId)
+    .limit(1)
+    .maybeSingle();
 
-  const authCookie =
-    req.cookies.get('sb-access-token') ||
-    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token');
+  if (findErr) throw findErr;
+  if (existing) return existing;
 
-  const authHeader = req.headers.get('Authorization');
-  const token = authCookie?.value ?? authHeader?.replace('Bearer ', '');
+  const now = Date.now();
+  const { data: created, error: createErr } = await supabase
+    .from('chats')
+    .insert({ connection_id: connectionId, created_at: now, updated_at: now })
+    .select()
+    .single();
 
-  if (!token) return { user: null, supabase };
+  if (createErr) throw createErr;
+  return created;
+}
 
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return { user: null, supabase };
-  return { user, supabase };
+async function resolveChatId(
+  supabase: SupabaseClient,
+  chatId?: string | null,
+  connectionId?: string | null
+) {
+  if (chatId) {
+    const { data: existing, error } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('id', chatId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (existing?.id) return existing.id as string;
+  }
+
+  if (!connectionId) return null;
+  const chat = await getOrCreateChat(supabase, connectionId);
+  return chat.id as string;
 }
 
 const DEFAULT_LIMIT = 40;
@@ -49,7 +72,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'chatId is required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Build message query with optional cursor-based pagination
@@ -112,36 +135,71 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { chatId, content } = body;
+  const { chatId, connectionId, content } = body;
 
-  if (!chatId || !content?.trim()) {
-    return NextResponse.json({ error: 'chatId and content are required' }, { status: 400 });
+  if ((!chatId && !connectionId) || !content?.trim()) {
+    return NextResponse.json({ error: 'chatId or connectionId and content are required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const now = Date.now();
-  const { data: message, error: insertErr } = await supabase
-    .from('messages')
-    .insert({
-      chat_id: chatId,
-      user_id: user.id,
-      content: content.trim(),
-      time_created: now,
-    })
-    .select()
-    .single();
+  try {
+    const resolvedChatId = await resolveChatId(supabase, chatId, connectionId);
+    if (!resolvedChatId) {
+      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+    }
 
-  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    const now = Date.now();
+    let { data: message, error: insertErr } = await supabase
+      .from('messages')
+      .insert({
+        chat_id: resolvedChatId,
+        user_id: user.id,
+        content: content.trim(),
+        time_created: now,
+      })
+      .select()
+      .single();
 
-  // Update chat's updated_at timestamp
-  await supabase
-    .from('chats')
-    .update({ updated_at: now })
-    .eq('id', chatId);
+    if (insertErr && connectionId) {
+      const ensuredChat = await getOrCreateChat(supabase, connectionId);
+      if (ensuredChat.id !== resolvedChatId) {
+        const retried = await supabase
+          .from('messages')
+          .insert({
+            chat_id: ensuredChat.id,
+            user_id: user.id,
+            content: content.trim(),
+            time_created: now,
+          })
+          .select()
+          .single();
 
-  return NextResponse.json({ message: { ...message, reactions: {} } }, { status: 201 });
+        message = retried.data;
+        insertErr = retried.error;
+      }
+    }
+
+    if (insertErr) {
+      console.error('Message insert failed', {
+        chatId,
+        connectionId,
+        userId: user.id,
+        error: insertErr.message,
+      });
+      return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    }
+
+    await supabase
+      .from('chats')
+      .update({ updated_at: now })
+      .eq('id', message.chat_id);
+
+    return NextResponse.json({ message: { ...message, reactions: {} } }, { status: 201 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message ?? 'Failed to send message' }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {
@@ -152,7 +210,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'messageId and content are required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data: message, error } = await supabase
@@ -173,7 +231,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'messageId is required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await supabase

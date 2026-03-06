@@ -8,30 +8,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-async function getAuthUser(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false },
-  });
-
-  // Match exact cookie names used by the connections route
-  const authCookie =
-    req.cookies.get('sb-access-token') ||
-    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token');
-
-  // Also support Authorization: Bearer header from the client
-  const authHeader = req.headers.get('Authorization');
-  const token = authCookie?.value ?? authHeader?.replace('Bearer ', '');
-
-  if (!token) return { user: null, supabase };
-
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return { user: null, supabase };
-  return { user, supabase };
-}
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 
 async function getOrCreateChat(supabase: SupabaseClient<any>, connectionId: string) {
   // Try to find existing chat
@@ -39,6 +17,7 @@ async function getOrCreateChat(supabase: SupabaseClient<any>, connectionId: stri
     .from('chats')
     .select('*')
     .eq('connection_id', connectionId)
+    .limit(1)
     .maybeSingle();
 
   if (findErr) throw findErr;
@@ -62,7 +41,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
@@ -80,7 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthUser(req);
+  const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
