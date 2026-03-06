@@ -947,24 +947,40 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 transition={{ duration: 0.3 }}
                 className="h-[calc(100dvh-180px)]"
               >
-                {selectedConnection ? (
-                  <ChatView
-                    connection={selectedConnection}
-                    currentUserId={user.id}
-                    otherUserName={selectedConnection.name}
-                    isArchived={archivedConnectionIds.has(selectedConnection.id)}
-                    isBlocked={selectedConnection.otherUserId ? blockedUserIds.has(selectedConnection.otherUserId) : false}
-                    onArchive={() => archiveConnection(selectedConnection.id)}
-                    onUnarchive={() => unarchiveConnection(selectedConnection.id)}
-                    onRemove={() => removeConnection(selectedConnection.id)}
-                    onReport={(reason) => reportConnection(selectedConnection.id, reason)}
-                    onBlock={() => blockUser(selectedConnection)}
-                    onUnblock={() => unblockUser(selectedConnection)}
-                    onClose={() => setSelectedConnection(null)}
-                  />
-                ) : (
-                  /* Connection picker list */
-                  <div className="space-y-6">
+                <AnimatePresence mode="wait" initial={false}>
+                  {selectedConnection ? (
+                    <motion.div
+                      key={selectedConnection.id}
+                      initial={{ opacity: 0, x: 24 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 24 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="h-full"
+                    >
+                      <ChatView
+                        connection={selectedConnection}
+                        currentUserId={user.id}
+                        otherUserName={selectedConnection.name}
+                        isArchived={archivedConnectionIds.has(selectedConnection.id)}
+                        isBlocked={selectedConnection.otherUserId ? blockedUserIds.has(selectedConnection.otherUserId) : false}
+                        onArchive={() => archiveConnection(selectedConnection.id)}
+                        onUnarchive={() => unarchiveConnection(selectedConnection.id)}
+                        onRemove={() => removeConnection(selectedConnection.id)}
+                        onReport={(reason) => reportConnection(selectedConnection.id, reason)}
+                        onBlock={() => blockUser(selectedConnection)}
+                        onUnblock={() => unblockUser(selectedConnection)}
+                        onClose={() => setSelectedConnection(null)}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="chat-list"
+                      initial={{ opacity: 0, x: -24 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -24 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="space-y-6"
+                    >
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[#8338EC]/20 rounded-xl">
                         <MessageCircle className="w-5 h-5 text-[#8338EC]" />
@@ -1027,11 +1043,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     <AnimatePresence mode="wait" initial={false}>
                       <motion.div
                         key={chatListTab}
-                        initial={{ opacity: 0, y: 18, filter: 'blur(10px)' }}
-                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                        exit={{ opacity: 0, y: -14, filter: 'blur(6px)' }}
-                        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                        className="will-change-transform"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                       >
                         {visibleChatConnections.length === 0 ? (
                           <div className="glass rounded-3xl border border-zinc-800 p-12 text-center">
@@ -1047,18 +1062,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                           </div>
                         ) : (
                           <div className="glass overflow-hidden rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
-                            {visibleChatConnections.map((conn, index) => {
+                            {visibleChatConnections.map((conn) => {
                               const isArchived = archivedConnectionIds.has(conn.id);
                               const previewText = conn.chatPreview?.trim() || 'No messages yet';
                               const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
                               return (
-                                <motion.div
-                                  key={conn.id}
-                                  initial={{ opacity: 0, y: 12 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{ duration: 0.2, delay: index * 0.025 }}
-                                  className="relative"
-                                >
+                                <div key={conn.id} className="relative">
                                   <motion.button
                                     whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
                                     whileTap={{ scale: 0.995 }}
@@ -1076,7 +1085,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     onTouchStart={() => startLongPress(conn.id)}
                                     onTouchEnd={endLongPress}
                                     onTouchCancel={endLongPress}
-                                    className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors"
+                                    className="w-full flex items-center gap-4 px-5 py-4 pr-16 text-left transition-colors"
                                   >
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold">
                                       {conn.name.charAt(0).toUpperCase()}
@@ -1090,8 +1099,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
                                     </div>
-                                    <div className="flex shrink-0 items-center self-stretch pl-2 pr-12">
-                                      <div className="flex min-w-0 flex-col items-end justify-center gap-2 self-stretch">
+                                    <div className="flex shrink-0 items-center self-center pl-2">
+                                      <div className="flex min-w-0 flex-col items-end justify-center gap-2">
                                         {activityLabel ? (
                                           <span className="shrink-0 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-2 py-0.5 text-[11px] text-zinc-400">
                                             {activityLabel}
@@ -1108,9 +1117,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                               Archived
                                             </span>
                                           ) : null}
-                                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-900/80 text-zinc-600">
-                                            <MessageCircle className="h-4 w-4 shrink-0" />
-                                          </span>
                                         </div>
                                       </div>
                                     </div>
@@ -1201,15 +1207,16 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       </button>
                                     </div>
                                   )}
-                                </motion.div>
+                                </div>
                               );
                             })}
                           </div>
                         )}
                       </motion.div>
                     </AnimatePresence>
-                  </div>
-                )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
