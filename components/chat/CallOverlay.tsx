@@ -53,7 +53,15 @@ function otherParticipantName(invite: WebCallInvite | null, currentUserId: strin
   return invite.callerId === currentUserId ? invite.calleeName : invite.callerName;
 }
 
-function VideoTrackSurface({ track, mirror }: { track: MediaTrack | null; mirror?: boolean }) {
+function VideoTrackSurface({
+  track,
+  mirror,
+  fit = 'cover',
+}: {
+  track: MediaTrack | null;
+  mirror?: boolean;
+  fit?: 'cover' | 'contain';
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -61,7 +69,8 @@ function VideoTrackSurface({ track, mirror }: { track: MediaTrack | null; mirror
     if (!container || !track) return;
 
     const element = track.attach();
-    element.classList.add('h-full', 'w-full', 'object-cover');
+    element.classList.add('h-full', 'w-full', fit === 'contain' ? 'object-contain' : 'object-cover');
+    element.style.backgroundColor = 'black';
     if (mirror) {
       element.style.transform = 'scaleX(-1)';
     }
@@ -74,9 +83,36 @@ function VideoTrackSurface({ track, mirror }: { track: MediaTrack | null; mirror
       } catch {}
       element.remove();
     };
-  }, [track, mirror]);
+  }, [fit, track, mirror]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return <div ref={containerRef} className="h-full w-full bg-black" />;
+}
+
+function CallControlButton({
+  label,
+  icon,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  const className = danger
+    ? 'border-red-400/30 bg-red-500 text-white shadow-lg shadow-red-500/20 hover:bg-red-400'
+    : 'border-white/10 bg-white/5 text-white hover:bg-white/10';
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex min-w-[92px] flex-col items-center gap-2 rounded-[22px] border px-4 py-3 transition ${className}`}
+      aria-label={label}
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/15">{icon}</span>
+      <span className="text-[11px] font-medium uppercase tracking-[0.18em]">{label}</span>
+    </button>
+  );
 }
 
 export default function CallOverlay({
@@ -94,6 +130,7 @@ export default function CallOverlay({
   const invite = overlayState.mode === 'idle' ? activeCall.invite : overlayState.invite;
   const name = otherParticipantName(invite, currentUserId);
   const isVideo = invite?.videoEnabled === true;
+  const hasVideoUi = isVideo || activeCall.cameraEnabled || activeCall.localVideoTrack != null || activeCall.remoteVideoTrack != null;
   const showPreview = overlayState.mode !== 'idle';
   const showActive = !showPreview && activeCall.status !== 'idle';
 
@@ -188,9 +225,9 @@ export default function CallOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[90] bg-[linear-gradient(180deg,rgba(4,6,16,0.98),rgba(6,10,26,0.98))] px-6 py-8"
+          className="fixed inset-0 z-[90] overflow-y-auto bg-[linear-gradient(180deg,rgba(4,6,16,0.98),rgba(6,10,26,0.98))] px-4 py-4 sm:px-6 sm:py-8"
         >
-          <div className="mx-auto flex h-full max-w-5xl flex-col">
+          <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-5">
             <div className="text-center">
               <p className="text-sm uppercase tracking-[0.28em] text-zinc-500">
                 {activeCall.status === 'connecting' && (isVideo ? 'Connecting Video Call' : 'Connecting Voice Call')}
@@ -201,10 +238,10 @@ export default function CallOverlay({
               {activeCall.reason ? <p className="mt-2 text-sm text-zinc-400">{activeCall.reason}</p> : null}
             </div>
 
-            <div className="mt-8 flex flex-1 flex-col gap-6 lg:flex-row">
-              <div className="relative min-h-[280px] flex-1 overflow-hidden rounded-[28px] border border-white/10 bg-zinc-900/80">
+            <div className="grid min-h-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+              <div className="relative min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-zinc-900/80 sm:min-h-[420px] lg:min-h-0 lg:aspect-video">
                 {activeCall.remoteVideoTrack ? (
-                  <VideoTrackSurface track={activeCall.remoteVideoTrack} />
+                  <VideoTrackSurface track={activeCall.remoteVideoTrack} fit="contain" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-center text-zinc-400">
                     <div>
@@ -217,43 +254,38 @@ export default function CallOverlay({
                 )}
               </div>
 
-              {isVideo ? (
-                <div className="relative h-56 overflow-hidden rounded-[24px] border border-white/10 bg-zinc-900/80 lg:h-auto lg:w-64">
+              {hasVideoUi ? (
+                <div className="relative h-48 overflow-hidden rounded-[24px] border border-white/10 bg-zinc-900/80 sm:h-56 lg:h-auto lg:w-full lg:aspect-video">
                   {activeCall.localVideoTrack ? (
                     <VideoTrackSurface track={activeCall.localVideoTrack} mirror />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-zinc-500">Local preview</div>
+                    <div className="flex h-full items-center justify-center px-6 text-center text-sm text-zinc-500">
+                      {activeCall.cameraEnabled ? 'Starting camera…' : 'Camera is off'}
+                    </div>
                   )}
                 </div>
               ) : null}
             </div>
 
-            <div className="mt-8 flex items-center justify-center gap-4">
-              <button
-                onClick={onToggleMicrophone}
-                className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
-                aria-label={activeCall.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
-              >
-                {activeCall.microphoneEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-              </button>
-
-              {isVideo ? (
-                <button
+            <div className="sticky bottom-0 pb-2">
+              <div className="mx-auto flex w-full max-w-xl flex-wrap items-center justify-center gap-3 rounded-[28px] border border-white/10 bg-black/35 px-3 py-3 backdrop-blur-xl">
+                <CallControlButton
+                  label={activeCall.microphoneEnabled ? 'Mute' : 'Unmute'}
+                  icon={activeCall.microphoneEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                  onClick={onToggleMicrophone}
+                />
+                <CallControlButton
+                  label={activeCall.cameraEnabled ? 'Camera Off' : 'Camera On'}
+                  icon={activeCall.cameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
                   onClick={onToggleCamera}
-                  className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
-                  aria-label={activeCall.cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-                >
-                  {activeCall.cameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                </button>
-              ) : null}
-
-              <button
-                onClick={onEndCall}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition hover:scale-[1.03]"
-                aria-label="End call"
-              >
-                <PhoneOff className="h-6 w-6" />
-              </button>
+                />
+                <CallControlButton
+                  label="Hang Up"
+                  icon={<PhoneOff className="h-5 w-5" />}
+                  onClick={onEndCall}
+                  danger
+                />
+              </div>
             </div>
           </div>
         </motion.div>

@@ -475,12 +475,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const toggleCamera = useCallback(async () => {
     const room = roomRef.current;
-    if (!room || !activeCallState.invite?.videoEnabled) return;
+    if (!room) return;
     const next = !activeCallState.cameraEnabled;
     await room.localParticipant.setCameraEnabled(next);
     const localCameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
     setActiveCallState((current) => ({ ...current, cameraEnabled: next, localVideoTrack: localCameraTrack }));
-  }, [activeCallState.cameraEnabled, activeCallState.invite?.videoEnabled]);
+  }, [activeCallState.cameraEnabled]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1575,11 +1575,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                             </p>
                           </div>
                         ) : (
-                          <div className="glass overflow-hidden rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
-                            {visibleChatConnections.map((conn) => {
+                          <div className="glass overflow-visible rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
+                            {visibleChatConnections.map((conn, index) => {
                               const isArchived = archivedConnectionIds.has(conn.id);
                               const previewText = conn.chatPreview?.trim() || 'No messages yet';
                               const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
+                              const menuOpensUpward = index >= visibleChatConnections.length - 2;
                               return (
                                 <div key={conn.id} className="relative">
                                   <motion.button
@@ -1651,7 +1652,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                   {menuConnectionId === conn.id && (
                                     <div
                                       data-connection-menu
-                                      className="absolute right-4 top-[calc(50%+1.8rem)] z-20 min-w-[140px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl"
+                                      className={`absolute right-4 z-20 min-w-[140px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <button
