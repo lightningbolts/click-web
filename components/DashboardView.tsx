@@ -1615,7 +1615,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       </p>
                                     </div>
                                     <div className="flex shrink-0 items-center self-center pl-2">
-                                      <div className="flex min-w-0 flex-col items-end justify-center gap-2">
+                                      <div className="flex min-w-0 items-center justify-end gap-2">
                                         {activityLabel ? (
                                           <span className="shrink-0 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-2 py-0.5 text-[11px] text-zinc-400">
                                             {activityLabel}
