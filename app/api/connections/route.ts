@@ -121,6 +121,145 @@ function computeProximityScore(params: {
   return { score, signals };
 }
 
+type ContextTagPayload = {
+  id: string;
+  label: string;
+  emoji: string;
+};
+
+type MemoryCapsulePayload = {
+  connectionId: string;
+  locationName: string | null;
+  geoLocation: { lat: number; lon: number } | null;
+  connectedAtMs: number;
+  weatherSnapshot: {
+    condition: string;
+    temperatureCelsius: number;
+    iconCode: string | null;
+  } | null;
+  contextTag: ContextTagPayload | null;
+  photoUri: string | null;
+  noiseLevelCategory: 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD' | null;
+};
+
+function normalizeContextTag(input: unknown): ContextTagPayload | null {
+  if (typeof input === 'string') {
+    const label = input.trim();
+    return label ? { id: 'custom', label, emoji: '✏️' } : null;
+  }
+
+  if (
+    input &&
+    typeof input === 'object' &&
+    'id' in input &&
+    'label' in input &&
+    typeof input.id === 'string' &&
+    typeof input.label === 'string'
+  ) {
+    const candidate = input as { id: string; label: string; emoji?: unknown };
+    return {
+      id: candidate.id,
+      label: candidate.label,
+      emoji: typeof candidate.emoji === 'string' ? candidate.emoji : '✏️',
+    };
+  }
+
+  return null;
+}
+
+function resolveContextTagId(contextTag: ContextTagPayload | null): string | null {
+  if (!contextTag) {
+    return null;
+  }
+
+  return contextTag.id === 'custom' ? contextTag.label : contextTag.id;
+}
+
+function normalizeNoiseLevel(value: unknown): MemoryCapsulePayload['noiseLevelCategory'] {
+  return value === 'QUIET' || value === 'MODERATE' || value === 'LOUD' || value === 'VERY_LOUD'
+    ? value
+    : null;
+}
+
+function toConditionLabel(weatherCode: number): string {
+  if (weatherCode === 0) return 'Sunny';
+  if ([1, 2, 3].includes(weatherCode)) return 'Cloudy';
+  if ([45, 48].includes(weatherCode)) return 'Foggy';
+  if ([51, 53, 55, 56, 57].includes(weatherCode)) return 'Drizzly';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) return 'Rainy';
+  if ([71, 73, 75, 77, 85, 86].includes(weatherCode)) return 'Snowy';
+  if ([95, 96, 99].includes(weatherCode)) return 'Stormy';
+  return 'Clear';
+}
+
+function toIconCode(weatherCode: number): string {
+  if (weatherCode === 0) return 'clear';
+  if ([1, 2, 3].includes(weatherCode)) return 'cloudy';
+  if ([45, 48].includes(weatherCode)) return 'fog';
+  if ([51, 53, 55, 56, 57].includes(weatherCode)) return 'drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) return 'rain';
+  if ([71, 73, 75, 77, 85, 86].includes(weatherCode)) return 'snow';
+  if ([95, 96, 99].includes(weatherCode)) return 'thunder';
+  return 'clear';
+}
+
+async function enrichMemoryCapsuleWeather(
+  adminClient: ReturnType<typeof createAdminClient>,
+  connectionId: string,
+  lat: number,
+  lon: number,
+  memoryCapsule: MemoryCapsulePayload,
+) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
+    return;
+  }
+
+  try {
+    const weatherResponse = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`,
+      { cache: 'no-store' }
+    );
+
+    if (!weatherResponse.ok) {
+      return;
+    }
+
+    const weatherJson = await weatherResponse.json() as {
+      current_weather?: { temperature?: number; weathercode?: number };
+    };
+    const currentWeather = weatherJson.current_weather;
+    if (
+      currentWeather?.temperature == null ||
+      currentWeather.weathercode == null
+    ) {
+      return;
+    }
+
+    const enrichedCapsule: MemoryCapsulePayload = {
+      ...memoryCapsule,
+      weatherSnapshot: {
+        condition: toConditionLabel(currentWeather.weathercode),
+        temperatureCelsius: currentWeather.temperature,
+        iconCode: toIconCode(currentWeather.weathercode),
+      },
+    };
+
+    const { error } = await adminClient
+      .from('connections')
+      .update({
+        memory_capsule: enrichedCapsule,
+        weather_condition: enrichedCapsule.weatherSnapshot?.condition ?? null,
+      })
+      .eq('id', connectionId);
+
+    if (error) {
+      console.error('Memory capsule weather update error:', error);
+    }
+  } catch (error) {
+    console.error('Memory capsule weather fetch error:', error);
+  }
+}
+
 // ─── GET — fetch user's connections ──────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -168,6 +307,12 @@ export async function POST(request: NextRequest) {
       wifiBssid1,       // initiator's WiFi BSSID (optional)
       wifiBssid2,       // scanner's WiFi BSSID (optional)
       contextTag,       // user-defined tag (optional)
+      contextTagObject,
+      initiatorId,
+      responderId,
+      initiator_id,
+      responder_id,
+      noiseLevelCategory,
     } = body;
 
     // Auth check
@@ -254,6 +399,21 @@ export async function POST(request: NextRequest) {
 
     const now = Date.now();
     const expiry = now + 30 * 24 * 60 * 60 * 1000; // 30 days
+    const resolvedContextTag = normalizeContextTag(contextTagObject ?? contextTag);
+    const resolvedContextTagId = resolveContextTagId(resolvedContextTag);
+    const resolvedNoiseLevel = normalizeNoiseLevel(noiseLevelCategory);
+    const resolvedInitiatorId = initiator_id ?? initiatorId ?? (connectionMethod === 'qr' ? userId2 : userId1);
+    const resolvedResponderId = responder_id ?? responderId ?? (connectionMethod === 'qr' ? userId1 : userId2);
+
+    const memoryCapsuleBase: Omit<MemoryCapsulePayload, 'connectionId'> = {
+      locationName: null,
+      geoLocation: geoLocation.lat === 0 && geoLocation.lon === 0 ? null : geoLocation,
+      connectedAtMs: now,
+      weatherSnapshot: null,
+      contextTag: resolvedContextTag,
+      photoUri: null,
+      noiseLevelCategory: resolvedNoiseLevel,
+    };
 
     const connectionData = {
       user_ids: [userId1, userId2],
@@ -267,7 +427,10 @@ export async function POST(request: NextRequest) {
       proximity_signals: proximitySignals,
       connection_method: connectionMethod,
       flagged: proximityConfidence < 20,
-      context_tag: contextTag || null,
+      context_tag_id: resolvedContextTagId,
+      initiator_id: resolvedInitiatorId,
+      responder_id: resolvedResponderId,
+      noise_level: resolvedNoiseLevel,
     };
 
     const { data: connection, error: insertError } = await adminClient
@@ -294,6 +457,28 @@ export async function POST(request: NextRequest) {
       console.error('Chat creation error (non-fatal):', chatError);
       // Non-fatal — connection was created
     }
+
+    const memoryCapsule: MemoryCapsulePayload = {
+      connectionId: connection.id,
+      ...memoryCapsuleBase,
+    };
+
+    const { error: memoryCapsuleError } = await adminClient
+      .from('connections')
+      .update({ memory_capsule: memoryCapsule })
+      .eq('id', connection.id);
+
+    if (memoryCapsuleError) {
+      console.error('Memory capsule base update error:', memoryCapsuleError);
+    }
+
+    void enrichMemoryCapsuleWeather(
+      adminClient,
+      connection.id,
+      geoLocation.lat,
+      geoLocation.lon,
+      memoryCapsule
+    );
 
     return NextResponse.json({
       success: true,

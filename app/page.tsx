@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Smartphone, Zap, Shield, Users, Clock, Sparkles } from 'lucide-react';
+import { Smartphone, Zap, Shield, Users, Clock, Sparkles, CheckCircle, X } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -12,6 +12,10 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [signupFirst, setSignupFirst] = useState(false);
+  const [showWaitlist, setShowWaitlist] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistStatus, setWaitlistStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [waitlistMessage, setWaitlistMessage] = useState('');
 
   // Show loading screen while checking auth
   if (loading) {
@@ -25,6 +29,34 @@ export default function Home() {
 
   const openSignup = () => { setSignupFirst(true); setShowAuth(true); };
   const openLogin  = () => { setSignupFirst(false); setShowAuth(true); };
+
+  const submitWaitlist = async () => {
+    if (!waitlistEmail.includes('@')) {
+      setWaitlistStatus('error');
+      setWaitlistMessage('Enter a valid email address.');
+      return;
+    }
+
+    setWaitlistStatus('loading');
+    try {
+      const response = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: waitlistEmail, source: 'homepage_hero' }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setWaitlistStatus('success');
+        setWaitlistMessage(data.message || "You're on the list! We'll be in touch.");
+        return;
+      }
+      setWaitlistStatus('error');
+      setWaitlistMessage(data.error || 'Something went wrong.');
+    } catch {
+      setWaitlistStatus('error');
+      setWaitlistMessage('Network error. Please try again.');
+    }
+  };
 
   return (
     <>
@@ -78,28 +110,117 @@ export default function Home() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.6 }}
-              className="flex flex-col sm:flex-row gap-3 justify-center items-center max-w-md mx-auto px-4"
+              className="flex flex-col gap-3 justify-center items-center max-w-md mx-auto px-4"
             >
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={openSignup}
-                className="w-full sm:w-auto px-8 py-3.5 bg-[#8338EC] hover:bg-[#9d4eff] rounded-full font-semibold transition-all glow-violet text-sm sm:text-base whitespace-nowrap"
+                onClick={() => {
+                  setShowWaitlist(true);
+                  setWaitlistStatus('idle');
+                  setWaitlistMessage('');
+                }}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#8338EC] hover:bg-[#9d4eff] text-white font-semibold text-lg transition-all duration-200 shadow-lg shadow-[#8338EC]/30 hover:shadow-[#8338EC]/50"
               >
-                Create Account
+                Join the Waitlist
               </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={openLogin}
-                className="w-full sm:w-auto px-8 py-3.5 glass rounded-full font-semibold border border-zinc-700 hover:border-[#8338EC]/50 transition-all text-sm sm:text-base whitespace-nowrap"
-              >
-                Sign In
-              </motion.button>
+
+              <p className="text-zinc-500 text-sm">Already have an account?</p>
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={openSignup}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-[#8338EC] hover:bg-[#9d4eff] rounded-full font-semibold transition-all glow-violet text-sm sm:text-base whitespace-nowrap"
+                >
+                  Create Account
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={openLogin}
+                  className="w-full sm:w-auto px-8 py-3.5 glass rounded-full font-semibold border border-zinc-700 hover:border-[#8338EC]/50 transition-all text-sm sm:text-base whitespace-nowrap"
+                >
+                  Sign In
+                </motion.button>
+              </div>
             </motion.div>
           </motion.div>
         </div>
       </section>
+
+      {showWaitlist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950/95 p-6 shadow-2xl backdrop-blur-xl"
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Join the Waitlist</h2>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Drop your email and we&apos;ll let you know when Click opens up.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowWaitlist(false)}
+                className="rounded-full border border-zinc-800 p-2 text-zinc-400 transition hover:border-zinc-700 hover:text-white"
+                aria-label="Close waitlist modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {waitlistStatus === 'success' ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center"
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+                >
+                  <CheckCircle className="mx-auto mb-3 h-10 w-10 text-emerald-400" />
+                </motion.div>
+                <p className="font-medium text-emerald-300">
+                  You&apos;re on the list! We&apos;ll be in touch.
+                </p>
+                <p className="mt-2 text-sm text-zinc-400">{waitlistMessage}</p>
+              </motion.div>
+            ) : (
+              <div className="space-y-4">
+                <input
+                  type="email"
+                  value={waitlistEmail}
+                  onChange={(event) => {
+                    setWaitlistEmail(event.target.value);
+                    if (waitlistStatus === 'error') {
+                      setWaitlistStatus('idle');
+                      setWaitlistMessage('');
+                    }
+                  }}
+                  placeholder="you@example.com"
+                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-white outline-none transition focus:border-[#8338EC]"
+                />
+                {waitlistStatus === 'error' && (
+                  <p className="text-sm text-red-400">{waitlistMessage}</p>
+                )}
+                <button
+                  onClick={submitWaitlist}
+                  disabled={waitlistStatus === 'loading'}
+                  className="w-full rounded-2xl bg-[#8338EC] px-4 py-3 font-semibold text-white transition hover:bg-[#9d4eff] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {waitlistStatus === 'loading' ? 'Joining...' : 'Submit'}
+                </button>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
 
       {/* Why Click Section */}
       <section className="relative z-10 px-6 md:px-12 py-12">
