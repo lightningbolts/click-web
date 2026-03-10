@@ -142,6 +142,10 @@ type MemoryCapsulePayload = {
   noiseLevelCategory: 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD' | null;
 };
 
+function buildUtcTimeOfDayLabel(isoTimestamp: string): string {
+  return `${isoTimestamp.slice(11, 19)} UTC`;
+}
+
 function normalizeContextTag(input: unknown): ContextTagPayload | null {
   if (typeof input === 'string') {
     const label = input.trim();
@@ -398,6 +402,8 @@ export async function POST(request: NextRequest) {
     }
 
     const now = Date.now();
+    const createdUtc = new Date(now).toISOString();
+    const timeOfDayUtc = buildUtcTimeOfDayLabel(createdUtc);
     const expiry = now + 30 * 24 * 60 * 60 * 1000; // 30 days
     const resolvedContextTag = normalizeContextTag(contextTagObject ?? contextTag);
     const resolvedContextTagId = resolveContextTagId(resolvedContextTag);
@@ -419,6 +425,8 @@ export async function POST(request: NextRequest) {
       user_ids: [userId1, userId2],
       geo_location: geoLocation,
       created: now,
+      created_utc: createdUtc,
+      time_of_day_utc: timeOfDayUtc,
       expiry,
       should_continue: [false, false],
       has_begun: false,

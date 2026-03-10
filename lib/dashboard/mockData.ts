@@ -214,7 +214,7 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
   return {
     id: rawConnection.id,
     name: otherUserName || rawConnection.semantic_location || 'Unknown',
-    dateMet: new Date(rawConnection.created || rawConnection.created_at),
+    dateMet: new Date(rawConnection.created_utc || rawConnection.created || rawConnection.created_at),
     location: rawConnection.semantic_location || 'Unknown location',
     context: rawConnection.context,
     status: rawConnection.status || 'kept',

@@ -595,6 +595,10 @@ export default function ChatView({
                 ) : (
                   <button
                     onClick={async () => {
+                      if (!window.confirm(`Block ${otherUserName} and remove this connection?`)) {
+                        setShowHeaderMenu(false);
+                        return;
+                      }
                       const success = await onBlock();
                       setActionToast(success
                         ? { type: 'success', message: 'User blocked and connection removed' }
@@ -614,6 +618,9 @@ export default function ChatView({
                 <button
                   onClick={async () => {
                     setShowHeaderMenu(false);
+                    if (!window.confirm(`Remove your connection with ${otherUserName}?`)) {
+                      return;
+                    }
                     const success = await onRemove();
                     setActionToast(success
                       ? { type: 'success', message: 'Connection removed' }
@@ -913,6 +920,9 @@ export default function ChatView({
                   onClick={async () => {
                     const reason = reportReason.trim();
                     if (!reason) return;
+                    if (!window.confirm('Submit this report for moderation review?')) {
+                      return;
+                    }
                     const success = await onReport(reason);
                     setActionToast(success
                       ? { type: 'success', message: 'Report submitted' }

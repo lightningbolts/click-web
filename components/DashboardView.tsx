@@ -844,7 +844,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 id: conn.id,
                 otherUserId,
                 name: displayName,
-                dateMet: new Date(conn.created || conn.created_at),
+                dateMet: new Date(conn.created_utc || conn.created || conn.created_at),
                 location: conn.semantic_location || 'Unknown location',
                 context: conn.context || undefined,
                 status: conn.status || 'kept',
@@ -1683,6 +1683,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         onClick={async () => {
                                           const reason = window.prompt('Report reason');
                                           if (!reason) return;
+                                          if (!window.confirm('Submit this report for moderation review?')) return;
                                           await reportConnection(conn.id, reason);
                                           setMenuConnectionId(null);
                                         }}
@@ -1703,6 +1704,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       ) : (
                                         <button
                                           onClick={async () => {
+                                            if (!window.confirm(`Block ${conn.name} and remove this connection?`)) return;
                                             await blockUser(conn);
                                             setMenuConnectionId(null);
                                           }}
@@ -1713,6 +1715,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       )}
                                       <button
                                         onClick={async () => {
+                                          if (!window.confirm(`Remove your connection with ${conn.name}?`)) return;
                                           await removeConnection(conn.id);
                                           setMenuConnectionId(null);
                                         }}
