@@ -18,6 +18,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 
+const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
+  : null;
+
+async function notifyChatMessagePush(token: string | null, chatId: string, messageId: string, senderUserId: string) {
+  if (!token || !pushFunctionUrl) return;
+
+  const response = await fetch(pushFunctionUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      data: {
+        type: 'chat_message',
+        chat_id: chatId,
+        message_id: messageId,
+        sender_user_id: senderUserId,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`send-push-notification returned ${response.status}: ${errorText}`);
+  }
+}
+
 async function getOrCreateChat(supabase: SupabaseClient, connectionId: string) {
   const { data: existing, error: findErr } = await supabase
     .from('chats')
@@ -141,7 +170,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'chatId or connectionId and content are required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthenticatedSupabase(req);
+  const { user, supabase, token } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
@@ -195,6 +224,17 @@ export async function POST(req: NextRequest) {
       .from('chats')
       .update({ updated_at: now })
       .eq('id', message.chat_id);
+
+    try {
+      await notifyChatMessagePush(token, message.chat_id, message.id, user.id);
+    } catch (pushError) {
+      console.error('Chat push dispatch failed', {
+        chatId: message.chat_id,
+        messageId: message.id,
+        userId: user.id,
+        error: pushError instanceof Error ? pushError.message : String(pushError),
+      });
+    }
 
     return NextResponse.json({ message: { ...message, reactions: {} } }, { status: 201 });
   } catch (err: any) {
