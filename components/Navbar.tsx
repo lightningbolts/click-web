@@ -35,6 +35,7 @@ export default function Navbar() {
   return (
     <>
       <nav
+        data-navbar-root="true"
         className={`relative z-[99999] flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? "border-b border-zinc-800" : ""}`}
       >
         <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
