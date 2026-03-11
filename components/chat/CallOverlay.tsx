@@ -139,18 +139,18 @@ export default function CallOverlay({
       {showPreview ? (
         <motion.div
           key={`call-preview-${overlayState.mode}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(58,134,255,0.18),transparent_42%),linear-gradient(180deg,rgba(5,8,22,0.98),rgba(4,6,16,0.98))] px-6"
+          initial={{ opacity: 0, y: -16, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -12, scale: 0.96 }}
+          className="pointer-events-none fixed inset-x-4 top-4 z-[90] flex justify-center sm:justify-end"
         >
-          <div className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950/90 p-8 text-center shadow-[0_24px_120px_rgba(58,134,255,0.18)]">
+          <div className="pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/95 p-6 text-center shadow-[0_24px_80px_rgba(58,134,255,0.18)] backdrop-blur-xl">
             <motion.div
               animate={{ scale: [0.96, 1.08, 0.96], opacity: [0.28, 0.5, 0.28] }}
               transition={{ repeat: Infinity, duration: 2.1, ease: 'easeInOut' }}
-              className="absolute inset-x-16 top-16 h-40 rounded-full bg-[#3A86FF]/20 blur-3xl"
+              className="absolute inset-x-12 top-10 h-28 rounded-full bg-[#3A86FF]/20 blur-3xl"
             />
-            <div className="relative mx-auto mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-4xl font-semibold text-white shadow-[0_0_50px_rgba(58,134,255,0.28)]">
+            <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-3xl font-semibold text-white shadow-[0_0_50px_rgba(58,134,255,0.28)]">
               {name.charAt(0).toUpperCase()}
             </div>
             <p className="relative text-sm uppercase tracking-[0.28em] text-zinc-500">
@@ -159,8 +159,8 @@ export default function CallOverlay({
               {overlayState.mode === 'connecting' && (isVideo ? 'Joining Video Call' : 'Joining Voice Call')}
               {overlayState.mode === 'ended' && 'Call Ended'}
             </p>
-            <h3 className="relative mt-3 text-3xl font-semibold text-white">{name}</h3>
-            <p className="relative mt-3 text-sm text-zinc-400">
+            <h3 className="relative mt-2 text-2xl font-semibold text-white">{name}</h3>
+            <p className="relative mt-2 text-sm text-zinc-400">
               {overlayState.mode === 'ended'
                 ? overlayState.reason
                 : isVideo
@@ -169,25 +169,25 @@ export default function CallOverlay({
             </p>
 
             {overlayState.mode === 'connecting' ? (
-              <div className="relative mt-8 flex items-center justify-center gap-3 text-sm text-zinc-300">
+              <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-zinc-300">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Connecting…
               </div>
             ) : null}
 
-            <div className="relative mt-10 flex items-center justify-center gap-4">
+            <div className="relative mt-8 flex items-center justify-center gap-4">
               {overlayState.mode === 'incoming' ? (
                 <>
                   <button
                     onClick={onDecline}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition hover:scale-[1.03]"
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition hover:scale-[1.03]"
                     aria-label="Decline call"
                   >
                     <PhoneOff className="h-6 w-6" />
                   </button>
                   <button
                     onClick={onAccept}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-white shadow-lg shadow-[#3A86FF]/25 transition hover:scale-[1.03]"
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-white shadow-lg shadow-[#3A86FF]/25 transition hover:scale-[1.03]"
                     aria-label="Accept call"
                   >
                     {isVideo ? <Video className="h-6 w-6" /> : <Phone className="h-6 w-6" />}
@@ -198,7 +198,7 @@ export default function CallOverlay({
               {(overlayState.mode === 'outgoing' || overlayState.mode === 'connecting') ? (
                 <button
                   onClick={onCancel}
-                  className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition hover:scale-[1.03]"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 transition hover:scale-[1.03]"
                   aria-label="Cancel call"
                 >
                   <PhoneOff className="h-6 w-6" />
@@ -208,7 +208,7 @@ export default function CallOverlay({
               {overlayState.mode === 'ended' ? (
                 <button
                   onClick={onDismissEnded}
-                  className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-white shadow-lg shadow-[#3A86FF]/25 transition hover:scale-[1.03]"
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-white shadow-lg shadow-[#3A86FF]/25 transition hover:scale-[1.03]"
                   aria-label="Dismiss call status"
                 >
                   <Check className="h-6 w-6" />
@@ -222,30 +222,30 @@ export default function CallOverlay({
       {showActive ? (
         <motion.div
           key={`call-active-${activeCall.status}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[90] overflow-y-auto bg-[linear-gradient(180deg,rgba(4,6,16,0.98),rgba(6,10,26,0.98))] px-4 py-4 sm:px-6 sm:py-8"
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 14, scale: 0.98 }}
+          className="pointer-events-none fixed inset-x-4 bottom-4 z-[90] flex justify-center sm:justify-end"
         >
-          <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-5">
+          <div className="pointer-events-auto flex w-full max-w-[min(94vw,380px)] flex-col gap-4 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(4,6,16,0.96),rgba(8,12,28,0.96))] p-4 shadow-[0_24px_80px_rgba(4,6,16,0.4)] backdrop-blur-xl">
             <div className="text-center">
               <p className="text-sm uppercase tracking-[0.28em] text-zinc-500">
                 {activeCall.status === 'connecting' && (isVideo ? 'Connecting Video Call' : 'Connecting Voice Call')}
                 {activeCall.status === 'connected' && (isVideo ? 'Video Call' : 'Voice Call')}
                 {activeCall.status === 'ended' && 'Call Ended'}
               </p>
-              <h3 className="mt-3 text-3xl font-semibold text-white">{name}</h3>
+              <h3 className="mt-2 text-2xl font-semibold text-white">{name}</h3>
               {activeCall.reason ? <p className="mt-2 text-sm text-zinc-400">{activeCall.reason}</p> : null}
             </div>
 
-            <div className="grid min-h-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
-              <div className="relative min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-zinc-900/80 sm:min-h-[420px] lg:min-h-0 lg:aspect-video">
+            <div className="grid min-h-0 items-start gap-3">
+              <div className="relative min-h-[180px] overflow-hidden rounded-[24px] border border-white/10 bg-zinc-900/80 aspect-[1.15/1]">
                 {activeCall.remoteVideoTrack ? (
                   <VideoTrackSurface track={activeCall.remoteVideoTrack} fit="contain" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-center text-zinc-400">
                     <div>
-                      <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-3xl font-semibold text-white">
+                      <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-2xl font-semibold text-white">
                         {name.charAt(0).toUpperCase()}
                       </div>
                       <p>{activeCall.status === 'connecting' ? 'Joining room…' : 'Waiting for video…'}</p>
@@ -255,7 +255,7 @@ export default function CallOverlay({
               </div>
 
               {hasVideoUi ? (
-                <div className="relative h-48 overflow-hidden rounded-[24px] border border-white/10 bg-zinc-900/80 sm:h-56 lg:h-auto lg:w-full lg:aspect-video">
+                <div className="relative h-28 overflow-hidden rounded-[20px] border border-white/10 bg-zinc-900/80">
                   {activeCall.localVideoTrack ? (
                     <VideoTrackSurface track={activeCall.localVideoTrack} mirror />
                   ) : (
@@ -267,8 +267,8 @@ export default function CallOverlay({
               ) : null}
             </div>
 
-            <div className="sticky bottom-0 pb-2">
-              <div className="mx-auto flex w-full max-w-xl flex-wrap items-center justify-center gap-3 rounded-[28px] border border-white/10 bg-black/35 px-3 py-3 backdrop-blur-xl">
+            <div>
+              <div className="mx-auto flex w-full flex-wrap items-center justify-center gap-3 rounded-[24px] border border-white/10 bg-black/35 px-3 py-3 backdrop-blur-xl">
                 <CallControlButton
                   label={activeCall.microphoneEnabled ? 'Mute' : 'Unmute'}
                   icon={activeCall.microphoneEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}

@@ -608,11 +608,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
             },
           );
         }
-
-        if (matchingConnection) {
-          setSelectedConnection(matchingConnection);
-          setActiveTab('chat');
-        }
       })
       .on('broadcast', { event: 'response' }, ({ payload }) => {
         const response = payload as { callId: string; accepted: boolean; busy?: boolean };
