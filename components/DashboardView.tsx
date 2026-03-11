@@ -42,6 +42,12 @@ import {
   downloadCSV,
   generateChaptersFromConnections
 } from '@/lib/dashboard/mockData';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  loadNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationPreferences,
+} from '@/lib/notifications/preferences';
 
 type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
 
@@ -87,6 +93,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [callOverlayState, setCallOverlayState] = useState<WebCallOverlayState>(IDLE_CALL_OVERLAY);
   const [activeCallState, setActiveCallState] = useState<WebActiveCallState>(IDLE_ACTIVE_CALL);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const outboundCallChannelsRef = useRef<Map<string, any>>(new Map());
   const activeInviteRef = useRef<WebCallInvite | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,6 +101,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const remoteAudioElementsRef = useRef<HTMLElement[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const ringtoneIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeTabRef = useRef<DashboardTab>(activeTab);
+  const selectedConnectionRef = useRef<ConnectionRecord | null>(selectedConnection);
+  const notificationPreferencesRef = useRef<NotificationPreferences>(notificationPreferences);
+  const connectionMapRef = useRef<Map<string, ConnectionRecord>>(new Map());
+  const chatConnectionMapRef = useRef<Map<string, string>>(new Map());
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
@@ -237,6 +249,81 @@ export default function DashboardView({ user }: DashboardViewProps) {
       }));
     }
   }, [clearCallTimeout, disconnectRoom, stopRingtone]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    selectedConnectionRef.current = selectedConnection;
+  }, [selectedConnection]);
+
+  useEffect(() => {
+    notificationPreferencesRef.current = notificationPreferences;
+  }, [notificationPreferences]);
+
+  useEffect(() => {
+    connectionMapRef.current = new Map(connectionRecords.map((connection) => [connection.id, connection]));
+  }, [connectionRecords]);
+
+  const showBrowserNotification = useCallback((
+    title: string,
+    body: string,
+    onClick?: () => void,
+  ) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    const notification = new Notification(title, {
+      body,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      silent: false,
+    });
+
+    notification.onclick = () => {
+      notification.close();
+      window.focus();
+      onClick?.();
+    };
+  }, []);
+
+  const persistNotificationPreferences = useCallback(async (preferences: NotificationPreferences) => {
+    const previousPreferences = notificationPreferencesRef.current;
+    setNotificationPreferences(preferences);
+
+    if (!user?.id) {
+      return { success: true };
+    }
+
+    const result = await saveNotificationPreferences(getSupabaseClient(), user.id, preferences);
+    if (!result.success) {
+      setNotificationPreferences(previousPreferences);
+    }
+    return result;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPreferences = async () => {
+      const preferences = await loadNotificationPreferences(getSupabaseClient(), user.id);
+      if (!cancelled) {
+        setNotificationPreferences(preferences);
+      }
+    };
+
+    void loadPreferences();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const joinCall = useCallback(async (invite: WebCallInvite) => {
     if (!user?.id) {
@@ -509,6 +596,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
         playRingtone('incoming');
 
         const matchingConnection = connectionRecords.find((connection) => connection.id === invite.connectionId);
+        if (notificationPreferencesRef.current.callPushEnabled && typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          showBrowserNotification(
+            `${invite.callerName} is calling`,
+            invite.videoEnabled ? 'Incoming video call on Click' : 'Incoming voice call on Click',
+            () => {
+              if (matchingConnection) {
+                setSelectedConnection(matchingConnection);
+                setActiveTab('chat');
+              }
+            },
+          );
+        }
+
         if (matchingConnection) {
           setSelectedConnection(matchingConnection);
           setActiveTab('chat');
@@ -570,7 +670,106 @@ export default function DashboardView({ user }: DashboardViewProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, joinCall, playRingtone, sendSignal, stopRingtone, user?.id]);
+  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, joinCall, playRingtone, sendSignal, showBrowserNotification, stopRingtone, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || connectionRecords.length === 0) {
+      chatConnectionMapRef.current = new Map();
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const primeChatMap = async () => {
+      const connectionIds = connectionRecords.map((connection) => connection.id);
+      const { data, error } = await supabase
+        .from('chats')
+        .select('id, connection_id')
+        .in('connection_id', connectionIds);
+
+      if (error) {
+        console.error('Error priming chat notification map:', error.message || error);
+      } else if (!cancelled) {
+        chatConnectionMapRef.current = new Map(
+          (data ?? []).map((chat: any) => [String(chat.id), String(chat.connection_id)])
+        );
+      }
+
+      channel = supabase
+        .channel(`dashboard:messages:${user.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
+          void (async () => {
+            const message = payload.new as { chat_id: string; user_id: string; content: string; time_created: number };
+            if (!message || message.user_id === user.id) return;
+
+            let connectionId = chatConnectionMapRef.current.get(message.chat_id);
+            if (!connectionId) {
+              const { data: chatRow, error: chatError } = await supabase
+                .from('chats')
+                .select('connection_id')
+                .eq('id', message.chat_id)
+                .maybeSingle();
+
+              if (chatError || !chatRow?.connection_id) {
+                return;
+              }
+
+              connectionId = String(chatRow.connection_id);
+              chatConnectionMapRef.current.set(message.chat_id, connectionId);
+            }
+
+            const connection = connectionMapRef.current.get(connectionId);
+            if (!connection) return;
+
+            setChatMetadataByConnectionId((current) => ({
+              ...current,
+              [connection.id]: {
+                preview: message.content,
+                lastMessageAt: message.time_created,
+                chatUpdatedAt: message.time_created,
+              },
+            }));
+
+            const isActiveVisibleChat =
+              activeTabRef.current === 'chat' &&
+              selectedConnectionRef.current?.id === connection.id &&
+              typeof document !== 'undefined' &&
+              document.visibilityState === 'visible';
+
+            if (!notificationPreferencesRef.current.messagePushEnabled || isActiveVisibleChat) {
+              return;
+            }
+
+            const preview = message.content.length > 140
+              ? `${message.content.slice(0, 137)}...`
+              : message.content;
+
+            showBrowserNotification(
+              connection.name,
+              preview,
+              () => {
+                setSelectedConnection(connection);
+                setActiveTab('chat');
+              },
+            );
+          })();
+        })
+        .subscribe();
+    };
+
+    void primeChatMap();
+
+    return () => {
+      cancelled = true;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [connectionRecords, showBrowserNotification, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -1765,7 +1964,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <SettingsView />
+                <SettingsView
+                  notificationPreferences={notificationPreferences}
+                  onSaveNotificationPreferences={persistNotificationPreferences}
+                />
               </motion.div>
             )}
           </AnimatePresence>

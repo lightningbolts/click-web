@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff, Phone, Video } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -23,6 +23,68 @@ interface ChatViewProps {
   onUnblock: () => Promise<boolean> | boolean;
   onStartCall: (videoEnabled: boolean) => void;
   onClose: () => void;
+}
+
+type ChatTimelineEntry =
+  | { kind: 'separator'; key: string; label: string }
+  | { kind: 'message'; message: Message };
+
+function getDayStart(timestamp: number) {
+  const date = new Date(timestamp);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function formatConversationDayLabel(timestamp: number) {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const targetDay = getDayStart(timestamp);
+  if (targetDay === today.getTime()) {
+    return 'Today';
+  }
+
+  if (targetDay === yesterday.getTime()) {
+    return 'Yesterday';
+  }
+
+  const datePart = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date(timestamp));
+
+  const timePart = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(timestamp));
+
+  return `${datePart} at ${timePart}`;
+}
+
+function buildTimelineEntries(messages: Message[]): ChatTimelineEntry[] {
+  const entries: ChatTimelineEntry[] = [];
+  let previousDayStart: number | null = null;
+
+  for (const message of messages) {
+    const dayStart = getDayStart(message.time_created);
+    if (dayStart !== previousDayStart) {
+      entries.push({
+        kind: 'separator',
+        key: `separator-${dayStart}`,
+        label: formatConversationDayLabel(message.time_created),
+      });
+      previousDayStart = dayStart;
+    }
+
+    entries.push({ kind: 'message', message });
+  }
+
+  return entries;
 }
 
 /**
@@ -452,6 +514,7 @@ export default function ChatView({
   const metDate = connection.dateMet.toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
+  const timelineEntries = useMemo(() => buildTimelineEntries(messages), [messages]);
 
   return (
     <div className="flex flex-col h-full">
@@ -700,14 +763,16 @@ export default function ChatView({
 
           {/* Message list */}
           <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              editingId === msg.id ? (
+            {timelineEntries.map((entry) => (
+              entry.kind === 'separator' ? (
+                <ConversationDaySeparator key={entry.key} label={entry.label} />
+              ) : editingId === entry.message.id ? (
                 /* Inline edit form */
                 <motion.div
-                  key={`edit-${msg.id}`}
+                  key={`edit-${entry.message.id}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className={`flex ${msg.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${entry.message.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className="flex gap-2 max-w-[72%]">
                     <input
@@ -737,9 +802,9 @@ export default function ChatView({
                 </motion.div>
               ) : (
                 <MessageBubble
-                  key={msg.id}
-                  message={msg}
-                  isMine={msg.user_id === currentUserId}
+                  key={entry.message.id}
+                  message={entry.message}
+                  isMine={entry.message.user_id === currentUserId}
                   currentUserId={currentUserId}
                   senderInitial={otherInitial}
                   onReact={handleReact}
@@ -963,6 +1028,18 @@ export default function ChatView({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function ConversationDaySeparator({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-800 to-zinc-700/80" />
+      <span className="rounded-full border border-zinc-700/80 bg-zinc-950/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-400">
+        {label}
+      </span>
+      <div className="h-px flex-1 bg-gradient-to-r from-zinc-700/80 via-zinc-800 to-transparent" />
     </div>
   );
 }

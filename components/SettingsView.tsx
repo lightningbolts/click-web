@@ -4,11 +4,20 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
-import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X } from 'lucide-react';
+import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
+import type { NotificationPreferences } from '@/lib/notifications/preferences';
 
-export default function SettingsView() {
+interface SettingsViewProps {
+  notificationPreferences: NotificationPreferences;
+  onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<{ success: boolean; error?: string }>;
+}
+
+export default function SettingsView({
+  notificationPreferences,
+  onSaveNotificationPreferences,
+}: SettingsViewProps) {
   const { user, signOut, refreshUser } = useAuth();
   const router = useRouter();
   const [fullName, setFullName] = useState('');
@@ -34,6 +43,20 @@ export default function SettingsView() {
   const [tagsMessage, setTagsMessage] = useState({ type: '', text: '' });
   const [tagsDirty, setTagsDirty] = useState(false);
   const [customInterestInput, setCustomInterestInput] = useState('');
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState({ type: '', text: '' });
+  const [browserPermission, setBrowserPermission] = useState<'default' | 'denied' | 'granted' | 'unsupported'>('unsupported');
+
+  const browserNotificationsSupported = typeof window !== 'undefined' && 'Notification' in window;
+
+  useEffect(() => {
+    if (!browserNotificationsSupported) {
+      setBrowserPermission('unsupported');
+      return;
+    }
+
+    setBrowserPermission(Notification.permission);
+  }, [browserNotificationsSupported]);
 
   // Reset initialization when user changes
   useEffect(() => {
@@ -222,6 +245,68 @@ export default function SettingsView() {
     }
   };
 
+  const requestBrowserPermission = async () => {
+    if (!browserNotificationsSupported) {
+      setNotificationMessage({ type: 'warning', text: 'Browser notifications are not supported in this browser.' });
+      return 'unsupported' as const;
+    }
+
+    const permission = await Notification.requestPermission();
+    setBrowserPermission(permission);
+    return permission;
+  };
+
+  const handleNotificationToggle = async (
+    key: keyof NotificationPreferences,
+    enabled: boolean,
+  ) => {
+    let permissionState = browserPermission;
+    if (enabled && permissionState === 'default') {
+      permissionState = await requestBrowserPermission();
+    }
+
+    setNotificationLoading(true);
+    const nextPreferences = {
+      ...notificationPreferences,
+      [key]: enabled,
+    };
+
+    const result = await onSaveNotificationPreferences(nextPreferences);
+    setNotificationLoading(false);
+
+    if (!result.success) {
+      setNotificationMessage({ type: 'error', text: result.error || 'Could not save notification preferences.' });
+      return;
+    }
+
+    if (enabled && permissionState === 'denied') {
+      setNotificationMessage({
+        type: 'warning',
+        text: 'Preference saved, but browser notifications are blocked. Enable notifications for this site in your browser settings to receive alerts.',
+      });
+      return;
+    }
+
+    if (enabled && permissionState === 'unsupported') {
+      setNotificationMessage({
+        type: 'warning',
+        text: 'Preference saved, but this browser does not support system notifications.',
+      });
+      return;
+    }
+
+    setNotificationMessage({ type: 'success', text: 'Notification preferences updated.' });
+  };
+
+  const permissionLabel =
+    browserPermission === 'granted'
+      ? 'Allowed'
+      : browserPermission === 'denied'
+        ? 'Blocked'
+        : browserPermission === 'default'
+          ? 'Not requested'
+          : 'Unsupported';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -387,6 +472,80 @@ export default function SettingsView() {
         </button>
       </div>
 
+      <div className="glass p-8 rounded-3xl border border-zinc-800">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
+            <Bell className="w-6 h-6 text-[#8338EC]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold">Notifications</h3>
+            <p className="text-zinc-400 text-sm">Control browser alerts for messages and incoming calls.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4">
+            <div>
+              <p className="text-sm font-semibold text-white">Browser permission</p>
+              <p className="mt-1 text-xs text-zinc-500">Current status for system notifications in this browser.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                browserPermission === 'granted'
+                  ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                  : browserPermission === 'denied'
+                    ? 'bg-red-500/10 text-red-300 border border-red-500/20'
+                    : 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+              }`}>
+                {permissionLabel}
+              </span>
+              {browserNotificationsSupported && browserPermission !== 'granted' ? (
+                <button
+                  onClick={() => { void requestBrowserPermission(); }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Request
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <NotificationToggleRow
+            icon={<MessageCircle className="w-4 h-4 text-[#8338EC]" />}
+            title="Chat push notifications"
+            description="Show browser alerts for new messages when you are outside that conversation or the tab is in the background."
+            checked={notificationPreferences.messagePushEnabled}
+            disabled={notificationLoading}
+            onChange={(checked) => { void handleNotificationToggle('messagePushEnabled', checked); }}
+          />
+
+          <NotificationToggleRow
+            icon={<Phone className="w-4 h-4 text-[#3A86FF]" />}
+            title="Incoming call alerts"
+            description="Show browser alerts for incoming calls when the dashboard is not frontmost."
+            checked={notificationPreferences.callPushEnabled}
+            disabled={notificationLoading}
+            onChange={(checked) => { void handleNotificationToggle('callPushEnabled', checked); }}
+          />
+        </div>
+
+        {notificationMessage.text && (
+          <div className={`mt-4 p-3 rounded-xl text-sm ${notificationMessage.type === 'error'
+              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+              : notificationMessage.type === 'warning'
+                ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+            }`}>
+            {notificationMessage.text}
+          </div>
+        )}
+
+        <p className="mt-4 text-xs text-zinc-500">
+          Browser alerts work while this dashboard is open in the browser. Closed-tab web push is not configured here.
+        </p>
+      </div>
+
       {/* Security Settings */}
       <div className="glass p-8 rounded-3xl border border-zinc-800">
         <div className="flex items-center gap-4 mb-6">
@@ -528,5 +687,52 @@ export default function SettingsView() {
         )}
       </div>
     </motion.div>
+  );
+}
+
+function NotificationToggleRow({
+  icon,
+  title,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 border border-white/5">
+            {icon}
+          </span>
+          <span>{title}</span>
+        </div>
+        <p className="mt-2 text-sm text-zinc-500">{description}</p>
+      </div>
+
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative h-8 w-14 shrink-0 rounded-full border transition ${
+          checked
+            ? 'border-[#8338EC]/40 bg-gradient-to-r from-[#8338EC] to-[#3A86FF]'
+            : 'border-zinc-700 bg-zinc-900'
+        } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      >
+        <span
+          className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-7' : 'translate-x-1'}`}
+        />
+      </button>
+    </div>
   );
 }
