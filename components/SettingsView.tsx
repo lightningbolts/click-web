@@ -49,9 +49,9 @@ export default function SettingsView({
   const [browserPermission, setBrowserPermission] = useState<'default' | 'denied' | 'granted' | 'unsupported'>('unsupported');
 
   const [locationPrefs, setLocationPrefs] = useState({
-    location_connection_snap_enabled: false,
-    location_show_on_map_enabled: false,
-    location_include_in_insights_enabled: false,
+    location_connection_snap_enabled: true,
+    location_show_on_map_enabled: true,
+    location_include_in_insights_enabled: true,
   });
   const [locationPrefsLoading, setLocationPrefsLoading] = useState(false);
   const [locationPrefsMessage, setLocationPrefsMessage] = useState({ type: '', text: '' });
@@ -79,9 +79,9 @@ export default function SettingsView({
       .then(({ data, error }) => {
         if (!error && data) {
           setLocationPrefs({
-            location_connection_snap_enabled: data.location_connection_snap_enabled ?? false,
-            location_show_on_map_enabled: data.location_show_on_map_enabled ?? false,
-            location_include_in_insights_enabled: data.location_include_in_insights_enabled ?? false,
+            location_connection_snap_enabled: data.location_connection_snap_enabled ?? true,
+            location_show_on_map_enabled: data.location_show_on_map_enabled ?? true,
+            location_include_in_insights_enabled: data.location_include_in_insights_enabled ?? true,
           });
         }
       });
@@ -583,7 +583,7 @@ export default function SettingsView({
           </div>
           <div>
             <h3 className="text-xl font-bold">Your Data</h3>
-            <p className="text-zinc-400 text-sm">Location stays off by default. Turn on only what you want to use. Ghost mode (on mobile) overrides these when active.</p>
+            <p className="text-zinc-400 text-sm">Location is enabled by default so your map and anonymous trends work right away. Turn off anything you do not want. Ghost mode (on mobile) overrides these when active.</p>
           </div>
         </div>
 
@@ -630,18 +630,18 @@ export default function SettingsView({
           />
           <LocationPrefToggleRow
             icon={<Shield className="w-4 h-4 text-[#8338EC]" />}
-            title="Include in business insights"
-            description="Anonymized — campuses/venues see trends, no personal data"
-            checked={locationPrefs.location_include_in_insights_enabled}
+            title="Opt out of business insights"
+            description="Anonymous venue/campus trends are included by default. Turn this on if you do not want to be included."
+            checked={!locationPrefs.location_include_in_insights_enabled}
             disabled={locationPrefsLoading}
             onChange={async (checked) => {
               setLocationPrefsLoading(true);
               setLocationPrefsMessage({ type: '', text: '' });
-              const next = { ...locationPrefs, location_include_in_insights_enabled: checked };
+              const next = { ...locationPrefs, location_include_in_insights_enabled: !checked };
               setLocationPrefs(next);
               const supabase = getSupabaseClient();
               if (supabase && user?.id) {
-                const { error } = await supabase.from('users').update({ location_include_in_insights_enabled: checked }).eq('id', user.id);
+                const { error } = await supabase.from('users').update({ location_include_in_insights_enabled: !checked }).eq('id', user.id);
                 if (error) setLocationPrefsMessage({ type: 'error', text: error.message });
                 else setLocationPrefsMessage({ type: 'success', text: 'Saved.' });
               }
