@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
+import * as Switch from '@radix-ui/react-switch';
 import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
@@ -717,32 +718,20 @@ function NotificationToggleRow({
         <p className="mt-2 text-sm text-zinc-500">{description}</p>
       </div>
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
+      <div className="flex shrink-0 justify-end">
+        <Switch.Root
+          checked={checked}
+          onCheckedChange={onChange}
           disabled={disabled}
-          onClick={() => onChange(!checked)}
-          className={`relative inline-flex h-10 w-[4.75rem] shrink-0 items-center rounded-full border px-1 transition-colors duration-200 ${
-            checked
-              ? 'border-[#8338EC]/50 bg-gradient-to-r from-[#8338EC] to-[#3A86FF]'
-              : 'border-zinc-700 bg-zinc-900'
-          } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+          className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-zinc-700 bg-zinc-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#8338EC] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 data-[state=checked]:border-[#8338EC]/50 data-[state=checked]:bg-[#8338EC] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="pointer-events-none flex w-full items-center justify-between px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
-            <span className={checked ? 'opacity-40' : 'opacity-100'}>Off</span>
-            <span className={checked ? 'opacity-100' : 'opacity-40'}>On</span>
-          </span>
-          <span
-            aria-hidden="true"
-            className={`absolute top-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[10px] font-bold uppercase tracking-wide text-zinc-900 shadow-[0_4px_18px_rgba(0,0,0,0.28)] transition-transform duration-200 ${
-              checked ? 'translate-x-[2.25rem]' : 'translate-x-0'
-            }`}
-          >
-            {checked ? 'On' : 'Off'}
-          </span>
-        </button>
+          <Switch.Thumb
+            className="absolute left-0.5 top-1/2 h-5 w-5 shrink-0 rounded-full bg-white shadow block transition-[transform] duration-200 ease-out"
+            style={{
+              transform: checked ? 'translate(20px, -50%)' : 'translate(0, -50%)',
+            }}
+          />
+        </Switch.Root>
       </div>
     </div>
   );

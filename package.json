@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@radix-ui/react-switch": "^1.2.6",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.83.0",
     "@vercel/analytics": "^1.5.0",
