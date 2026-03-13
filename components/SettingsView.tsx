@@ -49,9 +49,9 @@ export default function SettingsView({
   const [browserPermission, setBrowserPermission] = useState<'default' | 'denied' | 'granted' | 'unsupported'>('unsupported');
 
   const [locationPrefs, setLocationPrefs] = useState({
-    location_connection_snap_enabled: true,
-    location_show_on_map_enabled: true,
-    location_include_in_insights_enabled: true,
+    location_connection_snap_enabled: false,
+    location_show_on_map_enabled: false,
+    location_include_in_insights_enabled: false,
   });
   const [locationPrefsLoading, setLocationPrefsLoading] = useState(false);
   const [locationPrefsMessage, setLocationPrefsMessage] = useState({ type: '', text: '' });
@@ -79,9 +79,9 @@ export default function SettingsView({
       .then(({ data, error }) => {
         if (!error && data) {
           setLocationPrefs({
-            location_connection_snap_enabled: data.location_connection_snap_enabled ?? true,
-            location_show_on_map_enabled: data.location_show_on_map_enabled ?? true,
-            location_include_in_insights_enabled: data.location_include_in_insights_enabled ?? true,
+            location_connection_snap_enabled: data.location_connection_snap_enabled ?? false,
+            location_show_on_map_enabled: data.location_show_on_map_enabled ?? false,
+            location_include_in_insights_enabled: data.location_include_in_insights_enabled ?? false,
           });
         }
       });
@@ -583,7 +583,7 @@ export default function SettingsView({
           </div>
           <div>
             <h3 className="text-xl font-bold">Your Data</h3>
-            <p className="text-zinc-400 text-sm">Control how connection location is used. Ghost mode (on mobile) overrides these when active.</p>
+            <p className="text-zinc-400 text-sm">Location stays off by default. Turn on only what you want to use. Ghost mode (on mobile) overrides these when active.</p>
           </div>
         </div>
 
