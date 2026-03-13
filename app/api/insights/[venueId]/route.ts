@@ -59,7 +59,8 @@ export async function GET(
         const { data: connections, error: connError } = await supabase
             .from('connections')
             .select('created, expiry_state, last_message_at')
-            .eq('semantic_location', semanticLocation);
+            .eq('semantic_location', semanticLocation)
+            .eq('include_in_business_insights', true);
 
         if (connError) {
             console.error('Error fetching connections:', connError.message);

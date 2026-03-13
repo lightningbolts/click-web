@@ -134,6 +134,7 @@ export async function GET(request: Request) {
       .from("connections")
       .select("created_at, created") // Select both to be safe
       .eq("location_id", venueId)
+      .eq("include_in_business_insights", true)
       .gte("created_at", thirtyDaysAgo.toISOString());
 
     if (connectionsError) {
