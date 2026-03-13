@@ -484,12 +484,12 @@ export default function SettingsView({
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4">
-            <div>
+          <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-white">Browser permission</p>
               <p className="mt-1 text-xs text-zinc-500">Current status for system notifications in this browser.</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                 browserPermission === 'granted'
                   ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
@@ -706,8 +706,8 @@ function NotificationToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4">
-      <div className="min-w-0">
+    <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-sm font-semibold text-white">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 border border-white/5">
             {icon}
@@ -717,22 +717,33 @@ function NotificationToggleRow({
         <p className="mt-2 text-sm text-zinc-500">{description}</p>
       </div>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`relative h-8 w-14 shrink-0 rounded-full border transition ${
-          checked
-            ? 'border-[#8338EC]/40 bg-gradient-to-r from-[#8338EC] to-[#3A86FF]'
-            : 'border-zinc-700 bg-zinc-900'
-        } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-      >
-        <span
-          className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-7' : 'translate-x-1'}`}
-        />
-      </button>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={disabled}
+          onClick={() => onChange(!checked)}
+          className={`relative inline-flex h-10 w-[4.75rem] shrink-0 items-center rounded-full border px-1 transition-colors duration-200 ${
+            checked
+              ? 'border-[#8338EC]/50 bg-gradient-to-r from-[#8338EC] to-[#3A86FF]'
+              : 'border-zinc-700 bg-zinc-900'
+          } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+        >
+          <span className="pointer-events-none flex w-full items-center justify-between px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75">
+            <span className={checked ? 'opacity-40' : 'opacity-100'}>Off</span>
+            <span className={checked ? 'opacity-100' : 'opacity-40'}>On</span>
+          </span>
+          <span
+            aria-hidden="true"
+            className={`absolute top-1 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[10px] font-bold uppercase tracking-wide text-zinc-900 shadow-[0_4px_18px_rgba(0,0,0,0.28)] transition-transform duration-200 ${
+              checked ? 'translate-x-[2.25rem]' : 'translate-x-0'
+            }`}
+          >
+            {checked ? 'On' : 'Off'}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
