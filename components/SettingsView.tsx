@@ -630,18 +630,18 @@ export default function SettingsView({
           />
           <LocationPrefToggleRow
             icon={<Shield className="w-4 h-4 text-[#8338EC]" />}
-            title="Opt out of business insights"
-            description="Anonymous venue/campus trends are included by default. Turn this on if you do not want to be included."
-            checked={!locationPrefs.location_include_in_insights_enabled}
+            title="Include in business insights"
+            description="Anonymous venue/campus trends are on by default. Turn this off if you do not want to be included."
+            checked={locationPrefs.location_include_in_insights_enabled}
             disabled={locationPrefsLoading}
             onChange={async (checked) => {
               setLocationPrefsLoading(true);
               setLocationPrefsMessage({ type: '', text: '' });
-              const next = { ...locationPrefs, location_include_in_insights_enabled: !checked };
+              const next = { ...locationPrefs, location_include_in_insights_enabled: checked };
               setLocationPrefs(next);
               const supabase = getSupabaseClient();
               if (supabase && user?.id) {
-                const { error } = await supabase.from('users').update({ location_include_in_insights_enabled: !checked }).eq('id', user.id);
+                const { error } = await supabase.from('users').update({ location_include_in_insights_enabled: checked }).eq('id', user.id);
                 if (error) setLocationPrefsMessage({ type: 'error', text: error.message });
                 else setLocationPrefsMessage({ type: 'success', text: 'Saved.' });
               }
