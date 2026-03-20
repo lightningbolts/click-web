@@ -48,6 +48,11 @@ import {
   saveNotificationPreferences,
   type NotificationPreferences,
 } from '@/lib/notifications/preferences';
+import {
+  buildDashboardMetrics,
+  getNextMilestone,
+  getUnlockedAchievements,
+} from '@/lib/dashboard/userMetrics';
 
 type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
 
@@ -1440,6 +1445,21 @@ export default function DashboardView({ user }: DashboardViewProps) {
     [chatCandidates, archivedConnectionIds]
   );
 
+  const dashboardMetrics = useMemo(
+    () => buildDashboardMetrics(connectionRecords),
+    [connectionRecords]
+  );
+
+  const unlockedAchievements = useMemo(
+    () => getUnlockedAchievements(dashboardMetrics),
+    [dashboardMetrics]
+  );
+
+  const nextMilestone = useMemo(
+    () => getNextMilestone(dashboardMetrics.totalConnections),
+    [dashboardMetrics.totalConnections]
+  );
+
   const visibleChatConnections = chatListTab === 'active' ? activeConnections : archivedConnections;
 
   const formatChatActivity = useCallback((timestamp?: number | null) => {
@@ -1553,14 +1573,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 {/* Stats Overview Section */}
                 <section>
                   <StatsOverview
-                    totalConnections={connectionRecords.length}
-                    thisMonth={connectionRecords.filter(c => {
-                      const now = new Date();
-                      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                      return c.dateMet >= thisMonth;
-                    }).length}
-                    streak={7}
-                    retentionRate={Math.round((connectionRecords.filter(c => c.status === 'kept').length / Math.max(connectionRecords.length, 1)) * 100)}
+                    totalConnections={dashboardMetrics.totalConnections}
+                    thisMonth={dashboardMetrics.thisMonth}
+                    streak={dashboardMetrics.streak}
+                    retentionRate={dashboardMetrics.retentionRate}
                   />
                 </section>
 
@@ -1568,23 +1584,28 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <h3 className="text-sm font-medium text-zinc-400 mb-2">Recent Achievements</h3>
-                    <AchievementBadge
-                      title="Social Butterfly"
-                      description="Met 10+ people this month"
-                      isNew={true}
-                    />
-                    <AchievementBadge
-                      title="Week Warrior"
-                      description="7-day connection streak"
-                    />
+                    {unlockedAchievements.length === 0 ? (
+                      <div className="p-4 glass rounded-xl border border-zinc-800 text-sm text-zinc-500">
+                        No achievements yet. Connect with people to unlock your first badge.
+                      </div>
+                    ) : (
+                      unlockedAchievements.slice(0, 5).map((achievement) => (
+                        <AchievementBadge
+                          key={achievement.id}
+                          title={achievement.title}
+                          description={achievement.description}
+                          icon={achievement.icon}
+                        />
+                      ))
+                    )}
                   </div>
                   <div className="space-y-3">
                     <h3 className="text-sm font-medium text-zinc-400 mb-2">Next Milestone</h3>
                     <MilestoneProgress
-                      current={connectionRecords.length}
-                      target={25}
-                      label="Connection Collector"
-                      reward="Special badge unlock"
+                      current={dashboardMetrics.totalConnections}
+                      target={nextMilestone.target}
+                      label={nextMilestone.label}
+                      reward={nextMilestone.reward}
                     />
                   </div>
                 </section>
