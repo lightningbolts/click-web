@@ -83,7 +83,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8"
             >
               <Sparkles className="w-4 h-4 text-[#8338EC]" />
-              <span className="text-sm text-zinc-300">Launching Soon</span>
+              <span className="text-sm text-zinc-300">In the works</span>
             </motion.div>
 
             <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight">
@@ -99,10 +99,10 @@ export default function Home() {
             </h1>
 
             <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto mb-3 leading-relaxed px-4">
-              <span className="text-[#8338EC] font-semibold">Click</span> transforms fleeting in-person moments into lasting friendships.
+              You know that feeling — great conversation with someone you just met, followed each other on Instagram, never talked again. <span className="text-[#8338EC] font-semibold">Click</span> is built for that moment.
             </p>
             <p className="text-sm sm:text-base md:text-lg text-zinc-500 max-w-3xl mx-auto mb-12 leading-relaxed px-4">
-              Stop collecting followers. Start building real connections with the digital handshake.
+              Tap phones. No usernames, no handles, no algorithm. Just the person standing in front of you.
             </p>
 
             {/* CTA Buttons */}
@@ -161,7 +161,7 @@ export default function Home() {
               <div>
                 <h2 className="text-2xl font-bold text-white">Join the Waitlist</h2>
                 <p className="mt-2 text-sm text-zinc-400">
-                  Drop your email and we&apos;ll let you know when Click opens up.
+                  Leave your email and we&apos;ll reach out when we&apos;re ready.
                 </p>
               </div>
               <button
@@ -235,8 +235,7 @@ export default function Home() {
               Why <span className="text-[#8338EC]">Click</span>?
             </h2>
             <p className="text-base sm:text-lg text-zinc-400 leading-relaxed px-4">
-              Because great connections shouldn't be left to chance. One <span className="text-[#8338EC] font-semibold">Click</span>,
-              and you've turned a fleeting moment into a lasting friendship.
+              You've had that conversation at a party, a class, a show — the kind where you think, <em>I should actually know this person.</em> Then you follow each other and it evaporates. <span className="text-[#8338EC] font-semibold">Click</span> keeps that from happening.
             </p>
           </motion.div>
         </div>
@@ -263,9 +262,9 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mb-6">
                   <span className="text-2xl">💀</span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold mb-4">The Connection Graveyard</h3>
+                <h3 className="text-xl sm:text-2xl font-bold mb-4">The Follow-Back Void</h3>
                 <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-                  You meet someone at an event, swap social media, and never speak again. Sound familiar?
+                  You follow them. They follow back. Neither of you ever sends a message. A month later you see them post something and you've already forgotten their name.
                 </p>
               </div>
             </motion.div>
@@ -282,10 +281,10 @@ export default function Home() {
                   <Smartphone className="w-6 h-6 text-[#8338EC]" />
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold mb-4">
-                  <span className="text-[#8338EC]">Click</span> to Connect
+                  Tap. Done.
                 </h3>
                 <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-                  Instant NFC tap to exchange profiles. Just tap phones and go. No awkward "what's your @?"
+                  NFC tap or QR scan to swap profiles in under a second. No asking for their handle. No "it's spelled with an underscore."
                 </p>
               </div>
             </motion.div>
@@ -305,9 +304,7 @@ export default function Home() {
                     </div>
                     <h3 className="text-xl sm:text-2xl font-bold mb-4">30-Minute Vibe Check</h3>
                     <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl">
-                      After you <span className="text-[#8338EC] font-semibold">Click</span>, start a timed chat to spark real conversation. No pressure, no permanence.
-                      Deleted by default unless you both opt-in. If the vibe's right, save it.
-                      If not, no harm done.
+                      After you tap, you can open a timed chat. It disappears when the clock runs out — unless you both choose to save it. Good when the conversation's there. No weirdness when it's not.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -337,8 +334,7 @@ export default function Home() {
                   No Feed. <span className="text-[#8338EC]">Ever.</span>
                 </h3>
                 <p className="text-sm sm:text-base md:text-lg text-zinc-400 leading-relaxed max-w-2xl mx-auto">
-                  A tool, not a trap. No doomscrolling. No ads. No algorithm deciding who matters.
-                  Just real people, real moments, real connections.
+                  A tool, not a trap. No doomscrolling, no ads, no algorithm deciding who you should care about. Open the app, see your people, close it.
                 </p>
               </div>
             </motion.div>
@@ -360,7 +356,7 @@ export default function Home() {
               How <span className="text-[#8338EC]">Click</span> Works
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed px-4">
-              The digital handshake: Connection technology built for the real world
+              Simple enough to use in a five-second handshake.
             </p>
           </motion.div>
 
@@ -378,9 +374,9 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <Smartphone className="w-8 h-8 text-[#8338EC]" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4">NFC/QR Exchange</h3>
+                <h3 className="text-2xl font-bold mb-4">Tap or Scan</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4">
-                  The true digital handshake. Tap phones or scan QR codes to exchange profiles instantly.
+                  Tap phones with NFC or pull up a QR code. Profiles swap instantly — no typing, no spelling things out.
                 </p>
                 <ul className="space-y-2 text-zinc-500 text-sm">
                   <li className="flex items-center gap-2">
@@ -412,9 +408,9 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📍</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Contextual Memory</h3>
+                <h3 className="text-2xl font-bold mb-4">You'll Remember Where You Met</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4">
-                  Every connection remembers where and when you met. Context makes connections stick.
+                  Every connection logs the time and place. Months later you'll know it was the coffee shop on Pike, not just "some person from that event."
                 </p>
                 <div className="space-y-3">
                   <div className="glass p-3 rounded-xl text-xs">
@@ -442,9 +438,9 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📊</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Business Insights</h3>
+                <h3 className="text-2xl font-bold mb-4">Event Analytics</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4">
-                  For organizations: See where connections happen and which events generate the most engagement.
+                  For organizers and companies: see where people are actually meeting and which events are worth throwing again.
                 </p>
                 <ul className="space-y-2 text-zinc-500 text-sm">
                   <li className="flex items-center gap-2">
@@ -453,7 +449,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">•</span>
-                    <span>Event analytics & pacing metrics</span>
+                    <span>Event analytics & engagement metrics</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">•</span>
@@ -479,14 +475,13 @@ export default function Home() {
             <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/5 to-transparent" />
             <div className="relative z-10">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-center">
-                <span className="text-[#8338EC]">Click</span> is Building the{' '}
+                Built for the moment{' '}
                 <span className="bg-gradient-to-r from-[#8338EC] to-purple-400 bg-clip-text text-transparent">
-                  Connection Economy
+                  you put your phone down
                 </span>
               </h2>
               <p className="text-base sm:text-lg md:text-xl text-zinc-400 text-center max-w-3xl mx-auto mb-12 leading-relaxed px-4">
-                We're not building another social media app. <span className="text-[#8338EC] font-semibold">Click</span> is a bridge
-                between the digital and the real world.
+                Every other app is optimized to keep you scrolling. <span className="text-[#8338EC] font-semibold">Click</span> is optimized for the thirty seconds when you meet someone worth knowing.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
@@ -497,9 +492,9 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-4 mx-auto">
                     <Shield className="w-8 h-8 text-[#8338EC]" />
                   </div>
-                  <h4 className="text-lg font-semibold mb-2">Privacy First</h4>
+                  <h4 className="text-lg font-semibold mb-2">No Tracking</h4>
                   <p className="text-zinc-500 text-sm">
-                    Your data stays yours. No tracking, no selling, no BS.
+                    Your data is yours. No ads, no data brokers, no exceptions.
                   </p>
                 </motion.div>
 
@@ -512,7 +507,7 @@ export default function Home() {
                   </div>
                   <h4 className="text-lg font-semibold mb-2">Student Built</h4>
                   <p className="text-zinc-500 text-sm">
-                    Created by students, for students. Launching 2026.
+                    Built by students who were tired of losing people they actually liked. Launching 2026.
                   </p>
                 </motion.div>
 
@@ -523,9 +518,9 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-4 mx-auto">
                     <Users className="w-8 h-8 text-[#8338EC]" />
                   </div>
-                  <h4 className="text-lg font-semibold mb-2">Real-World Community</h4>
+                  <h4 className="text-lg font-semibold mb-2">Offline First</h4>
                   <p className="text-zinc-500 text-sm">
-                    Technology as a bridge, not a barrier. IRL first, always.
+                    Designed to get you off your phone, not keep you on it. Works without signal and syncs later.
                   </p>
                 </motion.div>
               </div>
