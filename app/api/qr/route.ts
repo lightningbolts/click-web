@@ -79,7 +79,12 @@ export async function GET(request: NextRequest) {
     const now = Date.now();
     const expiresAt = now + 90_000; // 90 seconds
 
-    // Store token in qr_tokens table
+    // Capture initiator's GPS from query params (sent by mobile/web client)
+    const lat = parseFloat(request.nextUrl.searchParams.get('lat') || '');
+    const lon = parseFloat(request.nextUrl.searchParams.get('lon') || '');
+    const hasValidGps = Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0);
+
+    // Store token in qr_tokens table with initiator location for proximity enforcement
     const adminClient = createAdminClient();
     const { error: insertError } = await adminClient
       .from('qr_tokens')
@@ -89,6 +94,7 @@ export async function GET(request: NextRequest) {
         created_at: now,
         expires_at: expiresAt,
         redeemed: false,
+        ...(hasValidGps ? { initiator_lat: lat, initiator_lon: lon } : {}),
       });
 
     if (insertError) {
@@ -173,9 +179,22 @@ export async function POST(request: NextRequest) {
       const { token, scannerLocation } = body;
       const adminClient = createAdminClient();
 
-      // Atomically redeem the token via RPC
+      // Build RPC params — include scanner GPS for proximity gate
+      const rpcParams: Record<string, unknown> = { p_token: token };
+      if (
+        scannerLocation &&
+        typeof scannerLocation.lat === 'number' &&
+        typeof scannerLocation.lon === 'number' &&
+        Number.isFinite(scannerLocation.lat) &&
+        Number.isFinite(scannerLocation.lon)
+      ) {
+        rpcParams.p_scanner_lat = scannerLocation.lat;
+        rpcParams.p_scanner_lon = scannerLocation.lon;
+      }
+
+      // Atomically redeem the token via RPC (includes proximity check)
       const { data: rpcResult, error: rpcError } = await adminClient
-        .rpc('redeem_qr_token', { p_token: token });
+        .rpc('redeem_qr_token', rpcParams);
 
       if (rpcError) {
         console.error('Token redemption RPC error:', rpcError);
@@ -185,9 +204,25 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = rpcResult as { success: boolean; error?: string; user_id?: string; token_age_ms?: number };
+      const result = rpcResult as {
+        success: boolean;
+        error?: string;
+        user_id?: string;
+        token_age_ms?: number;
+        distance_meters?: number;
+      };
 
       if (!result.success) {
+        if (result.error === 'proximity_failed') {
+          return NextResponse.json(
+            {
+              error: 'proximity_failed',
+              message: 'Connection failed: Users must be in the same physical location.',
+              distanceMeters: result.distance_meters,
+            },
+            { status: 403 }
+          );
+        }
         return NextResponse.json(
           { error: result.error || 'not_found' },
           { status: 400 }
