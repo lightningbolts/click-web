@@ -18,6 +18,7 @@ import {
 import SettingsView from '@/components/SettingsView';
 import { ChatView } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
+import { deriveKeysForConnection, decryptContent, isEncrypted } from '@/lib/chat/crypto';
 
 // Digital Memory Box components
 import {
@@ -725,10 +726,24 @@ export default function DashboardView({ user }: DashboardViewProps) {
             const connection = connectionMapRef.current.get(connectionId);
             if (!connection) return;
 
+            let decryptedPreview = message.content;
+            if (isEncrypted(decryptedPreview)) {
+              try {
+                if (connection.userIds && connection.userIds.length >= 2) {
+                  const keys = await deriveKeysForConnection(connection.id, connection.userIds);
+                  decryptedPreview = await decryptContent(decryptedPreview, keys);
+                } else {
+                  decryptedPreview = 'Tap to view message';
+                }
+              } catch {
+                decryptedPreview = 'Tap to view message';
+              }
+            }
+
             setChatMetadataByConnectionId((current) => ({
               ...current,
               [connection.id]: {
-                preview: message.content,
+                preview: decryptedPreview,
                 lastMessageAt: message.time_created,
                 chatUpdatedAt: message.time_created,
               },
@@ -744,9 +759,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
               return;
             }
 
-            const preview = message.content.length > 140
-              ? `${message.content.slice(0, 137)}...`
-              : message.content;
+            const preview = decryptedPreview.length > 140
+              ? `${decryptedPreview.slice(0, 137)}...`
+              : decryptedPreview;
 
             showBrowserNotification(
               connection.name,
@@ -874,9 +889,22 @@ export default function DashboardView({ user }: DashboardViewProps) {
               };
             }
 
+            let preview: string | null = typeof message?.content === 'string' ? message.content : null;
+            if (preview && isEncrypted(preview)) {
+              try {
+                const conn = connectionMapRef.current.get(chat.connection_id as string);
+                if (conn?.userIds && conn.userIds.length >= 2) {
+                  const keys = await deriveKeysForConnection(conn.id, conn.userIds);
+                  preview = await decryptContent(preview, keys);
+                }
+              } catch {
+                preview = 'Tap to view message';
+              }
+            }
+
             return {
               connectionId: chat.connection_id as string,
-              preview: typeof message?.content === 'string' ? message.content : null,
+              preview,
               lastMessageAt: typeof message?.time_created === 'number' ? message.time_created : null,
               chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
             };
