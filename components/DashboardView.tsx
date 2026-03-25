@@ -1042,6 +1042,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
               return {
                 id: conn.id,
                 otherUserId,
+                userIds: conn.user_ids || [],
                 name: displayName,
                 dateMet: new Date(conn.created_utc || conn.created || conn.created_at),
                 location: conn.semantic_location || 'Unknown location',

@@ -180,12 +180,14 @@ export async function POST(req: NextRequest) {
     }
 
     const now = Date.now();
+    // Preserve encrypted content verbatim; only trim plaintext
+    const wireContent = typeof content === 'string' && content.startsWith('e2e:') ? content : content.trim();
     let { data: message, error: insertErr } = await supabase
       .from('messages')
       .insert({
         chat_id: resolvedChatId,
         user_id: user.id,
-        content: content.trim(),
+        content: wireContent,
         time_created: now,
       })
       .select()
@@ -199,7 +201,7 @@ export async function POST(req: NextRequest) {
           .insert({
             chat_id: ensuredChat.id,
             user_id: user.id,
-            content: content.trim(),
+            content: wireContent,
             time_created: now,
           })
           .select()
@@ -253,11 +255,12 @@ export async function PATCH(req: NextRequest) {
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const wireContent = typeof content === 'string' && content.startsWith('e2e:') ? content : content.trim();
   const { data: message, error } = await supabase
     .from('messages')
-    .update({ content: content.trim(), time_edited: Date.now() })
+    .update({ content: wireContent, time_edited: Date.now() })
     .eq('id', messageId)
-    .eq('user_id', user.id) // ensure ownership
+    .eq('user_id', user.id)
     .select()
     .single();
 

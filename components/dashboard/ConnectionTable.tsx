@@ -18,13 +18,14 @@ import {
 export interface ConnectionRecord {
   id: string;
   otherUserId?: string;
+  /** Both user IDs from the connection (needed for E2EE key derivation) */
+  userIds?: string[];
   name: string;
   dateMet: Date;
   location: string;
   context?: string;
   status: 'kept' | 'expired' | 'pending';
   avatarUrl?: string;
-  // Geolocation data following the connection schema
   geo_location?: {
     latitude: number;
     longitude: number;

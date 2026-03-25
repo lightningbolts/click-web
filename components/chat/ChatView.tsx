@@ -7,6 +7,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -132,6 +133,7 @@ export default function ChatView({
   const [reportReason, setReportReason] = useState('');
   const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showCallMenu, setShowCallMenu] = useState(false);
+  const [e2eKeys, setE2eKeys] = useState<DerivedKeys | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -171,6 +173,15 @@ export default function ChatView({
     return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
   };
 
+  // ─────────────────────────── E2EE key derivation ────────────────────────
+
+  useEffect(() => {
+    const userIds = connection.userIds ?? (connection.otherUserId ? [currentUserId, connection.otherUserId] : []);
+    if (userIds.length >= 2) {
+      deriveKeysForConnection(connection.id, userIds).then(setE2eKeys);
+    }
+  }, [connection.id, connection.userIds, connection.otherUserId, currentUserId]);
+
   // ─────────────────────────── init: get/create chat ───────────────────────
 
   useEffect(() => {
@@ -200,10 +211,18 @@ export default function ChatView({
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? 'Failed to load messages');
 
-    // API returns newest-first; reverse for display (oldest at top)
-    const fetched: Message[] = (json.messages as Message[]).reverse();
-    return fetched;
-  }, []);
+    const raw: Message[] = (json.messages as Message[]).reverse();
+
+    if (!e2eKeys) return raw;
+    const decrypted = await Promise.all(
+      raw.map(async (m) => {
+        if (!isEncrypted(m.content)) return m;
+        const plaintext = await decryptContent(m.content, e2eKeys);
+        return { ...m, content: plaintext };
+      })
+    );
+    return decrypted;
+  }, [e2eKeys]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -259,27 +278,34 @@ export default function ChatView({
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
+    const decryptIfNeeded = async (content: string): Promise<string> => {
+      if (e2eKeys && isEncrypted(content)) {
+        return decryptContent(content, e2eKeys);
+      }
+      return content;
+    };
+
     const channel = supabase
       .channel(`chat:${chatId}`)
-      // New / updated / deleted messages
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` },
-        (payload: any) => {
+        async (payload: any) => {
           const { eventType, new: newRow, old: oldRow } = payload;
 
           if (eventType === 'INSERT') {
-            const msg: Message = { ...newRow, reactions: {} };
+            const plainContent = await decryptIfNeeded(newRow.content ?? '');
+            const msg: Message = { ...newRow, content: plainContent, reactions: {} };
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg.id)) return prev;
               const updated = [...prev, msg];
-              // Scroll only if user is near bottom
               if (isNearBottom()) setTimeout(() => scrollToBottom(), 60);
               return updated;
             });
           } else if (eventType === 'UPDATE') {
+            const plainContent = await decryptIfNeeded(newRow.content ?? '');
             setMessages((prev) =>
-              prev.map((m) => (m.id === newRow.id ? { ...m, ...newRow } : m))
+              prev.map((m) => (m.id === newRow.id ? { ...m, ...newRow, content: plainContent } : m))
             );
           } else if (eventType === 'DELETE') {
             setMessages((prev) => prev.filter((m) => m.id !== oldRow.id));
@@ -339,7 +365,7 @@ export default function ChatView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatId, currentUserId, scrollToBottom]);
+  }, [chatId, currentUserId, scrollToBottom, e2eKeys]);
 
   // ─────────────────────────── scroll event ────────────────────────────────
 
@@ -366,21 +392,21 @@ export default function ChatView({
     inputRef.current?.focus();
 
     try {
+      const wireContent = e2eKeys ? await encryptContent(content, e2eKeys) : content;
       const headers = await getAuthHeaders();
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ chatId, connectionId: connection.id, content }),
+        body: JSON.stringify({ chatId, connectionId: connection.id, content: wireContent }),
       });
       if (!res.ok) throw new Error('Send failed');
-      // Realtime will push the new message via subscription
     } catch (err) {
       console.error('Send error:', err);
-      setInputText(content); // restore
+      setInputText(content);
     } finally {
       setSending(false);
     }
-  }, [inputText, chatId, sending]);
+  }, [inputText, chatId, sending, e2eKeys]);
 
   // Broadcast typing indicator
   const broadcastTyping = useCallback(() => {
@@ -422,11 +448,12 @@ export default function ChatView({
     setEditingId(null);
     setEditText('');
 
+    const wireContent = e2eKeys ? await encryptContent(newContent, e2eKeys) : newContent;
     const headers = await getAuthHeaders();
     const res = await fetch('/api/chat/messages', {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({ messageId: editingId, content: newContent }),
+      body: JSON.stringify({ messageId: editingId, content: wireContent }),
     });
 
     if (!res.ok) {
@@ -434,7 +461,7 @@ export default function ChatView({
         m.id === previous.id ? previous : m
       )));
     }
-  }, [editingId, editText, getAuthHeaders, messages]);
+  }, [editingId, editText, getAuthHeaders, messages, e2eKeys]);
 
   // ─────────────────────────── delete message ──────────────────────────────
 
