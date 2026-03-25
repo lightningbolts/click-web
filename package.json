@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@radix-ui/react-switch": "^1.2.6",
@@ -28,11 +30,19 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "babel-plugin-react-compiler": "1.0.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   },
   "overrides": {
