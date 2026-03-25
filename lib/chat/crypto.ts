@@ -25,14 +25,16 @@ export interface DerivedKeys {
 
 const keyCache = new Map<string, DerivedKeys>();
 
-async function sha256(data: Uint8Array): Promise<ArrayBuffer> {
+type Bytes = Uint8Array<ArrayBuffer>;
+
+async function sha256(data: Bytes): Promise<ArrayBuffer> {
   return crypto.subtle.digest('SHA-256', data);
 }
 
-function concatBuffers(...buffers: (Uint8Array | ArrayBuffer)[]): Uint8Array {
-  const arrays = buffers.map((b) => (b instanceof Uint8Array ? b : new Uint8Array(b)));
+function concatBuffers(...buffers: (Bytes | ArrayBuffer)[]): Bytes {
+  const arrays = buffers.map((b) => (b instanceof Uint8Array ? b : new Uint8Array(b)) as Bytes);
   const totalLength = arrays.reduce((acc, a) => acc + a.length, 0);
-  const result = new Uint8Array(totalLength);
+  const result = new Uint8Array(totalLength) as Bytes;
   let offset = 0;
   for (const a of arrays) {
     result.set(a, offset);
@@ -41,15 +43,15 @@ function concatBuffers(...buffers: (Uint8Array | ArrayBuffer)[]): Uint8Array {
   return result;
 }
 
-function toUtf8(str: string): Uint8Array {
-  return new TextEncoder().encode(str);
+function toUtf8(str: string): Bytes {
+  return new TextEncoder().encode(str) as Bytes;
 }
 
-function fromUtf8(data: ArrayBuffer | Uint8Array): string {
+function fromUtf8(data: ArrayBuffer | Bytes): string {
   return new TextDecoder().decode(data);
 }
 
-function toBase64(data: Uint8Array): string {
+function toBase64(data: Bytes): string {
   let binary = '';
   for (let i = 0; i < data.length; i++) {
     binary += String.fromCharCode(data[i]);
@@ -57,9 +59,9 @@ function toBase64(data: Uint8Array): string {
   return btoa(binary);
 }
 
-function fromBase64(b64: string): Uint8Array {
+function fromBase64(b64: string): Bytes {
   const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
+  const bytes = new Uint8Array(binary.length) as Bytes;
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
@@ -76,10 +78,10 @@ export async function deriveKeysForConnection(
 
   const sorted = [...userIds].sort();
   const input = `${E2EE_SALT}:${sorted.join(':')}:${connectionId}`;
-  const master = new Uint8Array(await sha256(toUtf8(input)));
+  const master = new Uint8Array(await sha256(toUtf8(input))) as Bytes;
 
-  const encKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x01])));
-  const macKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x02])));
+  const encKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x01]) as Bytes));
+  const macKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x02]) as Bytes));
 
   const encKey = await crypto.subtle.importKey('raw', encKeyRaw, { name: 'AES-CBC' }, false, [
     'encrypt',
@@ -100,13 +102,13 @@ export async function deriveKeysForConnection(
 }
 
 export async function encryptContent(plaintext: string, keys: DerivedKeys): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH)) as Bytes;
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, keys.encKey, toUtf8(plaintext))
-  );
+  ) as Bytes;
   const hmac = new Uint8Array(
     await crypto.subtle.sign('HMAC', keys.macKey, concatBuffers(iv, ciphertext))
-  );
+  ) as Bytes;
   const payload = concatBuffers(iv, hmac, ciphertext);
   return E2EE_PREFIX + toBase64(payload);
 }
