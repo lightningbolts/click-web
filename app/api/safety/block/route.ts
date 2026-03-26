@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+async function resolveAuthenticatedUser(
+    request: NextRequest,
+    supabase: ReturnType<typeof createServerClient>
+) {
+    const cookieAuth = await supabase.auth.getUser();
+    if (cookieAuth.data.user && !cookieAuth.error) {
+        return { user: cookieAuth.data.user, error: null };
+    }
+
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : null;
+    if (!token) {
+        return { user: null, error: cookieAuth.error };
+    }
+
+    const tokenAuth = await supabase.auth.getUser(token);
+    return { user: tokenAuth.data.user, error: tokenAuth.error };
+}
+
 /**
  * Block a user.
  * POST { blocked_id: string }
@@ -25,7 +44,7 @@ export async function POST(request: NextRequest) {
             }
         );
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { user, error: authError } = await resolveAuthenticatedUser(request, supabase);
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -76,7 +95,7 @@ export async function DELETE(request: NextRequest) {
             }
         );
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { user, error: authError } = await resolveAuthenticatedUser(request, supabase);
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

@@ -7,7 +7,6 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
 
 interface ChatViewProps {
@@ -547,7 +546,7 @@ export default function ChatView({
   return (
     <div className="flex flex-col h-full">
       {/* ── Header ── */}
-      <div className="glass rounded-2xl mb-4 shrink-0">
+      <div className="glass relative z-30 rounded-2xl mb-4 shrink-0">
         <div className="flex items-center gap-4 px-5 py-4">
           <button
             onClick={onClose}
@@ -571,17 +570,6 @@ export default function ChatView({
                 <Calendar className="w-3 h-3 shrink-0 text-zinc-500" /> {metDate}
               </span>
             </div>
-            {(connection.context || connection.weatherSummary || connection.noiseSummary) && (
-              <div className="mt-2 border-t border-zinc-800/80 pt-2">
-                <MomentBlock
-                  compact
-                  context={connection.context}
-                  weatherSummary={connection.weatherSummary}
-                  noiseSummary={connection.noiseSummary}
-                  noiseCategory={connection.noiseCategory}
-                />
-              </div>
-            )}
           </div>
 
           {/* Connection status badge */}
@@ -604,7 +592,7 @@ export default function ChatView({
             </button>
 
             {showCallMenu && (
-              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden z-30">
+              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden z-50">
                 <button
                   onClick={() => {
                     setShowCallMenu(false);
@@ -642,7 +630,7 @@ export default function ChatView({
             </button>
 
             {showHeaderMenu && (
-              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden z-30">
+              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden z-50">
                 {isArchived ? (
                   <button
                     onClick={async () => {

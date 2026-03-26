@@ -31,7 +31,6 @@ import {
   ConnectionMap
 } from '@/components/dashboard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import CallOverlay, {
   type WebActiveCallState,
@@ -1390,9 +1389,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
     if (!connection.otherUserId) return false;
 
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch('/api/safety/block', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ blocked_id: connection.otherUserId }),
       });
 
@@ -1413,14 +1413,16 @@ export default function DashboardView({ user }: DashboardViewProps) {
       console.error('Error blocking user:', err);
       return false;
     }
-  }, [removeConnection]);
+  }, [getAuthHeaders, removeConnection]);
 
   const unblockUser = useCallback(async (connection: ConnectionRecord): Promise<boolean> => {
     if (!connection.otherUserId) return false;
 
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/safety/block?blocked_id=${encodeURIComponent(connection.otherUserId)}`, {
         method: 'DELETE',
+        headers,
       });
 
       if (!response.ok) {
@@ -1439,7 +1441,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       console.error('Error unblocking user:', err);
       return false;
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   const startLongPress = useCallback((connectionId: string) => {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -1869,17 +1871,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
-                                      {(conn.context || conn.weatherSummary || conn.noiseSummary) && (
-                                        <div className="mt-2 border-t border-zinc-800/60 pt-2">
-                                          <MomentBlock
-                                            compact
-                                            context={conn.context}
-                                            weatherSummary={conn.weatherSummary}
-                                            noiseSummary={conn.noiseSummary}
-                                            noiseCategory={conn.noiseCategory}
-                                          />
-                                        </div>
-                                      )}
                                     </div>
                                     <div className="flex shrink-0 items-center self-start pt-0.5 pl-2">
                                       <div className="flex min-w-0 items-center justify-end gap-2">
@@ -1914,7 +1905,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                   {menuConnectionId === conn.id && (
                                     <div
                                       data-connection-menu
-                                      className={`absolute right-4 z-20 min-w-[140px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
+                                      className={`absolute right-4 z-50 min-w-[140px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <button
