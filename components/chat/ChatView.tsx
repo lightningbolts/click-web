@@ -7,6 +7,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
 
 interface ChatViewProps {
@@ -562,14 +563,25 @@ export default function ChatView({
 
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-white truncate text-lg">{otherUserName}</p>
-            <div className="flex items-center gap-3 text-xs text-zinc-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
               <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" /> {connection.location}
+                <MapPin className="w-3 h-3 shrink-0 text-zinc-500" /> {connection.location}
               </span>
               <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" /> {metDate}
+                <Calendar className="w-3 h-3 shrink-0 text-zinc-500" /> {metDate}
               </span>
             </div>
+            {(connection.context || connection.weatherSummary || connection.noiseSummary) && (
+              <div className="mt-2 border-t border-zinc-800/80 pt-2">
+                <MomentBlock
+                  compact
+                  context={connection.context}
+                  weatherSummary={connection.weatherSummary}
+                  noiseSummary={connection.noiseSummary}
+                  noiseCategory={connection.noiseCategory}
+                />
+              </div>
+            )}
           </div>
 
           {/* Connection status badge */}

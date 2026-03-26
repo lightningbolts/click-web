@@ -12,8 +12,10 @@ import {
   ChevronUp,
   ChevronDown,
   Filter,
-  MessageCircle
+  MessageCircle,
 } from 'lucide-react';
+import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
+import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 
 export interface ConnectionRecord {
   id: string;
@@ -23,7 +25,14 @@ export interface ConnectionRecord {
   name: string;
   dateMet: Date;
   location: string;
+  /** Event / context tag (from memory_capsule or context_tag_id) */
   context?: string;
+  /** Weather when you connected, if captured */
+  weatherSummary?: string;
+  /** Noise level category and/or measured dB */
+  noiseSummary?: string;
+  /** Tier for volume-bar display (1 / 2 / 3 bars) */
+  noiseCategory?: NoiseLevelKey;
   status: 'kept' | 'expired' | 'pending';
   avatarUrl?: string;
   geo_location?: {
@@ -58,10 +67,13 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
   // Filter and sort connections
   const filteredConnections = useMemo(() => {
     let filtered = connections.filter((conn) => {
+      const q = searchQuery.toLowerCase();
       const matchesSearch = 
-        conn.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        conn.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (conn.context?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+        conn.name.toLowerCase().includes(q) ||
+        conn.location.toLowerCase().includes(q) ||
+        (conn.context?.toLowerCase().includes(q) ?? false) ||
+        (conn.weatherSummary?.toLowerCase().includes(q) ?? false) ||
+        (conn.noiseSummary?.toLowerCase().includes(q) ?? false);
       
       const matchesStatus = statusFilter === 'all' || conn.status === statusFilter;
       
@@ -188,7 +200,7 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <input
             type="text"
-            placeholder="Search by name, location, or context..."
+            placeholder="Search by name, location, event, weather, or noise..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors text-sm"
@@ -242,6 +254,9 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
                   <SortIcon field="location" />
                 </div>
               </th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider min-w-[11rem] w-[22%]">
+                Moment
+              </th>
               <th 
                 className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
                 onClick={() => handleSort('status')}
@@ -258,7 +273,7 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
             <AnimatePresence>
               {filteredConnections.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">
                     {searchQuery || statusFilter !== 'all' 
                       ? 'No connections match your search'
                       : 'No connections yet. Start meeting people!'}
@@ -275,37 +290,44 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
                     className="hover:bg-zinc-900/30 transition-colors cursor-pointer group"
                   onClick={() => onSelect?.(connection)}
                   >
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 align-top">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-xs font-bold">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-xs font-bold shrink-0">
                           {connection.name.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors">
-                            {connection.name}
-                          </p>
-                          {connection.context && (
-                            <p className="text-xs text-zinc-500">{connection.context}</p>
-                          )}
-                        </div>
+                        <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug">
+                          {connection.name}
+                        </p>
                       </div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2 text-sm text-zinc-300">
-                        <Calendar className="w-4 h-4 text-zinc-500" />
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex items-center gap-2 text-sm text-zinc-200">
+                        <Calendar className="w-4 h-4 text-zinc-400 shrink-0" />
                         {formatDate(connection.dateMet)}
                       </div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2 text-sm text-zinc-300">
-                        <MapPin className="w-4 h-4 text-zinc-500" />
-                        {connection.location}
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex items-center gap-2 text-sm text-zinc-200">
+                        <MapPin className="w-4 h-4 text-zinc-400 shrink-0" />
+                        <span className="leading-snug">{connection.location}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 align-top border-l border-zinc-800/80">
+                      {connection.context || connection.weatherSummary || connection.noiseSummary ? (
+                        <MomentBlock
+                          context={connection.context}
+                          weatherSummary={connection.weatherSummary}
+                          noiseSummary={connection.noiseSummary}
+                          noiseCategory={connection.noiseCategory}
+                        />
+                      ) : (
+                        <span className="text-sm text-zinc-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 align-top">
                       {getStatusBadge(connection.status)}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 align-top">
                       <button
                         onClick={(e) => { e.stopPropagation(); onSelect?.(connection); }}
                         className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-[#8338EC]/10 hover:bg-[#8338EC]/20 border border-[#8338EC]/30 rounded-xl text-xs text-[#8338EC] font-medium"

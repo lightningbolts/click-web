@@ -5,6 +5,13 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapPin, Loader2 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
+import { escapeHtml } from '@/lib/dashboard/connectionExtras';
+
+function atmosphereHtml(conn: ConnectionRecord): string {
+  const bits = [conn.weatherSummary, conn.noiseSummary].filter((b): b is string => typeof b === 'string' && b.length > 0);
+  if (bits.length === 0) return '';
+  return `<span style="color:#a1a1aa;font-size:10px;display:block;margin-top:6px;line-height:1.35;">${bits.map((b) => escapeHtml(b)).join(' · ')}</span>`;
+}
 
 interface ConnectionMapProps {
   connections: ConnectionRecord[];
@@ -176,11 +183,15 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             const groupedRows = groupedConnections
               .map((conn) => {
                 const date = conn.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                const ctx = conn.context
+                  ? `<span style="color:#8338EC; font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(131,56,236,0.2); border-radius:9999px;">${escapeHtml(conn.context)}</span>`
+                  : '';
+                const atm = atmosphereHtml(conn);
                 return `<div style="padding:8px 0; border-bottom:1px solid rgba(63,63,70,0.35);">
-                  <strong style="color:#8338EC; font-size:13px; display:block; margin-bottom:2px;">${conn.name}</strong>
-                  <span style="color:#a1a1aa; font-size:11px; display:block;">${conn.location}</span>
-                  <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${date}</span>
-                  ${conn.context ? `<span style="color:#8338EC; font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(131,56,236,0.2); border-radius:9999px;">${conn.context}</span>` : ''}
+                  <strong style="color:#8338EC; font-size:13px; display:block; margin-bottom:2px;">${escapeHtml(conn.name)}</strong>
+                  <span style="color:#a1a1aa; font-size:11px; display:block;">${escapeHtml(conn.location)}</span>
+                  <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${escapeHtml(date)}</span>
+                  ${ctx}${atm}
                   <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:linear-gradient(135deg, #8338EC, #6520c0); color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
                     Chat →
                   </button>
@@ -189,11 +200,16 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
               .join('');
 
             const single = groupedConnections.length === 1;
+            const singleDate = connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+            const singleCtx = connection.context
+              ? `<span style="color: #8338EC; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${escapeHtml(connection.context)}</span>`
+              : '';
+            const singleAtm = atmosphereHtml(connection);
             const popupContent = `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-height: 260px; overflow-y: auto;">
-              ${single ? `<strong style="color: #8338EC; font-size: 14px; display: block; margin-bottom: 4px;">${connection.name}</strong>
-              <span style="color: #a1a1aa; font-size: 12px; display: block;">${connection.location}</span>
-              <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
-              ${connection.context ? `<span style="color: #8338EC; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${connection.context}</span>` : ''}
+              ${single ? `<strong style="color: #8338EC; font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(connection.name)}</strong>
+              <span style="color: #a1a1aa; font-size: 12px; display: block;">${escapeHtml(connection.location)}</span>
+              <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${escapeHtml(singleDate)}</span>
+              ${singleCtx}${singleAtm}
               <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #8338EC, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
               : `<strong style="color:#8338EC; font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connections at this location</strong>${groupedRows}`}
             </div>`;

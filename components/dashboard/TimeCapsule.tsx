@@ -14,6 +14,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
+import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 
 export interface TimelineChapter {
   id: string;
@@ -345,7 +346,18 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                           {/* Name + location */}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-white font-medium truncate">{conn.name}</p>
-                            <p className="text-[10px] text-zinc-500 truncate">{conn.location}</p>
+                            <p className="text-[10px] text-zinc-400 truncate">{conn.location}</p>
+                            {(conn.context || conn.weatherSummary || conn.noiseSummary) && (
+                              <div className="mt-1.5 border-t border-zinc-800/70 pt-1.5">
+                                <MomentBlock
+                                  compact
+                                  context={conn.context}
+                                  weatherSummary={conn.weatherSummary}
+                                  noiseSummary={conn.noiseSummary}
+                                  noiseCategory={conn.noiseCategory}
+                                />
+                              </div>
+                            )}
                           </div>
                           {/* Context tag */}
                           {conn.context && (

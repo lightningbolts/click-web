@@ -5,6 +5,12 @@
 
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
+import {
+  extractEventContext,
+  extractNoiseSummary,
+  extractWeatherSummary,
+  normalizeNoiseCategory,
+} from '@/lib/dashboard/connectionExtras';
 
 // Generate mock connections with full geolocation data following the connection schema
 export const mockConnections: ConnectionRecord[] = [
@@ -14,6 +20,9 @@ export const mockConnections: ConnectionRecord[] = [
     dateMet: new Date('2026-01-15'),
     location: 'UW Red Square',
     context: 'Study Group',
+    weatherSummary: 'Cloudy · 43°F',
+    noiseSummary: 'Moderate',
+    noiseCategory: 'MODERATE',
     status: 'kept',
     geo_location: {
       latitude: 47.6553,
@@ -210,13 +219,17 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
   const latitude = typeof rawLat === 'number' ? rawLat : Number(rawLat);
   const longitude = typeof rawLon === 'number' ? rawLon : Number(rawLon);
   const hasValidGeo = Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0);
+  const raw = rawConnection as Record<string, unknown>;
 
   return {
     id: rawConnection.id,
     name: otherUserName || rawConnection.semantic_location || 'Unknown',
     dateMet: new Date(rawConnection.created_utc || rawConnection.created || rawConnection.created_at),
     location: rawConnection.semantic_location || 'Unknown location',
-    context: rawConnection.context,
+    context: extractEventContext(raw),
+    weatherSummary: extractWeatherSummary(raw),
+    noiseSummary: extractNoiseSummary(raw),
+    noiseCategory: normalizeNoiseCategory(raw),
     status: rawConnection.status || 'kept',
     // Include geo_location from the connection schema
     geo_location: hasValidGeo
@@ -277,12 +290,14 @@ export function generateChaptersFromConnections(connections: ConnectionRecord[])
  * Export connections to CSV format
  */
 export function exportToCSV(connections: ConnectionRecord[]): string {
-  const headers = ['Name', 'Date Met', 'Location', 'Context', 'Status'];
+  const headers = ['Name', 'Date Met', 'Location', 'Event / context', 'Weather', 'Noise', 'Status'];
   const rows = connections.map(conn => [
     conn.name,
     conn.dateMet.toISOString().split('T')[0],
     conn.location,
     conn.context || '',
+    conn.weatherSummary || '',
+    conn.noiseSummary || '',
     conn.status,
   ]);
 

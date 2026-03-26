@@ -31,6 +31,7 @@ import {
   ConnectionMap
 } from '@/components/dashboard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import CallOverlay, {
   type WebActiveCallState,
@@ -54,6 +55,12 @@ import {
   getNextMilestone,
   getUnlockedAchievements,
 } from '@/lib/dashboard/userMetrics';
+import {
+  extractEventContext,
+  extractNoiseSummary,
+  extractWeatherSummary,
+  normalizeNoiseCategory,
+} from '@/lib/dashboard/connectionExtras';
 
 type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
 
@@ -1067,6 +1074,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 (typeof otherUserName === 'string' && otherUserName.trim()) ||
                 'Connection';
 
+              const raw = conn as Record<string, unknown>;
+
               return {
                 id: conn.id,
                 otherUserId,
@@ -1074,7 +1083,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 name: displayName,
                 dateMet: new Date(conn.created_utc || conn.created || conn.created_at),
                 location: conn.semantic_location || 'Unknown location',
-                context: conn.context || undefined,
+                context: extractEventContext(raw),
+                weatherSummary: extractWeatherSummary(raw),
+                noiseSummary: extractNoiseSummary(raw),
+                noiseCategory: normalizeNoiseCategory(raw),
                 status: conn.status || 'kept',
                 geo_location: geoLoc,
               };
@@ -1844,7 +1856,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     onTouchStart={() => startLongPress(conn.id)}
                                     onTouchEnd={endLongPress}
                                     onTouchCancel={endLongPress}
-                                    className="w-full flex items-center gap-4 px-5 py-4 pr-16 text-left transition-colors"
+                                    className="w-full flex items-start gap-4 px-5 py-4 pr-16 text-left transition-colors"
                                   >
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold">
                                       {conn.name.charAt(0).toUpperCase()}
@@ -1854,23 +1866,29 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       <p className="mt-0.5 truncate pr-2 text-sm text-zinc-300">
                                         {previewText}
                                       </p>
-                                      <p className="mt-1 truncate pr-2 text-xs text-zinc-500">
+                                      <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
+                                      {(conn.context || conn.weatherSummary || conn.noiseSummary) && (
+                                        <div className="mt-2 border-t border-zinc-800/60 pt-2">
+                                          <MomentBlock
+                                            compact
+                                            context={conn.context}
+                                            weatherSummary={conn.weatherSummary}
+                                            noiseSummary={conn.noiseSummary}
+                                            noiseCategory={conn.noiseCategory}
+                                          />
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="flex shrink-0 items-center self-center pl-2">
+                                    <div className="flex shrink-0 items-center self-start pt-0.5 pl-2">
                                       <div className="flex min-w-0 items-center justify-end gap-2">
                                         {activityLabel ? (
-                                          <span className="shrink-0 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-2 py-0.5 text-[11px] text-zinc-400">
+                                          <span className="shrink-0 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-2 py-0.5 text-[11px] text-zinc-300">
                                             {activityLabel}
                                           </span>
                                         ) : null}
                                         <div className="flex flex-wrap items-center justify-end gap-2">
-                                          {conn.context && (
-                                            <span className="shrink-0 rounded-full border border-[#8338EC]/20 bg-[#8338EC]/10 px-2 py-0.5 text-[10px] text-[#8338EC]">
-                                              {conn.context}
-                                            </span>
-                                          )}
                                           {isArchived ? (
                                             <span className="shrink-0 rounded-full border border-zinc-600/40 bg-zinc-700/30 px-2 py-0.5 text-[10px] text-zinc-300">
                                               Archived
