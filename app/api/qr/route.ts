@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -133,7 +134,7 @@ export async function GET(request: NextRequest) {
         connectionUrl,
         deepLink: `click://connect/${user.id}`,
         universalLink: connectionUrl,
-        userName: user.user_metadata?.full_name || null,
+        userName: displayNameFromUserMetadata(user.user_metadata) || null,
         userEmail: user.email,
       }
     });

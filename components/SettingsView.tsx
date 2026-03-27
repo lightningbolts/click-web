@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
@@ -9,6 +9,7 @@ import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell,
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
+import { displayNameFromUserMetadata, firstLastFromUserMetadata } from '@/lib/userDisplayName';
 
 interface SettingsViewProps {
   notificationPreferences: NotificationPreferences;
@@ -21,11 +22,10 @@ export default function SettingsView({
 }: SettingsViewProps) {
   const { user, signOut, refreshUser } = useAuth();
   const router = useRouter();
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [isInitialized, setIsInitialized] = useState(false);
-
   const [profileLoading, setProfileLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -58,6 +58,30 @@ export default function SettingsView({
 
   const browserNotificationsSupported = typeof window !== 'undefined' && 'Notification' in window;
 
+  const accountDisplayName = useMemo(
+    () => (displayNameFromUserMetadata(user?.user_metadata) || '').trim(),
+    [user?.user_metadata],
+  );
+
+  /** Combined display string from the profile form fields, or saved metadata. */
+  const profileFormDisplayName = useMemo(
+    () =>
+      [firstName, lastName].map((s) => s.trim()).filter(Boolean).join(' ').trim() ||
+      accountDisplayName,
+    [firstName, lastName, accountDisplayName],
+  );
+
+  const profileMetadataKey = useMemo(() => {
+    const m = user?.user_metadata as Record<string, unknown> | undefined;
+    if (!m) return '';
+    return JSON.stringify({
+      first_name: m.first_name,
+      last_name: m.last_name,
+      full_name: m.full_name,
+      name: m.name,
+    });
+  }, [user?.user_metadata]);
+
   useEffect(() => {
     if (!browserNotificationsSupported) {
       setBrowserPermission('unsupported');
@@ -87,16 +111,14 @@ export default function SettingsView({
       });
   }, [user?.id]);
 
-  // Reset initialization when user changes
+  // Sync profile name fields when auth metadata changes
   useEffect(() => {
-    if (user) {
-      const currentName = user.user_metadata?.full_name || '';
-      if (!profileLoading && currentName !== fullName) {
-        setFullName(currentName);
-      }
-      setIsInitialized(true);
-    }
-  }, [user?.user_metadata?.full_name, user]);
+    if (!user) return;
+    if (profileLoading) return;
+    const { firstName: fn, lastName: ln } = firstLastFromUserMetadata(user.user_metadata);
+    setFirstName((prev) => (prev === fn ? prev : fn));
+    setLastName((prev) => (prev === ln ? prev : ln));
+  }, [profileLoading, profileMetadataKey, user]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -220,9 +242,20 @@ export default function SettingsView({
     }
 
     try {
+      const fn = firstName.trim();
+      const ln = lastName.trim();
+      if (!fn) {
+        setProfileMessage({ type: 'error', text: 'First name is required.' });
+        setProfileLoading(false);
+        return;
+      }
+      const full_name = [fn, ln].filter(Boolean).join(' ').trim();
       const { data, error } = await supabase.auth.updateUser({
         data: {
-          full_name: fullName.trim(),
+          first_name: fn,
+          last_name: ln,
+          full_name,
+          name: full_name,
         },
       });
 
@@ -230,7 +263,7 @@ export default function SettingsView({
         setProfileMessage({ type: 'error', text: error.message });
       } else {
         await refreshUser();
-        setProfileMessage({ type: 'success', text: `Profile updated to "${fullName.trim()}"!` });
+        setProfileMessage({ type: 'success', text: `Profile updated to ${full_name}!` });
         console.log('Profile updated successfully:', data.user?.user_metadata);
       }
     } catch (err: any) {
@@ -277,13 +310,13 @@ export default function SettingsView({
   };
 
   const handleDeleteAccount = async () => {
-    const expectedFullName = (fullName || user?.user_metadata?.full_name || '').trim();
+    const expectedFullName = profileFormDisplayName.trim();
     if (!expectedFullName) {
-      setDeleteError('Set your full name in Profile Settings before deleting your account.');
+      setDeleteError('Set your name in Profile Settings before deleting your account.');
       return;
     }
     if (deleteConfirmName.trim() !== expectedFullName) {
-      setDeleteError('Full name does not match. Please type your full name exactly to confirm deletion.');
+      setDeleteError('Name does not match. Type your first and last name exactly as shown to confirm deletion.');
       return;
     }
 
@@ -392,15 +425,36 @@ export default function SettingsView({
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Full Name</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
-              placeholder="Your Name"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="settings-first-name" className="block text-sm font-medium mb-2">
+                First name
+              </label>
+              <input
+                id="settings-first-name"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                autoComplete="given-name"
+                required
+                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                placeholder="First name"
+              />
+            </div>
+            <div>
+              <label htmlFor="settings-last-name" className="block text-sm font-medium mb-2">
+                Last name
+              </label>
+              <input
+                id="settings-last-name"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                autoComplete="family-name"
+                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                placeholder="Last name"
+              />
+            </div>
           </div>
 
           {profileMessage.text && (
@@ -789,7 +843,7 @@ export default function SettingsView({
 
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2 text-zinc-200">
-                Type your full name to confirm
+                Type your name to confirm
               </label>
               <input
                 type="text"
@@ -798,13 +852,13 @@ export default function SettingsView({
                   setDeleteConfirmName(e.target.value);
                   if (deleteError) setDeleteError('');
                 }}
-                placeholder={(fullName || user?.user_metadata?.full_name || '').trim() || 'Set full name above first'}
+                placeholder={profileFormDisplayName.trim() || 'Set your name in Profile Settings first'}
                 className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-red-500/70 transition-colors"
                 disabled={deleteLoading}
               />
-              {(fullName || user?.user_metadata?.full_name || '').trim() && (
+              {profileFormDisplayName.trim() && (
                 <p className="text-xs text-zinc-500 mt-2">
-                  Must match exactly: {(fullName || user?.user_metadata?.full_name || '').trim()}
+                  Must match exactly: {profileFormDisplayName.trim()}
                 </p>
               )}
             </div>
@@ -818,7 +872,11 @@ export default function SettingsView({
             <div className="flex gap-3">
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteLoading || !(fullName || user?.user_metadata?.full_name || '').trim() || deleteConfirmName.trim() !== (fullName || user?.user_metadata?.full_name || '').trim()}
+                disabled={
+                  deleteLoading ||
+                  !profileFormDisplayName.trim() ||
+                  deleteConfirmName.trim() !== profileFormDisplayName.trim()
+                }
                 className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
               >
                 {deleteLoading ? 'Deleting...' : 'Yes, Delete My Account'}

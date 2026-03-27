@@ -5,6 +5,8 @@ type UserRow = {
   id: string;
   name?: string | null;
   full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   email?: string | null;
 };
 
@@ -22,6 +24,43 @@ const isGenericName = (value: string | null | undefined): boolean => {
   return !normalized || GENERIC_NAMES.has(normalized);
 };
 
+/**
+ * Browser client (implicit flow) keeps the JWT in localStorage — callers must send
+ * `Authorization: Bearer <access_token>`. Cookie-based / SSR sessions use
+ * `sb-<project-ref>-auth-token` with a JSON body containing access_token.
+ */
+function accessTokenFromRequest(req: NextRequest): string | null {
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const t = authHeader.slice(7).trim();
+    if (t) return t;
+  }
+
+  const legacy =
+    req.cookies.get('sb-access-token')?.value ||
+    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token')?.value;
+  if (legacy?.trim()) return legacy.trim();
+
+  for (const { name, value } of req.cookies.getAll()) {
+    if (!/^sb-[^-]+-auth-token$/.test(name) || !value) continue;
+    const tryParse = (raw: string) => {
+      try {
+        const parsed = JSON.parse(raw) as { access_token?: string };
+        const t = parsed?.access_token?.trim();
+        return t || null;
+      } catch {
+        return null;
+      }
+    };
+    const fromDecoded = tryParse(decodeURIComponent(value));
+    if (fromDecoded) return fromDecoded;
+    const direct = tryParse(value);
+    if (direct) return direct;
+  }
+
+  return null;
+}
+
 async function getAuthUser(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -34,11 +73,7 @@ async function getAuthUser(req: NextRequest) {
     auth: { persistSession: false },
   });
 
-  const authCookie =
-    req.cookies.get('sb-access-token') ||
-    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token');
-  const authHeader = req.headers.get('Authorization');
-  const token = authCookie?.value ?? authHeader?.replace('Bearer ', '');
+  const token = accessTokenFromRequest(req);
 
   if (!token) return { user: null as any, error: 'Missing auth token' };
 
@@ -78,17 +113,22 @@ export async function POST(req: NextRequest) {
 
   const usersWithFullName = await admin
     .from('users')
-    .select('id, name, full_name, email')
+    .select('id, name, full_name, first_name, last_name, email')
     .in('id', userIds);
 
   const userRows: UserRow[] = usersWithFullName.error
-    ? ((await admin.from('users').select('id, name, email').in('id', userIds)).data as UserRow[] ?? [])
+    ? ((await admin.from('users').select('id, name, full_name, email').in('id', userIds)).data as UserRow[] ?? [])
     : (usersWithFullName.data as UserRow[] ?? []);
 
   const names: Record<string, string> = {};
 
   userRows.forEach((row) => {
-    const resolved = sanitize(row.full_name) || sanitize(row.name);
+    const fromParts = [row.first_name, row.last_name]
+      .map((x) => sanitize(x))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const resolved = fromParts || sanitize(row.full_name) || sanitize(row.name);
     if (resolved) {
       names[row.id] = resolved;
       return;
@@ -111,7 +151,12 @@ export async function POST(req: NextRequest) {
             if (error || !data?.user) return;
 
             const meta = data.user.user_metadata || {};
-            const fullName = sanitize((meta.full_name as string | undefined) || (meta.name as string | undefined));
+            const fn = sanitize(meta.first_name as string | undefined);
+            const ln = sanitize(meta.last_name as string | undefined);
+            const combined = [fn, ln].filter(Boolean).join(' ').trim();
+            const fullName =
+              combined ||
+              sanitize((meta.full_name as string | undefined) || (meta.name as string | undefined));
             if (fullName) {
               names[id] = fullName;
             }

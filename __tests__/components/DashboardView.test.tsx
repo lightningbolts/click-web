@@ -161,6 +161,19 @@ describe('DashboardView', () => {
     expect(screen.getByText(/bob/)).toBeInTheDocument();
   });
 
+  it('prefers first_name and last_name in user_metadata over full_name', async () => {
+    await renderDashboard(
+      buildMockUser({
+        user_metadata: {
+          first_name: 'Pat',
+          last_name: 'Lee',
+          full_name: 'Ignored Legacy',
+        },
+      }),
+    );
+    expect(screen.getByText(/Pat Lee/)).toBeInTheDocument();
+  });
+
   it('renders all five navigation tabs', async () => {
     await renderDashboard();
 

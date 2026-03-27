@@ -19,6 +19,7 @@ import SettingsView from '@/components/SettingsView';
 import { ChatView } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import { deriveKeysForConnection, decryptContent, isEncrypted } from '@/lib/chat/crypto';
+import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 
 // Digital Memory Box components
 import {
@@ -350,7 +351,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
         headers,
         body: JSON.stringify({
           roomName: invite.roomName,
-          participantName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Click User',
+          participantName:
+            displayNameFromUserMetadata(user.user_metadata) || user.email?.split('@')[0] || 'Click User',
           userId: user.id,
         }),
       });
@@ -456,7 +458,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
       connectionId: connection.id,
       roomName: `click-${connection.id}-${now}`,
       callerId: user.id,
-      callerName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Click User',
+      callerName:
+        displayNameFromUserMetadata(user.user_metadata) || user.email?.split('@')[0] || 'Click User',
       calleeId: connection.otherUserId,
       calleeName: connection.name,
       videoEnabled,
@@ -1007,7 +1010,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
               try {
                 const nameRes = await fetch('/api/users/display-names', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: await getAuthHeaders(),
                   body: JSON.stringify({ userIds: otherUserIds }),
                 });
                 if (nameRes.ok) {
@@ -1023,7 +1026,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 let usersData: any[] | null = null;
                 const { data: d1, error: e1 } = await supabase
                   .from('users')
-                  .select('id, name, full_name, email')
+                  .select('id, name, full_name, first_name, last_name, email')
                   .in('id', otherUserIds);
                 if (!e1 && d1) {
                   usersData = d1;
@@ -1038,7 +1041,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 if (usersData) {
                   userNameMap = Object.fromEntries(
                     usersData.map((u: any) => {
+                      const fromParts = [u.first_name, u.last_name]
+                        .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
+                        .join(' ')
+                        .trim();
                       const resolvedName =
+                        fromParts ||
                         (typeof u.full_name === 'string' && u.full_name.trim()) ||
                         (typeof u.name === 'string' && u.name.trim()) ||
                         (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
@@ -1108,7 +1116,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       fetchConnections();
     }
-  }, [user]);
+  }, [user, getAuthHeaders]);
 
   // Handle CSV export
   const handleExport = useCallback(() => {
@@ -1121,7 +1129,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setActiveTab('chat');
   }, []);
 
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const userName =
+    displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
 
   const archiveStorageKey = user?.id ? `click:archived-connections:${user.id}` : null;
 
@@ -2005,7 +2014,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
               >
                 <QRIdentityCard
                   userId={user.id}
-                  userName={user?.user_metadata?.full_name}
+                  userName={displayNameFromUserMetadata(user?.user_metadata)}
                   userEmail={user?.email}
                 />
               </motion.div>

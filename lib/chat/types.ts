@@ -3,6 +3,17 @@
  * Mirrors the Supabase schema: chats, messages, message_reactions
  */
 
+/** public.users fields used when resolving display names in the web app */
+export interface UserPublicRow {
+  id: string;
+  name?: string | null;
+  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  birthday?: string | null;
+  email?: string | null;
+}
+
 export interface Chat {
   id: string;
   connection_id: string;

@@ -4,7 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, action } = await request.json();
+    const body = await request.json();
+    const { email, password, action, first_name, last_name, birthday } = body as {
+      email?: string;
+      password?: string;
+      action?: string;
+      first_name?: string;
+      last_name?: string;
+      birthday?: string;
+    };
 
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -29,9 +37,21 @@ export async function POST(request: NextRequest) {
     );
 
     if (action === 'signup') {
+      const fn = typeof first_name === 'string' ? first_name.trim() : '';
+      const ln = typeof last_name === 'string' ? last_name.trim() : '';
+      const bd = typeof birthday === 'string' ? birthday.trim() : '';
+      const display = [fn, ln].filter(Boolean).join(' ').trim();
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            ...(fn ? { first_name: fn } : {}),
+            ...(ln ? { last_name: ln } : {}),
+            ...(bd ? { birthday: bd } : {}),
+            ...(display ? { full_name: display, name: display } : {}),
+          },
+        },
       });
 
       if (error) {

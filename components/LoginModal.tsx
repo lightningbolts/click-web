@@ -6,6 +6,14 @@ import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
+function isAtLeastYearsOld(isoDate: string, years: number): boolean {
+  const d = new Date(`${isoDate}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return false;
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - years);
+  return d <= cutoff;
+}
+
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,7 +28,9 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [birthday, setBirthday] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -94,12 +104,31 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
           return;
         }
 
+        const fn = firstName.trim();
+        const ln = lastName.trim();
+        if (!fn || !ln || !birthday) {
+          setError('Please enter first name, last name, and birthday.');
+          setIsLoading(false);
+          return;
+        }
+        if (!isAtLeastYearsOld(birthday, 13)) {
+          setError('You must be at least 13 years old.');
+          setIsLoading(false);
+          return;
+        }
+
+        const display = `${fn} ${ln}`.trim();
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              full_name: fullName,
+              first_name: fn,
+              last_name: ln,
+              birthday,
+              full_name: display,
+              name: display,
             },
             // Direct the confirmation email to the server-side callback
             // so it can exchange the code/token and set cookies properly.
@@ -192,20 +221,53 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
               {/* Form */}
               <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4">
                 {isSignup && !isForgotPassword && (
-                  <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium mb-2">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      id="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
-                      placeholder="John Doe"
-                    />
-                  </div>
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="firstName" className="block text-sm font-medium mb-2">
+                          First name
+                        </label>
+                        <input
+                          type="text"
+                          id="firstName"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          required
+                          autoComplete="given-name"
+                          className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                          placeholder="John"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="lastName" className="block text-sm font-medium mb-2">
+                          Last name
+                        </label>
+                        <input
+                          type="text"
+                          id="lastName"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          required
+                          autoComplete="family-name"
+                          className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                          placeholder="Doe"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="birthday" className="block text-sm font-medium mb-2">
+                        Birthday
+                      </label>
+                      <input
+                        type="date"
+                        id="birthday"
+                        value={birthday}
+                        onChange={(e) => setBirthday(e.target.value)}
+                        required
+                        className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                      />
+                    </div>
+                  </>
                 )}
 
                 <div>

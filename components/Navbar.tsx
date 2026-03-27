@@ -7,6 +7,7 @@ import { useState } from "react";
 import LoginModal from "@/components/LoginModal";
 import { usePathname, useRouter } from "next/navigation";
 import { User, LogOut, BarChart2 } from "lucide-react";
+import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
@@ -56,7 +57,7 @@ export default function Navbar() {
               <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-zinc-400">
                 <User className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
                 <span className="truncate max-w-[100px] md:max-w-[200px]">
-                  {user?.user_metadata?.full_name || user?.email}
+                  {displayNameFromUserMetadata(user?.user_metadata) || user?.email}
                 </span>
               </div>
               <button
