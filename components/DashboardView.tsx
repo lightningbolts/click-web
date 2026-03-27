@@ -38,6 +38,29 @@ import CallOverlay, {
   type WebCallInvite,
   type WebCallOverlayState,
 } from '@/components/chat/CallOverlay';
+
+/** Matches `CallPushNotifier.kt` → `send-push-notification` for `incoming_call` / VoIP wake-up. */
+function buildIncomingCallPushPayload(invite: WebCallInvite) {
+  return {
+    recipient_user_id: invite.calleeId,
+    title: invite.videoEnabled
+      ? `Incoming video call from ${invite.callerName}`
+      : `Incoming call from ${invite.callerName}`,
+    body: 'Open Click to answer',
+    data: {
+      type: 'incoming_call' as const,
+      call_id: invite.callId,
+      connection_id: invite.connectionId,
+      room_name: invite.roomName,
+      caller_id: invite.callerId,
+      caller_name: invite.callerName,
+      callee_id: invite.calleeId,
+      callee_name: invite.calleeName,
+      video_enabled: invite.videoEnabled,
+      created_at: invite.createdAt,
+    },
+  };
+}
 import {
   mockConnections,
   mockChapters,
@@ -207,6 +230,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
     const response = await channel.send({ type: 'broadcast', event, payload });
     return response === 'ok';
   }, [getOutboundChannel]);
+
+  const invokeIncomingCallPush = useCallback((invite: WebCallInvite) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    void supabase.functions
+      .invoke('send-push-notification', { body: buildIncomingCallPushPayload(invite) })
+      .then(({ error }) => {
+        if (error) {
+          console.warn('[calls] send-push-notification failed:', error.message);
+        }
+      });
+  }, []);
 
   const cleanupRemoteAudio = useCallback(() => {
     remoteAudioElementsRef.current.forEach((element) => element.remove());
@@ -470,6 +505,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setCallOverlayState({ mode: 'outgoing', invite });
     setActiveCallState({ ...IDLE_ACTIVE_CALL, invite });
     playRingtone('outgoing');
+    invokeIncomingCallPush(invite);
     const delivered = await sendSignal(connection.otherUserId, 'invite', invite);
     if (!delivered) {
       stopRingtone();
@@ -487,7 +523,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
       });
       endWithReason(invite, 'No answer');
     }, 30_000);
-  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, endWithReason, playRingtone, sendSignal, stopRingtone, user]);
+  }, [
+    activeCallState.status,
+    callOverlayState.mode,
+    clearCallTimeout,
+    endWithReason,
+    invokeIncomingCallPush,
+    playRingtone,
+    sendSignal,
+    stopRingtone,
+    user,
+  ]);
 
   const acceptIncomingCall = useCallback(async () => {
     if (callOverlayState.mode !== 'incoming') return;
