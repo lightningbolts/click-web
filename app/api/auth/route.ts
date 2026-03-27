@@ -37,12 +37,15 @@ export async function POST(request: NextRequest) {
     );
 
     if (action === 'signup') {
+      if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
+        return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+      }
       const fn = typeof first_name === 'string' ? first_name.trim() : '';
       const ln = typeof last_name === 'string' ? last_name.trim() : '';
       const bd = typeof birthday === 'string' ? birthday.trim() : '';
       const display = [fn, ln].filter(Boolean).join(' ').trim();
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           data: {
@@ -64,8 +67,11 @@ export async function POST(request: NextRequest) {
         user: data.user
       });
     } else if (action === 'login') {
+      if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
+        return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+      }
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
