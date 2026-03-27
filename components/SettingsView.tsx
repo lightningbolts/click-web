@@ -94,14 +94,33 @@ export default function SettingsView({
       if (!profileLoading && currentName !== fullName) {
         setFullName(currentName);
       }
-      // Load tags from user_metadata
-      const metaTags = user.user_metadata?.tags;
-      if (metaTags && Array.isArray(metaTags)) {
-        setTags(metaTags);
-      }
       setIsInitialized(true);
     }
-  }, [user?.user_metadata?.full_name, user?.user_metadata?.tags]);
+  }, [user?.user_metadata?.full_name, user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('user_interests')
+        .select('tags')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) return;
+      if (data?.tags && Array.isArray(data.tags)) {
+        setTags(data.tags);
+      } else {
+        setTags([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const toggleTag = (tag: string) => {
     const next = tags.includes(tag)
@@ -140,28 +159,43 @@ export default function SettingsView({
     setTagsMessage({ type: '', text: '' });
 
     try {
-      // Build interest history log (tracks changes over time)
+      const { data: prior, error: priorErr } = await supabase
+        .from('user_interests')
+        .select('tags')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (priorErr) {
+        setTagsMessage({ type: 'error', text: priorErr.message });
+        return;
+      }
+      const previousTags = prior?.tags && Array.isArray(prior.tags) ? prior.tags : [];
+
       const existingHistory = user.user_metadata?.interest_history || [];
       const historyEntry = {
-        previous: user.user_metadata?.tags || [],
+        previous: previousTags,
         updated: tags,
         at: new Date().toISOString(),
       };
-      const interest_history = [...existingHistory, historyEntry].slice(-50); // Keep last 50 changes
+      const interest_history = [...existingHistory, historyEntry].slice(-50);
 
-      // Save to user_metadata (primary, always works)
-      const { error } = await supabase.auth.updateUser({
-        data: { tags, interest_history },
+      const updatedAt = Date.now();
+      const { error: rowErr } = await supabase.from('user_interests').upsert(
+        { user_id: user.id, tags, updated_at: updatedAt },
+        { onConflict: 'user_id' },
+      );
+
+      if (rowErr) {
+        setTagsMessage({ type: 'error', text: rowErr.message });
+        return;
+      }
+
+      const { error: authErr } = await supabase.auth.updateUser({
+        data: { interest_history },
       });
 
-      if (error) {
-        setTagsMessage({ type: 'error', text: error.message });
+      if (authErr) {
+        setTagsMessage({ type: 'error', text: authErr.message });
       } else {
-        // Best-effort DB save
-        try {
-          await supabase.from('users').update({ tags }).eq('id', user.id);
-        } catch { /* column may not exist */ }
-
         await refreshUser();
         setTagsDirty(false);
         setTagsMessage({ type: 'success', text: `Saved ${tags.length} interests!` });

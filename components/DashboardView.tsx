@@ -807,30 +807,29 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   useEffect(() => {
     if (user) {
-      // Query tags_initialized — the canonical signal for onboarding completion.
-      // Falls back gracefully on any schema/network error so the user is never blocked.
-      const checkTagsInitialized = async () => {
+      // A row in public.user_interests means the user completed or skipped interest onboarding.
+      const checkUserInterestsRow = async () => {
         const supabase = getSupabaseClient();
-        if (!supabase) { setNeedsTagging(false); return; }
+        if (!supabase) {
+          setNeedsTagging(false);
+          return;
+        }
         try {
           const { data, error } = await supabase
-            .from('users')
-            .select('tags_initialized')
-            .eq('id', user.id)
+            .from('user_interests')
+            .select('user_id')
+            .eq('user_id', user.id)
             .maybeSingle();
           if (error) {
-            // Schema/network error — don't block the user
             setNeedsTagging(false);
             return;
           }
-          // data is null when no public.users row exists yet (trigger backfill pending)
-          setNeedsTagging(data != null && data.tags_initialized !== true);
+          setNeedsTagging(data == null);
         } catch {
-          // Network or schema error — don't block
           setNeedsTagging(false);
         }
       };
-      checkTagsInitialized();
+      checkUserInterestsRow();
     }
   }, [user]);
 
@@ -945,27 +944,30 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const handleTagsComplete = async (tags: string[]) => {
     const supabase = getSupabaseClient();
     if (supabase) {
-      // Save to user_metadata (always works, persists across sessions)
-      await supabase.auth.updateUser({ data: { tags } });
-      // Also persist to DB with the initialized flag
-      try {
-        await supabase.from('users').update({ tags, tags_initialized: true }).eq('id', user.id);
-      } catch {
-        // Best-effort — auth metadata save is sufficient
+      const updatedAt = Date.now();
+      const { error } = await supabase.from('user_interests').upsert(
+        { user_id: user.id, tags, updated_at: updatedAt },
+        { onConflict: 'user_id' },
+      );
+      if (error) {
+        console.error('user_interests upsert failed:', error.message || error);
       }
     }
     setNeedsTagging(false);
   };
 
   const handleTagsSkip = async () => {
-    // Immediately hide the screen; persist the skip flag to DB in the background
     setNeedsTagging(false);
     const supabase = getSupabaseClient();
     if (supabase) {
+      const updatedAt = Date.now();
       try {
-        await supabase.from('users').update({ tags_initialized: true }).eq('id', user.id);
-      } catch {
-        // Best-effort
+        await supabase.from('user_interests').upsert(
+          { user_id: user.id, tags: [], updated_at: updatedAt },
+          { onConflict: 'user_id' },
+        );
+      } catch (e) {
+        console.error('user_interests skip upsert failed:', e);
       }
     }
   };
