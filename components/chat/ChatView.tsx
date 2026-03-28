@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff, Phone, Video } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
+import { normalizeDbMessage } from '@/lib/chat/messages';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
@@ -211,12 +212,14 @@ export default function ChatView({
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? 'Failed to load messages');
 
-    const raw: Message[] = (json.messages as Message[]).reverse();
+    const raw: Message[] = (json.messages as Record<string, unknown>[])
+      .reverse()
+      .map(normalizeDbMessage);
 
     if (!e2eKeys) return raw;
     const decrypted = await Promise.all(
       raw.map(async (m) => {
-        if (!isEncrypted(m.content)) return m;
+        if (m.message_type === 'call_log' || !isEncrypted(m.content)) return m;
         const plaintext = await decryptContent(m.content, e2eKeys);
         return { ...m, content: plaintext };
       })
@@ -294,8 +297,15 @@ export default function ChatView({
           const { eventType, new: newRow, old: oldRow } = payload;
 
           if (eventType === 'INSERT') {
-            const plainContent = await decryptIfNeeded(newRow.content ?? '');
-            const msg: Message = { ...newRow, content: plainContent, reactions: {} };
+            const skipDecrypt = newRow.message_type === 'call_log';
+            const plainContent = skipDecrypt
+              ? (newRow.content ?? '')
+              : await decryptIfNeeded(newRow.content ?? '');
+            const msg = normalizeDbMessage({
+              ...newRow,
+              content: plainContent,
+              reactions: {},
+            });
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg.id)) return prev;
               const updated = [...prev, msg];
@@ -303,9 +313,21 @@ export default function ChatView({
               return updated;
             });
           } else if (eventType === 'UPDATE') {
-            const plainContent = await decryptIfNeeded(newRow.content ?? '');
+            const skipDecrypt = newRow.message_type === 'call_log';
+            const plainContent = skipDecrypt
+              ? (newRow.content ?? '')
+              : await decryptIfNeeded(newRow.content ?? '');
             setMessages((prev) =>
-              prev.map((m) => (m.id === newRow.id ? { ...m, ...newRow, content: plainContent } : m))
+              prev.map((m) =>
+                m.id === newRow.id
+                  ? normalizeDbMessage({
+                      ...m,
+                      ...newRow,
+                      content: plainContent,
+                      reactions: m.reactions,
+                    })
+                  : m
+              )
             );
           } else if (eventType === 'DELETE') {
             setMessages((prev) => prev.filter((m) => m.id !== oldRow.id));

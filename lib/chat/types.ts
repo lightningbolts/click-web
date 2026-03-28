@@ -21,6 +21,8 @@ export interface Chat {
   updated_at: number;
 }
 
+export type MessageType = 'text' | 'call_log';
+
 export interface Message {
   id: string;
   chat_id: string;
@@ -29,6 +31,9 @@ export interface Message {
   time_created: number;
   time_edited: number | null;
   is_read: boolean;
+  message_type: MessageType;
+  /** Server jsonb; call_log uses e.g. { call_state, duration_seconds } */
+  metadata: any;
   /** client-side enrichment: reactions keyed by reaction_type */
   reactions?: Record<string, MessageReaction[]>;
 }

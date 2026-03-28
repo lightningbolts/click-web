@@ -1,0 +1,61 @@
+/**
+ * Shared helpers for normalizing DB message rows and building insert payloads.
+ */
+
+import type { Message, MessageType } from '@/lib/chat/types';
+
+export function coerceMessageType(value: unknown): MessageType {
+  return value === 'call_log' ? 'call_log' : 'text';
+}
+
+export function coerceMetadata(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+/** Normalize a row from PostgREST / Realtime into a [Message] (safe defaults for new columns). */
+export function normalizeDbMessage(row: Record<string, unknown>): Message {
+  return {
+    id: String(row.id),
+    chat_id: String(row.chat_id),
+    user_id: String(row.user_id),
+    content: typeof row.content === 'string' ? row.content : '',
+    time_created: Number(row.time_created),
+    time_edited: row.time_edited != null ? Number(row.time_edited) : null,
+    is_read: Boolean(row.is_read),
+    message_type: coerceMessageType(row.message_type),
+    metadata: coerceMetadata(row.metadata),
+    ...(row.reactions !== undefined
+      ? { reactions: row.reactions as Message['reactions'] }
+      : {}),
+  };
+}
+
+export type MessageInsertRow = {
+  chat_id: string;
+  user_id: string;
+  content: string;
+  time_created: number;
+  message_type: MessageType;
+  metadata: Record<string, unknown>;
+};
+
+export function buildMessageInsertRow(params: {
+  chatId: string;
+  userId: string;
+  content: string;
+  now: number;
+  messageType?: MessageType;
+  metadata?: unknown;
+}): MessageInsertRow {
+  return {
+    chat_id: params.chatId,
+    user_id: params.userId,
+    content: params.content,
+    time_created: params.now,
+    message_type: params.messageType ?? 'text',
+    metadata: coerceMetadata(params.metadata),
+  };
+}

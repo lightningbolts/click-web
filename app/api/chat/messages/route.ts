@@ -17,6 +17,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import { buildMessageInsertRow, normalizeDbMessage } from '@/lib/chat/messages';
+import type { MessageType } from '@/lib/chat/types';
 
 const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
@@ -142,10 +144,12 @@ export async function GET(req: NextRequest) {
     reactionMap[r.message_id][r.reaction_type].push(r);
   });
 
-  const enriched = messages.map((m: any) => ({
-    ...m,
-    reactions: reactionMap[m.id] ?? {},
-  }));
+  const enriched = messages.map((m: Record<string, unknown>) =>
+    normalizeDbMessage({
+      ...m,
+      reactions: reactionMap[String(m.id)] ?? {},
+    })
+  );
 
   // Mark messages from the other user as read
   const unreadIds = messages
@@ -164,9 +168,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { chatId, connectionId, content } = body;
+  const { chatId, connectionId, content, message_type: rawMessageType, metadata } = body;
+  const messageType: MessageType = rawMessageType === 'call_log' ? 'call_log' : 'text';
+  const isCallLog = messageType === 'call_log';
 
-  if ((!chatId && !connectionId) || !content?.trim()) {
+  if (!chatId && !connectionId) {
+    return NextResponse.json({ error: 'chatId or connectionId is required' }, { status: 400 });
+  }
+  if (!isCallLog && !content?.trim()) {
     return NextResponse.json({ error: 'chatId or connectionId and content are required' }, { status: 400 });
   }
 
@@ -180,30 +189,32 @@ export async function POST(req: NextRequest) {
     }
 
     const now = Date.now();
-    // Preserve encrypted content verbatim; only trim plaintext
-    const wireContent = typeof content === 'string' && content.startsWith('e2e:') ? content : content.trim();
-    let { data: message, error: insertErr } = await supabase
-      .from('messages')
-      .insert({
-        chat_id: resolvedChatId,
-        user_id: user.id,
-        content: wireContent,
-        time_created: now,
-      })
-      .select()
-      .single();
+    const wireContent =
+      typeof content === 'string' && content.startsWith('e2e:')
+        ? content
+        : isCallLog
+          ? typeof content === 'string'
+            ? content
+            : ''
+          : String(content).trim();
+
+    const insertRow = buildMessageInsertRow({
+      chatId: resolvedChatId,
+      userId: user.id,
+      content: wireContent,
+      now,
+      messageType,
+      metadata,
+    });
+
+    let { data: message, error: insertErr } = await supabase.from('messages').insert(insertRow).select().single();
 
     if (insertErr && connectionId) {
       const ensuredChat = await getOrCreateChat(supabase, connectionId);
       if (ensuredChat.id !== resolvedChatId) {
         const retried = await supabase
           .from('messages')
-          .insert({
-            chat_id: ensuredChat.id,
-            user_id: user.id,
-            content: wireContent,
-            time_created: now,
-          })
+          .insert({ ...insertRow, chat_id: ensuredChat.id as string })
           .select()
           .single();
 
@@ -227,18 +238,23 @@ export async function POST(req: NextRequest) {
       .update({ updated_at: now })
       .eq('id', message.chat_id);
 
-    try {
-      await notifyChatMessagePush(token, message.chat_id, message.id, user.id);
-    } catch (pushError) {
-      console.error('Chat push dispatch failed', {
-        chatId: message.chat_id,
-        messageId: message.id,
-        userId: user.id,
-        error: pushError instanceof Error ? pushError.message : String(pushError),
-      });
+    if (messageType !== 'call_log') {
+      try {
+        await notifyChatMessagePush(token, message.chat_id, message.id, user.id);
+      } catch (pushError) {
+        console.error('Chat push dispatch failed', {
+          chatId: message.chat_id,
+          messageId: message.id,
+          userId: user.id,
+          error: pushError instanceof Error ? pushError.message : String(pushError),
+        });
+      }
     }
 
-    return NextResponse.json({ message: { ...message, reactions: {} } }, { status: 201 });
+    return NextResponse.json(
+      { message: normalizeDbMessage({ ...(message as Record<string, unknown>), reactions: {} }) },
+      { status: 201 }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message ?? 'Failed to send message' }, { status: 500 });
   }
@@ -265,7 +281,9 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ message });
+  return NextResponse.json({
+    message: normalizeDbMessage(message as Record<string, unknown>),
+  });
 }
 
 export async function DELETE(req: NextRequest) {
