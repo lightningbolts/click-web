@@ -2,9 +2,10 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, Trash2, SmilePlus, Check, Phone } from 'lucide-react';
+import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight } from 'lucide-react';
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import ReactionPicker from './ReactionPicker';
+import { getReplyFromMetadata } from '@/lib/chat/reply';
 
 interface MessageBubbleProps {
   message: Message;
@@ -12,6 +13,9 @@ interface MessageBubbleProps {
   currentUserId: string;
   /** Show the sender's first initial avatar */
   senderInitial?: string;
+  /** Green online dot on the sender avatar (Realtime `room:presence`). */
+  showSenderOnline?: boolean;
+  onReply?: (message: Message) => void;
   onReact: (messageId: string, emoji: string) => void;
   onEdit: (messageId: string, currentContent: string) => void;
   onDelete: (messageId: string) => void;
@@ -52,6 +56,8 @@ export default function MessageBubble({
   isMine,
   currentUserId,
   senderInitial = '?',
+  showSenderOnline = false,
+  onReply,
   onReact,
   onEdit,
   onDelete,
@@ -105,6 +111,7 @@ export default function MessageBubble({
   };
 
   const timeLabel = formatMessageTimeLabel(message.time_created);
+  const replyMeta = getReplyFromMetadata(message.metadata);
 
   return (
     <motion.div
@@ -116,9 +123,19 @@ export default function MessageBubble({
     >
       {/* Avatar */}
       {!isMine && (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
-          flex items-center justify-center text-xs font-bold shrink-0 mb-1 shadow-[0_0_12px_rgba(131,56,236,0.3)]">
-          {senderInitial}
+        <div className="relative w-8 h-8 shrink-0 mb-1">
+          <div
+            className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
+            text-xs font-bold shadow-[0_0_12px_rgba(131,56,236,0.3)]"
+          >
+            {senderInitial}
+          </div>
+          {showSenderOnline && (
+            <span
+              className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
+              aria-hidden
+            />
+          )}
         </div>
       )}
 
@@ -146,6 +163,21 @@ export default function MessageBubble({
                 : 'glass-panel text-zinc-100 rounded-bl-sm'
               }`}
           >
+            {replyMeta && (
+              <div
+                className={`mb-2 rounded-lg px-2.5 py-1.5 text-xs leading-snug border ${
+                  isMine
+                    ? 'bg-black/15 border-white/10 text-white/85'
+                    : 'bg-zinc-950/40 border-zinc-600/40 text-zinc-400'
+                }`}
+              >
+                <span className="flex items-center gap-1 font-medium opacity-80">
+                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
+                  Reply
+                </span>
+                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+              </div>
+            )}
             {message.content}
             {message.time_edited && (
               <span className="ml-2 text-[10px] opacity-60 italic">edited</span>
@@ -169,6 +201,19 @@ export default function MessageBubble({
               >
                 <SmilePlus className="w-3.5 h-3.5" />
               </button>
+              {onReply && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReply(message);
+                    setShowActions(false);
+                  }}
+                  className="p-1 rounded-full hover:bg-zinc-600/30 text-zinc-400 hover:text-zinc-100 transition-colors text-[11px] font-semibold px-2"
+                  title="Reply"
+                >
+                  Reply
+                </button>
+              )}
               {isMine && (
                 <>
                   <button

@@ -9,6 +9,8 @@ import { normalizeDbMessage } from '@/lib/chat/messages';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
+import { useAuth } from '@/lib/AuthContext';
+import { replySnippetForSend } from '@/lib/chat/reply';
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -25,6 +27,8 @@ interface ChatViewProps {
   onUnblock: () => Promise<boolean> | boolean;
   onStartCall: (videoEnabled: boolean) => void;
   onClose: () => void;
+  /** Open profile sheet for the given user (e.g. peer avatar tap). */
+  onOpenProfile?: (userId: string) => void;
 }
 
 type ChatTimelineEntry =
@@ -114,7 +118,17 @@ export default function ChatView({
   onUnblock,
   onStartCall,
   onClose,
+  onOpenProfile,
 }: ChatViewProps) {
+  const { onlineUserIds } = useAuth();
+  const peerUserId = useMemo(() => {
+    if (connection.otherUserId) return connection.otherUserId;
+    const ids = connection.userIds;
+    if (!ids?.length) return undefined;
+    return ids.find((id) => id !== currentUserId);
+  }, [connection.otherUserId, connection.userIds, currentUserId]);
+  const peerIsOnline = !!(peerUserId && onlineUserIds.has(peerUserId));
+
   const [chatId, setChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +139,7 @@ export default function ChatView({
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [typingIndicator, setTypingIndicator] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
@@ -135,6 +150,7 @@ export default function ChatView({
   const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showCallMenu, setShowCallMenu] = useState(false);
   const [e2eKeys, setE2eKeys] = useState<DerivedKeys | null>(null);
+  const [replyBannerText, setReplyBannerText] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -182,6 +198,34 @@ export default function ChatView({
       deriveKeysForConnection(connection.id, userIds).then(setE2eKeys);
     }
   }, [connection.id, connection.userIds, connection.otherUserId, currentUserId]);
+
+  useEffect(() => {
+    if (!replyingTo || replyingTo.message_type === 'call_log') {
+      setReplyBannerText('');
+      return;
+    }
+    const raw = replyingTo.content;
+    if (!isEncrypted(raw)) {
+      setReplyBannerText(replySnippetForSend(raw, 120));
+      return;
+    }
+    if (!e2eKeys) {
+      setReplyBannerText('Encrypted message');
+      return;
+    }
+    let cancelled = false;
+    decryptContent(raw, e2eKeys).then(
+      (plain) => {
+        if (!cancelled) setReplyBannerText(replySnippetForSend(plain, 120));
+      },
+      () => {
+        if (!cancelled) setReplyBannerText('Encrypted message');
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [replyingTo, e2eKeys]);
 
   // ─────────────────────────── init: get/create chat ───────────────────────
 
@@ -416,19 +460,36 @@ export default function ChatView({
     try {
       const wireContent = e2eKeys ? await encryptContent(content, e2eKeys) : content;
       const headers = await getAuthHeaders();
+      let metadata: { reply_to_id: string; reply_to_content: string } | undefined;
+      if (replyingTo && replyingTo.message_type !== 'call_log') {
+        let snippetSource = replyingTo.content;
+        if (e2eKeys && isEncrypted(replyingTo.content)) {
+          snippetSource = await decryptContent(replyingTo.content, e2eKeys);
+        }
+        metadata = {
+          reply_to_id: replyingTo.id,
+          reply_to_content: replySnippetForSend(snippetSource, 140),
+        };
+      }
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ chatId, connectionId: connection.id, content: wireContent }),
+        body: JSON.stringify({
+          chatId,
+          connectionId: connection.id,
+          content: wireContent,
+          ...(metadata ? { metadata } : {}),
+        }),
       });
       if (!res.ok) throw new Error('Send failed');
+      setReplyingTo(null);
     } catch (err) {
       console.error('Send error:', err);
       setInputText(content);
     } finally {
       setSending(false);
     }
-  }, [inputText, chatId, sending, e2eKeys]);
+  }, [inputText, chatId, sending, e2eKeys, replyingTo, connection.id]);
 
   // Broadcast typing indicator
   const broadcastTyping = useCallback(() => {
@@ -451,6 +512,7 @@ export default function ChatView({
   // ─────────────────────────── edit message ────────────────────────────────
 
   const startEdit = useCallback((messageId: string, currentContent: string) => {
+    setReplyingTo(null);
     setEditingId(messageId);
     setEditText(currentContent);
   }, []);
@@ -577,10 +639,25 @@ export default function ChatView({
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
-            flex items-center justify-center text-sm font-bold shrink-0 glow-violet">
-            {otherInitial}
-          </div>
+          <button
+            type="button"
+            className="relative shrink-0 rounded-full border-0 bg-transparent p-0 cursor-pointer"
+            onClick={() => peerUserId && onOpenProfile?.(peerUserId)}
+            disabled={!peerUserId || !onOpenProfile}
+          >
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
+              text-sm font-bold glow-violet"
+            >
+              {otherInitial}
+            </div>
+            {peerIsOnline && (
+              <span
+                className="absolute bottom-0.5 right-0.5 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950/90"
+                aria-hidden
+              />
+            )}
+          </button>
 
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-white truncate text-lg">{otherUserName}</p>
@@ -856,8 +933,14 @@ export default function ChatView({
                   isMine={entry.message.user_id === currentUserId}
                   currentUserId={currentUserId}
                   senderInitial={otherInitial}
+                  showSenderOnline={peerIsOnline && entry.message.user_id === peerUserId}
                   onReact={handleReact}
                   onEdit={startEdit}
+                  onReply={(msg) => {
+                    setEditingId(null);
+                    setEditText('');
+                    setReplyingTo(msg);
+                  }}
                   onDelete={(messageId) => {
                     setPendingDeleteMessageId(messageId);
                     setShowDeleteConfirm(true);
@@ -877,9 +960,19 @@ export default function ChatView({
                 exit={{ opacity: 0, y: 4 }}
                 className="flex items-center gap-2"
               >
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] 
-                  flex items-center justify-center text-[10px] font-bold shrink-0">
-                  {otherInitial}
+                <div className="relative h-6 w-6 shrink-0">
+                  <div
+                    className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
+                    text-[10px] font-bold"
+                  >
+                    {otherInitial}
+                  </div>
+                  {peerIsOnline && (
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
+                      aria-hidden
+                    />
+                  )}
                 </div>
                 <div className="glass-panel rounded-2xl rounded-bl-sm px-4 py-2.5">
                   <span className="inline-flex gap-1">
@@ -918,6 +1011,20 @@ export default function ChatView({
 
       {/* ── Input area ── */}
       <div className="glass rounded-2xl mt-2 px-4 py-2 shrink-0">
+        {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
+          <div className="mb-2 flex items-start gap-2 rounded-xl border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-xs">
+            <span className="text-[#8338EC] font-medium shrink-0">Replying</span>
+            <p className="text-zinc-400 line-clamp-2 flex-1">{replyBannerText}</p>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              className="text-zinc-500 hover:text-white shrink-0"
+              aria-label="Cancel reply"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-3">
           <div className="flex-1 flex items-center bg-zinc-900/60 border border-zinc-700/50 
             rounded-xl px-4 py-[7px] focus-within:border-[#8338EC]/50 transition-colors">

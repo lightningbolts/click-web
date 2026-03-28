@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
+import { useAuth } from '@/lib/AuthContext';
 
 export interface ConnectionRecord {
   id: string;
@@ -49,16 +50,35 @@ interface ConnectionTableProps {
   onExport?: () => void;
   /** Called when a row is clicked – opens the chat view */
   onSelect?: (connection: ConnectionRecord) => void;
+  /** Avatar tap opens public profile (does not select row). */
+  onOpenProfile?: (userId: string) => void;
 }
 
 type SortField = 'name' | 'dateMet' | 'location' | 'status';
 type SortOrder = 'asc' | 'desc';
 
+function RowAvatar({ initial, showOnline }: { initial: string; showOnline: boolean }) {
+  return (
+    <div className="relative h-8 w-8 shrink-0">
+      <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-xs font-bold">
+        {initial}
+      </div>
+      {showOnline && (
+        <span
+          className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
+          aria-hidden
+        />
+      )}
+    </div>
+  );
+}
+
 /**
  * ConnectionTable - A searchable, sortable data table of "People I've Met"
  * Part of the Digital Memory Box experience
  */
-export default function ConnectionTable({ connections, onExport, onSelect }: ConnectionTableProps) {
+export default function ConnectionTable({ connections, onExport, onSelect, onOpenProfile }: ConnectionTableProps) {
+  const { onlineUserIds, user: authUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('dateMet');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -280,7 +300,13 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
                   </td>
                 </tr>
               ) : (
-                filteredConnections.map((connection, index) => (
+                filteredConnections.map((connection, index) => {
+                  const selfId = authUser?.id;
+                  const peerId =
+                    connection.otherUserId ??
+                    (selfId ? connection.userIds?.find((id) => id !== selfId) : undefined);
+                  const peerOnline = !!(peerId && onlineUserIds.has(peerId));
+                  return (
                   <motion.tr
                     key={connection.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -292,9 +318,27 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
                   >
                     <td className="px-4 py-4 align-top">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-xs font-bold shrink-0">
-                          {connection.name.charAt(0).toUpperCase()}
-                        </div>
+                        {onOpenProfile && peerId ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenProfile(peerId);
+                            }}
+                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
+                            aria-label={`View ${connection.name}'s profile`}
+                          >
+                            <RowAvatar
+                              initial={connection.name.charAt(0).toUpperCase()}
+                              showOnline={peerOnline}
+                            />
+                          </button>
+                        ) : (
+                          <RowAvatar
+                            initial={connection.name.charAt(0).toUpperCase()}
+                            showOnline={peerOnline}
+                          />
+                        )}
                         <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug">
                           {connection.name}
                         </p>
@@ -337,7 +381,8 @@ export default function ConnectionTable({ connections, onExport, onSelect }: Con
                       </button>
                     </td>
                   </motion.tr>
-                ))
+                  );
+                })
               )}
             </AnimatePresence>
           </tbody>

@@ -39,6 +39,7 @@ import CallOverlay, {
   type WebCallInvite,
   type WebCallOverlayState,
 } from '@/components/chat/CallOverlay';
+import UserProfileModal from '@/components/UserProfileModal';
 
 /** Matches `CallPushNotifier.kt` → `send-push-notification` for `incoming_call` / VoIP wake-up. */
 function buildIncomingCallPushPayload(invite: WebCallInvite) {
@@ -148,6 +149,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     const supabase = getSupabaseClient();
@@ -1787,6 +1789,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     connections={connectionRecords}
                     onExport={handleExport}
                     onSelect={handleOpenChat}
+                    onOpenProfile={(id) => setProfileUserId(id)}
                   />
                 </section>
 
@@ -1856,6 +1859,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         onUnblock={() => unblockUser(selectedConnection)}
                         onStartCall={(videoEnabled) => startOutgoingCall(selectedConnection, videoEnabled)}
                         onClose={() => setSelectedConnection(null)}
+                        onOpenProfile={(id) => setProfileUserId(id)}
                       />
                     </motion.div>
                   ) : (
@@ -1953,12 +1957,26 @@ export default function DashboardView({ user }: DashboardViewProps) {
                               const previewText = conn.chatPreview?.trim() || 'No messages yet';
                               const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
                               const menuOpensUpward = index >= visibleChatConnections.length - 2;
+                              const listPeerId =
+                                conn.otherUserId ??
+                                (user?.id ? conn.userIds?.find((id) => id !== user.id) : undefined);
                               return (
                                 <div key={conn.id} className="relative">
-                                  <motion.button
+                                  <motion.div
+                                    role="button"
+                                    tabIndex={0}
                                     whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
                                     whileTap={{ scale: 0.995 }}
                                     onClick={() => {
+                                      if (suppressClickConnectionId === conn.id) {
+                                        setSuppressClickConnectionId(null);
+                                        return;
+                                      }
+                                      setSelectedConnection(conn);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                                      e.preventDefault();
                                       if (suppressClickConnectionId === conn.id) {
                                         setSuppressClickConnectionId(null);
                                         return;
@@ -1972,11 +1990,25 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     onTouchStart={() => startLongPress(conn.id)}
                                     onTouchEnd={endLongPress}
                                     onTouchCancel={endLongPress}
-                                    className="w-full flex items-start gap-4 px-5 py-4 pr-16 text-left transition-colors"
+                                    className="w-full flex cursor-pointer items-start gap-4 px-5 py-4 pr-16 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]/50"
                                   >
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold">
-                                      {conn.name.charAt(0).toUpperCase()}
-                                    </div>
+                                    {listPeerId ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setProfileUserId(listPeerId);
+                                        }}
+                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
+                                        aria-label={`View ${conn.name}'s profile`}
+                                      >
+                                        {conn.name.charAt(0).toUpperCase()}
+                                      </button>
+                                    ) : (
+                                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold">
+                                        {conn.name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
                                     <div className="min-w-0 flex-1">
                                       <p className="truncate pr-2 font-semibold text-white">{conn.name}</p>
                                       <p className="mt-0.5 truncate pr-2 text-sm text-zinc-300">
@@ -2002,9 +2034,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         </div>
                                       </div>
                                     </div>
-                                  </motion.button>
+                                  </motion.div>
 
                                   <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       openActionMenu(conn.id);
@@ -2153,6 +2186,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
         onEndCall={endActiveCall}
         onToggleMicrophone={toggleMicrophone}
         onToggleCamera={toggleCamera}
+      />
+
+      <UserProfileModal
+        userId={profileUserId}
+        getAuthHeaders={getAuthHeaders}
+        onClose={() => setProfileUserId(null)}
       />
 
     </div>
