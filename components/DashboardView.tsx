@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
+import { insertCallLogMessage } from '@/lib/chat/messages';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import {
@@ -136,6 +137,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const roomRef = useRef<Room | null>(null);
   const remoteAudioElementsRef = useRef<HTMLElement[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const callConnectedAtRef = useRef<number | null>(null);
+  const completedCallLoggedRef = useRef(false);
   const ringtoneIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeTabRef = useRef<DashboardTab>(activeTab);
   const selectedConnectionRef = useRef<ConnectionRecord | null>(selectedConnection);
@@ -155,6 +158,51 @@ export default function DashboardView({ user }: DashboardViewProps) {
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     };
   }, []);
+
+  const tryInsertCompletedCallLog = useCallback(
+    async (invite: WebCallInvite | null) => {
+      if (!invite || !user?.id) return;
+      if (user.id !== invite.callerId) {
+        callConnectedAtRef.current = null;
+        return;
+      }
+      const start = callConnectedAtRef.current;
+      if (start == null || completedCallLoggedRef.current) return;
+      completedCallLoggedRef.current = true;
+      callConnectedAtRef.current = null;
+      const durationSeconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      try {
+        await insertCallLogMessage(getAuthHeaders, invite.connectionId, 'completed', durationSeconds);
+      } catch (e) {
+        console.warn('[calls] call_log completed insert failed', e);
+      }
+    },
+    [getAuthHeaders, user?.id],
+  );
+
+  const insertDeclinedCallLog = useCallback(
+    async (invite: WebCallInvite) => {
+      if (!user?.id || user.id !== invite.callerId) return;
+      try {
+        await insertCallLogMessage(getAuthHeaders, invite.connectionId, 'declined', 0);
+      } catch (e) {
+        console.warn('[calls] call_log declined insert failed', e);
+      }
+    },
+    [getAuthHeaders, user?.id],
+  );
+
+  const insertMissedCallLog = useCallback(
+    async (invite: WebCallInvite) => {
+      if (!user?.id || user.id !== invite.callerId) return;
+      try {
+        await insertCallLogMessage(getAuthHeaders, invite.connectionId, 'missed', 0);
+      } catch (e) {
+        console.warn('[calls] call_log missed insert failed', e);
+      }
+    },
+    [getAuthHeaders, user?.id],
+  );
 
   const clearCallTimeout = useCallback(() => {
     if (callTimeoutRef.current) {
@@ -269,6 +317,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const disconnectRoom = useCallback((reason?: string) => {
+    void tryInsertCompletedCallLog(activeInviteRef.current);
     const room = roomRef.current;
     roomRef.current = null;
     if (room) {
@@ -279,7 +328,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
     cleanupRemoteAudio();
     resetCallState(reason, true);
-  }, [cleanupRemoteAudio, resetCallState]);
+  }, [cleanupRemoteAudio, resetCallState, tryInsertCompletedCallLog]);
 
   const endWithReason = useCallback((invite: WebCallInvite | null, reason: string) => {
     activeInviteRef.current = invite;
@@ -458,6 +507,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
       }
 
       const localCameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
+      callConnectedAtRef.current = Date.now();
+      completedCallLoggedRef.current = false;
       setActiveCallState((current) => ({
         ...current,
         status: 'connected',
@@ -486,6 +537,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
     if (callOverlayState.mode !== 'idle' || activeCallState.status !== 'idle') {
       return;
     }
+
+    callConnectedAtRef.current = null;
+    completedCallLoggedRef.current = false;
 
     const now = Date.now();
     const invite: WebCallInvite = {
@@ -521,6 +575,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         senderId: invite.callerId,
         reason: 'missed',
       });
+      void insertMissedCallLog(invite);
       endWithReason(invite, 'No answer');
     }, 30_000);
   }, [
@@ -529,6 +584,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     clearCallTimeout,
     endWithReason,
     invokeIncomingCallPush,
+    insertMissedCallLog,
     playRingtone,
     sendSignal,
     stopRingtone,
@@ -686,6 +742,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         } else if (response.busy) {
           endWithReason(invite, `${invite.calleeName} is busy`);
         } else {
+          void insertDeclinedCallLog(invite);
           endWithReason(invite, `${invite.calleeName} declined the call`);
         }
       })
@@ -726,7 +783,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, joinCall, playRingtone, sendSignal, showBrowserNotification, stopRingtone, user?.id]);
+  }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, insertDeclinedCallLog, joinCall, playRingtone, sendSignal, showBrowserNotification, stopRingtone, user?.id]);
 
   useEffect(() => {
     if (!user?.id || connectionRecords.length === 0) {

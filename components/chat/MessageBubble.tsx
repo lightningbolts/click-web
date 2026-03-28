@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Pencil, Trash2, SmilePlus, Check } from 'lucide-react';
+import { Pencil, Trash2, SmilePlus, Check, Phone } from 'lucide-react';
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import ReactionPicker from './ReactionPicker';
 
@@ -15,6 +15,32 @@ interface MessageBubbleProps {
   onReact: (messageId: string, emoji: string) => void;
   onEdit: (messageId: string, currentContent: string) => void;
   onDelete: (messageId: string) => void;
+}
+
+function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
+  const m = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? (metadata as Record<string, unknown>) : {};
+  const state = typeof m.call_state === 'string' ? m.call_state : '';
+  const rawDur = m.duration_seconds;
+  const dur =
+    typeof rawDur === 'number'
+      ? rawDur
+      : typeof rawDur === 'string'
+        ? parseInt(rawDur, 10) || 0
+        : 0;
+  if (state === 'missed') return { text: 'Missed Voice Call', missed: true };
+  if (state === 'declined') return { text: 'Declined Call', missed: false };
+  if (state === 'completed') {
+    const s = Math.max(0, Math.floor(dur));
+    const min = Math.floor(s / 60);
+    const sec = s % 60;
+    const durLabel = min > 0 ? `${min}m ${sec.toString().padStart(2, '0')}s` : `${sec}s`;
+    return { text: `Call Ended • ${durLabel}`, missed: false };
+  }
+  return { text: 'Call', missed: false };
+}
+
+function formatMessageTimeLabel(ms: number) {
+  return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 /**
@@ -33,6 +59,28 @@ export default function MessageBubble({
   const [showPicker, setShowPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (message.message_type === 'call_log') {
+    const { text, missed } = callLogLabel(message.metadata);
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.18 }}
+        className="flex w-full justify-center px-2 py-2"
+      >
+        <div
+          className="inline-flex max-w-[90%] items-center gap-2 rounded-[20px] border border-zinc-700/60 bg-zinc-800/70 px-3.5 py-2 text-sm backdrop-blur-sm"
+          role="status"
+        >
+          <Phone className={`h-4 w-4 shrink-0 ${missed ? 'text-red-400' : 'text-zinc-400'}`} aria-hidden />
+          <span className={missed ? 'font-medium text-red-400' : 'font-medium text-zinc-300'}>{text}</span>
+          <span className="text-[10px] text-zinc-500">{formatMessageTimeLabel(message.time_created)}</span>
+        </div>
+      </motion.div>
+    );
+  }
 
   const flatReactions: { emoji: string; count: number; iMine: boolean }[] = Object.entries(
     message.reactions ?? {}
@@ -56,10 +104,7 @@ export default function MessageBubble({
     }, 300);
   };
 
-  const timeLabel = new Date(message.time_created).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const timeLabel = formatMessageTimeLabel(message.time_created);
 
   return (
     <motion.div

@@ -42,6 +42,28 @@ export type MessageInsertRow = {
   metadata: Record<string, unknown>;
 };
 
+export type CallLogStateKey = 'missed' | 'declined' | 'completed';
+
+/** POST a call_log row via the Next.js messages API (caller-only for missed/declined/completed per app rules). */
+export async function insertCallLogMessage(
+  getAuthHeaders: () => Promise<HeadersInit>,
+  connectionId: string,
+  callState: CallLogStateKey,
+  durationSeconds: number,
+): Promise<void> {
+  const headers = await getAuthHeaders();
+  await fetch('/api/chat/messages', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      connectionId,
+      content: '',
+      message_type: 'call_log',
+      metadata: { call_state: callState, duration_seconds: durationSeconds },
+    }),
+  });
+}
+
 export function buildMessageInsertRow(params: {
   chatId: string;
   userId: string;
