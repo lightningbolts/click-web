@@ -52,7 +52,7 @@ export async function insertCallLogMessage(
   durationSeconds: number,
 ): Promise<void> {
   const headers = await getAuthHeaders();
-  await fetch('/api/chat/messages', {
+  const res = await fetch('/api/chat/messages', {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -62,6 +62,10 @@ export async function insertCallLogMessage(
       metadata: { call_state: callState, duration_seconds: durationSeconds },
     }),
   });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`insertCallLogMessage failed: ${res.status} ${text}`);
+  }
 }
 
 export function buildMessageInsertRow(params: {
