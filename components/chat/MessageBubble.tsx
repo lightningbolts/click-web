@@ -1,15 +1,29 @@
 'use client';
 
-import { useState, useRef, useLayoutEffect, useCallback, useMemo, useEffect, type RefObject } from 'react';
+import {
+  useState,
+  useRef,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+  useEffect,
+  type RefObject,
+  type MouseEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight } from 'lucide-react';
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
-import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar } from '@/lib/chat/portalBounds';
+import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
+import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
 
 const ACTION_MENU_OPEN_EVENT = 'chat:message-action-open';
+
+/** Crossing gaps to portaled UI + slower movement should not dismiss menus. */
+const HIDE_DELAY_MS = 520;
+const HIDE_DELAY_REACTION_OPEN_MS = 1400;
 
 interface MessageBubbleProps {
   message: Message;
@@ -92,11 +106,12 @@ export default function MessageBubble({
 
   const scheduleHide = useCallback(() => {
     if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    const delay = showPicker ? HIDE_DELAY_REACTION_OPEN_MS : HIDE_DELAY_MS;
     hideTimeout.current = setTimeout(() => {
       setShowActions(false);
       setShowPicker(false);
-    }, 260);
-  }, []);
+    }, delay);
+  }, [showPicker]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -111,6 +126,10 @@ export default function MessageBubble({
       document.removeEventListener(ACTION_MENU_OPEN_EVENT, onOtherMenuOpened as EventListener);
     };
   }, [message.id]);
+
+  useEffect(() => {
+    if (showPicker) cancelHide();
+  }, [showPicker, cancelHide]);
 
   if (message.message_type === 'call_log') {
     const { text, missed } = callLogLabel(message.metadata);
@@ -156,7 +175,13 @@ export default function MessageBubble({
     setShowActions(true);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
+    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
+    scheduleHide();
+  };
+
+  const handlePortaledMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
+    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
     scheduleHide();
   };
 
@@ -199,14 +224,10 @@ export default function MessageBubble({
         leftEdge = placed.left;
         top = placed.top;
       } else if (bubbleR) {
-        /** Theirs: align to the left edge of the bubble; prefer above, else below. */
-        leftEdge = clampBarLeftToBubble(bubbleR.left, bubbleR.right, barW, 'start', pad, boundsRect, pad);
-        const boundsTop = boundsRect ? boundsRect.top + pad : pad;
-        top = bubbleR.top - barH - gap;
-        if (top < boundsTop) {
-          top = bubbleR.bottom + gap;
-        }
-        top = clampTop(top, barH, pad, boundsRect, pad);
+        /** Theirs: beside the bubble (right edge) when possible; else above/below, end-aligned. */
+        const placed = placeTheirMessageActionBar(bubbleR, barW, barH, gap, pad, boundsRect, pad);
+        leftEdge = placed.left;
+        top = placed.top;
       } else {
         leftEdge = clampBarLeftToBubble(r.left, r.right, barW, 'start', pad, boundsRect, pad);
         top = clampTop(r.top - barH - gap, barH, pad, boundsRect, pad);
@@ -281,6 +302,7 @@ export default function MessageBubble({
 
       <div
         ref={messageColumnRef}
+        {...{ [CHAT_HOVER_ANCHOR_ATTR]: message.id }}
         className={`relative max-w-[72%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -290,6 +312,7 @@ export default function MessageBubble({
           boundsRef={portalsBoundsRef}
           alignToBubbleEnd={isMine}
           toolbarDock={pickerToolbarDock}
+          hoverGroupId={message.id}
           visible={showPicker}
           activeReactions={myReactions}
           onReact={(emoji) => {
@@ -337,6 +360,7 @@ export default function MessageBubble({
           createPortal(
             <div
               ref={actionBarRef}
+              {...{ [CHAT_HOVER_ANCHOR_ATTR]: message.id }}
               style={{
                 position: 'fixed',
                 top: actionBarGeom.top,
@@ -346,7 +370,7 @@ export default function MessageBubble({
                 boxSizing: 'border-box',
               }}
               onMouseEnter={cancelHide}
-              onMouseLeave={scheduleHide}
+              onMouseLeave={handlePortaledMouseLeave}
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.92 }}

@@ -173,3 +173,51 @@ export function placeMineMessageActionBar(
 
   return { left, top };
 }
+
+/**
+ * Other person's message action bar: prefer just to the right of the bubble (inward toward chat
+ * center) so it doesn't stack over adjacent messages. Falls back like own messages if there's no room.
+ */
+export function placeTheirMessageActionBar(
+  bubbleRect: DOMRect,
+  barW: number,
+  barH: number,
+  gap: number,
+  viewportPad: number,
+  boundsRect: DOMRect | null,
+  containerPad: number,
+): { left: number; top: number } {
+  const idealLeft = bubbleRect.right + gap;
+  const clampedLeft = clampLeftEdge(idealLeft, barW, viewportPad, boundsRect, containerPad);
+  const clearsBubbleRight = clampedLeft >= bubbleRect.right + gap - OVERLAP_EPS;
+
+  if (clearsBubbleRight) {
+    const top = clampTop(
+      bubbleRect.top + bubbleRect.height / 2 - barH / 2,
+      barH,
+      viewportPad,
+      boundsRect,
+      containerPad,
+    );
+    return { left: clampedLeft, top };
+  }
+
+  let left = clampBarLeftToBubble(
+    bubbleRect.left,
+    bubbleRect.right,
+    barW,
+    'end',
+    viewportPad,
+    boundsRect,
+    containerPad,
+  );
+
+  const boundsTop = boundsRect ? boundsRect.top + containerPad : viewportPad;
+  let top = bubbleRect.top - barH - gap;
+  if (top < boundsTop) {
+    top = bubbleRect.bottom + gap;
+  }
+  top = clampTop(top, barH, viewportPad, boundsRect, containerPad);
+
+  return { left, top };
+}

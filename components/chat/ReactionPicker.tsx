@@ -1,12 +1,21 @@
 'use client';
 
-import { useState, useLayoutEffect, useRef, useCallback, type RefObject } from 'react';
+import {
+  useState,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useEffect,
+  type RefObject,
+  type MouseEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import data from '@emoji-mart/data';
 import { motion, AnimatePresence } from 'framer-motion';
 import { REACTION_EMOJIS } from '@/lib/chat/types';
 import { clampBarLeftToBubble, clampLeftEdge, clampTop } from '@/lib/chat/portalBounds';
+import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
 
 const Picker = dynamic(() => import('@emoji-mart/react').then((m) => m.default), {
   ssr: false,
@@ -66,6 +75,9 @@ function responsivePickerMetrics(vw: number, vh: number, boundW: number) {
 /** Space between the quick bar and the full picker so they never visually merge. */
 const STACK_SPINE = 14;
 
+/** Shadow DOM / gaps: brief leave should not tear down the picker. */
+const PICKER_POINTER_LEAVE_MS = 480;
+
 const EMOJI_MART_SCROLL_FIX_ID = 'click-emoji-mart-scroll-layout-fix';
 
 /**
@@ -101,13 +113,25 @@ function injectEmojiMartScrollLayoutFix(hostEl: HTMLElement | null) {
   flex: 1 1 0% !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
+  box-sizing: border-box !important;
+  padding-right: 12px !important;
+  margin-right: 0 !important;
+  scrollbar-gutter: stable !important;
 }
 .scroll {
   scrollbar-width: thin !important;
   scrollbar-color: rgba(255, 255, 255, 0.4) rgba(255, 255, 255, 0.08) !important;
 }
+.scroll::-webkit-scrollbar {
+  width: 8px !important;
+}
+.scroll::-webkit-scrollbar-track {
+  margin: 2px 0 !important;
+  background: transparent !important;
+}
 .scroll::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.22) !important;
+  border-radius: 999px !important;
 }
 .scroll:hover::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.4) !important;
@@ -135,6 +159,8 @@ interface ReactionPickerProps {
   } | null;
   /** Pin panel to the right edge of the bubble (yours, no dock) vs left (theirs). */
   alignToBubbleEnd?: boolean;
+  /** Same id as `MessageBubble` column / toolbar for hover bridging across portals. */
+  hoverGroupId?: string;
   onPortaledPointerChange?: (inside: boolean) => void;
 }
 
@@ -183,9 +209,11 @@ function measureAnchor(
   const maxFullHeightByBounds = Math.max(0, boundsInnerHeight - quickHeight - STACK_SPINE);
   const desiredFullPanelInnerH = Math.min(fullPanelInnerH, maxFullHeightByBounds);
   const measuredCapped = measuredFullHeight > 0 ? Math.min(measuredFullHeight, maxFullHeightByBounds) : 0;
-  const fullHeight = showFull ? Math.max(desiredFullPanelInnerH, measuredCapped) : 0;
-  const needH = showFull ? quickHeight + STACK_SPINE + fullHeight : quickHeight;
+  /** Anchor position uses only the quick strip so opening the full picker does not move it. */
+  const needH = quickHeight;
   const gap = 10;
+  const effectiveTop = boundsRect ? boundsRect.top + pad : pad;
+  const effectiveBottom = boundsRect ? boundsRect.bottom - pad : vh - pad;
 
   let left: number;
   let top: number;
@@ -197,8 +225,6 @@ function measureAnchor(
     const H = toolbarDock.height;
     const toolbarLeft = toolbarDock.left;
     const toolbarRight = toolbarDock.left + toolbarDock.width;
-    const effectiveTop = boundsRect ? boundsRect.top + pad : pad;
-    const effectiveBottom = boundsRect ? boundsRect.bottom - pad : vh - pad;
 
     const sidePreference = toolbarDock.preferSide ?? (alignToBubbleEnd ? 'left' : 'right');
     const sideLeft = clampLeftEdge(toolbarLeft - g - maxPanelW, maxPanelW, pad, boundsRect, pad);
@@ -243,8 +269,8 @@ function measureAnchor(
     } else {
       const clampedAbove = clampTop(topAbove, needH, pad, boundsRect, pad);
       const clampedBelow = clampTop(topBelow, needH, pad, boundsRect, pad);
-      const overlapAbove = Math.max(0, Math.min(clampedAbove + needH, T + H + g) - Math.max(clampedAbove, T - g));
-      const overlapBelow = Math.max(0, Math.min(clampedBelow + needH, T + H + g) - Math.max(clampedBelow, T - g));
+      const overlapAbove = Math.max(0, Math.min(clampedAbove + quickHeight, T + H + g) - Math.max(clampedAbove, T - g));
+      const overlapBelow = Math.max(0, Math.min(clampedBelow + quickHeight, T + H + g) - Math.max(clampedBelow, T - g));
       placeBelow = overlapBelow <= overlapAbove;
       top = placeBelow ? clampedBelow : clampedAbove;
     }
@@ -261,8 +287,6 @@ function measureAnchor(
       pad,
     );
 
-    const effectiveTop = boundsRect ? boundsRect.top + pad : pad;
-    const effectiveBottom = boundsRect ? boundsRect.bottom - pad : vh - pad;
     const topIfBelow = r.bottom + gap;
     const topIfAbove = r.top - gap - needH;
     const usableBelow = effectiveBottom - topIfBelow;
@@ -285,6 +309,18 @@ function measureAnchor(
     top = clampTop(top, needH, pad, boundsRect, pad);
   }
 
+  let resolvedFullInnerH = desiredFullPanelInnerH;
+  if (showFull) {
+    const raw = Math.max(desiredFullPanelInnerH, measuredCapped);
+    let cap: number;
+    if (placeBelow) {
+      cap = Math.max(0, effectiveBottom - (top + quickHeight + STACK_SPINE));
+    } else {
+      cap = Math.max(0, top - STACK_SPINE - effectiveTop);
+    }
+    resolvedFullInnerH = Math.min(raw, cap);
+  }
+
   return {
     top,
     left,
@@ -292,7 +328,7 @@ function measureAnchor(
     maxPanelW,
     emojiSize,
     emojiButtonSize,
-    fullPanelInnerH: fullHeight > 0 ? fullHeight : desiredFullPanelInnerH,
+    fullPanelInnerH: showFull ? resolvedFullInnerH : desiredFullPanelInnerH,
     quickH,
     perLine,
   };
@@ -309,12 +345,47 @@ export default function ReactionPicker({
   boundsRef,
   toolbarDock = null,
   alignToBubbleEnd = false,
+  hoverGroupId,
   onPortaledPointerChange,
 }: ReactionPickerProps) {
   const [showFull, setShowFull] = useState(false);
   const quickBarRef = useRef<HTMLDivElement>(null);
   const fullPanelRef = useRef<HTMLDivElement>(null);
   const emojiMartHostRef = useRef<HTMLDivElement>(null);
+  const leavePickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPickerLeaveTimer = useCallback(() => {
+    if (leavePickerTimerRef.current) {
+      clearTimeout(leavePickerTimerRef.current);
+      leavePickerTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!visible) clearPickerLeaveTimer();
+  }, [visible, clearPickerLeaveTimer]);
+
+  useEffect(() => () => clearPickerLeaveTimer(), [clearPickerLeaveTimer]);
+
+  const handlePickerRootEnter = useCallback(() => {
+    clearPickerLeaveTimer();
+    onPortaledPointerChange?.(true);
+  }, [clearPickerLeaveTimer, onPortaledPointerChange]);
+
+  const handlePickerRootLeave = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (hoverGroupId && pointerMovesWithinHoverGroup(e.relatedTarget, hoverGroupId)) {
+        return;
+      }
+      clearPickerLeaveTimer();
+      leavePickerTimerRef.current = setTimeout(() => {
+        leavePickerTimerRef.current = null;
+        onPortaledPointerChange?.(false);
+        setShowFull(false);
+      }, PICKER_POINTER_LEAVE_MS);
+    },
+    [clearPickerLeaveTimer, hoverGroupId, onPortaledPointerChange],
+  );
   const [measuredHeights, setMeasuredHeights] = useState({ quick: 0, full: 0 });
   const [pos, setPos] = useState<{
     top: number;
@@ -403,81 +474,87 @@ export default function ReactionPicker({
 
   if (!visible || typeof document === 'undefined' || !pos) return null;
 
-  const fullPanel = showFull ? (
-    <div
-      ref={fullPanelRef}
-      className="flex min-h-0 w-full flex-col overflow-hidden overscroll-contain rounded-2xl border border-zinc-600/80 bg-zinc-950 p-2 shadow-xl ring-1 ring-white/[0.06]"
-      style={{
-        width: pos.maxPanelW,
-        maxWidth: pos.maxPanelW,
-        height: pos.fullPanelInnerH,
-        maxHeight: pos.fullPanelInnerH,
-        boxSizing: 'border-box',
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div
-        ref={emojiMartHostRef}
-        className="chat-emoji-mart-host box-border min-h-0 flex-1 basis-0 rounded-xl px-1 py-0.5"
-      >
-        <Picker
-          data={data}
-          theme="dark"
-          dynamicWidth
-          previewPosition="none"
-          skinTonePosition="search"
-          searchPosition="static"
-          navPosition="top"
-          perLine={pos.perLine}
-          emojiSize={pos.emojiSize}
-          emojiButtonSize={pos.emojiButtonSize}
-          maxFrequentRows={3}
-          categories={[...FULL_PICKER_CATEGORIES]}
-          onEmojiSelect={(e: { native: string }) => {
-            onReact(e.native);
-            setShowFull(false);
-          }}
-        />
-      </div>
-    </div>
-  ) : null;
-
   return createPortal(
     <AnimatePresence>
       {visible && pos && (
         <div
           key="reaction-picker"
-          className="pointer-events-auto overflow-visible"
+          {...(hoverGroupId ? { [CHAT_HOVER_ANCHOR_ATTR]: hoverGroupId } : {})}
+          className="pointer-events-auto relative overflow-visible"
           style={{
             position: 'fixed',
             top: pos.top,
             left: pos.left,
             zIndex: 260,
           }}
-          onMouseEnter={() => onPortaledPointerChange?.(true)}
-          onMouseLeave={() => {
-            onPortaledPointerChange?.(false);
-            setShowFull(false);
-          }}
+          onMouseEnter={handlePickerRootEnter}
+          onMouseLeave={handlePickerRootLeave}
         >
           <motion.div
             initial={{ opacity: 0, y: pos.placeBelow ? -6 : 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: pos.placeBelow ? -6 : 6 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            className="flex flex-col items-stretch gap-0 overflow-visible p-0.5"
-            style={{ transformOrigin: pos.placeBelow ? 'top center' : 'bottom center' }}
+            className="relative inline-block overflow-visible p-0.5"
+            style={{ transformOrigin: pos.placeBelow ? 'top left' : 'bottom left' }}
           >
-          {showFull && !pos.placeBelow && fullPanel}
-          {showFull && !pos.placeBelow && (
-            <div className="shrink-0" style={{ width: pos.maxPanelW, height: STACK_SPINE }} aria-hidden />
-          )}
+            {showFull && (
+              <div
+                className="absolute z-[1]"
+                style={{
+                  width: pos.maxPanelW,
+                  ...(alignToBubbleEnd
+                    ? { right: 0, left: 'auto' }
+                    : { left: 0, right: 'auto' }),
+                  ...(pos.placeBelow
+                    ? { top: `calc(100% + ${STACK_SPINE}px)` }
+                    : { bottom: `calc(100% + ${STACK_SPINE}px)` }),
+                }}
+              >
+                <div
+                  ref={fullPanelRef}
+                  className="flex min-h-0 w-full flex-col overflow-hidden overscroll-contain rounded-2xl border border-zinc-600/80 bg-zinc-950 p-2 pr-1 shadow-xl ring-1 ring-white/[0.06]"
+                  style={{
+                    width: pos.maxPanelW,
+                    maxWidth: pos.maxPanelW,
+                    height: pos.fullPanelInnerH,
+                    maxHeight: pos.fullPanelInnerH,
+                    boxSizing: 'border-box',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    ref={emojiMartHostRef}
+                    className="chat-emoji-mart-host box-border min-h-0 flex-1 basis-0 rounded-xl px-1 py-0.5"
+                  >
+                    <Picker
+                      data={data}
+                      theme="dark"
+                      dynamicWidth
+                      previewPosition="none"
+                      skinTonePosition="search"
+                      searchPosition="static"
+                      navPosition="top"
+                      perLine={pos.perLine}
+                      emojiSize={pos.emojiSize}
+                      emojiButtonSize={pos.emojiButtonSize}
+                      maxFrequentRows={3}
+                      categories={[...FULL_PICKER_CATEGORIES]}
+                      onEmojiSelect={(e: { native: string }) => {
+                        onReact(e.native);
+                        setShowFull(false);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           <div
             ref={quickBarRef}
-            className="flex max-w-full items-center gap-1 rounded-full border border-zinc-600/50 bg-zinc-950/95 py-1.5 pl-2.5 pr-1 shadow-xl backdrop-blur-md sm:gap-1.5 sm:pl-3 sm:pr-1.5 sm:py-1.5"
+            className="flex w-max max-w-full items-center gap-1 rounded-full border border-zinc-600/50 bg-zinc-950/95 py-1.5 pl-2.5 pr-1 shadow-xl backdrop-blur-md sm:gap-1.5 sm:pl-3 sm:pr-1.5 sm:py-1.5"
             style={{ maxWidth: pos.maxPanelW, boxSizing: 'border-box' }}
           >
-            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:thin] sm:gap-1">
+            <div className="flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:thin] sm:gap-1">
               {REACTION_EMOJIS.map((emoji) => {
                 const isActive = activeReactions.includes(emoji);
                 return (
@@ -509,10 +586,6 @@ export default function ReactionPicker({
               +
             </button>
           </div>
-          {showFull && pos.placeBelow && (
-            <div className="shrink-0" style={{ width: pos.maxPanelW, height: STACK_SPINE }} aria-hidden />
-          )}
-          {showFull && pos.placeBelow && fullPanel}
           </motion.div>
         </div>
       )}
