@@ -46,7 +46,7 @@ export interface MessageReaction {
   created_at: number;
 }
 
-/** All emoji reactions allowed in the picker */
+/** Quick reactions in the compact strip; use + for the full picker. */
 export const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '👍', '🔥'] as const;
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 

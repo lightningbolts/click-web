@@ -32,8 +32,6 @@ export type ProfileConnectionLines = {
   place?: string;
   /** Structured address when distinct from [place]. */
   addressDetail?: string;
-  /** Lat/lon fallback. */
-  geoHint?: string;
   when?: string;
   weather?: string;
   noise?: string;
@@ -56,20 +54,7 @@ function formatFullLocation(full: Record<string, unknown> | null | undefined): s
   return parts.length ? parts.join(', ') : '';
 }
 
-export function formatProfileGeoHint(c: SharedConnectionPayload): string | undefined {
-  const g = c.geo_location;
-  if (!g || typeof g !== 'object') return undefined;
-  const lat = (g as { lat?: unknown; latitude?: unknown }).lat ?? (g as { latitude?: unknown }).latitude;
-  const lon =
-    (g as { lon?: unknown; lng?: unknown; longitude?: unknown }).lon ??
-    (g as { longitude?: unknown }).longitude ??
-    (g as { lng?: unknown }).lng;
-  const la = typeof lat === 'number' ? lat : Number(lat);
-  const lo = typeof lon === 'number' ? lon : Number(lon);
-  if (!Number.isFinite(la) || !Number.isFinite(lo) || (la === 0 && lo === 0)) return undefined;
-  return `${la.toFixed(4)}°, ${lo.toFixed(4)}°`;
-}
-
+/** Local calendar date + clock time only (no raw UTC bucket / GPS). */
 export function formatProfileWhenLine(c: SharedConnectionPayload): string | undefined {
   const iso = typeof c.created_utc === 'string' && c.created_utc.trim() ? c.created_utc.trim() : null;
   const ms = typeof c.created === 'number' && Number.isFinite(c.created) ? c.created : null;
@@ -93,10 +78,7 @@ export function formatProfileWhenLine(c: SharedConnectionPayload): string | unde
     hour: 'numeric',
     minute: '2-digit',
   }).format(d);
-  const tod = typeof c.time_of_day_utc === 'string' ? c.time_of_day_utc.trim() : '';
-  const bits = [datePart, timePart];
-  if (tod) bits.push(tod.replace(/_/g, ' '));
-  return bits.join(' · ');
+  return `${datePart} · ${timePart}`;
 }
 
 export function buildProfileConnectionLines(c: SharedConnectionPayload): ProfileConnectionLines {
@@ -104,15 +86,12 @@ export function buildProfileConnectionLines(c: SharedConnectionPayload): Profile
   const context = extractEventContext(raw);
   const semantic = typeof c.semantic_location === 'string' ? c.semantic_location.trim() : '';
   const addressDetail = formatFullLocation(c.full_location ?? undefined);
-  const geoHint = formatProfileGeoHint(c);
 
   let place = semantic || addressDetail;
   let detail = '';
   if (semantic && addressDetail && semantic !== addressDetail) {
     place = semantic;
     detail = addressDetail;
-  } else if (!place && geoHint) {
-    place = 'Coordinates';
   }
 
   const when = formatProfileWhenLine(c);
@@ -123,11 +102,6 @@ export function buildProfileConnectionLines(c: SharedConnectionPayload): Profile
   if (context) lines.context = context;
   if (place) lines.place = place;
   if (detail) lines.addressDetail = detail;
-  if (geoHint && (semantic || addressDetail || context)) lines.geoHint = geoHint;
-  else if (geoHint && !place) {
-    lines.place = 'Meeting point';
-    lines.geoHint = geoHint;
-  }
   if (when) lines.when = when;
   if (weather) lines.weather = weather;
   if (noise) lines.noise = noise;

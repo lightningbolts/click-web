@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, CalendarDays, Cloud, Volume2 } from 'lucide-react';
+import { X, Sparkles, MapPin, Clock, Cloud, Volume2 } from 'lucide-react';
 import {
   buildProfileConnectionLines,
   type SharedConnectionPayload,
@@ -64,6 +64,34 @@ type UserProfileModalProps = {
   onClose: () => void;
 };
 
+function ProfileLoadingSkeleton() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-5 py-1"
+      aria-busy
+      aria-label="Loading profile"
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-24 w-24 rounded-full bg-white/5 ring-1 ring-white/[0.06] animate-pulse" />
+        <div className="h-5 w-40 rounded-lg bg-white/5 animate-pulse" />
+        <div className="h-3 w-28 rounded-md bg-white/[0.04] animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-3 w-24 rounded bg-white/[0.06] animate-pulse" />
+        <div className="h-9 w-full rounded-xl bg-white/[0.04] animate-pulse" />
+        <div className="h-9 w-[80%] rounded-xl bg-white/[0.04] animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-3 w-20 rounded bg-white/[0.06] animate-pulse" />
+        <div className="h-16 w-full rounded-xl bg-white/[0.04] animate-pulse" />
+      </div>
+    </motion.div>
+  );
+}
+
 export default function UserProfileModal({ userId, getAuthHeaders, onClose }: UserProfileModalProps) {
   const [data, setData] = useState<UserProfilePayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -117,14 +145,15 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-sm p-4"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+            initial={{ opacity: 0, y: 28, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.98 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.85 }}
             className="w-full max-w-md max-h-[min(88vh,640px)] overflow-y-auto rounded-3xl border border-zinc-700/80 bg-zinc-950 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -141,14 +170,17 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
             </div>
 
             <div className="p-5">
-              {loading && (
-                <p className="text-sm text-zinc-400 text-center py-10">Loading…</p>
-              )}
+              {loading && <ProfileLoadingSkeleton />}
               {error && !loading && (
                 <p className="text-sm text-red-400 text-center py-6">{error}</p>
               )}
               {data && !loading && (
-                <div className="space-y-5">
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-5"
+                >
                   <div className="flex flex-col items-center gap-3">
                     {data.user.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -178,65 +210,55 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                   </div>
 
                   {hasMoment && momentLines && (
-                    <section className="rounded-2xl border border-zinc-800/90 bg-gradient-to-b from-zinc-900/80 to-zinc-950/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-[#a78bfa] mb-3">
+                    <section>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
                         When you connected
                       </h3>
-                      <div className="space-y-3">
-                        {(momentLines.context || momentLines.place || momentLines.addressDetail || momentLines.geoHint) && (
-                          <div className="flex gap-3 rounded-xl bg-zinc-950/50 border border-zinc-800/80 p-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8338EC]/15 text-[#c4b5fd]">
-                              <MapPin className="h-4 w-4" aria-hidden />
+                      <div className="space-y-3 text-sm text-zinc-200">
+                        {momentLines.context && (
+                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                            <Sparkles className="h-4 w-4 shrink-0 text-[#8338EC]/80 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Moment</p>
+                              <p className="mt-0.5 leading-snug">{momentLines.context}</p>
                             </div>
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Place</p>
-                              {momentLines.context && (
-                                <p className="text-sm font-medium text-white leading-snug">{momentLines.context}</p>
-                              )}
-                              {momentLines.place && (
-                                <p className={`text-sm leading-snug ${momentLines.context ? 'text-zinc-300' : 'text-white font-medium'}`}>
-                                  {momentLines.place}
-                                </p>
-                              )}
-                              {momentLines.addressDetail && (
-                                <p className="text-xs text-zinc-500 leading-relaxed">{momentLines.addressDetail}</p>
-                              )}
-                              {momentLines.geoHint && (
-                                <p className="text-[11px] font-mono text-zinc-600">{momentLines.geoHint}</p>
-                              )}
+                          </div>
+                        )}
+                        {(momentLines.place || momentLines.addressDetail) && (
+                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                            <MapPin className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Place</p>
+                              <p className="mt-0.5 leading-snug">
+                                {[momentLines.place, momentLines.addressDetail].filter(Boolean).join(' · ')}
+                              </p>
                             </div>
                           </div>
                         )}
                         {momentLines.when && (
-                          <div className="flex gap-3 rounded-xl bg-zinc-950/50 border border-zinc-800/80 p-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-300">
-                              <CalendarDays className="h-4 w-4" aria-hidden />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 mb-0.5">Time</p>
-                              <p className="text-sm text-zinc-200 leading-snug">{momentLines.when}</p>
+                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                            <Clock className="h-4 w-4 shrink-0 text-amber-300/90 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Time</p>
+                              <p className="mt-0.5 leading-snug">{momentLines.when}</p>
                             </div>
                           </div>
                         )}
                         {momentLines.weather && (
-                          <div className="flex gap-3 rounded-xl bg-zinc-950/50 border border-zinc-800/80 p-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-300">
-                              <Cloud className="h-4 w-4" aria-hidden />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 mb-0.5">Weather</p>
-                              <p className="text-sm text-zinc-200 leading-snug">{momentLines.weather}</p>
+                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                            <Cloud className="h-4 w-4 shrink-0 text-zinc-300 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Weather</p>
+                              <p className="mt-0.5 leading-snug">{momentLines.weather}</p>
                             </div>
                           </div>
                         )}
                         {momentLines.noise && (
-                          <div className="flex gap-3 rounded-xl bg-zinc-950/50 border border-zinc-800/80 p-3">
-                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-300">
-                              <Volume2 className="h-4 w-4" aria-hidden />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 mb-0.5">Ambience</p>
-                              <p className="text-sm text-zinc-200 leading-snug">{momentLines.noise}</p>
+                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                            <Volume2 className="h-4 w-4 shrink-0 text-emerald-400/85 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Ambience</p>
+                              <p className="mt-0.5 leading-snug">{momentLines.noise}</p>
                             </div>
                           </div>
                         )}
@@ -295,7 +317,7 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                       </div>
                     )}
                   </section>
-                </div>
+                </motion.div>
               )}
             </div>
           </motion.div>

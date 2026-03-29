@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff, Phone, Video } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -154,11 +155,65 @@ export default function ChatView({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /** Glass messages card — clip portaled message menus to this region. */
+  const messagesPanelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const channelRef = useRef<ReturnType<typeof getSupabaseClient> extends null ? never : any>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callMenuAnchorRef = useRef<HTMLDivElement>(null);
+  const headerMenuAnchorRef = useRef<HTMLDivElement>(null);
+  const [callMenuPos, setCallMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; left: number } | null>(null);
 
   const PAGE_SIZE = 40;
+
+  useLayoutEffect(() => {
+    if (!showCallMenu || typeof document === 'undefined') {
+      setCallMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const el = callMenuAnchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const menuW = 200;
+      setCallMenuPos({
+        top: r.bottom + 8,
+        left: Math.min(r.right - menuW, window.innerWidth - menuW - 12),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [showCallMenu]);
+
+  useLayoutEffect(() => {
+    if (!showHeaderMenu || typeof document === 'undefined') {
+      setHeaderMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const el = headerMenuAnchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const menuW = 200;
+      setHeaderMenuPos({
+        top: r.bottom + 8,
+        left: Math.min(r.right - menuW, window.innerWidth - menuW - 12),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [showHeaderMenu]);
 
   useEffect(() => {
     if (!actionToast) return;
@@ -628,9 +683,9 @@ export default function ChatView({
   const timelineEntries = useMemo(() => buildTimelineEntries(messages), [messages]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0 overflow-visible">
       {/* ── Header ── */}
-      <div className="glass relative z-30 rounded-2xl mb-4 shrink-0">
+      <div className="glass relative z-50 rounded-2xl mb-4 shrink-0 overflow-visible">
         <div className="flex items-center gap-4 px-5 py-4">
           <button
             onClick={onClose}
@@ -678,7 +733,7 @@ export default function ChatView({
             Connected
           </div>
 
-          <div className="relative">
+          <div className="relative" ref={callMenuAnchorRef}>
             <button
               onClick={() => {
                 setShowCallMenu((prev) => !prev);
@@ -690,33 +745,48 @@ export default function ChatView({
               <Phone className="w-5 h-5" />
             </button>
 
-            {showCallMenu && (
-              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden z-50">
-                <button
-                  onClick={() => {
-                    setShowCallMenu(false);
-                    onStartCall(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
-                >
-                  <Phone className="h-4 w-4" />
-                  Voice call
-                </button>
-                <button
-                  onClick={() => {
-                    setShowCallMenu(false);
-                    onStartCall(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
-                >
-                  <Video className="h-4 w-4" />
-                  Video call
-                </button>
-              </div>
-            )}
+            {showCallMenu &&
+              callMenuPos &&
+              typeof document !== 'undefined' &&
+              createPortal(
+                <>
+                  <button
+                    type="button"
+                    aria-label="Dismiss menu"
+                    className="fixed inset-0 z-[240] cursor-default bg-transparent"
+                    onClick={() => setShowCallMenu(false)}
+                  />
+                  <div
+                    className="fixed z-[250] min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden"
+                    style={{ top: callMenuPos.top, left: callMenuPos.left }}
+                  >
+                    <button
+                      onClick={() => {
+                        setShowCallMenu(false);
+                        onStartCall(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                    >
+                      <Phone className="h-4 w-4" />
+                      Voice call
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCallMenu(false);
+                        onStartCall(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                    >
+                      <Video className="h-4 w-4" />
+                      Video call
+                    </button>
+                  </div>
+                </>,
+                document.body,
+              )}
           </div>
 
-          <div className="relative">
+          <div className="relative" ref={headerMenuAnchorRef}>
             <button
               onClick={() => {
                 setShowHeaderMenu((prev) => !prev);
@@ -728,8 +798,21 @@ export default function ChatView({
               <MoreHorizontal className="w-5 h-5" />
             </button>
 
-            {showHeaderMenu && (
-              <div className="absolute right-0 top-full mt-2 min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden z-50">
+            {showHeaderMenu &&
+              headerMenuPos &&
+              typeof document !== 'undefined' &&
+              createPortal(
+                <>
+                  <button
+                    type="button"
+                    aria-label="Dismiss menu"
+                    className="fixed inset-0 z-[240] cursor-default bg-transparent"
+                    onClick={() => setShowHeaderMenu(false)}
+                  />
+                  <div
+                    className="fixed z-[250] min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
+                    style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
+                  >
                 {isArchived ? (
                   <button
                     onClick={async () => {
@@ -823,14 +906,19 @@ export default function ChatView({
                 >
                   <UserMinus className="w-4 h-4" /> Remove connection
                 </button>
-              </div>
-            )}
+                  </div>
+                </>,
+                document.body,
+              )}
           </div>
         </div>
       </div>
 
       {/* ── Messages area ── */}
-      <div className="glass rounded-2xl flex-1 flex flex-col min-h-0 overflow-hidden relative">
+      <div
+        ref={messagesPanelRef}
+        className="glass rounded-2xl flex-1 flex flex-col min-h-0 min-w-0 relative"
+      >
         {/* Subtle gradient glow behind messages */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#8338EC] rounded-full blur-[160px] opacity-[0.04]" />
@@ -934,6 +1022,7 @@ export default function ChatView({
                   currentUserId={currentUserId}
                   senderInitial={otherInitial}
                   showSenderOnline={peerIsOnline && entry.message.user_id === peerUserId}
+                  portalsBoundsRef={messagesPanelRef}
                   onReact={handleReact}
                   onEdit={startEdit}
                   onReply={(msg) => {
@@ -1009,12 +1098,12 @@ export default function ChatView({
         </AnimatePresence>
       </div>
 
-      {/* ── Input area ── */}
-      <div className="glass rounded-2xl mt-2 px-4 py-2 shrink-0">
+      {/* ── Input area (overflow visible so portaled pickers align; chrome stacks above messages) ── */}
+      <div className="glass rounded-2xl mt-2 px-4 py-2 shrink-0 relative z-40 overflow-visible">
         {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
-          <div className="mb-2 flex items-start gap-2 rounded-xl border border-zinc-700/60 bg-zinc-900/50 px-3 py-2 text-xs">
+          <div className="mb-2 flex w-full items-start gap-2 rounded-2xl border border-zinc-700/60 bg-zinc-900/50 px-3 py-2.5 text-xs">
             <span className="text-[#8338EC] font-medium shrink-0">Replying</span>
-            <p className="text-zinc-400 line-clamp-2 flex-1">{replyBannerText}</p>
+            <p className="text-zinc-400 line-clamp-2 flex-1 min-w-0">{replyBannerText}</p>
             <button
               type="button"
               onClick={() => setReplyingTo(null)}
@@ -1025,7 +1114,7 @@ export default function ChatView({
             </button>
           </div>
         )}
-        <div className="flex items-end gap-3">
+        <div className="flex w-full items-end gap-3 min-w-0">
           <div className="flex-1 flex items-center bg-zinc-900/60 border border-zinc-700/50 
             rounded-xl px-4 py-[7px] focus-within:border-[#8338EC]/50 transition-colors">
             <textarea

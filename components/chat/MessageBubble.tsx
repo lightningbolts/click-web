@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useLayoutEffect, useCallback, useMemo, useEffect, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight } from 'lucide-react';
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
+import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar } from '@/lib/chat/portalBounds';
+
+const ACTION_MENU_OPEN_EVENT = 'chat:message-action-open';
 
 interface MessageBubbleProps {
   message: Message;
@@ -19,6 +23,8 @@ interface MessageBubbleProps {
   onReact: (messageId: string, emoji: string) => void;
   onEdit: (messageId: string, currentContent: string) => void;
   onDelete: (messageId: string) => void;
+  /** Messages glass panel — keeps portaled toolbars inside the chat card. */
+  portalsBoundsRef?: RefObject<HTMLElement | null>;
 }
 
 function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
@@ -61,10 +67,50 @@ export default function MessageBubble({
   onReact,
   onEdit,
   onDelete,
+  portalsBoundsRef,
 }: MessageBubbleProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  /** Whole message column (bubble + reactions + time); toolbar is positioned from this so it never covers text. */
+  const messageColumnRef = useRef<HTMLDivElement>(null);
+  const actionBarRef = useRef<HTMLDivElement>(null);
+  const layoutApplyRef = useRef<() => void>(() => {});
+  /** Portaled toolbar geometry (for layout + emoji picker dock). */
+  const [actionBarGeom, setActionBarGeom] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    maxWidthPx?: number;
+  } | null>(null);
+
+  const cancelHide = useCallback(() => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    hideTimeout.current = setTimeout(() => {
+      setShowActions(false);
+      setShowPicker(false);
+    }, 260);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onOtherMenuOpened = (event: Event) => {
+      const incomingId = (event as CustomEvent<{ messageId?: string }>).detail?.messageId;
+      if (!incomingId || incomingId === message.id) return;
+      setShowActions(false);
+      setShowPicker(false);
+    };
+    document.addEventListener(ACTION_MENU_OPEN_EVENT, onOtherMenuOpened as EventListener);
+    return () => {
+      document.removeEventListener(ACTION_MENU_OPEN_EVENT, onOtherMenuOpened as EventListener);
+    };
+  }, [message.id]);
 
   if (message.message_type === 'call_log') {
     const { text, missed } = callLogLabel(message.metadata);
@@ -99,19 +145,113 @@ export default function MessageBubble({
   const myReactions = flatReactions.filter((r) => r.iMine).map((r) => r.emoji);
 
   const handleMouseEnter = () => {
-    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    cancelHide();
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(
+        new CustomEvent<{ messageId: string }>(ACTION_MENU_OPEN_EVENT, {
+          detail: { messageId: message.id },
+        }),
+      );
+    }
     setShowActions(true);
   };
 
   const handleMouseLeave = () => {
-    hideTimeout.current = setTimeout(() => {
-      setShowActions(false);
-      setShowPicker(false);
-    }, 300);
+    scheduleHide();
   };
+
+  useLayoutEffect(() => {
+    if (!showActions || typeof document === 'undefined') {
+      setActionBarGeom(null);
+      return;
+    }
+    const gap = 8;
+    const pad = 12;
+    const estimateBarW = (maxWidthPx?: number) => {
+      const mineExtra = isMine ? 88 : 0;
+      const replyExtra = typeof onReply === 'function' ? 48 : 0;
+      const estimated = 36 + mineExtra + replyExtra;
+      return maxWidthPx !== undefined ? Math.min(estimated, maxWidthPx) : estimated;
+    };
+
+    const apply = () => {
+      const el = messageColumnRef.current;
+      if (!el) {
+        setActionBarGeom(null);
+        return;
+      }
+      const boundsRect = portalsBoundsRef?.current?.getBoundingClientRect() ?? null;
+      const maxWidthPx =
+        boundsRect && boundsRect.width > 2 * pad ? boundsRect.width - 2 * pad : undefined;
+      const r = el.getBoundingClientRect();
+      const bubbleR = bubbleRef.current?.getBoundingClientRect();
+      const measuredW = actionBarRef.current?.offsetWidth;
+      const measuredH = actionBarRef.current?.offsetHeight;
+      const rawBarW = measuredW && measuredW > 0 ? measuredW : estimateBarW(maxWidthPx);
+      const barW = maxWidthPx !== undefined ? Math.min(rawBarW, maxWidthPx) : rawBarW;
+      const barH = measuredH && measuredH > 0 ? measuredH : 44;
+
+      let leftEdge: number;
+      let top: number;
+
+      if (isMine && bubbleR) {
+        const placed = placeMineMessageActionBar(bubbleR, barW, barH, gap, pad, boundsRect, pad);
+        leftEdge = placed.left;
+        top = placed.top;
+      } else if (bubbleR) {
+        /** Theirs: align to the left edge of the bubble; prefer above, else below. */
+        leftEdge = clampBarLeftToBubble(bubbleR.left, bubbleR.right, barW, 'start', pad, boundsRect, pad);
+        const boundsTop = boundsRect ? boundsRect.top + pad : pad;
+        top = bubbleR.top - barH - gap;
+        if (top < boundsTop) {
+          top = bubbleR.bottom + gap;
+        }
+        top = clampTop(top, barH, pad, boundsRect, pad);
+      } else {
+        leftEdge = clampBarLeftToBubble(r.left, r.right, barW, 'start', pad, boundsRect, pad);
+        top = clampTop(r.top - barH - gap, barH, pad, boundsRect, pad);
+      }
+
+      setActionBarGeom({
+        left: leftEdge,
+        top,
+        width: barW,
+        height: barH,
+        ...(maxWidthPx !== undefined ? { maxWidthPx } : {}),
+      });
+    };
+    layoutApplyRef.current = apply;
+    apply();
+    const raf = requestAnimationFrame(apply);
+    window.addEventListener('resize', apply);
+    window.addEventListener('scroll', apply, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', apply);
+      window.removeEventListener('scroll', apply, true);
+    };
+  }, [showActions, isMine, portalsBoundsRef, onReply]);
+
+  useLayoutEffect(() => {
+    if (!showActions || !actionBarGeom) return;
+    const el = actionBarRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => layoutApplyRef.current());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showActions, actionBarGeom]);
 
   const timeLabel = formatMessageTimeLabel(message.time_created);
   const replyMeta = getReplyFromMetadata(message.metadata);
+
+  const pickerToolbarDock = useMemo(() => {
+    if (!showActions || !actionBarGeom) return null;
+    return {
+      ...actionBarGeom,
+      gap: 16,
+      preferSide: isMine ? ('left' as const) : ('right' as const),
+    };
+  }, [isMine, showActions, actionBarGeom]);
 
   return (
     <motion.div
@@ -140,29 +280,36 @@ export default function MessageBubble({
       )}
 
       <div
+        ref={messageColumnRef}
         className={`relative max-w-[72%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Reaction picker */}
-        <div className="relative">
-          <ReactionPicker
-            visible={showPicker}
-            activeReactions={myReactions}
-            onReact={(emoji) => {
-              onReact(message.id, emoji);
-              setShowPicker(false);
-            }}
-          />
+        <ReactionPicker
+          anchorRef={bubbleRef}
+          boundsRef={portalsBoundsRef}
+          alignToBubbleEnd={isMine}
+          toolbarDock={pickerToolbarDock}
+          visible={showPicker}
+          activeReactions={myReactions}
+          onReact={(emoji) => {
+            onReact(message.id, emoji);
+            setShowPicker(false);
+          }}
+          onPortaledPointerChange={(inside) => {
+            if (inside) cancelHide();
+            else scheduleHide();
+          }}
+        />
 
-          {/* Bubble */}
-          <div
-            className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words
+        <div
+          ref={bubbleRef}
+          className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words
               ${isMine
                 ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm shadow-[0_2px_16px_rgba(131,56,236,0.25)]'
                 : 'glass-panel text-zinc-100 rounded-bl-sm'
               }`}
-          >
+        >
             {replyMeta && (
               <div
                 className={`mb-2 rounded-lg px-2.5 py-1.5 text-xs leading-snug border ${
@@ -182,21 +329,36 @@ export default function MessageBubble({
             {message.time_edited && (
               <span className="ml-2 text-[10px] opacity-60 italic">edited</span>
             )}
-          </div>
+        </div>
 
-          {/* Floating action bar */}
-          {showActions && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`absolute top-[-6px] flex items-center gap-1 
-                glass rounded-full px-1.5 py-1 shadow-xl z-10
-                ${isMine ? 'right-full mr-2' : 'left-full ml-2'}`}
+        {showActions &&
+          actionBarGeom &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <div
+              ref={actionBarRef}
+              style={{
+                position: 'fixed',
+                top: actionBarGeom.top,
+                left: actionBarGeom.left,
+                zIndex: 190,
+                maxWidth: actionBarGeom.maxWidthPx,
+                boxSizing: 'border-box',
+              }}
+              onMouseEnter={cancelHide}
+              onMouseLeave={scheduleHide}
             >
-              {/* Reaction toggle */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 520, damping: 32 }}
+                className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap glass rounded-full px-1.5 py-1 shadow-xl max-w-full [scrollbar-width:thin]"
+                style={{ transformOrigin: 'center center' }}
+              >
               <button
+                type="button"
                 onClick={() => setShowPicker((p) => !p)}
-                className="p-1 rounded-full hover:bg-[#8338EC]/20 text-zinc-400 hover:text-[#8338EC] transition-colors"
+                className="shrink-0 p-1 rounded-full hover:bg-[#8338EC]/20 text-zinc-400 hover:text-[#8338EC] transition-colors"
                 title="React"
               >
                 <SmilePlus className="w-3.5 h-3.5" />
@@ -208,7 +370,7 @@ export default function MessageBubble({
                     onReply(message);
                     setShowActions(false);
                   }}
-                  className="p-1 rounded-full hover:bg-zinc-600/30 text-zinc-400 hover:text-zinc-100 transition-colors text-[11px] font-semibold px-2"
+                  className="shrink-0 p-1 rounded-full hover:bg-zinc-600/30 text-zinc-400 hover:text-zinc-100 transition-colors text-[11px] font-semibold px-2"
                   title="Reply"
                 >
                   Reply
@@ -217,24 +379,27 @@ export default function MessageBubble({
               {isMine && (
                 <>
                   <button
+                    type="button"
                     onClick={() => onEdit(message.id, message.content)}
-                    className="p-1 rounded-full hover:bg-[#3A86FF]/20 text-zinc-400 hover:text-[#3A86FF] transition-colors"
+                    className="shrink-0 p-1 rounded-full hover:bg-[#3A86FF]/20 text-zinc-400 hover:text-[#3A86FF] transition-colors"
                     title="Edit"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => onDelete(message.id)}
-                    className="p-1 rounded-full hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
+                    className="shrink-0 p-1 rounded-full hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
                     title="Delete"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </>
               )}
-            </motion.div>
+              </motion.div>
+            </div>,
+            document.body,
           )}
-        </div>
 
         {/* Reactions row */}
         {flatReactions.length > 0 && (

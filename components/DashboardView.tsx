@@ -1833,7 +1833,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="h-[calc(100dvh-180px)]"
+                className="h-[calc(100dvh-180px)] min-h-0 overflow-visible"
               >
                 <AnimatePresence mode="wait" initial={false}>
                   {selectedConnection ? (
@@ -1843,7 +1843,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 24 }}
                       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                      className="h-full"
+                      className="h-full min-h-0 overflow-visible"
                     >
                       <ChatView
                         connection={selectedConnection}
