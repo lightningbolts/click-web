@@ -66,7 +66,11 @@ export async function GET(request: Request) {
     if (type === 'recovery') {
       return NextResponse.redirect(new URL('/reset-password', request.url));
     }
-    if (type === 'signup' || type === 'magiclink') {
+    // Signup email confirmation: show themed success page instead of an abrupt dashboard redirect.
+    if (type === 'signup') {
+      return NextResponse.redirect(new URL('/auth/callback?verified=signup', request.url));
+    }
+    if (type === 'magiclink') {
       return NextResponse.redirect(new URL(next, request.url));
     }
   }
