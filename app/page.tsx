@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import LoadingScreen from '@/components/LoadingScreen';
 import DashboardView from '@/components/DashboardView';
 import LoginModal from '@/components/LoginModal';
+import LiveConnectionTicker from '@/components/LiveConnectionTicker';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -222,9 +223,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* Why Click Section */}
-      <section className="relative z-10 px-6 md:px-12 py-12">
-        <div className="max-w-4xl mx-auto text-center">
+      {/* Why Click, live ticker, and problem/solution bento share one section so vertical rhythm stays even (no stacked section padding). */}
+      <section className="relative z-10 px-6 md:px-12 pt-12 pb-20">
+        <div className="mx-auto max-w-4xl text-center">
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
@@ -239,17 +240,18 @@ export default function Home() {
             </p>
           </motion.div>
         </div>
-      </section>
 
-      {/* Problem vs Solution - Bento Grid */}
-      <section className="relative z-10 px-6 md:px-12 py-20">
-        <div className="max-w-6xl mx-auto">
+        <div className="mx-auto mt-12 w-full max-w-6xl">
+          <LiveConnectionTicker />
+        </div>
+
+        <div className="mx-auto mt-12 w-full max-w-6xl">
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            className="grid grid-cols-1 gap-6 md:grid-cols-2"
           >
             {/* Card 1 - The Problem */}
             <motion.div
@@ -477,7 +479,7 @@ export default function Home() {
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-center">
                 Built for the moment{' '}
                 <span className="bg-gradient-to-r from-[#8338EC] to-purple-400 bg-clip-text text-transparent">
-                  you put your phone down
+                  you put your phone down.
                 </span>
               </h2>
               <p className="text-base sm:text-lg md:text-xl text-zinc-400 text-center max-w-3xl mx-auto mb-12 leading-relaxed px-4">
