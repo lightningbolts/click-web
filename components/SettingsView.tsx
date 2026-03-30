@@ -663,7 +663,7 @@ export default function SettingsView({
         </p>
       </div>
 
-      {/* Your Data — location privacy */}
+      {/* Your Data: location privacy */}
       <div className="glass p-8 rounded-3xl border border-zinc-800">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
@@ -699,7 +699,7 @@ export default function SettingsView({
           <LocationPrefToggleRow
             icon={<Map className="w-4 h-4 text-[#8338EC]" />}
             title="Show on my Memory Map"
-            description="Personal only — never shared with others"
+            description="Personal only, never shared with others"
             checked={locationPrefs.location_show_on_map_enabled}
             disabled={locationPrefsLoading}
             onChange={async (checked) => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Smartphone, Zap, Shield, Users, Clock, Sparkles, CheckCircle, X } from 'lucide-react';
+import { Smartphone, Zap, Shield, Users, MapPin, Sparkles, CheckCircle, X, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -236,7 +236,7 @@ export default function Home() {
               Why <span className="text-[#8338EC]">Click</span>?
             </h2>
             <p className="text-base sm:text-lg text-zinc-400 leading-relaxed px-4">
-              You've had that conversation at a party, a class, a show — the kind where you think, <em>I should actually know this person.</em> Then you follow each other and it evaporates. <span className="text-[#8338EC] font-semibold">Click</span> keeps that from happening.
+              You&apos;ve had that conversation at a party, a class, a show, the kind where you think, <em>I should actually know this person.</em> Then you follow each other and it evaporates. Pretty soon they&apos;re just another handle in the same endless scroll as everyone else.
             </p>
           </motion.div>
         </div>
@@ -271,72 +271,68 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* Card 2 - NFC Tap */}
+            {/* Card 2: friction of exchanging contact (solution: Tap or Scan) */}
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
               className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
-                  <Smartphone className="w-6 h-6 text-[#8338EC]" />
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
+                  <Smartphone className="w-6 h-6 text-amber-400/90" />
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold mb-4">
-                  Tap. Done.
+                  The handle handoff
                 </h3>
                 <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-                  NFC tap or QR scan to swap profiles in under a second. No asking for their handle. No "it's spelled with an underscore."
+                  You hunt for the right app, guess at spelling, and thumb-type while the conversation stalls. Half the time you save the wrong @ or the wrong name, and the person in front of you is already halfway across the room.
                 </p>
               </div>
             </motion.div>
 
-            {/* Card 3 - 30-Minute Vibe Check */}
+            {/* Card 3: contextless contacts (solution: memory capsule / tagging) */}
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
               className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group md:col-span-2"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                   <div className="flex-1">
-                    <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
-                      <Clock className="w-6 h-6 text-[#8338EC]" />
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
+                      <MapPin className="w-6 h-6 text-amber-400/90" />
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-bold mb-4">30-Minute Vibe Check</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold mb-4">A name without a where</h3>
                     <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl">
-                      After you tap, you can open a timed chat. It disappears when the clock runs out — unless you both choose to save it. Good when the conversation's there. No weirdness when it's not.
+                      Later, they&apos;re a row in your messages or a follow in a list, with no tether to the actual night, venue, or vibe. You remember liking them; you don&apos;t remember <em>where reality collided</em>, so reaching out feels oddly blank.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="w-3 h-3 rounded-full bg-[#8338EC]"
-                    />
-                    <span className="text-[#8338EC] font-mono text-sm">30:00</span>
+                  <div className="flex flex-wrap gap-2 md:max-w-[220px] md:justify-end md:pt-14">
+                    <span className="rounded-full border border-zinc-700/80 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-500">&quot;Which event was this?&quot;</span>
+                    <span className="rounded-full border border-zinc-700/80 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-500">&quot;Do I know you from…?&quot;</span>
                   </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* Card 4 - No Feed */}
+            {/* Card 4: feed apps vs follow-up (solution: no-feed product shape) */}
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
               className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group md:col-span-2"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6 mx-auto">
-                  <Zap className="w-6 h-6 text-[#8338EC]" />
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6 mx-auto">
+                  <Zap className="w-6 h-6 text-amber-400/90" />
                 </div>
                 <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
-                  No Feed. <span className="text-[#8338EC]">Ever.</span>
+                  Built to scroll, not to <span className="text-amber-400/90">follow up</span>
                 </h3>
                 <p className="text-sm sm:text-base md:text-lg text-zinc-400 leading-relaxed max-w-2xl mx-auto">
-                  A tool, not a trap. No doomscrolling, no ads, no algorithm deciding who you should care about. Open the app, see your people, close it.
+                  The apps you open ten times a day are tuned for feeds, ads, and staying on platform, not for closing the loop with one human who&apos;s standing right there. So the follow happens; the actual relationship usually doesn&apos;t.
                 </p>
               </div>
             </motion.div>
@@ -358,7 +354,7 @@ export default function Home() {
               How <span className="text-[#8338EC]">Click</span> Works
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed px-4">
-              Simple enough to use in a five-second handshake.
+              Here&apos;s what we built: simple enough for a five-second handshake, deliberate enough that the moment still means something later.
             </p>
           </motion.div>
 
@@ -378,7 +374,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-2xl font-bold mb-4">Tap or Scan</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4">
-                  Tap phones with NFC or pull up a QR code. Profiles swap instantly — no typing, no spelling things out.
+                  Pull up a QR code or tap your phone with NFC. Profiles swap instantly. No typing, no spelling things out.
                 </p>
                 <ul className="space-y-2 text-zinc-500 text-sm">
                   <li className="flex items-center gap-2">
@@ -387,11 +383,11 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">✓</span>
-                    <span>Works offline, syncs later</span>
+                    <span>Works anywhere, syncs blazingly fast</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">✓</span>
-                    <span>One tap, instant connection</span>
+                    <span>One scan or tap, instant connection</span>
                   </li>
                 </ul>
               </div>
@@ -410,18 +406,24 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📍</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">You'll Remember Where You Met</h3>
+                <h3 className="text-2xl font-bold mb-4">You&apos;ll Remember How You Met</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4">
-                  Every connection logs the time and place. Months later you'll know it was the coffee shop on Pike, not just "some person from that event."
+                  After you connect, a quick sheet asks you to label the encounter (presets or a short custom line). With your permission, we attach place, time, weather, and an optional ambient snapshot. That becomes a memory capsule on the connection, so months later you know it was the comedy show at the quiet coffee shop on Pike in the drizzle, not just &quot;some person from that event.&quot;
                 </p>
                 <div className="space-y-3">
                   <div className="glass p-3 rounded-xl text-xs">
                     <p className="text-zinc-300">Met <span className="text-[#8338EC] font-semibold">Historia</span> at Red Square</p>
-                    <p className="text-zinc-500 mt-1">Yesterday afternoon</p>
+                    <p className="text-zinc-500 mt-1">Weather: Sunny & Warm</p>
+                    <p className="text-zinc-500 mt-1">Volume: Loud</p>
+                    <p className="text-zinc-500 mt-1">Event: Outdoor concert</p>
+                    <p className="text-zinc-500 mt-1">Time: Yesterday afternoon</p>
                   </div>
                   <div className="glass p-3 rounded-xl text-xs">
                     <p className="text-zinc-300">Clicked with <span className="text-[#8338EC] font-semibold">Ymir</span> at Pike Place</p>
-                    <p className="text-zinc-500 mt-1">Last week</p>
+                    <p className="text-zinc-500 mt-1">Weather: Drizzly & Cold</p>
+                    <p className="text-zinc-500 mt-1">Volume: Moderate</p>
+                    <p className="text-zinc-500 mt-1">Event: Indoor comedy show</p>
+                    <p className="text-zinc-500 mt-1">Time: Last week</p>
                   </div>
                 </div>
               </div>
@@ -522,9 +524,97 @@ export default function Home() {
                   </div>
                   <h4 className="text-lg font-semibold mb-2">Offline First</h4>
                   <p className="text-zinc-500 text-sm">
-                    Designed to get you off your phone, not keep you on it. Works without signal and syncs later.
+                    Designed to get you off your phone, not keep you on it. Use Click for what you actually want to do.
                   </p>
                 </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Join us: final conversion */}
+      <section className="relative z-10 px-6 md:px-12 pb-24 pt-8">
+        <div className="mx-auto max-w-3xl text-center">
+          <motion.div
+            initial={{ y: 28, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.75 }}
+            viewport={{ once: true, margin: '-60px' }}
+            className="rounded-3xl border border-[#8338EC]/25 bg-gradient-to-b from-[#8338EC]/[0.12] to-zinc-950/80 px-8 py-12 shadow-xl shadow-[#8338EC]/10 backdrop-blur-xl sm:px-12 sm:py-14"
+          >
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
+              Join us <span className="text-[#8338EC]">today</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+              We&apos;re building Click in the open. Get on the waitlist for early access, or create an account now and
+              start using the web dashboard. Your profile, QR, and connections stay in sync when the mobile app ships.
+            </p>
+            <ul className="mx-auto mt-8 flex max-w-md flex-col gap-3 text-left text-sm text-zinc-500 sm:mx-auto sm:max-w-lg">
+              <li className="flex items-start gap-3">
+                <span className="mt-0.5 text-[#8338EC]" aria-hidden>
+                  ✓
+                </span>
+                <span>
+                  <span className="font-medium text-zinc-300">Be first in line </span> when we open invites and campus
+                  pilots. You&apos;ll hear directly from us.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-0.5 text-[#8338EC]" aria-hidden>
+                  ✓
+                </span>
+                <span>
+                  <span className="font-medium text-zinc-300">Lock in your identity</span> on Click now so nobody else
+                  has to guess your name in a noisy room later.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-0.5 text-[#8338EC]" aria-hidden>
+                  ✓
+                </span>
+                <span>
+                  <span className="font-medium text-zinc-300">Always free to join</span>. No credit card, no ads, no feed to
+                  scroll before you get started.
+                </span>
+              </li>
+            </ul>
+
+            <div className="mt-10 flex flex-col items-stretch gap-3 sm:items-center">
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  setShowWaitlist(true);
+                  setWaitlistStatus('idle');
+                  setWaitlistMessage('');
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#8338EC] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-[#8338EC]/35 transition hover:bg-[#9d4eff] sm:w-auto"
+              >
+                Join the waitlist
+                <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
+              </motion.button>
+              <p className="text-xs text-zinc-500">Already have an account?</p>
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:justify-center">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={openSignup}
+                  className="rounded-full bg-[#8338EC] px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-[#9d4eff] sm:text-base"
+                >
+                  Create account
+                </motion.button>
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={openLogin}
+                  className="rounded-full border border-zinc-600 bg-zinc-900/50 px-8 py-3.5 text-sm font-semibold text-white transition hover:border-[#8338EC]/50 sm:text-base"
+                >
+                  Sign in
+                </motion.button>
               </div>
             </div>
           </motion.div>

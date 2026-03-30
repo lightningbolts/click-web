@@ -75,12 +75,12 @@ export default function TermsOfService() {
                 Click uses a multi-stage connection model to encourage authentic interactions:
               </p>
               <ul className="mt-4 space-y-3 list-disc list-inside">
-                <li>New connections start with a 48-hour &quot;Say Hi&quot; window — send a message to activate the connection</li>
+                <li>New connections start with a 48-hour &quot;Say Hi&quot; window: send a message to activate the connection</li>
                 <li>Active connections stay open as long as messages are exchanged within a 7-day rolling window</li>
                 <li>Both users can choose to &quot;Keep&quot; a connection, making it permanent</li>
                 <li>An optional 30-minute Vibe Check is available for real-time conversations</li>
                 <li>Expired connections and their messages are permanently deleted</li>
-                <li>Screenshots are discouraged but technically possible — be respectful</li>
+                <li>Screenshots are discouraged but technically possible; be respectful</li>
               </ul>
             </section>
 

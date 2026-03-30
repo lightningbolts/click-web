@@ -43,13 +43,39 @@ function emojiForWeather(condition: string): string {
   return '🌤️';
 }
 
+/** Connection moment in the viewer's local timezone and locale. */
+export function formatConnectionLocalTime(c: SanitizedTickerConnection): string {
+  const iso = c.created_utc?.trim();
+  const d = iso ? new Date(iso) : new Date(c.created);
+  if (Number.isNaN(d.getTime())) return '';
+
+  const now = new Date();
+  const sameCalendarDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+
+  if (sameCalendarDay) {
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function formatTickerLine(c: SanitizedTickerConnection): string {
   const place = c.display_location?.trim() || 'a new city';
+  const timePart = formatConnectionLocalTime(c);
+  const when = timePart ? ` at ${timePart}` : '';
   const w = c.weather_condition?.trim();
   if (w) {
-    return `New Connection in ${place} • ${emojiForWeather(w)} ${w}`;
+    return `New Connection in ${place}${when} • ${emojiForWeather(w)} ${w}`;
   }
-  return `New Connection in ${place}`;
+  return `New Connection in ${place}${when}`;
 }
 
 function isRecord(x: unknown): x is Record<string, unknown> {

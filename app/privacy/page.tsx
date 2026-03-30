@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
               <p>
                 Click is built on a simple conviction: your social life is nobody else&apos;s business.
                 We collect the minimum data needed to make the product work, we never sell your data,
-                and we delete it when it&apos;s no longer needed. Privacy isn&apos;t a feature — it&apos;s the
+                and we delete it when it&apos;s no longer needed. Privacy isn&apos;t a feature; it&apos;s the
                 foundation.
               </p>
             </section>
@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
               <ul className="space-y-3 list-disc list-inside">
                 <li><strong className="text-white">Account info:</strong> Email address and display name</li>
                 <li><strong className="text-white">Interest tags:</strong> Self-selected interests you choose during onboarding</li>
-                <li><strong className="text-white">Connection data:</strong> Records of who you connected with, when, and where (semantic location only — e.g. &quot;Coffee Lab&quot;, not GPS coordinates)</li>
+                <li><strong className="text-white">Connection data:</strong> Records of who you connected with, when, and where (semantic location only, e.g. &quot;Coffee Lab&quot;, not GPS coordinates)</li>
                 <li><strong className="text-white">Messages:</strong> Chat messages sent during active connections</li>
                 <li><strong className="text-white">Device info:</strong> Platform (iOS/Android) for NFC compatibility</li>
               </ul>
@@ -77,9 +77,9 @@ export default function PrivacyPolicy() {
                 Click offers anonymized analytics to venue partners (&quot;Insights&quot;). Here&apos;s what they can see:
               </p>
               <ul className="space-y-3 list-disc list-inside">
-                <li>Total connection count by day and hour — <strong className="text-white">never</strong> individual identities</li>
-                <li>Aggregated interest tag distributions — <strong className="text-white">never</strong> which specific users</li>
-                <li>Kept ratio (percentage of connections that become permanent) — <strong className="text-white">never</strong> which connections</li>
+                <li>Total connection count by day and hour; <strong className="text-white">never</strong> individual identities</li>
+                <li>Aggregated interest tag distributions; <strong className="text-white">never</strong> which specific users</li>
+                <li>Kept ratio (percentage of connections that become permanent); <strong className="text-white">never</strong> which connections</li>
               </ul>
               <p className="mt-4">
                 All analytics queries aggregate before returning data. No user IDs,

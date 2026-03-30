@@ -304,7 +304,7 @@ export default function SocialActivityPage() {
           </div>
         </GlassPanel>
 
-        {/* Last 14 days — this-week vs last-week */}
+        {/* Last 14 days: this-week vs last-week */}
         <GlassPanel className="p-6">
           <div className="mb-5">
             <h3 className="text-base font-semibold text-white">Week-over-Week Comparison</h3>
@@ -368,7 +368,7 @@ export default function SocialActivityPage() {
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-base font-semibold text-white">Hourly Activity Pattern</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Connections by hour of day — peak at {data?.peakHour ?? '—'}:00</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Connections by hour of day (peak at {data?.peakHour ?? '—'}:00)</p>
             </div>
             <span className="text-xs px-2.5 py-1 rounded-lg bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC]">
               {data?.peakHour ?? '—'}:00 peak

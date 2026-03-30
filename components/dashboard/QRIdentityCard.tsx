@@ -12,7 +12,7 @@ interface QRIdentityCardProps {
 }
 
 interface QRData {
-  qrPayload: string;       // JSON token payload — encode this in the QR
+  qrPayload: string;       // JSON token payload; encode this in the QR
   connectionUrl: string;   // For display and fallback
   clickId: string;
   expiresAt: number;       // ms timestamp
@@ -345,11 +345,11 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8338EC]">2.</span>
-              <span>They scan it with the Click app — it expires in 90s</span>
+              <span>They scan it with the Click app; it expires in 90s</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8338EC]">3.</span>
-              <span>Each code is single-use, protecting against screenshots</span>
+              <span>Important: each code is single-use!</span>
             </li>
           </ul>
         </div>

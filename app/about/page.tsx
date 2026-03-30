@@ -3,252 +3,121 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 
+type TeamMember = {
+  name: string;
+  initials: string;
+  subtitle: string;
+  email?: string;
+  gradient: string;
+};
+
+const TEAM: TeamMember[] = [
+  {
+    name: 'Kairui Cheng',
+    initials: 'K',
+    subtitle: 'Computer Science, UW',
+    email: 'kcheng29@uw.edu',
+    gradient: 'from-[#8338EC] to-purple-600',
+  },
+  {
+    name: 'Matthew Epshtein',
+    initials: 'M',
+    subtitle: 'Computer Science, UW',
+    email: 'mepsht@uw.edu',
+    gradient: 'from-purple-600 to-pink-600',
+  },
+  {
+    name: 'Rayan Rizwan',
+    initials: 'R',
+    subtitle: 'Computer Science, UW',
+    email: 'rayanr@uw.edu',
+    gradient: 'from-pink-600 to-red-600',
+  },
+  {
+    name: 'Andrew Lu',
+    initials: 'A',
+    subtitle: 'Computer Science, UW',
+    email: 'luand29@uw.edu',
+    gradient: 'from-emerald-600 to-teal-600',
+  },
+  {
+    name: 'Jaret Zhang',
+    initials: 'J',
+    subtitle: 'Computer Science, UW',
+    gradient: 'from-sky-600 to-indigo-600',
+  },
+];
+
 export default function About() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute left-1/4 top-0 h-96 w-96 rounded-full bg-[#8338EC] opacity-15 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-[#8338EC] opacity-15 blur-[120px]" />
+      </div>
 
-      {/* Content */}
-      <div className="max-w-6xl mx-auto px-6 md:px-12 py-20">
+      <div className="relative z-10 mx-auto max-w-6xl px-6 py-20 md:px-12">
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8 }}
         >
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 text-center">
+          <h1 className="mb-6 text-center text-5xl font-bold md:text-6xl">
             About <span className="text-[#8338EC]">Click</span>
           </h1>
-          <p className="text-xl text-zinc-400 text-center max-w-3xl mx-auto mb-20 leading-relaxed">
-            Building the bridge between digital and real-world connections
+          <p className="mx-auto mb-6 max-w-2xl text-center text-lg leading-relaxed text-zinc-400">
+            We&apos;re a team of Computer Science students at the{' '}
+            <span className="text-zinc-300">University of Washington</span> building tools for real-world connection, not
+            another endless feed.
+          </p>
+          <p className="mx-auto mb-16 max-w-xl text-center text-sm leading-relaxed text-zinc-500">
+            For what Click does, why it exists, and how to join the waitlist or create an account, see the{' '}
+            <Link href="/" className="font-medium text-[#8338EC] underline-offset-4 hover:underline">
+              homepage
+            </Link>
+            .
           </p>
 
-          {/* Mission */}
-          <section className="mb-20">
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-              className="glass p-12 md:p-16 rounded-3xl border border-zinc-800"
-            >
-              <h2 className="text-3xl md:text-4xl font-bold mb-6 text-center">Our Mission</h2>
-              <p className="text-lg text-zinc-300 leading-relaxed max-w-3xl mx-auto text-center">
-                We believe technology should bring people together, not isolate them behind screens.
-                Click is designed to transform fleeting in-person moments into lasting friendships—no
-                endless feeds, no doomscrolling, no algorithms deciding who matters. Just real people,
-                real moments, and real connections.
-              </p>
-            </motion.div>
-          </section>
-
-          {/* The Problem */}
-          <section className="mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">
-              The <span className="text-[#8338EC]">Connection Graveyard</span>
+          <section>
+            <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">
+              Meet the <span className="text-[#8338EC]">team</span>
             </h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              <motion.div
-                initial={{ x: -30, opacity: 0 }}
-                whileInView={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.8 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800"
-              >
-                <h3 className="text-2xl font-bold mb-4 text-red-400">The Problem</h3>
-                <p className="text-zinc-300 leading-relaxed">
-                  You meet someone interesting at an event. You exchange Instagrams or Snapchats.
-                  You follow each other. And then... nothing. The connection dies in the infinite
-                  scroll of social media feeds. You become another face in their follower count.
-                </p>
-              </motion.div>
-
-              <motion.div
-                initial={{ x: 30, opacity: 0 }}
-                whileInView={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.8 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800"
-              >
-                <h3 className="text-2xl font-bold mb-4 text-[#8338EC]">Our Solution</h3>
-                <p className="text-zinc-300 leading-relaxed">
-                  Click creates intentional connections. The 30-minute vibe check forces real
-                  conversation in the moment. Contextual tagging helps you remember not just who
-                  someone is, but where and when you connected. It's technology that respects the
-                  real world.
-                </p>
-              </motion.div>
-            </div>
-          </section>
-
-          {/* The Team */}
-          <section className="mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-center">
-              Meet the <span className="text-[#8338EC]">Team</span>
-            </h2>
-            <p className="text-zinc-400 text-center mb-12 max-w-2xl mx-auto">
-              Click is a project taken on by three Computer Science students at the University of Washington.
-              Our vision is for Click to empower students to better connect in the future, making massive
-              transitions seamless.
+            <p className="mx-auto mb-12 max-w-2xl text-center text-zinc-400">
+              Five of us are working on product, mobile, and web, with a focus on campus life and making big transitions
+              (new school, new city, new semester) a little less lonely.
             </p>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              {/* Kairui */}
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.1 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
-              >
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#8338EC] to-purple-600 mx-auto mb-6 flex items-center justify-center text-4xl font-bold">
-                  K
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Kairui Cheng</h3>
-                <p className="text-zinc-400 mb-4">Computer Science</p>
-                <a
-                  href="mailto:kcheng29@uw.edu"
-                  className="text-[#8338EC] hover:underline text-sm"
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {TEAM.map((member, i) => (
+                <motion.div
+                  key={member.name}
+                  initial={{ y: 28, opacity: 0 }}
+                  whileInView={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.65, delay: i * 0.06 }}
+                  viewport={{ once: true }}
+                  className="glass rounded-3xl border border-zinc-800 p-8 text-center transition-colors hover:border-[#8338EC]/50"
                 >
-                  kcheng29@uw.edu
-                </a>
-              </motion.div>
-
-              {/* Matthew */}
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
-              >
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 mx-auto mb-6 flex items-center justify-center text-4xl font-bold">
-                  M
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Matthew Epshtein</h3>
-                <p className="text-zinc-400 mb-4">Computer Science</p>
-                <a
-                  href="mailto:mepsht@uw.edu"
-                  className="text-[#8338EC] hover:underline text-sm"
-                >
-                  mepsht@uw.edu
-                </a>
-              </motion.div>
-
-              {/* Rayan */}
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.3 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800 text-center hover:border-[#8338EC] transition-colors"
-              >
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-pink-600 to-red-600 mx-auto mb-6 flex items-center justify-center text-4xl font-bold">
-                  R
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Rayan Rizwan</h3>
-                <p className="text-zinc-400 mb-4">Computer Science</p>
-                <a
-                  href="mailto:rayanr@uw.edu"
-                  className="text-[#8338EC] hover:underline text-sm"
-                >
-                  rayanr@uw.edu
-                </a>
-              </motion.div>
+                  <div
+                    className={`mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br text-4xl font-bold ${member.gradient}`}
+                  >
+                    {member.initials}
+                  </div>
+                  <h3 className="mb-2 text-2xl font-bold">{member.name}</h3>
+                  <p className="text-zinc-400">{member.subtitle}</p>
+                  {member.email && (
+                    <a
+                      href={`mailto:${member.email}`}
+                      className="mt-4 inline-block text-sm text-[#8338EC] hover:underline"
+                    >
+                      {member.email}
+                    </a>
+                  )}
+                </motion.div>
+              ))}
             </div>
-          </section>
-
-          {/* Our Values */}
-          <section className="mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">
-              Our <span className="text-[#8338EC]">Values</span>
-            </h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.1 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800"
-              >
-                <div className="text-4xl mb-4">🛡️</div>
-                <h3 className="text-xl font-bold mb-3">Privacy First</h3>
-                <p className="text-zinc-400 leading-relaxed">
-                  Your data is yours. We don't track you, sell your information, or build
-                  advertising profiles. End-to-end encryption for messages. Anonymized analytics only.
-                </p>
-              </motion.div>
-
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800"
-              >
-                <div className="text-4xl mb-4">🌍</div>
-                <h3 className="text-xl font-bold mb-3">Real-World First</h3>
-                <p className="text-zinc-400 leading-relaxed">
-                  Technology should bridge to the real world, not replace it. No endless feeds,
-                  no doomscrolling. Just tools to help you remember and nurture real connections.
-                </p>
-              </motion.div>
-
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.3 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800"
-              >
-                <div className="text-4xl mb-4">⚡</div>
-                <h3 className="text-xl font-bold mb-3">Intentional Design</h3>
-                <p className="text-zinc-400 leading-relaxed">
-                  Every feature is designed with purpose. The 30-minute vibe check creates urgency.
-                  Contextual tagging builds memory. No gamification, no dark patterns.
-                </p>
-              </motion.div>
-
-              <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                viewport={{ once: true }}
-                className="glass p-8 rounded-3xl border border-zinc-800"
-              >
-                <div className="text-4xl mb-4">🎓</div>
-                <h3 className="text-xl font-bold mb-3">Student-Driven</h3>
-                <p className="text-zinc-400 leading-relaxed">
-                  Built by students who understand the struggle of making friends in new environments.
-                  We're solving our own problem—and hopefully helping millions do the same.
-                </p>
-              </motion.div>
-            </div>
-          </section>
-
-          {/* The Vision */}
-          <section>
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-              className="glass p-12 md:p-16 rounded-3xl border border-zinc-800 text-center"
-            >
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Building the <span className="text-[#8338EC]">Connection Economy</span>
-              </h2>
-              <p className="text-lg text-zinc-300 leading-relaxed max-w-3xl mx-auto mb-8">
-                We envision a world where technology strengthens real-world relationships instead of
-                replacing them. Where meeting someone new doesn't mean adding another follower, but
-                starting a real friendship. Where social apps are tools, not traps.
-              </p>
-              <p className="text-xl font-semibold text-[#8338EC]">
-                Join us. Launch 2026.
-              </p>
-            </motion.div>
           </section>
         </motion.div>
       </div>
     </div>
   );
 }
-

@@ -19,7 +19,7 @@ type VerificationStatus = 'loading' | 'success' | 'error';
  *  5. Post-signup success   (?verified=signup)                 → success UI (session set by API)
  *
  * Note: `otp_expired` errors originate at Supabase's server before reaching
- * this page — they indicate the email link token expired/was already used.
+ * this page; they indicate the email link token expired/was already used.
  * Fix in Supabase dashboard: Auth → Settings → increase OTP Expiry (default
  * 3600 s). Also ensure the Site URL and Redirect URLs are set correctly.
  */
@@ -52,7 +52,7 @@ export default function AuthCallbackPage() {
       if (qError || qErrorCode) {
         const desc = qErrorDesc
           ? decodeURIComponent(qErrorDesc.replace(/\+/g, ' '))
-          : 'Authentication failed. The link may have expired — please request a new one.';
+          : 'Authentication failed. The link may have expired. Please request a new one.';
         setErrorMessage(desc);
         setStatus('error');
         return;
@@ -78,7 +78,7 @@ export default function AuthCallbackPage() {
       // --- 4. Legacy implicit flow: hash fragment tokens ---
       const hash = window.location.hash;
       if (!hash || hash.length < 2) {
-        // No tokens at all — user navigated here directly
+        // No tokens at all: user navigated here directly
         setErrorMessage('No authentication data found. Please request a new link.');
         setStatus('error');
         return;
@@ -92,7 +92,7 @@ export default function AuthCallbackPage() {
       if (hashError) {
         const desc = errorDescription
           ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
-          : 'Authentication failed. The link may have expired — please request a new one.';
+          : 'Authentication failed. The link may have expired. Please request a new one.';
         setErrorMessage(desc);
         setStatus('error');
         return;
