@@ -44,6 +44,7 @@ const TEAM: TeamMember[] = [
     name: 'Jaret Zhang',
     initials: 'J',
     subtitle: 'Computer Science, UW',
+    email: 'jaretz@uw.edu',
     gradient: 'from-sky-600 to-indigo-600',
   },
 ];

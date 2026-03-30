@@ -84,6 +84,12 @@ export default function Navbar() {
                 Mission
               </button>
               <Link
+                href="/enterprise"
+                className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
+              >
+                Enterprise
+              </Link>
+              <Link
                 href="/about"
                 className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
               >

@@ -28,6 +28,10 @@ export default function Footer() {
             <Link href="/about" className="text-white hover:text-[#8338EC] transition-colors">
               About
             </Link>
+            <span className="text-zinc-600">•</span>
+            <Link href="/enterprise" className="text-white hover:text-[#8338EC] transition-colors">
+              Enterprise
+            </Link>
           </div>
         </div>
         <div className="text-center text-xs md:text-sm text-zinc-400 space-y-2">
