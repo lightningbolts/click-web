@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import type { ReactNode } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
 import {
@@ -45,6 +44,9 @@ import {
 } from "@/lib/insights/mockData";
 import type { VibeMessage } from "@/lib/insights/mockData";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
+import AdvancedMetricsGrid from "./AdvancedMetricsGrid";
+import EnvironmentalMetrics from "./EnvironmentalMetrics";
+import { GlassPanel } from "./GlassPanel";
 
 interface InsightsResponse {
   totalConnections: number;
@@ -96,9 +98,12 @@ function InsightsSkeleton() {
  * InsightsDashboard - The main content component for the Insights page
  * Contains all the bento box cards and charts
  */
-function InsightsDashboardContent({ venueId }: { venueId?: string }) {
+function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const venueIdFromQuery = searchParams.get("venue_id") ?? undefined;
+  const venueId = venueIdProp ?? venueIdFromQuery ?? undefined;
 
   const liveCount = emptyLiveCount;
   const vibeMessages: VibeMessage[] = [];
@@ -248,6 +253,16 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
         <StickyScoreCard data={emptyStickyScore} />
         <ConnectionDensityCard data={emptyConnectionDensity} />
         <LiveCountCard data={liveCount} />
+      </motion.div>
+
+      {/* Advanced Social ROI (RPC-backed) */}
+      <motion.div variants={itemVariants}>
+        <AdvancedMetricsGrid venueId={venueId} />
+      </motion.div>
+
+      {/* Environment & flow (WRI, PSV, GCR) */}
+      <motion.div variants={itemVariants}>
+        <EnvironmentalMetrics venueId={venueId} />
       </motion.div>
 
       {/* SECOND ROW: Heatmap + Tribe Analysis */}
@@ -511,44 +526,4 @@ export default function InsightsDashboard({ venueId }: { venueId?: string }) {
   return <InsightsDashboardContent venueId={venueId} />;
 }
 
-/**
- * GlassPanel - Reusable glassmorphism panel component
- */
-interface GlassPanelProps {
-  children: ReactNode;
-  className?: string;
-  hover?: boolean;
-  glow?: "purple" | "blue" | "green" | "none";
-}
-
-export function GlassPanel({
-  children,
-  className = "",
-  hover = true,
-  glow = "none",
-}: GlassPanelProps) {
-  const glowColors = {
-    purple: "hover:shadow-[0_0_30px_-5px_rgba(131,56,236,0.3)]",
-    blue: "hover:shadow-[0_0_30px_-5px_rgba(58,134,255,0.3)]",
-    green: "hover:shadow-[0_0_30px_-5px_rgba(34,197,94,0.3)]",
-    none: "",
-  };
-
-  return (
-    <motion.div
-      whileHover={hover ? { scale: 1.01, y: -2 } : undefined}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className={`
-        bg-white/5 backdrop-blur-md
-        border border-white/10
-        rounded-2xl
-        transition-all duration-300
-        ${hover ? "hover:bg-white/[0.07] hover:border-white/20" : ""}
-        ${glowColors[glow]}
-        ${className}
-      `}
-    >
-      {children}
-    </motion.div>
-  );
-}
+export { GlassPanel } from "./GlassPanel";
