@@ -30,6 +30,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
+import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 
 interface InsightsResponse {
   totalConnections: number;
@@ -38,9 +39,10 @@ interface InsightsResponse {
   peakHour: number;
   retentionRate: string;
   busiestDay: string;
+  status?: string;
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) => fetchInsightsApiJson<InsightsResponse>(url);
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -197,8 +199,8 @@ export default function SocialActivityPage() {
               Last 30 days
             </span>
           </div>
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[320px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
               <AreaChart data={dailyData}>
                 <defs>
                   <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -262,8 +264,8 @@ export default function SocialActivityPage() {
             <h3 className="text-base font-semibold text-white">Day-of-Week Pattern</h3>
             <p className="text-xs text-zinc-500 mt-0.5">Which days drive the most connections</p>
           </div>
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[220px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={dowData} barCategoryGap="30%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis
@@ -310,8 +312,8 @@ export default function SocialActivityPage() {
             <h3 className="text-base font-semibold text-white">Week-over-Week Comparison</h3>
             <p className="text-xs text-zinc-500 mt-0.5">Last 7 days vs. previous 7 days</p>
           </div>
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[220px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart
                 data={dailyData.slice(-7).map((d, i) => ({
                   day: DAYS[parseDateLocal(d.date).getDay()],
@@ -374,8 +376,8 @@ export default function SocialActivityPage() {
               {data?.peakHour ?? '—'}:00 peak
             </span>
           </div>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[200px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
               <BarChart
                 data={(data?.hourlyDistribution ?? []).map((count, hour) => ({ hour: `${hour}:00`, count, isHour: hour }))}
               >

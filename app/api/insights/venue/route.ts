@@ -1,74 +1,22 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
+import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                // @ts-ignore - ReadonlyRequestCookies doesn't have set, but we handle the error
-                (cookieStore as any).set(name, value, options),
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
-        },
-      },
-    );
-
-    // 1. Auth Check
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
 
     if (authError || !user) {
-      console.error("Auth Error:", authError);
+      if (authError) {
+        console.error("Auth Error:", authError);
+      }
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Role Check
-    // Query public.users table for role
-    const { data: userProfile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    console.log("User ID:", user.id);
-    console.log("User Email:", user.email);
-    console.log("Profile Query Result:", { userProfile, profileError });
-
-    // Allow specific emails for development/testing
-    const allowedDevEmails = ["timberlake2025@gmail.com"];
-    const isDevUser = allowedDevEmails.includes(user.email || "");
-
-    if (
-      !isDevUser &&
-      (profileError || userProfile?.role !== "verified_business")
-    ) {
+    const mayAccess = await userMayAccessBusinessInsights(supabase, user);
+    if (!mayAccess) {
       return NextResponse.json(
-        {
-          error: "Forbidden: Requires verified_business role",
-          debug: {
-            profileError: profileError?.message,
-            role: userProfile?.role,
-          },
-        },
+        { error: "Forbidden: Requires verified_business role" },
         { status: 403 },
       );
     }
@@ -82,47 +30,18 @@ export async function GET(request: Request) {
       venueId = user.user_metadata?.venue_id;
     }
 
-    // If no venue_id, return mock/demo data for development
+    // No venue linked — return empty aggregates (no demo/sample analytics).
     if (!venueId) {
-      // Return demo data for development/testing
-      const demoHourlyDistribution = [
-        2, 1, 0, 0, 0, 0, 1, 3, 8, 15, 22, 28, 35, 42, 38, 45, 52, 58, 65, 72,
-        68, 55, 42, 28,
-      ];
-      const demoDailyData: { date: string; count: number }[] = [];
-      const now = new Date();
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        demoDailyData.push({
-          date: date.toISOString().split("T")[0],
-          count: Math.floor(Math.random() * 30) + 10 + (i < 7 ? 15 : 0), // Higher recent activity
-        });
-      }
-
-      // Sort a copy so demoDailyData (date-ascending order) is NOT mutated
-      const busiestDemoEntry = [...demoDailyData].sort(
-        (a, b) => b.count - a.count,
-      )[0];
-      const busiestDemoDay = busiestDemoEntry
-        ? (() => {
-            const [y, m, d] = busiestDemoEntry.date.split("-").map(Number);
-            return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            });
-          })()
-        : "Saturday";
-
       return NextResponse.json({
-        totalConnections: 847,
-        hourlyDistribution: demoHourlyDistribution,
-        dailyData: demoDailyData,
-        peakHour: 19,
-        retentionRate: "68%",
-        busiestDay: busiestDemoDay,
-        isDemo: true,
+        status: "no_venue",
+        message:
+          "Link a venue to your account to see insights. Until then, charts stay empty.",
+        totalConnections: 0,
+        hourlyDistribution: new Array(24).fill(0),
+        dailyData: [] as { date: string; count: number }[],
+        peakHour: 0,
+        retentionRate: "0%",
+        busiestDay: "N/A",
       });
     }
 

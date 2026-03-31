@@ -61,7 +61,7 @@ interface BusinessInsightsShellProps {
  */
 export default function BusinessInsightsShell({
   children,
-  venueName = "The Neon Lounge",
+  venueName = "Insights",
 }: BusinessInsightsShellProps) {
   const pathname = usePathname();
   const router = useRouter();

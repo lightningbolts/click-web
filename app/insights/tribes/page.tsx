@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { Users2, Link2, TrendingUp, Info } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import TribeChart from '@/components/insights/TribeChart';
-import { mockTribes } from '@/lib/insights/mockData';
 import type { TribeBubble } from '@/lib/insights/mockData';
 import {
   RadarChart,
@@ -32,16 +31,20 @@ const itemVariants = {
 };
 
 export default function TribesPage() {
-  const tribes: TribeBubble[] = mockTribes;
+  const tribes: TribeBubble[] = [];
   const [selected, setSelected] = useState<TribeBubble | null>(null);
 
   const sorted = [...tribes].sort((a, b) => b.connections - a.connections);
   const totalConnections = tribes.reduce((s, t) => s + t.connections, 0);
-  const avgConnections = Math.round(totalConnections / tribes.length);
-  const mostOverlapping = tribes.reduce(
-    (max, t) => ((t.overlap?.length ?? 0) > (max.overlap?.length ?? 0) ? t : max),
-    tribes[0]
-  );
+  const avgConnections =
+    tribes.length > 0 ? Math.round(totalConnections / tribes.length) : 0;
+  const mostOverlapping =
+    tribes.length > 0
+      ? tribes.reduce((max, t) =>
+          (t.overlap?.length ?? 0) > (max.overlap?.length ?? 0) ? t : max,
+        tribes[0],
+      )
+      : null;
 
   // Connections bar data (top 6)
   const barData = sorted.slice(0, 6).map((t) => ({
@@ -50,11 +53,16 @@ export default function TribesPage() {
     color: t.color,
   }));
 
+  const maxTribeSize = tribes.length ? Math.max(...tribes.map((x) => x.size), 1) : 1;
+  const maxTribeConnections = tribes.length
+    ? Math.max(...tribes.map((x) => x.connections), 1)
+    : 1;
+
   // Radar chart: each tribe's relative size vs connections
   const radarData = sorted.slice(0, 6).map((t) => ({
     subject: t.name,
-    members: Math.round((t.size / Math.max(...tribes.map((x) => x.size))) * 100),
-    connections: Math.round((t.connections / Math.max(...tribes.map((x) => x.connections))) * 100),
+    members: Math.round((t.size / maxTribeSize) * 100),
+    connections: Math.round((t.connections / maxTribeConnections) * 100),
   }));
 
   return (
@@ -118,7 +126,13 @@ export default function TribesPage() {
 
       {/* Full tribe chart */}
       <motion.div variants={itemVariants}>
-        <TribeChart tribes={tribes} />
+        {tribes.length === 0 ? (
+          <GlassPanel className="p-8 text-center text-sm text-zinc-500">
+            Tribe clustering will show here once interest-tag data is available for your venue.
+          </GlassPanel>
+        ) : (
+          <TribeChart tribes={tribes} />
+        )}
       </motion.div>
 
       {/* Bottom row */}
@@ -167,8 +181,8 @@ export default function TribesPage() {
             <h3 className="text-base font-semibold text-white">Top Tribes by Connections</h3>
             <p className="text-xs text-zinc-500 mt-0.5">Connections formed within each community</p>
           </div>
-          <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[280px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <BarChart data={barData} layout="vertical" barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                 <XAxis

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   MessageSquare,
@@ -15,7 +14,6 @@ import {
 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import VibeStream from '@/components/insights/VibeStream';
-import { mockVibeStream } from '@/lib/insights/mockData';
 import type { VibeMessage } from '@/lib/insights/mockData';
 import {
   BarChart,
@@ -63,7 +61,7 @@ const SENTIMENT_CONFIG = {
 };
 
 export default function VibeStreamPage() {
-  const [messages, setMessages] = useState<VibeMessage[]>(mockVibeStream);
+  const messages: VibeMessage[] = [];
 
   // Sentiment counts
   const sentiment = {
@@ -71,7 +69,7 @@ export default function VibeStreamPage() {
     negative: messages.filter((m) => m.sentiment === 'negative').length,
     neutral: messages.filter((m) => m.sentiment === 'neutral').length,
   };
-  const total = messages.length || 1;
+  const total = Math.max(messages.length, 1);
   const positiveRatio = Math.round((sentiment.positive / total) * 100);
 
   // Category distribution
@@ -164,8 +162,8 @@ export default function VibeStreamPage() {
         <GlassPanel className="p-6 flex flex-col">
           <h3 className="text-base font-semibold text-white mb-4">Sentiment Breakdown</h3>
           <div className="flex-1 flex items-center justify-center">
-            <div className="w-full h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="w-full h-[220px] min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -218,8 +216,8 @@ export default function VibeStreamPage() {
               <p className="text-xs text-zinc-500 mt-0.5">Which aspects of your venue generate the most feedback</p>
             </div>
           </div>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[200px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
               <BarChart data={categoryData} barCategoryGap="35%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis

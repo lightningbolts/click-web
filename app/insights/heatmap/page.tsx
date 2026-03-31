@@ -5,9 +5,6 @@ import { motion } from 'framer-motion';
 import { MapPin, Flame, TrendingUp, BarChart2 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import HeatmapView from '@/components/insights/HeatmapView';
-import {
-  mockHeatmapZones,
-} from '@/lib/insights/mockData';
 import type { HeatmapZone } from '@/lib/insights/mockData';
 import {
   BarChart,
@@ -54,9 +51,10 @@ function IntensityBadge({ intensity }: { intensity: number }) {
 }
 
 export default function HeatmapPage() {
-  const zones: HeatmapZone[] = mockHeatmapZones;
+  const zones: HeatmapZone[] = [];
   const sorted = [...zones].sort((a, b) => b.connections - a.connections);
   const totalConnections = zones.reduce((s, z) => s + z.connections, 0);
+  const maxZoneConnections = sorted[0]?.connections ?? 1;
 
   // Type distribution chart data
   const typeDist = Object.entries(
@@ -121,7 +119,7 @@ export default function HeatmapPage() {
             <span className="text-xs text-zinc-400">Avg / Zone</span>
           </div>
           <div className="text-2xl font-bold text-white">
-            {Math.round(totalConnections / zones.length)}
+            {zones.length ? Math.round(totalConnections / zones.length) : 0}
           </div>
           <div className="text-xs text-zinc-500 mt-1">connections avg</div>
         </GlassPanel>
@@ -138,6 +136,11 @@ export default function HeatmapPage() {
         <GlassPanel className="p-6">
           <h3 className="text-base font-semibold text-white mb-4">Zone Rankings</h3>
           <div className="space-y-3">
+            {sorted.length === 0 ? (
+              <p className="text-sm text-zinc-500 py-6 text-center">
+                Zone-level heatmap data will appear when your venue has mapped check-ins.
+              </p>
+            ) : null}
             {sorted.map((zone, i) => (
               <div key={zone.id} className="flex items-center gap-3">
                 <span className="text-xs font-bold text-zinc-500 w-5">{i + 1}</span>
@@ -152,7 +155,7 @@ export default function HeatmapPage() {
                   <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${(zone.connections / sorted[0].connections) * 100}%` }}
+                      animate={{ width: `${(zone.connections / maxZoneConnections) * 100}%` }}
                       transition={{ duration: 0.8, delay: i * 0.06, ease: 'easeOut' }}
                       className="h-full rounded-full"
                       style={{ backgroundColor: TYPE_COLORS[zone.type] ?? '#8338EC' }}
@@ -170,8 +173,8 @@ export default function HeatmapPage() {
             <h3 className="text-base font-semibold text-white">Connections by Zone Type</h3>
             <p className="text-xs text-zinc-500 mt-0.5">Total connections grouped by venue area type</p>
           </div>
-          <div className="h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[240px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={typeDist} layout="vertical" barCategoryGap="25%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                 <XAxis

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Radio, Users, TrendingUp, Clock, Zap, BarChart3 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import { LiveCountCard } from '@/components/insights/StickyScoreCard';
-import { mockLiveCount } from '@/lib/insights/mockData';
+import { emptyLiveCount } from '@/lib/insights/mockData';
 import type { LiveCount } from '@/lib/insights/mockData';
 import {
   BarChart,
@@ -23,13 +23,14 @@ import {
   ReferenceLine,
 } from 'recharts';
 import useSWR from 'swr';
+import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 
 interface InsightsResponse {
   hourlyDistribution: number[];
   peakHour: number;
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) => fetchInsightsApiJson<InsightsResponse>(url);
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -42,21 +43,9 @@ const itemVariants = {
 
 export default function LiveMetricsPage() {
   const { data } = useSWR<InsightsResponse>('/api/insights/venue', fetcher);
-  const [liveCount, setLiveCount] = useState<LiveCount>(mockLiveCount);
+  const liveCount: LiveCount = useMemo(() => ({ ...emptyLiveCount }), []);
 
-  // Simulate live count updates
-  useEffect(() => {
-    const id = setInterval(() => {
-      setLiveCount((prev) => {
-        const delta = Math.floor(Math.random() * 11) - 5;
-        const next = Math.max(0, Math.min(prev.current + delta, prev.capacity));
-        return { ...prev, current: next, trend: [...prev.trend.slice(1), next] };
-      });
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-
-  const fillPct = Math.round((liveCount.current / liveCount.capacity) * 100);
+  const fillPct = Math.round((liveCount.current / Math.max(liveCount.capacity, 1)) * 100);
   const capacityColor =
     fillPct >= 90 ? '#ef4444' : fillPct >= 70 ? '#f59e0b' : fillPct >= 40 ? '#22c55e' : '#3A86FF';
 
@@ -176,8 +165,8 @@ export default function LiveMetricsPage() {
               Live
             </span>
           </div>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[200px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
               <AreaChart data={trendData}>
                 <defs>
                   <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
@@ -244,8 +233,8 @@ export default function LiveMetricsPage() {
               <span className="text-xs text-zinc-500">Avg across 30 days</span>
             </div>
           </div>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[200px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
               <BarChart data={hourlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis

@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import BusinessInsightsShell from '@/components/insights/BusinessInsightsShell';
+import InsightsAccessGate from '@/components/insights/InsightsAccessGate';
 import { useSearchParams } from 'next/navigation';
 
 function InsightsLayoutInner({ children }: { children: React.ReactNode }) {
@@ -15,18 +16,23 @@ function InsightsLayoutInner({ children }: { children: React.ReactNode }) {
   );
 }
 
+function InsightsLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-[#121212] text-white flex items-center justify-center">
+      <div className="h-10 w-10 rounded-full border-2 border-[#8338EC]/30 border-t-[#8338EC] animate-spin" />
+    </div>
+  );
+}
+
 /**
- * InsightsLayout — wraps all /insights/* pages with the business sub-navigation shell.
- * Reads venue name from ?venue= query param, falling back to a default.
+ * InsightsLayout — verified business only (InsightsAccessGate). Shell reads ?venue= for display name.
  */
 export default function InsightsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={
-      <BusinessInsightsShell venueName="Loading...">
-        {children}
-      </BusinessInsightsShell>
-    }>
-      <InsightsLayoutInner>{children}</InsightsLayoutInner>
-    </Suspense>
+    <InsightsAccessGate>
+      <Suspense fallback={<InsightsLoadingFallback />}>
+        <InsightsLayoutInner>{children}</InsightsLayoutInner>
+      </Suspense>
+    </InsightsAccessGate>
   );
 }

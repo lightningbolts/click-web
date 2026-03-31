@@ -64,8 +64,6 @@ function buildIncomingCallPushPayload(invite: WebCallInvite) {
   };
 }
 import {
-  mockConnections,
-  mockChapters,
   downloadCSV,
   generateChaptersFromConnections
 } from '@/lib/dashboard/mockData';
@@ -1086,10 +1084,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
       const fetchConnections = async () => {
         const supabase = getSupabaseClient();
         if (!supabase) {
-          setConnectionRecords(mockConnections);
-          setChapters(mockChapters);
+          setConnectionRecords([]);
+          setChapters(generateChaptersFromConnections([]));
           return;
         }
+
+        const setEmptyConnections = () => {
+          setConnectionRecords([]);
+          setChapters(generateChaptersFromConnections([]));
+        };
 
         try {
           const { data, error } = await supabase
@@ -1100,8 +1103,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
           if (error) {
             console.error('Error fetching connections:', error.message || error);
-            setConnectionRecords(mockConnections);
-            setChapters(mockChapters);
+            setEmptyConnections();
           } else if (data && data.length > 0) {
             // Resolve other user names from the users table
             const otherUserIds = data.flatMap((conn: any) =>
@@ -1209,13 +1211,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
             setConnectionRecords(records);
             setChapters(generateChaptersFromConnections(records));
           } else {
-            setConnectionRecords(mockConnections);
-            setChapters(mockChapters);
+            setEmptyConnections();
           }
         } catch (err) {
           console.error('Unexpected error fetching connections:', err);
-          setConnectionRecords(mockConnections);
-          setChapters(mockChapters);
+          setEmptyConnections();
         }
       };
 

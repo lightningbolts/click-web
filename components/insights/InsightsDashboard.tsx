@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
@@ -38,16 +38,13 @@ import HeatmapView from "./HeatmapView";
 import TribeChart from "./TribeChart";
 import VibeStream from "./VibeStream";
 
-// Import mock data
 import {
-  mockStickyScore,
-  mockConnectionDensity,
-  mockLiveCount,
-  mockHeatmapZones,
-  mockTribes,
-  mockVibeStream,
-  generateLiveUpdate,
+  emptyStickyScore,
+  emptyConnectionDensity,
+  emptyLiveCount,
 } from "@/lib/insights/mockData";
+import type { VibeMessage } from "@/lib/insights/mockData";
+import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 
 interface InsightsResponse {
   totalConnections: number;
@@ -60,18 +57,7 @@ interface InsightsResponse {
   message?: string;
 }
 
-const fetcher = (url: string) =>
-  fetch(url).then((res) => {
-    if (!res.ok) {
-      const error = new Error("An error occurred while fetching the data.");
-      // @ts-ignore
-      error.info = res.json();
-      // @ts-ignore
-      error.status = res.status;
-      throw error;
-    }
-    return res.json();
-  });
+const fetcher = (url: string) => fetchInsightsApiJson<InsightsResponse>(url);
 
 /**
  * InsightsSkeleton - Bento-grid loading skeleton with rounded corners
@@ -114,41 +100,16 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [liveCount, setLiveCount] = useState(mockLiveCount);
-  const [vibeMessages, setVibeMessages] = useState(mockVibeStream);
+  const liveCount = emptyLiveCount;
+  const vibeMessages: VibeMessage[] = [];
 
-  const apiUrl = venueId ? `/api/insights/${venueId}` : null;
+  const insightsUrl = venueId ? `/api/insights/${venueId}` : "/api/insights/venue";
   const { data: apiData, error, isLoading } = useSWR<InsightsResponse>(
-    user ? apiUrl : null,
+    user ? insightsUrl : null,
     fetcher,
   );
 
-  // Demo fallback data when no venueId is provided
-  const demoData: InsightsResponse = {
-    totalConnections: 284,
-    hourlyDistribution: [2, 1, 0, 0, 0, 1, 3, 5, 12, 18, 24, 31, 28, 22, 19, 25, 34, 42, 48, 39, 27, 18, 9, 4],
-    dailyData: Array.from({ length: 30 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (29 - i));
-      return { date: d.toISOString().split('T')[0], count: Math.floor(Math.random() * 15) + 3 };
-    }),
-    peakHour: 18,
-    retentionRate: '42.3%',
-    busiestDay: 'Friday',
-  };
-
-  const data = apiData || (venueId ? null : demoData);
-
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const update = generateLiveUpdate();
-      if (update.liveCount) {
-        setLiveCount(update.liveCount);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
+  const data = apiData;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -156,7 +117,7 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
     }
   }, [user, authLoading, router]);
 
-  if (authLoading || (isLoading && !error)) {
+  if (authLoading || !user || (isLoading && !error)) {
     return <InsightsSkeleton />;
   }
 
@@ -177,15 +138,40 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
               This dashboard is only available to verified business partners.
             </p>
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/")}
               className="bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
             >
-              Go to User Dashboard
+              Go to your dashboard
             </button>
           </motion.div>
         </div>
       );
     }
+
+    return (
+      <div className="flex items-center justify-center p-4 min-h-[400px]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl max-w-md text-center"
+        >
+          <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">
+            Could not load insights
+          </h1>
+          <p className="text-zinc-400 mb-6">
+            Something went wrong. Please refresh or try again later.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
+          >
+            Retry
+          </button>
+        </motion.div>
+      </div>
+    );
   }
 
   if (data?.status === "insufficient_data") {
@@ -205,10 +191,10 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
               "We need at least 5 connections to generate insights to protect user privacy."}
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/")}
             className="bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
           >
-            Back to Dashboard
+            Back to your dashboard
           </button>
         </motion.div>
       </div>
@@ -245,13 +231,22 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
       animate="visible"
       className="space-y-6"
     >
+      {data?.status === "no_venue" && data.message ? (
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95"
+        >
+          {data.message}
+        </motion.div>
+      ) : null}
+
       {/* TOP ROW: Metric Cards */}
       <motion.div
         variants={itemVariants}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
       >
-        <StickyScoreCard data={mockStickyScore} />
-        <ConnectionDensityCard data={mockConnectionDensity} />
+        <StickyScoreCard data={emptyStickyScore} />
+        <ConnectionDensityCard data={emptyConnectionDensity} />
         <LiveCountCard data={liveCount} />
       </motion.div>
 
@@ -260,8 +255,8 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
         variants={itemVariants}
         className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"
       >
-        <HeatmapView zones={mockHeatmapZones} />
-        <TribeChart tribes={mockTribes} />
+        <HeatmapView zones={[]} />
+        <TribeChart tribes={[]} />
       </motion.div>
 
       {/* THIRD ROW: Historical Charts + Vibe Stream */}
@@ -282,14 +277,11 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
             </div>
             <span className="text-xs text-zinc-500">Last 30 days</span>
           </div>
-          <div
-            className="h-[280px] w-full min-h-[280px]"
-            style={{ minWidth: "200px" }}
-          >
+          <div className="h-[280px] w-full min-h-[280px] min-w-0">
             <ResponsiveContainer
               width="100%"
               height="100%"
-              minWidth={200}
+              minWidth={0}
               minHeight={200}
             >
               <LineChart data={data?.dailyData || []}>
@@ -451,14 +443,11 @@ function InsightsDashboardContent({ venueId }: { venueId?: string }) {
             </div>
             <span className="text-xs text-zinc-500">Hourly distribution</span>
           </div>
-          <div
-            className="h-[200px] w-full min-h-[200px]"
-            style={{ minWidth: "200px" }}
-          >
+          <div className="h-[200px] w-full min-h-[200px] min-w-0">
             <ResponsiveContainer
               width="100%"
               height="100%"
-              minWidth={200}
+              minWidth={0}
               minHeight={150}
             >
               <BarChart data={hourlyData}>

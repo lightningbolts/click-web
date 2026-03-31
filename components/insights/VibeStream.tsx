@@ -99,6 +99,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
   };
 
   const totalMessages = messages.length;
+  const denom = Math.max(totalMessages, 1);
   const positiveRatio = totalMessages > 0 ? (stats.positive / totalMessages) * 100 : 0;
 
   return (
@@ -138,19 +139,19 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
         <div className="flex h-1.5 rounded-full overflow-hidden bg-white/5">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${(stats.positive / totalMessages) * 100}%` }}
+            animate={{ width: `${(stats.positive / denom) * 100}%` }}
             className="bg-green-500"
             transition={{ duration: 0.5 }}
           />
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${(stats.neutral / totalMessages) * 100}%` }}
+            animate={{ width: `${(stats.neutral / denom) * 100}%` }}
             className="bg-amber-500"
             transition={{ duration: 0.5, delay: 0.1 }}
           />
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${(stats.negative / totalMessages) * 100}%` }}
+            animate={{ width: `${(stats.negative / denom) * 100}%` }}
             className="bg-red-500"
             transition={{ duration: 0.5, delay: 0.2 }}
           />

@@ -8,12 +8,24 @@ import LoginModal from "@/components/LoginModal";
 import { usePathname, useRouter } from "next/navigation";
 import { User, LogOut, BarChart2 } from "lucide-react";
 import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
+import useSWR from "swr";
+import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
+
+type InsightsAccessPayload = { insightsAllowed: boolean };
+
+const insightsAccessFetcher = (url: string) =>
+  fetchInsightsApiJson<InsightsAccessPayload>(url);
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+
+  const { data: insightsAccess } = useSWR(
+    user ? "/api/user/insights-access" : null,
+    insightsAccessFetcher,
+  );
 
   // Hide on /insights — BusinessInsightsShell has its own sticky nav there
   if (pathname.startsWith("/insights")) return null;
@@ -46,14 +58,15 @@ export default function Navbar() {
         <div className="flex items-center gap-2 md:gap-6">
           {isLoggedInView ? (
             <>
-              {/* Business Insights link for verified businesses */}
-              <Link
-                href="/insights"
-                className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] hover:text-[#8338EC] transition-colors whitespace-nowrap"
-              >
-                <BarChart2 className="w-3 h-3 md:w-4 md:h-4" />
-                <span className="hidden sm:inline">Insights</span>
-              </Link>
+              {insightsAccess?.insightsAllowed ? (
+                <Link
+                  href="/insights"
+                  className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] hover:text-[#8338EC] transition-colors whitespace-nowrap"
+                >
+                  <BarChart2 className="w-3 h-3 md:w-4 md:h-4" />
+                  <span className="hidden sm:inline">Insights</span>
+                </Link>
+              ) : null}
               <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-zinc-400">
                 <User className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
                 <span className="truncate max-w-[100px] md:max-w-[200px]">

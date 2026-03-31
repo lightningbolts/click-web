@@ -330,6 +330,33 @@ export const mockVibeStream: VibeMessage[] = [
   },
 ];
 
+/** Neutral placeholders when the user has no venue data yet (no fake sample metrics). */
+export const emptyStickyScore: StickyScore = {
+  score: 0,
+  trend: 'stable',
+  change: 0,
+  breakdown: {
+    repeatVisitors: 0,
+    avgConnectionsPerVisit: 0,
+    communityEngagement: 0,
+  },
+};
+
+export const emptyConnectionDensity: ConnectionDensity = {
+  value: 0,
+  totalArea: 0,
+  activeZones: 0,
+  trend: 'stable',
+};
+
+export const emptyLiveCount: LiveCount = {
+  current: 0,
+  peak: 0,
+  peakTime: '—',
+  capacity: 1,
+  trend: Array(12).fill(0),
+};
+
 // Combined mock data export
 export const mockVenueInsights: VenueInsights = {
   stickyScore: mockStickyScore,
