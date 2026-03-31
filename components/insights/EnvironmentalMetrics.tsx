@@ -136,8 +136,8 @@ export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) 
             <p className="text-xs text-zinc-500 mb-3">
               Velocity {(psv.velocity ?? 0).toFixed(2)}× vs average hour · {psv.numDistinctDays} active days
             </p>
-            <div className="h-[100px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <div className="w-full min-w-0 overflow-hidden">
+              <ResponsiveContainer width="100%" height={100} minWidth={0} minHeight={80}>
                 <LineChart data={sparkData} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                   <XAxis dataKey="hour" hide />
                   <Tooltip

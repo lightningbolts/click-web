@@ -292,10 +292,10 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             </div>
             <span className="text-xs text-zinc-500">Last 30 days</span>
           </div>
-          <div className="h-[280px] w-full min-h-[280px] min-w-0">
+          <div className="w-full min-w-0 overflow-hidden">
             <ResponsiveContainer
               width="100%"
-              height="100%"
+              height={280}
               minWidth={0}
               minHeight={200}
             >
@@ -458,10 +458,10 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             </div>
             <span className="text-xs text-zinc-500">Hourly distribution</span>
           </div>
-          <div className="h-[200px] w-full min-h-[200px] min-w-0">
+          <div className="w-full min-w-0 overflow-hidden">
             <ResponsiveContainer
               width="100%"
-              height="100%"
+              height={200}
               minWidth={0}
               minHeight={150}
             >

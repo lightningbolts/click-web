@@ -44,12 +44,12 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   if (pathname === '/insights' || pathname.startsWith('/insights/')) {
     const signupUrl = new URL('/business/signup', request.url);
+
+    // Browser auth uses implicit flow + localStorage (see lib/supabase.ts). Middleware only
+    // sees cookie-based sessions, so getUser() is often null even when the user is signed in.
+    // Defer to client-side InsightsAccessGate + /api/user/insights-access (Bearer from client).
     if (!user) {
-      const redirect = NextResponse.redirect(signupUrl);
-      response.cookies.getAll().forEach((c) => {
-        redirect.cookies.set(c.name, c.value);
-      });
-      return redirect;
+      return response;
     }
 
     const allowed = await userMayAccessBusinessInsights(supabase, user);
