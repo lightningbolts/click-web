@@ -1123,150 +1123,171 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
   };
 
-  // Fetch user connections
-  useEffect(() => {
-    if (user) {
-      const fetchConnections = async () => {
-        const supabase = getSupabaseClient();
-        if (!supabase) {
-          setConnectionRecords([]);
-          setChapters(generateChaptersFromConnections([]));
-          return;
-        }
+  const loadConnections = useCallback(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !user?.id) {
+      setConnectionRecords([]);
+      setChapters(generateChaptersFromConnections([]));
+      return;
+    }
 
-        const setEmptyConnections = () => {
-          setConnectionRecords([]);
-          setChapters(generateChaptersFromConnections([]));
-        };
+    const setEmptyConnections = () => {
+      setConnectionRecords([]);
+      setChapters(generateChaptersFromConnections([]));
+    };
 
-        try {
-          const { data, error } = await supabase
-            .from('connections')
-            .select('*')
-            .contains('user_ids', [user.id])
-            .order('created', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('connections')
+        .select('*')
+        .contains('user_ids', [user.id])
+        .order('created', { ascending: false });
 
-          if (error) {
-            console.error('Error fetching connections:', error.message || error);
-            setEmptyConnections();
-          } else if (data && data.length > 0) {
-            // Resolve other user names from the users table
-            const otherUserIds = data.flatMap((conn: any) =>
-              (conn.user_ids || []).filter((id: string) => id !== user.id)
-            ).filter((id: string, i: number, arr: string[]) => arr.indexOf(id) === i);
+      if (error) {
+        console.error('Error fetching connections:', error.message || error);
+        setEmptyConnections();
+      } else if (data && data.length > 0) {
+        // Resolve other user names from the users table
+        const otherUserIds = data.flatMap((conn: any) =>
+          (conn.user_ids || []).filter((id: string) => id !== user.id)
+        ).filter((id: string, i: number, arr: string[]) => arr.indexOf(id) === i);
 
-            let userNameMap: Record<string, string> = {};
-            if (otherUserIds.length > 0) {
-              // Resolve names through the server so we can fall back to auth metadata
-              // when profile rows are incomplete.
-              try {
-                const nameRes = await fetch('/api/users/display-names', {
-                  method: 'POST',
-                  headers: await getAuthHeaders(),
-                  body: JSON.stringify({ userIds: otherUserIds }),
-                });
-                if (nameRes.ok) {
-                  const payload = await nameRes.json();
-                  userNameMap = payload?.names ?? {};
-                }
-              } catch {
-                // Fall through to direct DB lookup below.
-              }
+        let userNameMap: Record<string, string> = {};
+        if (otherUserIds.length > 0) {
+          // Resolve names through the server so we can fall back to auth metadata
+          // when profile rows are incomplete.
+          try {
+            const nameRes = await fetch('/api/users/display-names', {
+              method: 'POST',
+              headers: await getAuthHeaders(),
+              body: JSON.stringify({ userIds: otherUserIds }),
+            });
+            if (nameRes.ok) {
+              const payload = await nameRes.json();
+              userNameMap = payload?.names ?? {};
+            }
+          } catch {
+            // Fall through to direct DB lookup below.
+          }
 
-              if (Object.keys(userNameMap).length === 0) {
-                // Fallback path if the server helper is unavailable.
-                let usersData: any[] | null = null;
-                const { data: d1, error: e1 } = await supabase
-                  .from('users')
-                  .select('id, name, full_name, first_name, last_name, email')
-                  .in('id', otherUserIds);
-                if (!e1 && d1) {
-                  usersData = d1;
-                } else {
-                  const { data: d2 } = await supabase
-                    .from('users')
-                    .select('id, name, email')
-                    .in('id', otherUserIds);
-                  usersData = d2;
-                }
-
-                if (usersData) {
-                  userNameMap = Object.fromEntries(
-                    usersData.map((u: any) => {
-                      const fromParts = [u.first_name, u.last_name]
-                        .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
-                        .join(' ')
-                        .trim();
-                      const resolvedName =
-                        fromParts ||
-                        (typeof u.full_name === 'string' && u.full_name.trim()) ||
-                        (typeof u.name === 'string' && u.name.trim()) ||
-                        (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
-                        '';
-                      return [u.id, resolvedName];
-                    })
-                  );
-                }
-              }
+          if (Object.keys(userNameMap).length === 0) {
+            // Fallback path if the server helper is unavailable.
+            let usersData: any[] | null = null;
+            const { data: d1, error: e1 } = await supabase
+              .from('users')
+              .select('id, name, full_name, first_name, last_name, email')
+              .in('id', otherUserIds);
+            if (!e1 && d1) {
+              usersData = d1;
+            } else {
+              const { data: d2 } = await supabase
+                .from('users')
+                .select('id, name, email')
+                .in('id', otherUserIds);
+              usersData = d2;
             }
 
-            const records: ConnectionRecord[] = data.map((conn: any) => {
-              // Resolve the other user's name
-              const otherUserId = (conn.user_ids || []).find((id: string) => id !== user.id);
-              const otherUserName = (otherUserId && userNameMap[otherUserId]) || null;
-
-              // Parse geo_location — DB stores { lat, lon }, filter out invalid coords
-              let geoLoc: { latitude: number; longitude: number } | undefined;
-              if (conn.geo_location) {
-                const rawLat = conn.geo_location.lat ?? conn.geo_location.latitude;
-                const rawLon = conn.geo_location.lon ?? conn.geo_location.longitude ?? conn.geo_location.lng ?? conn.geo_location.long;
-                const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
-                const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
-                if (
-                  typeof lat === 'number' && typeof lon === 'number' &&
-                  isFinite(lat) && isFinite(lon) &&
-                  !(lat === 0 && lon === 0)
-                ) {
-                  geoLoc = { latitude: lat, longitude: lon };
-                }
-              }
-
-              const displayName =
-                (typeof otherUserName === 'string' && otherUserName.trim()) ||
-                'Connection';
-
-              const raw = conn as Record<string, unknown>;
-
-              return {
-                id: conn.id,
-                otherUserId,
-                userIds: conn.user_ids || [],
-                name: displayName,
-                dateMet: new Date(conn.created_utc || conn.created || conn.created_at),
-                location: conn.semantic_location || 'Unknown location',
-                context: extractEventContext(raw),
-                weatherSummary: extractWeatherSummary(raw),
-                noiseSummary: extractNoiseSummary(raw),
-                noiseCategory: normalizeNoiseCategory(raw),
-                status: conn.status || 'kept',
-                geo_location: geoLoc,
-              };
-            });
-
-            setConnectionRecords(records);
-            setChapters(generateChaptersFromConnections(records));
-          } else {
-            setEmptyConnections();
+            if (usersData) {
+              userNameMap = Object.fromEntries(
+                usersData.map((u: any) => {
+                  const fromParts = [u.first_name, u.last_name]
+                    .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
+                    .join(' ')
+                    .trim();
+                  const resolvedName =
+                    fromParts ||
+                    (typeof u.full_name === 'string' && u.full_name.trim()) ||
+                    (typeof u.name === 'string' && u.name.trim()) ||
+                    (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
+                    '';
+                  return [u.id, resolvedName];
+                })
+              );
+            }
           }
-        } catch (err) {
-          console.error('Unexpected error fetching connections:', err);
-          setEmptyConnections();
         }
-      };
 
-      fetchConnections();
+        const records: ConnectionRecord[] = data.map((conn: any) => {
+          // Resolve the other user's name
+          const otherUserId = (conn.user_ids || []).find((id: string) => id !== user.id);
+          const otherUserName = (otherUserId && userNameMap[otherUserId]) || null;
+
+          // Parse geo_location — DB stores { lat, lon }, filter out invalid coords
+          let geoLoc: { latitude: number; longitude: number } | undefined;
+          if (conn.geo_location) {
+            const rawLat = conn.geo_location.lat ?? conn.geo_location.latitude;
+            const rawLon = conn.geo_location.lon ?? conn.geo_location.longitude ?? conn.geo_location.lng ?? conn.geo_location.long;
+            const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+            const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
+            if (
+              typeof lat === 'number' && typeof lon === 'number' &&
+              isFinite(lat) && isFinite(lon) &&
+              !(lat === 0 && lon === 0)
+            ) {
+              geoLoc = { latitude: lat, longitude: lon };
+            }
+          }
+
+          const displayName =
+            (typeof otherUserName === 'string' && otherUserName.trim()) ||
+            'Connection';
+
+          const raw = conn as Record<string, unknown>;
+
+          return {
+            id: conn.id,
+            otherUserId,
+            userIds: conn.user_ids || [],
+            name: displayName,
+            dateMet: new Date(conn.created_utc || conn.created || conn.created_at),
+            location: conn.semantic_location || 'Unknown location',
+            context: extractEventContext(raw),
+            weatherSummary: extractWeatherSummary(raw),
+            noiseSummary: extractNoiseSummary(raw),
+            noiseCategory: normalizeNoiseCategory(raw),
+            status: conn.status || 'kept',
+            geo_location: geoLoc,
+          };
+        });
+
+        setConnectionRecords(records);
+        setChapters(generateChaptersFromConnections(records));
+      } else {
+        setEmptyConnections();
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching connections:', err);
+      setEmptyConnections();
     }
   }, [user, getAuthHeaders]);
+
+  // Fetch user connections (initial load)
+  useEffect(() => {
+    if (!user) return;
+    void loadConnections();
+  }, [user, loadConnections]);
+
+  // Stay in sync when a new connection is created or updated (e.g. app user scans this user’s web QR)
+  useEffect(() => {
+    if (!user?.id) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel(`dashboard-connections:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'connections' },
+        () => {
+          void loadConnections();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id, loadConnections]);
 
   // Handle CSV export
   const handleExport = useCallback(() => {
