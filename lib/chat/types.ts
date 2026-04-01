@@ -21,7 +21,22 @@ export interface Chat {
   updated_at: number;
 }
 
-export type MessageType = 'text' | 'call_log';
+/**
+ * Aligned with `public.messages.message_type` (lowercase text column) and KMP `ChatMessageType`.
+ */
+export type MessageType = 'text' | 'image' | 'audio' | 'call_log';
+
+/** Structured fields stored in `messages.metadata` for media (matches mobile `MessageMediaMetadata`). */
+export interface MessageMediaMetadata {
+  media_url?: string;
+  /** Voice note length in seconds (optional). */
+  duration_seconds?: number;
+  /** Reply threading (existing). */
+  reply_to_id?: string;
+  reply_to_content?: string;
+  /** Call log / other keys remain loose. */
+  [key: string]: unknown;
+}
 
 export interface Message {
   id: string;
@@ -32,8 +47,8 @@ export interface Message {
   time_edited: number | null;
   is_read: boolean;
   message_type: MessageType;
-  /** Server jsonb; call_log uses e.g. { call_state, duration_seconds } */
-  metadata: any;
+  /** Server jsonb: media uses `media_url`, `duration_seconds`; call_log uses call_state, etc. */
+  metadata: MessageMediaMetadata;
   /** client-side enrichment: reactions keyed by reaction_type */
   reactions?: Record<string, MessageReaction[]>;
 }

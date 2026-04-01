@@ -16,6 +16,8 @@ import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight } from 'lucide
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
+import { LinkifiedText } from '@/lib/chat/linkify';
+import { durationSecondsFromMetadata, mediaUrlFromMetadata } from '@/lib/chat/mediaMetadata';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
 
@@ -65,6 +67,22 @@ function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
 
 function formatMessageTimeLabel(ms: number) {
   return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function formatAudioDurationLabel(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m > 0 ? `${m}:${r.toString().padStart(2, '0')}` : `${r}s`;
 }
 
 /**
@@ -264,6 +282,9 @@ export default function MessageBubble({
 
   const timeLabel = formatMessageTimeLabel(message.time_created);
   const replyMeta = getReplyFromMetadata(message.metadata);
+  const mediaUrl = mediaUrlFromMetadata(message.metadata);
+  const audioDuration = durationSecondsFromMetadata(message.metadata);
+  const linkVariant = isMine ? 'mine' : 'theirs';
 
   const pickerToolbarDock = useMemo(() => {
     if (!showActions || !actionBarGeom) return null;
@@ -348,7 +369,59 @@ export default function MessageBubble({
                 <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
               </div>
             )}
-            {message.content}
+            {message.message_type === 'image' && (
+              <>
+                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs are dynamic per project
+                  <img
+                    src={mediaUrl}
+                    alt=""
+                    className="max-h-64 max-w-full rounded-xl object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <p className={`text-xs ${isMine ? 'text-white/80' : 'text-zinc-400'}`}>Photo unavailable</p>
+                )}
+                {message.content.trim() ? (
+                  <div className="mt-2 leading-relaxed break-words">
+                    <LinkifiedText text={message.content} variant={linkVariant} />
+                  </div>
+                ) : null}
+              </>
+            )}
+            {message.message_type === 'audio' && (
+              <>
+                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
+                  <audio
+                    controls
+                    preload="metadata"
+                    src={mediaUrl}
+                    className={`mt-0.5 w-full max-w-[min(100%,260px)] h-9 rounded-lg ${
+                      isMine ? '[&::-webkit-media-controls-panel]:bg-white/10' : ''
+                    }`}
+                  />
+                ) : (
+                  <p className={`text-xs ${isMine ? 'text-white/80' : 'text-zinc-400'}`}>
+                    Voice message unavailable
+                  </p>
+                )}
+                {typeof audioDuration === 'number' && audioDuration > 0 ? (
+                  <span
+                    className={`mt-1 block text-[10px] opacity-70 ${isMine ? 'text-white/80' : 'text-zinc-500'}`}
+                  >
+                    {formatAudioDurationLabel(audioDuration)}
+                  </span>
+                ) : null}
+                {message.content.trim() ? (
+                  <div className="mt-2 leading-relaxed break-words">
+                    <LinkifiedText text={message.content} variant={linkVariant} />
+                  </div>
+                ) : null}
+              </>
+            )}
+            {message.message_type === 'text' && (
+              <LinkifiedText text={message.content} variant={linkVariant} />
+            )}
             {message.time_edited && (
               <span className="ml-2 text-[10px] opacity-60 italic">edited</span>
             )}
@@ -400,25 +473,25 @@ export default function MessageBubble({
                   Reply
                 </button>
               )}
+              {isMine && message.message_type === 'text' && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(message.id, message.content)}
+                  className="shrink-0 p-1 rounded-full hover:bg-[#3A86FF]/20 text-zinc-400 hover:text-[#3A86FF] transition-colors"
+                  title="Edit"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
               {isMine && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onEdit(message.id, message.content)}
-                    className="shrink-0 p-1 rounded-full hover:bg-[#3A86FF]/20 text-zinc-400 hover:text-[#3A86FF] transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(message.id)}
-                    className="shrink-0 p-1 rounded-full hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => onDelete(message.id)}
+                  className="shrink-0 p-1 rounded-full hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               )}
               </motion.div>
             </div>,

@@ -166,17 +166,45 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ messages: enriched });
 }
 
+function parsePostMessageType(raw: unknown): MessageType {
+  const s = typeof raw === 'string' ? raw.toLowerCase() : '';
+  if (s === 'call_log') return 'call_log';
+  if (s === 'image') return 'image';
+  if (s === 'audio') return 'audio';
+  return 'text';
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const { chatId, connectionId, content, message_type: rawMessageType, metadata } = body;
-  const messageType: MessageType = rawMessageType === 'call_log' ? 'call_log' : 'text';
+  const messageType = parsePostMessageType(rawMessageType);
   const isCallLog = messageType === 'call_log';
+  const isMedia = messageType === 'image' || messageType === 'audio';
 
   if (!chatId && !connectionId) {
     return NextResponse.json({ error: 'chatId or connectionId is required' }, { status: 400 });
   }
-  if (!isCallLog && !content?.trim()) {
-    return NextResponse.json({ error: 'chatId or connectionId and content are required' }, { status: 400 });
+
+  const meta =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? (metadata as Record<string, unknown>)
+      : {};
+  const mediaUrl = typeof meta.media_url === 'string' ? meta.media_url.trim() : '';
+
+  if (isCallLog) {
+    // call_log rows may use empty content
+  } else if (isMedia) {
+    if (!mediaUrl) {
+      return NextResponse.json(
+        { error: 'metadata.media_url is required for image and audio messages' },
+        { status: 400 },
+      );
+    }
+  } else {
+    const c = typeof content === 'string' ? content : '';
+    if (!c.trim()) {
+      return NextResponse.json({ error: 'chatId or connectionId and content are required' }, { status: 400 });
+    }
   }
 
   const { user, supabase, token } = await getAuthenticatedSupabase(req);
@@ -189,14 +217,14 @@ export async function POST(req: NextRequest) {
     }
 
     const now = Date.now();
-    const wireContent =
-      typeof content === 'string' && content.startsWith('e2e:')
-        ? content
-        : isCallLog
-          ? typeof content === 'string'
-            ? content
-            : ''
-          : String(content).trim();
+    const rawContent = typeof content === 'string' ? content : '';
+    const wireContent = rawContent.startsWith('e2e:')
+      ? rawContent
+      : isCallLog
+        ? rawContent
+        : isMedia
+          ? rawContent.trim()
+          : rawContent.trim();
 
     const insertRow = buildMessageInsertRow({
       chatId: resolvedChatId,

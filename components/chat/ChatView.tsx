@@ -3,10 +3,32 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Send, Loader2, AlertCircle, ChevronDown, MapPin, Calendar, MoreHorizontal, Archive, UserMinus, Flag, Shield, ShieldOff, Phone, Video } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Loader2,
+  AlertCircle,
+  ChevronDown,
+  MapPin,
+  Calendar,
+  MoreHorizontal,
+  Archive,
+  UserMinus,
+  Flag,
+  Shield,
+  ShieldOff,
+  Phone,
+  Video,
+  ImagePlus,
+  Mic,
+  Square,
+  X,
+} from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import { normalizeDbMessage } from '@/lib/chat/messages';
+import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
+import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
@@ -152,16 +174,27 @@ export default function ChatView({
   const [showCallMenu, setShowCallMenu] = useState(false);
   const [e2eKeys, setE2eKeys] = useState<DerivedKeys | null>(null);
   const [replyBannerText, setReplyBannerText] = useState('');
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingMs, setRecordingMs] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   /** Glass messages card — clip portaled message menus to this region. */
   const messagesPanelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputTextRef = useRef('');
   const channelRef = useRef<ReturnType<typeof getSupabaseClient> extends null ? never : any>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callMenuAnchorRef = useRef<HTMLDivElement>(null);
   const headerMenuAnchorRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<BlobPart[]>([]);
+  const recordingMimeRef = useRef<string>('audio/webm');
+  const recordingStartedAtRef = useRef<number>(0);
+  const voiceCancelRef = useRef(false);
   const [callMenuPos, setCallMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -233,6 +266,30 @@ export default function ChatView({
     };
   }, []);
 
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
+
+  const appendReplyToMetadata = useCallback(
+    async (meta: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      if (!replyingTo || replyingTo.message_type === 'call_log') return meta;
+      let snippetSource = replyingTo.content;
+      if (e2eKeys && isEncrypted(replyingTo.content)) {
+        snippetSource = await decryptContent(replyingTo.content, e2eKeys);
+      }
+      const replyLabel =
+        replyingTo.message_type === 'image' || replyingTo.message_type === 'audio'
+          ? previewLabelForMessage({ ...replyingTo, content: snippetSource })
+          : snippetSource;
+      return {
+        ...meta,
+        reply_to_id: replyingTo.id,
+        reply_to_content: replySnippetForSend(replyLabel, 140),
+      };
+    },
+    [replyingTo, e2eKeys],
+  );
+
   // ─────────────────────────── helpers ────────────────────────────────────
 
   const scrollToBottom = useCallback((smooth = true) => {
@@ -259,6 +316,31 @@ export default function ChatView({
       setReplyBannerText('');
       return;
     }
+    if (replyingTo.message_type === 'image' || replyingTo.message_type === 'audio') {
+      const raw = replyingTo.content;
+      if (!isEncrypted(raw)) {
+        setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: raw }));
+        return;
+      }
+      if (!e2eKeys) {
+        setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: '' }));
+        return;
+      }
+      let cancelled = false;
+      decryptContent(raw, e2eKeys).then(
+        (plain) => {
+          if (!cancelled) {
+            setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: plain }));
+          }
+        },
+        () => {
+          if (!cancelled) setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: '' }));
+        },
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
     const raw = replyingTo.content;
     if (!isEncrypted(raw)) {
       setReplyBannerText(replySnippetForSend(raw, 120));
@@ -281,6 +363,16 @@ export default function ChatView({
       cancelled = true;
     };
   }, [replyingTo, e2eKeys]);
+
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingMs(0);
+      return;
+    }
+    const t0 = Date.now();
+    const id = window.setInterval(() => setRecordingMs(Date.now() - t0), 200);
+    return () => clearInterval(id);
+  }, [isRecording]);
 
   // ─────────────────────────── init: get/create chat ───────────────────────
 
@@ -506,7 +598,7 @@ export default function ChatView({
 
   const sendMessage = useCallback(async () => {
     const content = inputText.trim();
-    if (!content || !chatId || sending) return;
+    if (!content || !chatId || sending || mediaBusy || isRecording) return;
 
     setSending(true);
     setInputText('');
@@ -515,17 +607,10 @@ export default function ChatView({
     try {
       const wireContent = e2eKeys ? await encryptContent(content, e2eKeys) : content;
       const headers = await getAuthHeaders();
-      let metadata: { reply_to_id: string; reply_to_content: string } | undefined;
-      if (replyingTo && replyingTo.message_type !== 'call_log') {
-        let snippetSource = replyingTo.content;
-        if (e2eKeys && isEncrypted(replyingTo.content)) {
-          snippetSource = await decryptContent(replyingTo.content, e2eKeys);
-        }
-        metadata = {
-          reply_to_id: replyingTo.id,
-          reply_to_content: replySnippetForSend(snippetSource, 140),
-        };
-      }
+      const metadata =
+        replyingTo && replyingTo.message_type !== 'call_log'
+          ? await appendReplyToMetadata({})
+          : undefined;
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
@@ -533,7 +618,7 @@ export default function ChatView({
           chatId,
           connectionId: connection.id,
           content: wireContent,
-          ...(metadata ? { metadata } : {}),
+          ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
         }),
       });
       if (!res.ok) throw new Error('Send failed');
@@ -544,7 +629,181 @@ export default function ChatView({
     } finally {
       setSending(false);
     }
-  }, [inputText, chatId, sending, e2eKeys, replyingTo, connection.id]);
+  }, [
+    inputText,
+    chatId,
+    sending,
+    mediaBusy,
+    isRecording,
+    e2eKeys,
+    replyingTo,
+    connection.id,
+    getAuthHeaders,
+    appendReplyToMetadata,
+  ]);
+
+  const uploadAndSendVoice = useCallback(
+    async (blob: Blob, durationSeconds: number) => {
+      if (!chatId) return;
+      setMediaBusy(true);
+      try {
+        const caption = inputTextRef.current.trim();
+        setInputText('');
+        const wireContent =
+          e2eKeys && caption ? await encryptContent(caption, e2eKeys) : caption;
+        const { publicUrl } = await uploadChatMediaBlob(
+          currentUserId,
+          blob,
+          blob.type || recordingMimeRef.current || 'audio/webm',
+        );
+        const headers = await getAuthHeaders();
+        const metadata = await appendReplyToMetadata({
+          media_url: publicUrl,
+          duration_seconds: durationSeconds,
+        });
+        const res = await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chatId,
+            connectionId: connection.id,
+            content: wireContent,
+            message_type: 'audio',
+            metadata,
+          }),
+        });
+        if (!res.ok) throw new Error('Send failed');
+        setReplyingTo(null);
+      } catch (err) {
+        console.error('Voice send error:', err);
+        setActionToast({ type: 'error', message: 'Could not send voice message' });
+      } finally {
+        setMediaBusy(false);
+      }
+    },
+    [
+      chatId,
+      currentUserId,
+      connection.id,
+      e2eKeys,
+      getAuthHeaders,
+      appendReplyToMetadata,
+    ],
+  );
+
+  const beginVoiceRecording = useCallback(async () => {
+    if (!chatId || sending || mediaBusy || isRecording) return;
+    voiceCancelRef.current = false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const preferred =
+        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm')
+            ? 'audio/webm'
+            : '';
+      const mr = preferred
+        ? new MediaRecorder(stream, { mimeType: preferred })
+        : new MediaRecorder(stream);
+      recordingMimeRef.current = mr.mimeType || 'audio/webm';
+      recordingChunksRef.current = [];
+      recordingStartedAtRef.current = Date.now();
+      mr.ondataavailable = (ev) => {
+        if (ev.data.size > 0) recordingChunksRef.current.push(ev.data);
+      };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+        if (voiceCancelRef.current) {
+          voiceCancelRef.current = false;
+          return;
+        }
+        const blob = new Blob(recordingChunksRef.current, { type: recordingMimeRef.current });
+        recordingChunksRef.current = [];
+        if (blob.size < 32) return;
+        const elapsedSec = Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000));
+        void uploadAndSendVoice(blob, elapsedSec);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start(400);
+      setIsRecording(true);
+    } catch {
+      setActionToast({ type: 'error', message: 'Microphone access denied or unavailable' });
+    }
+  }, [chatId, sending, mediaBusy, isRecording, uploadAndSendVoice]);
+
+  const stopVoiceRecording = useCallback(() => {
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') mr.stop();
+  }, []);
+
+  const cancelVoiceRecording = useCallback(() => {
+    voiceCancelRef.current = true;
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') mr.stop();
+    else {
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      voiceCancelRef.current = false;
+    }
+  }, []);
+
+  const onPhotoSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file || !chatId || sending || mediaBusy || isRecording) return;
+      if (!file.type.startsWith('image/')) {
+        setActionToast({ type: 'error', message: 'Please choose an image file' });
+        return;
+      }
+      setMediaBusy(true);
+      inputRef.current?.focus();
+      try {
+        const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
+        const caption = inputTextRef.current.trim();
+        setInputText('');
+        const wireContent =
+          e2eKeys && caption ? await encryptContent(caption, e2eKeys) : caption;
+        const headers = await getAuthHeaders();
+        const metadata = await appendReplyToMetadata({ media_url: publicUrl });
+        const res = await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chatId,
+            connectionId: connection.id,
+            content: wireContent,
+            message_type: 'image',
+            metadata,
+          }),
+        });
+        if (!res.ok) throw new Error('Send failed');
+        setReplyingTo(null);
+      } catch (err) {
+        console.error('Photo send error:', err);
+        setActionToast({ type: 'error', message: 'Could not send photo' });
+      } finally {
+        setMediaBusy(false);
+      }
+    },
+    [
+      chatId,
+      sending,
+      mediaBusy,
+      isRecording,
+      currentUserId,
+      e2eKeys,
+      connection.id,
+      getAuthHeaders,
+      appendReplyToMetadata,
+    ],
+  );
 
   // Broadcast typing indicator
   const broadcastTyping = useCallback(() => {
@@ -1114,9 +1373,60 @@ export default function ChatView({
             </button>
           </div>
         )}
-        <div className="flex w-full items-end gap-3 min-w-0">
+        <div className="flex w-full items-end gap-2 sm:gap-3 min-w-0">
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={onPhotoSelected}
+          />
+          <div className="flex shrink-0 flex-row items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={!chatId || sending || mediaBusy || isRecording}
+              className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Attach photo"
+            >
+              {mediaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+            </button>
+            {!isRecording ? (
+              <button
+                type="button"
+                onClick={() => void beginVoiceRecording()}
+                disabled={!chatId || sending || mediaBusy}
+                className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Record voice message"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            ) : (
+              <>
+                <span className="text-[10px] font-mono text-red-400 tabular-nums min-w-[2.5rem] text-center">
+                  {`${Math.floor(recordingMs / 60000)}:${String(Math.floor((recordingMs % 60000) / 1000)).padStart(2, '0')}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={stopVoiceRecording}
+                  className="p-2.5 rounded-xl bg-[#8338EC]/25 text-[#8338EC] border border-[#8338EC]/40"
+                  title="Stop and send"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelVoiceRecording}
+                  className="p-2.5 rounded-xl border border-zinc-700/60 text-zinc-500 hover:text-white hover:bg-zinc-800"
+                  title="Cancel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
           <div className="flex-1 flex items-center bg-zinc-900/60 border border-zinc-700/50 
-            rounded-xl px-4 py-[7px] focus-within:border-[#8338EC]/50 transition-colors">
+            rounded-xl px-4 py-[7px] focus-within:border-[#8338EC]/50 transition-colors min-w-0">
             <textarea
               ref={inputRef}
               value={inputText}
@@ -1128,7 +1438,11 @@ export default function ChatView({
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
               }}
               onKeyDown={handleKeyDown}
-              placeholder={`Message ${otherUserName}…`}
+              placeholder={
+                isRecording
+                  ? 'Optional caption…'
+                  : `Message ${otherUserName}…`
+              }
               rows={1}
               className="w-full resize-none bg-transparent text-sm text-white placeholder-zinc-600 
                 focus:outline-none leading-relaxed"
@@ -1139,7 +1453,7 @@ export default function ChatView({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={sendMessage}
-            disabled={!inputText.trim() || sending}
+            disabled={!inputText.trim() || sending || mediaBusy || isRecording}
             className="p-3 rounded-xl bg-gradient-to-br from-[#8338EC] to-[#6520c0] 
               hover:from-[#9b4dff] hover:to-[#7b30e0] disabled:opacity-30 
               disabled:cursor-not-allowed transition-all shrink-0 glow-violet"

@@ -5,12 +5,16 @@
 import type { Message, MessageType } from '@/lib/chat/types';
 
 export function coerceMessageType(value: unknown): MessageType {
-  return value === 'call_log' ? 'call_log' : 'text';
+  const s = typeof value === 'string' ? value.toLowerCase() : '';
+  if (s === 'call_log') return 'call_log';
+  if (s === 'image') return 'image';
+  if (s === 'audio') return 'audio';
+  return 'text';
 }
 
-export function coerceMetadata(value: unknown): Record<string, unknown> {
+export function coerceMetadata(value: unknown): Message['metadata'] {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
+    return value as Message['metadata'];
   }
   return {};
 }
@@ -39,7 +43,7 @@ export type MessageInsertRow = {
   content: string;
   time_created: number;
   message_type: MessageType;
-  metadata: Record<string, unknown>;
+  metadata: Message['metadata'];
 };
 
 export type CallLogStateKey = 'missed' | 'declined' | 'completed';
