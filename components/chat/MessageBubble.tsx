@@ -18,6 +18,7 @@ import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
 import { LinkifiedText } from '@/lib/chat/linkify';
 import { durationSecondsFromMetadata, mediaUrlFromMetadata } from '@/lib/chat/mediaMetadata';
+import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
 
@@ -78,12 +79,6 @@ function isSafeHttpUrl(url: string): boolean {
   }
 }
 
-function formatAudioDurationLabel(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return m > 0 ? `${m}:${r.toString().padStart(2, '0')}` : `${r}s`;
-}
 
 /**
  * MessageBubble - renders a single chat message with reactions,
@@ -285,6 +280,13 @@ export default function MessageBubble({
   const mediaUrl = mediaUrlFromMetadata(message.metadata);
   const audioDuration = durationSecondsFromMetadata(message.metadata);
   const linkVariant = isMine ? 'mine' : 'theirs';
+  const captionText = message.content.trim();
+  const showCaption = captionText.length > 0;
+  const isImage = message.message_type === 'image';
+  const isAudio = message.message_type === 'audio';
+  const textBubbleClass = isMine
+    ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm shadow-[0_2px_16px_rgba(131,56,236,0.25)]'
+    : 'glass-panel text-zinc-100 rounded-bl-sm';
 
   const pickerToolbarDock = useMemo(() => {
     if (!showActions || !actionBarGeom) return null;
@@ -346,14 +348,80 @@ export default function MessageBubble({
           }}
         />
 
-        <div
-          ref={bubbleRef}
-          className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words
-              ${isMine
-                ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm shadow-[0_2px_16px_rgba(131,56,236,0.25)]'
-                : 'glass-panel text-zinc-100 rounded-bl-sm'
-              }`}
-        >
+        {isImage || isAudio ? (
+          <div
+            ref={bubbleRef}
+            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
+          >
+            {replyMeta && (
+              <div
+                className={`max-w-full rounded-2xl px-3 py-2 text-xs leading-snug border ${
+                  isMine
+                    ? 'border-white/15 bg-white/10 text-white/90 shadow-[0_2px_12px_rgba(0,0,0,0.12)]'
+                    : 'border-zinc-600/50 bg-zinc-950/50 text-zinc-300'
+                }`}
+              >
+                <span className="flex items-center gap-1 font-medium opacity-90">
+                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
+                  Reply
+                </span>
+                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+              </div>
+            )}
+
+            {isImage && (
+              <>
+                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
+                  <div
+                    className={`max-w-full overflow-hidden rounded-2xl ${
+                      isMine
+                        ? 'shadow-[0_10px_40px_rgba(131,56,236,0.38)] ring-1 ring-white/30'
+                        : 'border border-zinc-600/55 shadow-[0_8px_28px_rgba(0,0,0,0.35)] ring-1 ring-black/30'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs are dynamic per project */}
+                    <img
+                      src={mediaUrl}
+                      alt=""
+                      className="block max-h-72 w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>Photo unavailable</p>
+                )}
+              </>
+            )}
+
+            {isAudio && (
+              <>
+                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
+                  <ChatThemeAudioPlayer
+                    src={mediaUrl}
+                    variant={linkVariant}
+                    durationHint={audioDuration}
+                  />
+                ) : (
+                  <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                    Voice message unavailable
+                  </p>
+                )}
+              </>
+            )}
+
+            {showCaption && (
+              <div
+                className={`relative max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${textBubbleClass}`}
+              >
+                <LinkifiedText text={message.content} variant={linkVariant} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            ref={bubbleRef}
+            className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${textBubbleClass}`}
+          >
             {replyMeta && (
               <div
                 className={`mb-2 rounded-lg px-2.5 py-1.5 text-xs leading-snug border ${
@@ -369,63 +437,9 @@ export default function MessageBubble({
                 <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
               </div>
             )}
-            {message.message_type === 'image' && (
-              <>
-                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs are dynamic per project
-                  <img
-                    src={mediaUrl}
-                    alt=""
-                    className="max-h-64 max-w-full rounded-xl object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <p className={`text-xs ${isMine ? 'text-white/80' : 'text-zinc-400'}`}>Photo unavailable</p>
-                )}
-                {message.content.trim() ? (
-                  <div className="mt-2 leading-relaxed break-words">
-                    <LinkifiedText text={message.content} variant={linkVariant} />
-                  </div>
-                ) : null}
-              </>
-            )}
-            {message.message_type === 'audio' && (
-              <>
-                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
-                  <audio
-                    controls
-                    preload="metadata"
-                    src={mediaUrl}
-                    className={`mt-0.5 w-full max-w-[min(100%,260px)] h-9 rounded-lg ${
-                      isMine ? '[&::-webkit-media-controls-panel]:bg-white/10' : ''
-                    }`}
-                  />
-                ) : (
-                  <p className={`text-xs ${isMine ? 'text-white/80' : 'text-zinc-400'}`}>
-                    Voice message unavailable
-                  </p>
-                )}
-                {typeof audioDuration === 'number' && audioDuration > 0 ? (
-                  <span
-                    className={`mt-1 block text-[10px] opacity-70 ${isMine ? 'text-white/80' : 'text-zinc-500'}`}
-                  >
-                    {formatAudioDurationLabel(audioDuration)}
-                  </span>
-                ) : null}
-                {message.content.trim() ? (
-                  <div className="mt-2 leading-relaxed break-words">
-                    <LinkifiedText text={message.content} variant={linkVariant} />
-                  </div>
-                ) : null}
-              </>
-            )}
-            {message.message_type === 'text' && (
-              <LinkifiedText text={message.content} variant={linkVariant} />
-            )}
-            {message.time_edited && (
-              <span className="ml-2 text-[10px] opacity-60 italic">edited</span>
-            )}
-        </div>
+            <LinkifiedText text={message.content} variant={linkVariant} />
+          </div>
+        )}
 
         {showActions &&
           actionBarGeom &&
@@ -521,7 +535,12 @@ export default function MessageBubble({
 
         {/* Timestamp & read receipt */}
         <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
-          <span className="text-[10px] text-zinc-600">{timeLabel}</span>
+          <span className="text-[10px] text-zinc-600">
+            {timeLabel}
+            {message.time_edited ? (
+              <span className="ml-1 italic text-zinc-500 opacity-80">· edited</span>
+            ) : null}
+          </span>
           {isMine && message.is_read && (
             <Check className="w-3 h-3 text-[#8338EC]" />
           )}

@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
-import { insertCallLogMessage } from '@/lib/chat/messages';
+import { coerceMessageType, insertCallLogMessage } from '@/lib/chat/messages';
+import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import {
@@ -816,7 +817,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
         .channel(`dashboard:messages:${user.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
           void (async () => {
-            const message = payload.new as { chat_id: string; user_id: string; content: string; time_created: number };
+            const message = payload.new as {
+              chat_id: string;
+              user_id: string;
+              content: string;
+              time_created: number;
+              message_type?: string;
+            };
             if (!message || message.user_id === user.id) return;
 
             let connectionId = chatConnectionMapRef.current.get(message.chat_id);
@@ -838,24 +845,37 @@ export default function DashboardView({ user }: DashboardViewProps) {
             const connection = connectionMapRef.current.get(connectionId);
             if (!connection) return;
 
-            let decryptedPreview = message.content;
-            if (isEncrypted(decryptedPreview)) {
+            let decryptedPreview = typeof message.content === 'string' ? message.content : '';
+            const wasEncrypted = decryptedPreview.length > 0 && isEncrypted(decryptedPreview);
+            let decryptFailed = false;
+            if (wasEncrypted) {
               try {
                 if (connection.userIds && connection.userIds.length >= 2) {
                   const keys = await deriveKeysForConnection(connection.id, connection.userIds);
                   decryptedPreview = await decryptContent(decryptedPreview, keys);
                 } else {
-                  decryptedPreview = 'Tap to view message';
+                  decryptFailed = true;
+                  decryptedPreview = '';
                 }
               } catch {
-                decryptedPreview = 'Tap to view message';
+                decryptFailed = true;
+                decryptedPreview = '';
               }
             }
+
+            const mt = coerceMessageType(message.message_type);
+            const listPreview =
+              decryptFailed && mt === 'text'
+                ? 'Tap to view message'
+                : previewLabelForMessage({
+                    message_type: mt,
+                    content: decryptedPreview,
+                  });
 
             setChatMetadataByConnectionId((current) => ({
               ...current,
               [connection.id]: {
-                preview: decryptedPreview,
+                preview: listPreview,
                 lastMessageAt: message.time_created,
                 chatUpdatedAt: message.time_created,
               },
@@ -871,9 +891,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
               return;
             }
 
-            const preview = decryptedPreview.length > 140
-              ? `${decryptedPreview.slice(0, 137)}...`
-              : decryptedPreview;
+            const preview =
+              listPreview.length > 140 ? `${listPreview.slice(0, 137)}...` : listPreview;
 
             showBrowserNotification(
               connection.name,
@@ -984,7 +1003,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
           chats.map(async (chat: any) => {
             const { data: message, error: messageError } = await supabase
               .from('messages')
-              .select('content, time_created')
+              .select('content, time_created, message_type')
               .eq('chat_id', chat.id)
               .order('time_created', { ascending: false })
               .limit(1)
@@ -1000,23 +1019,49 @@ export default function DashboardView({ user }: DashboardViewProps) {
               };
             }
 
-            let preview: string | null = typeof message?.content === 'string' ? message.content : null;
-            if (preview && isEncrypted(preview)) {
+            if (!message) {
+              return {
+                connectionId: chat.connection_id as string,
+                preview: null,
+                lastMessageAt: null,
+                chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
+              };
+            }
+
+            let raw: string = typeof message.content === 'string' ? message.content : '';
+            const wasEncrypted = raw.length > 0 && isEncrypted(raw);
+            let decryptFailed = false;
+            if (wasEncrypted) {
               try {
                 const conn = connectionMapRef.current.get(chat.connection_id as string);
                 if (conn?.userIds && conn.userIds.length >= 2) {
                   const keys = await deriveKeysForConnection(conn.id, conn.userIds);
-                  preview = await decryptContent(preview, keys);
+                  raw = await decryptContent(raw, keys);
+                } else {
+                  decryptFailed = true;
+                  raw = '';
                 }
               } catch {
-                preview = 'Tap to view message';
+                decryptFailed = true;
+                raw = '';
               }
+            }
+
+            const messageType = coerceMessageType(message.message_type);
+            let preview: string | null;
+            if (decryptFailed && messageType === 'text') {
+              preview = 'Tap to view message';
+            } else {
+              preview = previewLabelForMessage({
+                message_type: messageType,
+                content: raw,
+              });
             }
 
             return {
               connectionId: chat.connection_id as string,
               preview,
-              lastMessageAt: typeof message?.time_created === 'number' ? message.time_created : null,
+              lastMessageAt: typeof message.time_created === 'number' ? message.time_created : null,
               chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
             };
           })

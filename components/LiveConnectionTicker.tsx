@@ -73,9 +73,9 @@ export function formatTickerLine(c: SanitizedTickerConnection): string {
   const when = timePart ? ` at ${timePart}` : '';
   const w = c.weather_condition?.trim();
   if (w) {
-    return `New Connection in ${place}${when} • ${emojiForWeather(w)} ${w}`;
+    return `New Click in ${place}${when} • ${emojiForWeather(w)} ${w}`;
   }
-  return `New Connection in ${place}${when}`;
+  return `New Click in ${place}${when}`;
 }
 
 function isRecord(x: unknown): x is Record<string, unknown> {
@@ -316,7 +316,7 @@ export default function LiveConnectionTicker() {
             )}
             <span className="text-xs font-medium text-zinc-400">
               {totalCount === null ? '—' : totalCount.toLocaleString()}{' '}
-              <span className="text-zinc-500">connections</span>
+              <span className="text-zinc-500">clicks</span>
             </span>
           </div>
         </div>
