@@ -1816,7 +1816,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     <MapPin className="w-5 h-5 text-[#8338EC]" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold">Connection Map</h2>
+                    <h2 className="text-xl font-bold">Click Map</h2>
                     <p className="text-sm text-zinc-500">Where your memories were made</p>
                   </div>
                 </div>
@@ -1877,7 +1877,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       </div>
                       <div>
                         <h2 className="text-xl font-bold">Messages</h2>
-                        <p className="text-sm text-zinc-500">Chat with your connections</p>
+                        <p className="text-sm text-zinc-500">Chat with your Clicks</p>
                       </div>
                     </div>
 

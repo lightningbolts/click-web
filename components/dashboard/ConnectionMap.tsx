@@ -302,7 +302,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         <MapPin className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
         <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>
         <p className="text-zinc-400">
-          Your connection map will appear here once you start making connections!
+          Your Click map will appear here once you start making clicks!
         </p>
       </div>
     );
