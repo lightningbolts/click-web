@@ -35,28 +35,81 @@ export function computeConnectionStreak(connections: ConnectionRecord[]): number
   return streak;
 }
 
-export function countConnectionsThisMonth(connections: ConnectionRecord[]): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+export function countConnectionsThisMonth(connections: ConnectionRecord[], now = new Date()): number {
+  const start = startOfMonth(now);
   return connections.filter((c) => c.dateMet >= start).length;
+}
+
+/** Connections whose `dateMet` falls in the previous calendar month (relative to `now`). */
+export function countConnectionsLastMonth(connections: ConnectionRecord[], now = new Date()): number {
+  const thisStart = startOfMonth(now);
+  const lastStart = new Date(thisStart);
+  lastStart.setMonth(lastStart.getMonth() - 1);
+  return connections.filter((c) => c.dateMet >= lastStart && c.dateMet < thisStart).length;
+}
+
+/**
+ * Month-over-month % change in how many connections were made (this calendar month vs last).
+ * Returns null when there is no meaningful baseline (last month had zero).
+ */
+export function computeThisMonthVsLastMonthPercent(thisMonth: number, lastMonth: number): number | null {
+  if (lastMonth > 0) {
+    return Math.round(((thisMonth - lastMonth) / lastMonth) * 100);
+  }
+  return null;
+}
+
+/**
+ * New connections this month as a percentage of the network size at the start of the month
+ * (connections with dateMet before the current month). Null when there is nothing to compare.
+ */
+export function computeNetworkGrowthPercentThisMonth(
+  totalConnections: number,
+  thisMonth: number
+): number | null {
+  if (thisMonth <= 0 || totalConnections <= 0) return null;
+  const priorCount = totalConnections - thisMonth;
+  if (priorCount <= 0) return 100;
+  return Math.min(999, Math.round((thisMonth / priorCount) * 100));
 }
 
 export interface UserDashboardMetrics {
   totalConnections: number;
   thisMonth: number;
+  lastMonth: number;
   streak: number;
   retentionRate: number;
   keptCount: number;
+  /** MoM % change in connections made (this month vs last); null if last month was 0 */
+  thisMonthTrendPercent: number | null;
+  /** This month's new connections as % of prior network size; null if not applicable */
+  totalNetworkGrowthPercent: number | null;
 }
 
-export function buildDashboardMetrics(connections: ConnectionRecord[]): UserDashboardMetrics {
+export function buildDashboardMetrics(connections: ConnectionRecord[], now = new Date()): UserDashboardMetrics {
   const totalConnections = connections.length;
-  const thisMonth = countConnectionsThisMonth(connections);
+  const thisMonth = countConnectionsThisMonth(connections, now);
+  const lastMonth = countConnectionsLastMonth(connections, now);
   const streak = computeConnectionStreak(connections);
   const keptCount = connections.filter((c) => c.status === 'kept').length;
   const retentionRate =
     totalConnections > 0 ? Math.round((keptCount / totalConnections) * 100) : 0;
-  return { totalConnections, thisMonth, streak, retentionRate, keptCount };
+  const thisMonthTrendPercent = computeThisMonthVsLastMonthPercent(thisMonth, lastMonth);
+  const totalNetworkGrowthPercent = computeNetworkGrowthPercentThisMonth(totalConnections, thisMonth);
+  return {
+    totalConnections,
+    thisMonth,
+    lastMonth,
+    streak,
+    retentionRate,
+    keptCount,
+    thisMonthTrendPercent,
+    totalNetworkGrowthPercent,
+  };
 }
 
 export interface UnlockedAchievement {

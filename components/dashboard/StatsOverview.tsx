@@ -1,21 +1,27 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { 
-  Users, 
-  TrendingUp, 
-  Calendar, 
-  Flame, 
+import {
+  Users,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Flame,
   Heart,
   Award,
   Zap,
-  Target
+  Target,
 } from 'lucide-react';
+
+interface StatTrend {
+  /** Signed percent change; null hides the badge */
+  percent: number | null;
+}
 
 interface StatItem {
   label: string;
   value: string | number;
-  change?: number;
+  trend?: StatTrend;
   icon: any;
   color: string;
   bgColor: string;
@@ -26,6 +32,10 @@ interface StatsOverviewProps {
   thisMonth: number;
   streak: number;
   retentionRate: number;
+  /** This month's adds vs network size at month start (null = hide) */
+  totalNetworkGrowthPercent?: number | null;
+  /** Vs last calendar month's connection count (null = hide) */
+  thisMonthTrendPercent?: number | null;
   topLocation?: string;
 }
 
@@ -38,13 +48,18 @@ export default function StatsOverview({
   thisMonth,
   streak,
   retentionRate,
+  totalNetworkGrowthPercent = null,
+  thisMonthTrendPercent = null,
   topLocation = 'UW Campus',
 }: StatsOverviewProps) {
   const stats: StatItem[] = [
     {
       label: 'Total Connections',
       value: totalConnections,
-      change: 12,
+      trend:
+        totalNetworkGrowthPercent !== null
+          ? { percent: totalNetworkGrowthPercent }
+          : undefined,
       icon: Users,
       color: 'text-[#8338EC]',
       bgColor: 'bg-[#8338EC]/20',
@@ -52,7 +67,8 @@ export default function StatsOverview({
     {
       label: 'This Month',
       value: thisMonth,
-      change: 25,
+      trend:
+        thisMonthTrendPercent !== null ? { percent: thisMonthTrendPercent } : undefined,
       icon: Calendar,
       color: 'text-[#3A86FF]',
       bgColor: 'bg-[#3A86FF]/20',
@@ -67,7 +83,6 @@ export default function StatsOverview({
     {
       label: 'Retention Rate',
       value: `${retentionRate}%`,
-      change: 5,
       icon: Heart,
       color: 'text-pink-500',
       bgColor: 'bg-pink-500/20',
@@ -108,10 +123,24 @@ export default function StatsOverview({
               <div className={`p-2 ${stat.bgColor} rounded-xl`}>
                 <Icon className={`w-4 h-4 ${stat.color}`} />
               </div>
-              {stat.change && (
-                <div className="flex items-center gap-1 text-xs text-green-400">
-                  <TrendingUp className="w-3 h-3" />
-                  +{stat.change}%
+              {stat.trend && stat.trend.percent !== null && (
+                <div
+                  className={`flex items-center gap-1 text-xs ${
+                    stat.trend.percent >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}
+                  title={
+                    stat.label === 'Total Connections'
+                      ? 'New connections this month as a share of your network at the start of the month'
+                      : 'Change vs number of connections made last calendar month'
+                  }
+                >
+                  {stat.trend.percent >= 0 ? (
+                    <TrendingUp className="w-3 h-3" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3" />
+                  )}
+                  {stat.trend.percent >= 0 ? '+' : ''}
+                  {stat.trend.percent}%
                 </div>
               )}
             </div>

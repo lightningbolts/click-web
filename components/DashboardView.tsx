@@ -1802,6 +1802,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     thisMonth={dashboardMetrics.thisMonth}
                     streak={dashboardMetrics.streak}
                     retentionRate={dashboardMetrics.retentionRate}
+                    totalNetworkGrowthPercent={dashboardMetrics.totalNetworkGrowthPercent}
+                    thisMonthTrendPercent={dashboardMetrics.thisMonthTrendPercent}
                   />
                 </section>
 

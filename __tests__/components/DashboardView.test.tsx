@@ -103,8 +103,12 @@ jest.mock('@/lib/dashboard/userMetrics', () => ({
   buildDashboardMetrics: jest.fn(() => ({
     totalConnections: 0,
     thisMonth: 0,
+    lastMonth: 0,
     streak: 0,
     retentionRate: 0,
+    keptCount: 0,
+    thisMonthTrendPercent: null,
+    totalNetworkGrowthPercent: null,
   })),
   getNextMilestone: jest.fn(() => ({
     target: 5,
