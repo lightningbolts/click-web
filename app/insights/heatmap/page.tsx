@@ -5,7 +5,9 @@ import { motion } from 'framer-motion';
 import { MapPin, Flame, TrendingUp, BarChart2 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import HeatmapView from '@/components/insights/HeatmapView';
-import type { HeatmapZone } from '@/lib/insights/mockData';
+import { mockVenueInsights, type HeatmapZone } from '@/lib/insights/mockData';
+import { DemoBanner } from '@/components/insights/DemoBanner';
+import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
 import {
   BarChart,
   Bar,
@@ -51,7 +53,8 @@ function IntensityBadge({ intensity }: { intensity: number }) {
 }
 
 export default function HeatmapPage() {
-  const zones: HeatmapZone[] = [];
+  const { demoMode } = useInsightsDemo();
+  const zones: HeatmapZone[] = demoMode ? mockVenueInsights.heatmapZones : [];
   const sorted = [...zones].sort((a, b) => b.connections - a.connections);
   const totalConnections = zones.reduce((s, z) => s + z.connections, 0);
   const maxZoneConnections = sorted[0]?.connections ?? 1;
@@ -71,6 +74,11 @@ export default function HeatmapPage() {
       animate="visible"
       className="space-y-6"
     >
+      {demoMode ? (
+        <motion.div variants={itemVariants}>
+          <DemoBanner />
+        </motion.div>
+      ) : null}
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-3 mb-2">
         <div className="p-2.5 bg-[#FF6B6B]/20 rounded-xl border border-[#FF6B6B]/30">

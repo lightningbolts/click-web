@@ -41,6 +41,7 @@ import CallOverlay, {
   type WebCallOverlayState,
 } from '@/components/chat/CallOverlay';
 import UserProfileModal from '@/components/UserProfileModal';
+import PostConnectionVibePrompt from '@/components/dashboard/PostConnectionVibePrompt';
 
 /** Matches `CallPushNotifier.kt` → `send-push-notification` for `incoming_call` / VoIP wake-up. */
 function buildIncomingCallPushPayload(invite: WebCallInvite) {
@@ -125,6 +126,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
   const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
+  const [vibePromptConnection, setVibePromptConnection] = useState<ConnectionRecord | null>(null);
+  const seenConnectionIdsRef = useRef<Set<string> | null>(null);
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
   const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useState<Record<string, ChatListMetadata>>({});
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1289,6 +1292,30 @@ export default function DashboardView({ user }: DashboardViewProps) {
     };
   }, [user?.id, loadConnections]);
 
+  // After a new connection appears, offer optional venue vibe capture (Business Insights).
+  useEffect(() => {
+    if (!user?.id) return;
+    if (connectionRecords.length === 0) return;
+    const ids = connectionRecords.map((c) => c.id);
+    if (seenConnectionIdsRef.current === null) {
+      seenConnectionIdsRef.current = new Set(ids);
+      return;
+    }
+    const newOnes = connectionRecords.filter((c) => !seenConnectionIdsRef.current!.has(c.id));
+    newOnes.forEach((c) => seenConnectionIdsRef.current!.add(c.id));
+    const eligible = newOnes.find((c) => {
+      if (typeof window === 'undefined') return false;
+      try {
+        return !window.sessionStorage.getItem(`click:vibe-skip:${c.id}`);
+      } catch {
+        return true;
+      }
+    });
+    if (eligible) {
+      setVibePromptConnection((cur) => cur ?? eligible);
+    }
+  }, [connectionRecords, user?.id]);
+
   // Handle CSV export
   const handleExport = useCallback(() => {
     downloadCSV(connectionRecords, `click-connections-${user.email?.split('@')[0] || 'user'}`);
@@ -2261,6 +2288,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
         getAuthHeaders={getAuthHeaders}
         onClose={() => setProfileUserId(null)}
       />
+
+      {vibePromptConnection ? (
+        <PostConnectionVibePrompt
+          connectionId={vibePromptConnection.id}
+          venueLabel={vibePromptConnection.location || 'This place'}
+          getAuthHeaders={getAuthHeaders}
+          onClose={() => setVibePromptConnection(null)}
+        />
+      ) : null}
 
     </div>
   );

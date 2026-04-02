@@ -8,6 +8,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { AdvancedMetricsApiResponse } from "@/lib/insights/advancedMetrics";
 import { GlassPanel } from "./GlassPanel";
+import { InsightCallout } from "./InsightCallout";
 
 const TEAL = "#2dd4bf";
 const AMBER = "#f59e0b";
@@ -30,9 +31,21 @@ function EnvironmentalSkeleton() {
   );
 }
 
-export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) {
-  const url = venueId ? `/api/insights/${venueId}/advanced-metrics` : null;
-  const { data, error, isLoading } = useSWR<AdvancedMetricsApiResponse>(url, fetcher);
+export default function EnvironmentalMetrics({
+  venueId,
+  staticData,
+}: {
+  venueId?: string;
+  /** When set, skips fetch and renders this payload (e.g. demo mode). */
+  staticData?: AdvancedMetricsApiResponse | null;
+}) {
+  const url =
+    staticData || !venueId ? null : `/api/insights/${venueId}/advanced-metrics`;
+  const { data: swrData, error, isLoading } = useSWR<AdvancedMetricsApiResponse>(
+    url,
+    fetcher,
+  );
+  const data = staticData ?? swrData;
 
   const sparkData = useMemo(() => {
     const avgs = data?.peakSocialVelocity?.hourlyAverages ?? [];
@@ -45,11 +58,11 @@ export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) 
 
   const peakHour = data?.peakSocialVelocity?.peakHour ?? 0;
 
-  if (!venueId) {
+  if (!venueId && !staticData) {
     return null;
   }
 
-  if (isLoading && !error) {
+  if (isLoading && !error && !staticData) {
     return (
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-zinc-500 tracking-wide">Environment &amp; flow</h2>
@@ -65,6 +78,7 @@ export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) 
   const wri = data.weatherResilience;
   const psv = data.peakSocialVelocity;
   const gcr = data.groupClusteringRate;
+  const peers = data.peerPercentiles;
 
   return (
     <div className="space-y-3">
@@ -114,6 +128,16 @@ export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) 
                 Adverse ÷ fair daily averages (above 1 means stronger traffic on rough-weather days)
               </span>
             </div>
+            {wri.index !== null && !Number.isNaN(wri.index) ? (
+              <InsightCallout
+                value={wri.index}
+                metricKey="wri"
+                peerPercentile={peers?.wri ?? undefined}
+                peerCohortSize={
+                  peers?.wri != null ? peers.cohortSize : undefined
+                }
+              />
+            ) : null}
           </GlassPanel>
         </motion.div>
 
@@ -173,6 +197,14 @@ export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) 
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            <InsightCallout
+              value={psv.velocity ?? 0}
+              metricKey="psv_velocity"
+              peerPercentile={peers?.psv_velocity ?? undefined}
+              peerCohortSize={
+                peers?.psv_velocity != null ? peers.cohortSize : undefined
+              }
+            />
           </GlassPanel>
         </motion.div>
 
@@ -233,6 +265,14 @@ export default function EnvironmentalMetrics({ venueId }: { venueId?: string }) 
                 </div>
               </div>
             </div>
+            <InsightCallout
+              value={gcr}
+              metricKey="gcr"
+              peerPercentile={peers?.gcr ?? undefined}
+              peerCohortSize={
+                peers?.gcr != null ? peers.cohortSize : undefined
+              }
+            />
           </GlassPanel>
         </motion.div>
       </div>

@@ -3,7 +3,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, Users, Link2, Sparkles } from 'lucide-react';
-import { GlassPanel } from './InsightsDashboard';
+import { GlassPanel } from './GlassPanel';
+import { InsightCallout } from './InsightCallout';
 import type { StickyScore, ConnectionDensity, LiveCount } from '@/lib/insights/mockData';
 
 // ============================================
@@ -114,6 +115,9 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
           <p className="text-[10px] text-zinc-500">Engaged</p>
         </div>
       </div>
+      {score > 0 ? (
+        <InsightCallout value={score} metricKey="sticky_score" />
+      ) : null}
     </GlassPanel>
   );
 }

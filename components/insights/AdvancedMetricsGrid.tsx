@@ -7,6 +7,7 @@ import { Anchor, AudioLines, GitBranch, HeartHandshake, Info } from "lucide-reac
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { AdvancedMetricsApiResponse } from "@/lib/insights/advancedMetrics";
 import { GlassPanel } from "./GlassPanel";
+import { InsightCallout } from "./InsightCallout";
 
 const fetcher = (url: string) => fetchInsightsApiJson<AdvancedMetricsApiResponse>(url);
 
@@ -45,9 +46,20 @@ function AdvancedMetricsSkeleton() {
   );
 }
 
-export default function AdvancedMetricsGrid({ venueId }: { venueId?: string }) {
-  const url = venueId ? `/api/insights/${venueId}/advanced-metrics` : null;
-  const { data, error, isLoading } = useSWR<AdvancedMetricsApiResponse>(url, fetcher);
+export default function AdvancedMetricsGrid({
+  venueId,
+  staticData,
+}: {
+  venueId?: string;
+  staticData?: AdvancedMetricsApiResponse | null;
+}) {
+  const url =
+    staticData || !venueId ? null : `/api/insights/${venueId}/advanced-metrics`;
+  const { data: swrData, error, isLoading } = useSWR<AdvancedMetricsApiResponse>(
+    url,
+    fetcher,
+  );
+  const data = staticData ?? swrData;
 
   const acr = useMemo(
     () => (data ? noiseRecommendation(data.acousticConversion) : null),
@@ -66,11 +78,11 @@ export default function AdvancedMetricsGrid({ venueId }: { venueId?: string }) {
     return Math.max(...topAnchors.map((a) => a.ams_score), 1e-9);
   }, [topAnchors]);
 
-  if (!venueId) {
+  if (!venueId && !staticData) {
     return null;
   }
 
-  if (isLoading && !error) {
+  if (isLoading && !error && !staticData) {
     return (
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-zinc-500 tracking-wide">Advanced Social ROI</h2>
@@ -82,6 +94,8 @@ export default function AdvancedMetricsGrid({ venueId }: { venueId?: string }) {
   if (error || !data) {
     return null;
   }
+
+  const peers = data.peerPercentiles;
 
   return (
     <div className="space-y-3">
@@ -108,6 +122,14 @@ export default function AdvancedMetricsGrid({ venueId }: { venueId?: string }) {
               Return visitors after connecting — share of guests who came back to this venue more
               than 24 hours after their first connection here.
             </p>
+            <InsightCallout
+              value={data.venueLoyaltyCoefficient}
+              metricKey="vlc"
+              peerPercentile={peers?.vlc ?? undefined}
+              peerCohortSize={
+                peers?.vlc != null ? peers.cohortSize : undefined
+              }
+            />
           </GlassPanel>
         </motion.div>
 

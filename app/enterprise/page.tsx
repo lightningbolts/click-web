@@ -9,9 +9,10 @@ import {
   CalendarDays,
   CheckCircle,
   GraduationCap,
-  Landmark,
   MapPin,
   MessageSquare,
+  Mic2,
+  Mountain,
   Radio,
   Shield,
   Store,
@@ -47,9 +48,31 @@ const USE_CASES = [
   { title: 'Conferences & trade shows', desc: 'Booth staff and attendees connect in seconds; organizers see which touchpoints drove real exchanges.' },
   { title: 'Campus life & student affairs', desc: 'Clubs, housing, and career fairs where context (event, place, time) prevents the “who was that?” problem later.' },
   { title: 'Customer experience & retail', desc: 'High-touch retail, showrooms, and demos: swap contact without breaking the conversation.' },
-  { title: 'Corporate & internal networks', desc: 'Offsites, onboarding weeks, and cross-functional projects where relationships span offices and time zones.' },
   { title: 'Membership & alumni', desc: 'Associations, foundations, and advancement teams strengthen ties when every handshake is captured with consent.' },
   { title: 'Public & civic programs', desc: 'Workshops, town halls, and community programs where participants opt in to stay connected beyond a single evening.' },
+] as const;
+
+const OUTCOME_VERTICALS = [
+  {
+    title: 'Universities',
+    icon: GraduationCap,
+    outcome:
+      'Know which dorms are socially isolated before the first midterm — not after the dropout.',
+    metric: 'Connection Velocity (freshman class, first 6 weeks)',
+  },
+  {
+    title: 'Events & venues',
+    icon: Mic2,
+    outcome: 'Find out which artists actually build a fanbase vs. just sell tickets.',
+    metric:
+      'Social Sticky Score (connections per 100 attendees, post-event re-engagement rate)',
+  },
+  {
+    title: 'Climbing gyms & third places',
+    icon: Mountain,
+    outcome: 'Turn regulars who recognize each other into regulars who actually know each other.',
+    metric: 'Return Connection Rate (pairs who met at your venue and came back)',
+  },
 ] as const;
 
 const CAPABILITIES = [
@@ -188,26 +211,17 @@ export default function EnterprisePage() {
             className="text-center"
           >
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-400 backdrop-blur">
-              <Landmark className="h-4 w-4 text-[#8338EC]" />
-              <span>Organizations, venues &amp; schools</span>
+              <GraduationCap className="h-4 w-4 text-[#8338EC]" />
+              <span>Higher ed &amp; Student Affairs</span>
             </div>
-            <h1 className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-              <span className="text-[#8338EC]">Click</span> for{' '}
-              <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent">
-                enterprise
+            <h1 className="mb-6 max-w-5xl mx-auto text-3xl font-bold tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
+              <span className="text-zinc-50">
+                A university can&apos;t measure student loneliness from their contact lists. They can from ours.
               </span>
-              <br className="hidden sm:block" />
-              <span className="text-zinc-100"> and institutions</span>
             </h1>
-            <p className="mx-auto mb-4 max-w-3xl text-lg leading-relaxed text-zinc-400 md:text-xl">
-              The same tap-and-scan connection people use in daily life, packaged for businesses, event operators, and education
-              systems that need scale, clarity, and{' '}
-              <span className="text-zinc-300">Business Insights</span> to study social patterns and how your own teams use
-              Click on the floor, without turning every introduction into a feed.
-            </p>
-            <p className="mx-auto mb-10 max-w-2xl text-sm leading-relaxed text-zinc-500 md:text-base">
-              Whether you run a single flagship store or a multi-campus university, Click helps participants exchange identity in
-              the moment and remember it later.
+            <p className="mx-auto mb-10 max-w-3xl text-lg leading-relaxed text-zinc-300 md:text-xl">
+              Click gives Student Affairs offices a real-time connection velocity dashboard — the leading indicator for freshman
+              retention that no other platform produces.
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
               <motion.a
@@ -243,6 +257,44 @@ export default function EnterprisePage() {
                 meet the team
               </Link>
               .
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.65, delay: 0.15 }}
+            className="mx-auto mt-4 grid max-w-6xl gap-6 md:grid-cols-3"
+          >
+            {OUTCOME_VERTICALS.map((v) => (
+              <article
+                key={v.title}
+                className="glass flex flex-col rounded-3xl border border-zinc-800 bg-zinc-900/30 p-6 text-left transition-colors hover:border-[#8338EC]/35"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
+                  <v.icon className="h-6 w-6 text-[#8338EC]" />
+                </div>
+                <h2 className="mb-3 text-lg font-bold text-zinc-100">{v.title}</h2>
+                <p className="mb-4 flex-1 text-sm leading-relaxed text-zinc-400">{v.outcome}</p>
+                <p className="border-t border-zinc-800/80 pt-4 text-xs font-medium uppercase tracking-wide text-[#c4a3ff]">
+                  Metric highlighted
+                </p>
+                <p className="mt-1 text-sm leading-snug text-zinc-300">{v.metric}</p>
+              </article>
+            ))}
+          </motion.div>
+
+          <motion.div
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+            className="mx-auto mt-12 max-w-3xl rounded-2xl border border-[#8338EC]/25 bg-gradient-to-br from-[#8338EC]/10 via-zinc-900/40 to-zinc-950/80 px-6 py-8 text-center md:px-10"
+          >
+            <p className="text-sm font-semibold uppercase tracking-wider text-[#c4a3ff]">University ROI snapshot</p>
+            <p className="mt-4 text-base leading-relaxed text-zinc-200 md:text-lg">
+              If Click is deployed at a university of 30,000 students and improves freshman retention by 1%: 300 students retained
+              × ~$30,000 avg tuition = <span className="font-semibold text-white">$9,000,000</span> in tuition revenue preserved.
+              One pilot. One semester.
             </p>
           </motion.div>
         </section>

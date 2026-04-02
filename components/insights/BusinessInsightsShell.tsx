@@ -19,7 +19,9 @@ import {
   Radio,
   ChevronLeft,
   LogOut,
+  Sparkles,
 } from "lucide-react";
+import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
 
 const navItems = [
   { href: "/insights", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -66,6 +68,7 @@ export default function BusinessInsightsShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { demoMode, setDemoMode } = useInsightsDemo();
   const [isLive] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
@@ -141,6 +144,28 @@ export default function BusinessInsightsShell({
 
             {/* Controls */}
             <div className="flex items-center gap-2">
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setDemoMode(!demoMode)}
+                title={
+                  demoMode
+                    ? "Turn off sample data — show live insights only"
+                    : "Fill empty insights with sample data (demo)"
+                }
+                className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-medium transition-colors md:px-3 ${
+                  demoMode
+                    ? "border-amber-500/40 bg-amber-500/15 text-amber-100"
+                    : "border-white/10 bg-white/5 text-zinc-400 hover:border-violet-500/30 hover:text-white"
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">
+                  {demoMode ? "Demo on" : "Demo data"}
+                </span>
+              </motion.button>
+
               {/* Back to dashboard */}
               <Link
                 href="/"

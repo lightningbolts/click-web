@@ -38,6 +38,15 @@ export type PeakSocialVelocityData = {
   totalConnections: number;
 };
 
+/** Percentile rank (0–100) vs venues with enough volume; from `insights_peer_percentiles` RPC. */
+export type PeerPercentiles = {
+  cohortSize: number;
+  vlc: number | null;
+  gcr: number | null;
+  psv_velocity: number | null;
+  wri: number | null;
+};
+
 export type AdvancedMetricsApiResponse = {
   venueId: string;
   venueLoyaltyCoefficient: number;
@@ -47,6 +56,8 @@ export type AdvancedMetricsApiResponse = {
   weatherResilience: WeatherResilienceData;
   peakSocialVelocity: PeakSocialVelocityData;
   groupClusteringRate: number;
+  /** Present when `insights_peer_percentiles` RPC is available; older deploys may omit. */
+  peerPercentiles?: PeerPercentiles | null;
 };
 
 export function parseAmsJson(data: unknown): AnchorMagnetismRow[] {
@@ -123,5 +134,24 @@ export function parsePsvJson(data: unknown): PeakSocialVelocityData {
     hourlyAverages,
     numDistinctDays: Number(o.num_distinct_days ?? 0),
     totalConnections: Number(o.total_connections ?? 0),
+  };
+}
+
+export function parsePeerPercentiles(data: unknown): PeerPercentiles | null {
+  if (data === null || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const optInt = (k: string): number | null => {
+    const v = o[k];
+    if (v === null || v === undefined) return null;
+    const x = Number(v);
+    return Number.isFinite(x) ? Math.round(x) : null;
+  };
+  const cohort = Number(o.cohortSize ?? 0);
+  return {
+    cohortSize: Number.isFinite(cohort) ? cohort : 0,
+    vlc: optInt("vlc"),
+    gcr: optInt("gcr"),
+    psv_velocity: optInt("psv_velocity"),
+    wri: optInt("wri"),
   };
 }

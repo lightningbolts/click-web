@@ -3,6 +3,8 @@
  * This file contains sample data for development and testing
  */
 
+import type { AdvancedMetricsApiResponse } from "@/lib/insights/advancedMetrics";
+
 // ============================================
 // TYPE DEFINITIONS
 // ============================================
@@ -379,4 +381,87 @@ export const generateLiveUpdate = (): Partial<VenueInsights> => {
     },
     lastUpdated: new Date(),
   };
+};
+
+// --- Demo overlay: charts + advanced metrics (deterministic) ---
+
+const DEMO_DAY_UTC = Date.UTC(2026, 0, 1);
+
+export const mockInsightsDailyData: { date: string; count: number }[] = Array.from(
+  { length: 30 },
+  (_, i) => {
+    const d = new Date(DEMO_DAY_UTC + i * 86400000);
+    return {
+      date: d.toISOString().slice(0, 10),
+      count: 12 + ((i * 11) % 28),
+    };
+  },
+);
+
+export const mockInsightsHourlyDistribution: number[] = Array.from({ length: 24 }, (_, h) => {
+  if (h >= 21 || h <= 1) return 18 + (h % 4);
+  if (h >= 10 && h <= 14) return 8 + h;
+  return 4 + (h % 6);
+});
+
+export const mockInsightsPeakHour = mockInsightsHourlyDistribution.indexOf(
+  Math.max(...mockInsightsHourlyDistribution),
+);
+
+/** Sample advanced metrics for demo / empty-venue dashboard (matches `AdvancedMetricsApiResponse`). */
+export const mockAdvancedMetrics: AdvancedMetricsApiResponse = {
+  venueId: "demo",
+  venueLoyaltyCoefficient: 35,
+  anchorMagnetism: [
+    {
+      nfc_anchor_id: "demo-entrance",
+      name: "Main entrance",
+      connection_count: 120,
+      total_count: 200,
+      anchor_retention: 40,
+      ams_score: 0.42,
+    },
+    {
+      nfc_anchor_id: "demo-bar",
+      name: "Bar tap",
+      connection_count: 98,
+      total_count: 180,
+      anchor_retention: 35,
+      ams_score: 0.31,
+    },
+    {
+      nfc_anchor_id: "demo-stage",
+      name: "Stage side",
+      connection_count: 64,
+      total_count: 150,
+      anchor_retention: 28,
+      ams_score: 0.18,
+    },
+  ],
+  acousticConversion: { quiet: 22, moderate: 45, loud: 18 },
+  crossPollinationRate: 28,
+  weatherResilience: {
+    index: 0.88,
+    avgDailyAdverse: 12,
+    avgDailyFair: 14,
+    adverseDays: 8,
+    fairDays: 22,
+  },
+  peakSocialVelocity: {
+    peakHour: 23,
+    velocity: 2.2,
+    hourlyAverages: Array.from({ length: 24 }, (_, h) =>
+      Math.max(0.5, 4 + Math.sin(h / 4) * 3 + (h === 23 ? 4 : 0)),
+    ),
+    numDistinctDays: 28,
+    totalConnections: 420,
+  },
+  groupClusteringRate: 45,
+  peerPercentiles: {
+    cohortSize: 48,
+    vlc: 62,
+    gcr: 55,
+    psv_velocity: 71,
+    wri: 58,
+  },
 };

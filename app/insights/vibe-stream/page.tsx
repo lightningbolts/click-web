@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import VibeStream from '@/components/insights/VibeStream';
-import type { VibeMessage } from '@/lib/insights/mockData';
+import { mockVenueInsights, type VibeMessage } from '@/lib/insights/mockData';
+import { DemoBanner } from '@/components/insights/DemoBanner';
+import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
 import {
   BarChart,
   Bar,
@@ -61,7 +63,8 @@ const SENTIMENT_CONFIG = {
 };
 
 export default function VibeStreamPage() {
-  const messages: VibeMessage[] = [];
+  const { demoMode } = useInsightsDemo();
+  const messages: VibeMessage[] = demoMode ? mockVenueInsights.vibeStream : [];
 
   // Sentiment counts
   const sentiment = {
@@ -94,6 +97,11 @@ export default function VibeStreamPage() {
       animate="visible"
       className="space-y-6"
     >
+      {demoMode ? (
+        <motion.div variants={itemVariants}>
+          <DemoBanner />
+        </motion.div>
+      ) : null}
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-3 mb-2">
         <div className="p-2.5 bg-[#FFD93D]/20 rounded-xl border border-[#FFD93D]/30">

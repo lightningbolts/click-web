@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import BusinessInsightsShell from '@/components/insights/BusinessInsightsShell';
 import InsightsAccessGate from '@/components/insights/InsightsAccessGate';
+import { InsightsDemoProvider } from '@/components/insights/InsightsDemoContext';
 import { useSearchParams } from 'next/navigation';
 
 function InsightsLayoutInner({ children }: { children: React.ReactNode }) {
@@ -10,9 +11,11 @@ function InsightsLayoutInner({ children }: { children: React.ReactNode }) {
   const venueName = searchParams.get('venue') || 'My Venue';
 
   return (
-    <BusinessInsightsShell venueName={venueName}>
-      {children}
-    </BusinessInsightsShell>
+    <InsightsDemoProvider>
+      <BusinessInsightsShell venueName={venueName}>
+        {children}
+      </BusinessInsightsShell>
+    </InsightsDemoProvider>
   );
 }
 

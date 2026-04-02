@@ -41,8 +41,15 @@ import {
   emptyStickyScore,
   emptyConnectionDensity,
   emptyLiveCount,
+  mockVenueInsights,
+  mockAdvancedMetrics,
+  mockInsightsDailyData,
+  mockInsightsHourlyDistribution,
+  mockInsightsPeakHour,
 } from "@/lib/insights/mockData";
 import type { VibeMessage } from "@/lib/insights/mockData";
+import { DemoBanner } from "./DemoBanner";
+import { useInsightsDemo } from "./InsightsDemoContext";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import AdvancedMetricsGrid from "./AdvancedMetricsGrid";
 import EnvironmentalMetrics from "./EnvironmentalMetrics";
@@ -102,11 +109,9 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { demoMode } = useInsightsDemo();
   const venueIdFromQuery = searchParams.get("venue_id") ?? undefined;
   const venueId = venueIdProp ?? venueIdFromQuery ?? undefined;
-
-  const liveCount = emptyLiveCount;
-  const vibeMessages: VibeMessage[] = [];
 
   const insightsUrl = venueId ? `/api/insights/${venueId}` : "/api/insights/venue";
   const { data: apiData, error, isLoading } = useSWR<InsightsResponse>(
@@ -115,6 +120,32 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
   );
 
   const data = apiData;
+
+  const isDemoFallback =
+    demoMode &&
+    !!data &&
+    (data.status === "no_venue" || data.status === "insufficient_data");
+
+  const displayInsights: InsightsResponse | undefined =
+    isDemoFallback && data
+      ? {
+          ...data,
+          totalConnections: mockInsightsDailyData.reduce((s, x) => s + x.count, 0),
+          hourlyDistribution: mockInsightsHourlyDistribution,
+          dailyData: mockInsightsDailyData,
+          peakHour: mockInsightsPeakHour,
+          retentionRate: "42%",
+          busiestDay: "Saturday",
+        }
+      : data;
+
+  const stickyForView = isDemoFallback ? mockVenueInsights.stickyScore : emptyStickyScore;
+  const densityForView = isDemoFallback
+    ? mockVenueInsights.connectionDensity
+    : emptyConnectionDensity;
+  const liveForView = isDemoFallback ? mockVenueInsights.liveCount : emptyLiveCount;
+  const vibeMessages: VibeMessage[] = isDemoFallback ? mockVenueInsights.vibeStream : [];
+  const advancedVenueId = venueId ?? (isDemoFallback ? "demo" : undefined);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -179,7 +210,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
     );
   }
 
-  if (data?.status === "insufficient_data") {
+  if (data?.status === "insufficient_data" && !isDemoFallback) {
     return (
       <div className="flex items-center justify-center p-4 min-h-[400px]">
         <motion.div
@@ -208,7 +239,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
   // Prepare data for charts
   const hourlyData =
-    data?.hourlyDistribution?.map((count: number, hour: number) => ({
+    displayInsights?.hourlyDistribution?.map((count: number, hour: number) => ({
       hour: `${hour}:00`,
       count,
     })) || [];
@@ -236,7 +267,11 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       animate="visible"
       className="space-y-6"
     >
-      {data?.status === "no_venue" && data.message ? (
+      {isDemoFallback ? (
+        <motion.div variants={itemVariants}>
+          <DemoBanner />
+        </motion.div>
+      ) : data?.status === "no_venue" && data.message ? (
         <motion.div
           variants={itemVariants}
           className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95"
@@ -250,19 +285,25 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         variants={itemVariants}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
       >
-        <StickyScoreCard data={emptyStickyScore} />
-        <ConnectionDensityCard data={emptyConnectionDensity} />
-        <LiveCountCard data={liveCount} />
+        <StickyScoreCard data={stickyForView} />
+        <ConnectionDensityCard data={densityForView} />
+        <LiveCountCard data={liveForView} />
       </motion.div>
 
       {/* Advanced Social ROI (RPC-backed) */}
       <motion.div variants={itemVariants}>
-        <AdvancedMetricsGrid venueId={venueId} />
+        <AdvancedMetricsGrid
+          venueId={advancedVenueId}
+          staticData={isDemoFallback ? mockAdvancedMetrics : undefined}
+        />
       </motion.div>
 
       {/* Environment & flow (WRI, PSV, GCR) */}
       <motion.div variants={itemVariants}>
-        <EnvironmentalMetrics venueId={venueId} />
+        <EnvironmentalMetrics
+          venueId={advancedVenueId}
+          staticData={isDemoFallback ? mockAdvancedMetrics : undefined}
+        />
       </motion.div>
 
       {/* SECOND ROW: Heatmap + Tribe Analysis */}
@@ -270,8 +311,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         variants={itemVariants}
         className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"
       >
-        <HeatmapView zones={[]} />
-        <TribeChart tribes={[]} />
+        <HeatmapView zones={isDemoFallback ? mockVenueInsights.heatmapZones : []} />
+        <TribeChart tribes={isDemoFallback ? mockVenueInsights.tribes : []} />
       </motion.div>
 
       {/* THIRD ROW: Historical Charts + Vibe Stream */}
@@ -299,7 +340,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
               minWidth={0}
               minHeight={200}
             >
-              <LineChart data={data?.dailyData || []}>
+              <LineChart data={displayInsights?.dailyData || []}>
                 <defs>
                   <linearGradient
                     id="colorGradient"
@@ -395,7 +436,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             </span>
           </div>
           <div className="text-3xl font-bold text-white">
-            {data?.totalConnections || 0}
+            {displayInsights?.totalConnections || 0}
           </div>
           <div className="text-xs text-zinc-500 mt-2">Last 30 days</div>
         </GlassPanel>
@@ -410,7 +451,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             </span>
           </div>
           <div className="text-3xl font-bold text-white">
-            {data?.retentionRate || "N/A"}
+            {displayInsights?.retentionRate || "N/A"}
           </div>
           <div className="text-xs text-zinc-500 mt-2">Returning visitors</div>
         </GlassPanel>
@@ -425,7 +466,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             </span>
           </div>
           <div className="text-2xl font-bold text-white">
-            {data?.busiestDay || "N/A"}
+            {displayInsights?.busiestDay || "N/A"}
           </div>
           <div className="text-xs text-zinc-500 mt-2">Highest activity</div>
         </GlassPanel>
@@ -438,7 +479,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             <span className="text-sm font-medium text-zinc-400">Peak Hour</span>
           </div>
           <div className="text-3xl font-bold text-white">
-            {data?.peakHour ?? "N/A"}:00
+            {displayInsights?.peakHour ?? "N/A"}:00
           </div>
           <div className="text-xs text-zinc-500 mt-2">Most active time</div>
         </GlassPanel>
@@ -487,12 +528,12 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                     <Cell
                       key={`cell-${index}`}
                       fill={
-                        index === data?.peakHour
+                        index === displayInsights?.peakHour
                           ? "#8338EC"
                           : "rgba(255,255,255,0.15)"
                       }
                       style={
-                        index === data?.peakHour
+                        index === displayInsights?.peakHour
                           ? {
                             filter:
                               "drop-shadow(0 0 8px rgba(131, 56, 236, 0.5))",
@@ -508,7 +549,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           <div className="mt-4 text-center text-xs text-zinc-400">
             Peak activity is around{" "}
             <span className="text-[#8338EC] font-bold">
-              {data?.peakHour}:00
+              {displayInsights?.peakHour}:00
             </span>
           </div>
         </GlassPanel>

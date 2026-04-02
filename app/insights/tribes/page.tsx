@@ -5,7 +5,9 @@ import { motion } from 'framer-motion';
 import { Users2, Link2, TrendingUp, Info } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import TribeChart from '@/components/insights/TribeChart';
-import type { TribeBubble } from '@/lib/insights/mockData';
+import { mockVenueInsights, type TribeBubble } from '@/lib/insights/mockData';
+import { DemoBanner } from '@/components/insights/DemoBanner';
+import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
 import {
   RadarChart,
   Radar,
@@ -31,7 +33,8 @@ const itemVariants = {
 };
 
 export default function TribesPage() {
-  const tribes: TribeBubble[] = [];
+  const { demoMode } = useInsightsDemo();
+  const tribes: TribeBubble[] = demoMode ? mockVenueInsights.tribes : [];
   const [selected, setSelected] = useState<TribeBubble | null>(null);
 
   const sorted = [...tribes].sort((a, b) => b.connections - a.connections);
@@ -72,6 +75,11 @@ export default function TribesPage() {
       animate="visible"
       className="space-y-6"
     >
+      {demoMode ? (
+        <motion.div variants={itemVariants}>
+          <DemoBanner />
+        </motion.div>
+      ) : null}
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-3 mb-2">
         <div className="p-2.5 bg-[#C77DFF]/20 rounded-xl border border-[#C77DFF]/30">

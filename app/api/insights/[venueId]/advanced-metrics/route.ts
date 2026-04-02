@@ -6,6 +6,7 @@ import {
   parseAcrJson,
   parseWriJson,
   parsePsvJson,
+  parsePeerPercentiles,
   type AdvancedMetricsApiResponse,
 } from "@/lib/insights/advancedMetrics";
 
@@ -80,6 +81,16 @@ export async function GET(
       );
     }
 
+    let peerPercentiles = null;
+    const peerRes = await supabase.rpc("insights_peer_percentiles", {
+      venue_id_param: venueId,
+    });
+    if (!peerRes.error && peerRes.data != null) {
+      peerPercentiles = parsePeerPercentiles(peerRes.data);
+    } else if (peerRes.error) {
+      console.warn("insights_peer_percentiles:", peerRes.error.message);
+    }
+
     const body: AdvancedMetricsApiResponse = {
       venueId,
       venueLoyaltyCoefficient: Number(vlc.data ?? 0),
@@ -89,6 +100,7 @@ export async function GET(
       weatherResilience: parseWriJson(wri.data),
       peakSocialVelocity: parsePsvJson(psv.data),
       groupClusteringRate: Number(gcr.data ?? 0),
+      peerPercentiles,
     };
 
     return NextResponse.json(body);
