@@ -25,3 +25,6 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 - **Dashboard route (`/dashboard`) redirects to home** when there is no authenticated session, which is expected behavior without Supabase credentials.
 - **Turbopack root override** in `next.config.ts` (`turbopack.root: process.cwd()`) exists to prevent lockfile resolution issues. Do not remove it.
 - **React Compiler** is enabled (`reactCompiler: true` in `next.config.ts`). The `babel-plugin-react-compiler` dev dependency supports this.
+- **Restarting the dev server is required after creating/changing `.env.local`** — Next.js does not hot-reload environment variable changes. Kill the `npm run dev` process and restart it.
+- **Waitlist API (`POST /api/waitlist`)** works even without Supabase — it logs the email and returns success. With Supabase connected it inserts into the `waitlist` table. This is a good smoke-test endpoint.
+- **`.env.local` must be created manually** from secrets `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The `.gitignore` already excludes `.env*.local`.
