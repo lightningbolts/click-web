@@ -5,12 +5,12 @@ import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 /* ------------------------------------------------------------------ */
 
 const mockGetUser = jest.fn();
-const mockCreateClient = jest.fn(() => ({
+const mockCreateClient = jest.fn((_url?: string, _key?: string, _options?: object) => ({
   auth: { getUser: mockGetUser },
 }));
 
 jest.mock('@supabase/supabase-js', () => ({
-  createClient: (...args: unknown[]) => mockCreateClient(...args),
+  createClient: (url: string, key: string, options?: object) => mockCreateClient(url, key, options),
 }));
 
 function buildMockRequest(overrides: {
