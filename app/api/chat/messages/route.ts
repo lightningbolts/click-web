@@ -19,6 +19,7 @@ import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { buildMessageInsertRow, normalizeDbMessage } from '@/lib/chat/messages';
 import type { MessageType } from '@/lib/chat/types';
+import { MESSAGE_BODY_MAX_LENGTH } from '@/lib/constants/limits';
 
 const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
@@ -93,6 +94,16 @@ async function resolveChatId(
 }
 
 const DEFAULT_LIMIT = 40;
+
+function enforceMessageBodyLength(content: string, isE2EPayload: boolean): NextResponse | null {
+  if (isE2EPayload || content.length <= MESSAGE_BODY_MAX_LENGTH) {
+    return null;
+  }
+  return NextResponse.json(
+    { error: `Message must be at most ${MESSAGE_BODY_MAX_LENGTH} characters` },
+    { status: 400 },
+  );
+}
 
 export async function GET(req: NextRequest) {
   const chatId = req.nextUrl.searchParams.get('chatId');
@@ -226,6 +237,9 @@ export async function POST(req: NextRequest) {
           ? rawContent.trim()
           : rawContent.trim();
 
+    const lengthErr = enforceMessageBodyLength(wireContent, wireContent.startsWith('e2e:'));
+    if (lengthErr) return lengthErr;
+
     const insertRow = buildMessageInsertRow({
       chatId: resolvedChatId,
       userId: user.id,
@@ -300,6 +314,9 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const wireContent = typeof content === 'string' && content.startsWith('e2e:') ? content : content.trim();
+  const patchLengthErr = enforceMessageBodyLength(wireContent, wireContent.startsWith('e2e:'));
+  if (patchLengthErr) return patchLengthErr;
+
   const { data: message, error } = await supabase
     .from('messages')
     .update({ content: wireContent, time_edited: Date.now() })

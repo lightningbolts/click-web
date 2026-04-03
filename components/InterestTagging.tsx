@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Sparkles, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { INTEREST_TAG_MAX_STRING_LENGTH, INTEREST_TAGS_MAX_COUNT } from '@/lib/constants/limits';
 
 // ─── Shared interest taxonomy ───
 export interface InterestCategory {
@@ -59,7 +60,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
     const toggleTag = (tag: string) => {
         if (selected.includes(tag)) {
             setSelected(selected.filter((s) => s !== tag));
-        } else {
+        } else if (selected.length < INTEREST_TAGS_MAX_COUNT) {
             setSelected([...selected, tag]);
         }
     };
@@ -69,8 +70,9 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
     };
 
     const addCustomInterest = () => {
-        const raw = customInterestInput.trim();
+        const raw = customInterestInput.trim().slice(0, INTEREST_TAG_MAX_STRING_LENGTH);
         if (!raw) return;
+        if (selected.length >= INTEREST_TAGS_MAX_COUNT) return;
         const normalized = raw.toLowerCase();
         const exists = selected.some((s) => s.toLowerCase() === normalized);
         if (!exists) {
@@ -131,7 +133,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         expandedCategory={expandedCategory}
                         onToggleTag={toggleTag}
                         onToggleExpand={toggleExpand}
-                        maxTags={undefined}
+                        maxTags={INTEREST_TAGS_MAX_COUNT}
                     />
 
                     <div className="mt-5 space-y-2">
@@ -139,6 +141,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         <div className="flex gap-2">
                             <input
                                 value={customInterestInput}
+                                maxLength={INTEREST_TAG_MAX_STRING_LENGTH}
                                 onChange={(e) => setCustomInterestInput(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
@@ -229,12 +232,19 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                 tabIndex={0}
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
-                                onClick={() => onToggleTag(label)}
-                                className={`relative w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-sm font-medium cursor-pointer select-none ${isSelected
+                                onClick={() => {
+                                    if (maxTags != null && !isSelected && selected.length >= maxTags) return;
+                                    onToggleTag(label);
+                                }}
+                                aria-disabled={maxTags != null && !isSelected && selected.length >= maxTags}
+                                className={`relative w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-sm font-medium select-none ${maxTags != null && !isSelected && selected.length >= maxTags
+                                    ? 'opacity-30 cursor-not-allowed'
+                                    : 'cursor-pointer'
+                                    } ${isSelected
                                         ? 'bg-[#8338EC]/15 border-[#8338EC]/50 text-[#8338EC]'
                                         : hasSelectedSubs
                                             ? 'bg-[#8338EC]/5 border-[#8338EC]/20 text-zinc-200'
-                                            : 'bg-white/5 border-zinc-700/50 text-zinc-300 hover:border-zinc-600'
+                                        : 'bg-white/5 border-zinc-700/50 text-zinc-300 hover:border-zinc-600'
                                     }`}
                             >
                                 <span>{emoji}</span>

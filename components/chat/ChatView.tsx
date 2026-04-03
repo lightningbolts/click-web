@@ -34,6 +34,11 @@ import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
 import { useAuth } from '@/lib/AuthContext';
 import { replySnippetForSend } from '@/lib/chat/reply';
+import { MESSAGE_BODY_MAX_LENGTH } from '@/lib/constants/limits';
+
+function clampMessagePlaintext(plain: string): string {
+  return plain.slice(0, MESSAGE_BODY_MAX_LENGTH);
+}
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -597,7 +602,7 @@ export default function ChatView({
   // ─────────────────────────── send message ────────────────────────────────
 
   const sendMessage = useCallback(async () => {
-    const content = inputText.trim();
+    const content = clampMessagePlaintext(inputText.trim());
     if (!content || !chatId || sending || mediaBusy || isRecording) return;
 
     setSending(true);
@@ -647,7 +652,7 @@ export default function ChatView({
       if (!chatId) return;
       setMediaBusy(true);
       try {
-        const caption = inputTextRef.current.trim();
+        const caption = clampMessagePlaintext(inputTextRef.current.trim());
         setInputText('');
         const wireContent =
           e2eKeys && caption ? await encryptContent(caption, e2eKeys) : caption;
@@ -766,7 +771,7 @@ export default function ChatView({
       inputRef.current?.focus();
       try {
         const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
-        const caption = inputTextRef.current.trim();
+        const caption = clampMessagePlaintext(inputTextRef.current.trim());
         setInputText('');
         const wireContent =
           e2eKeys && caption ? await encryptContent(caption, e2eKeys) : caption;
@@ -837,7 +842,7 @@ export default function ChatView({
     const previous = messages.find((m) => m.id === editingId);
     if (!previous) return;
 
-    const newContent = editText.trim();
+    const newContent = clampMessagePlaintext(editText.trim());
     const editedAt = Date.now();
 
     setMessages((prev) => prev.map((m) => (
@@ -1251,6 +1256,7 @@ export default function ChatView({
                     <input
                       autoFocus
                       value={editText}
+                      maxLength={e2eKeys ? undefined : MESSAGE_BODY_MAX_LENGTH}
                       onChange={(e) => setEditText(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') submitEdit();
@@ -1430,6 +1436,7 @@ export default function ChatView({
             <textarea
               ref={inputRef}
               value={inputText}
+              maxLength={e2eKeys ? undefined : MESSAGE_BODY_MAX_LENGTH}
               onChange={(e) => {
                 setInputText(e.target.value);
                 broadcastTyping();

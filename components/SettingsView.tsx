@@ -10,6 +10,11 @@ import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
 import { displayNameFromUserMetadata, firstLastFromUserMetadata } from '@/lib/userDisplayName';
+import {
+  INTEREST_TAG_MAX_STRING_LENGTH,
+  INTEREST_TAGS_MAX_COUNT,
+  normalizeInterestTagsForSave,
+} from '@/lib/constants/limits';
 
 interface SettingsViewProps {
   notificationPreferences: NotificationPreferences;
@@ -147,14 +152,17 @@ export default function SettingsView({
   const toggleTag = (tag: string) => {
     const next = tags.includes(tag)
       ? tags.filter((t) => t !== tag)
-      : [...tags, tag];
+      : tags.length < INTEREST_TAGS_MAX_COUNT
+        ? [...tags, tag]
+        : tags;
     setTags(next);
     setTagsDirty(true);
   };
 
   const addCustomInterest = () => {
-    const raw = customInterestInput.trim();
+    const raw = customInterestInput.trim().slice(0, INTEREST_TAG_MAX_STRING_LENGTH);
     if (!raw) return;
+    if (tags.length >= INTEREST_TAGS_MAX_COUNT) return;
     const exists = tags.some((t) => t.toLowerCase() === raw.toLowerCase());
     if (!exists) {
       setTags([...tags, raw]);
@@ -201,8 +209,9 @@ export default function SettingsView({
       const interest_history = [...existingHistory, historyEntry].slice(-50);
 
       const updatedAt = Date.now();
+      const tagsToSave = normalizeInterestTagsForSave(tags);
       const { error: rowErr } = await supabase.from('user_interests').upsert(
-        { user_id: user.id, tags, updated_at: updatedAt },
+        { user_id: user.id, tags: tagsToSave, updated_at: updatedAt },
         { onConflict: 'user_id' },
       );
 
@@ -219,8 +228,9 @@ export default function SettingsView({
         setTagsMessage({ type: 'error', text: authErr.message });
       } else {
         await refreshUser();
+        setTags(tagsToSave);
         setTagsDirty(false);
-        setTagsMessage({ type: 'success', text: `Saved ${tags.length} interests!` });
+        setTagsMessage({ type: 'success', text: `Saved ${tagsToSave.length} interests!` });
       }
     } catch (err: any) {
       setTagsMessage({ type: 'error', text: err.message || 'Failed to save' });
@@ -516,7 +526,7 @@ export default function SettingsView({
           expandedCategory={expandedCategory}
           onToggleTag={toggleTag}
           onToggleExpand={(cat) => setExpandedCategory(expandedCategory === cat ? null : cat)}
-          maxTags={undefined}
+          maxTags={INTEREST_TAGS_MAX_COUNT}
         />
 
         <div className="mt-5 space-y-2">
@@ -524,6 +534,7 @@ export default function SettingsView({
           <div className="flex gap-2">
             <input
               value={customInterestInput}
+              maxLength={INTEREST_TAG_MAX_STRING_LENGTH}
               onChange={(e) => setCustomInterestInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {

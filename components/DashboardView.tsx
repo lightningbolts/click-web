@@ -22,6 +22,7 @@ import { ChatView } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import { deriveKeysForConnection, decryptContent, isEncrypted } from '@/lib/chat/crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
+import { normalizeInterestTagsForSave } from '@/lib/constants/limits';
 
 // Digital Memory Box components
 import {
@@ -1099,8 +1100,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
     const supabase = getSupabaseClient();
     if (supabase) {
       const updatedAt = Date.now();
+      const normalizedTags = normalizeInterestTagsForSave(tags);
       const { error } = await supabase.from('user_interests').upsert(
-        { user_id: user.id, tags, updated_at: updatedAt },
+        { user_id: user.id, tags: normalizedTags, updated_at: updatedAt },
         { onConflict: 'user_id' },
       );
       if (error) {
