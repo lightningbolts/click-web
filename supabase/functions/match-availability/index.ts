@@ -197,7 +197,6 @@ Deno.serve(async (req) => {
 
   if (matches.length > 0) {
     const m = matches[0];
-    const peerLabel = m.peer_user_id.slice(0, 8);
     push_notification = {
       title: 'Availability match',
       body: `You and a connection are both available for “${m.intent_tag}”.`,

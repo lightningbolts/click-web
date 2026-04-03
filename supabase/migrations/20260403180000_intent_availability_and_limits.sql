@@ -73,6 +73,22 @@ END $$;
 
 -- ─── 3. profiles.interests: max 5 tags, each <= 25 chars ───────────────────
 
+-- Helper: returns TRUE when every element in the array is <= max_len chars.
+-- IMMUTABLE so it can be referenced inside a CHECK constraint.
+CREATE OR REPLACE FUNCTION public.check_array_element_lengths(arr text[], max_len int)
+    RETURNS boolean
+    LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE
+    elem text;
+BEGIN
+    IF arr IS NULL THEN RETURN TRUE; END IF;
+    FOREACH elem IN ARRAY arr LOOP
+        IF char_length(elem) > max_len THEN RETURN FALSE; END IF;
+    END LOOP;
+    RETURN TRUE;
+END;
+$$;
+
 DO $$
 BEGIN
     IF EXISTS (
@@ -100,11 +116,7 @@ BEGIN
                 ADD CONSTRAINT profiles_interests_limits
                 CHECK (
                     cardinality(interests) <= 5
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM unnest(interests) AS t (tag)
-                        WHERE char_length(tag) > 25
-                    )
+                    AND public.check_array_element_lengths(interests, 25)
                 );
         END IF;
     END IF;
