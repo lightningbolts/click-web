@@ -1,8 +1,23 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
+import { isConnectionsApiRateLimited } from '@/lib/server/connectionsRateLimit';
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  if (pathname === '/api/connections' || pathname.startsWith('/api/connections/')) {
+    const { limited, retryAfterSec } = isConnectionsApiRateLimited(request);
+    if (limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(retryAfterSec) },
+        },
+      );
+    }
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -41,7 +56,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
   if (pathname === '/insights' || pathname.startsWith('/insights/')) {
     const signupUrl = new URL('/business/signup', request.url);
 
