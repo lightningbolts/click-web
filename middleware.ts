@@ -19,7 +19,7 @@ function getClientIp(request: NextRequest): string {
 }
 
 function isConnectionsApiPath(pathname: string): boolean {
-  return pathname === '/api/connections' || pathname.startsWith('/api/connections/');
+  return pathname === '/api/connections';
 }
 
 function connectionsRateLimitExceeded(ip: string): boolean {
