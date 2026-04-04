@@ -35,8 +35,10 @@ BEGIN
           AND column_name = 'body'
     ) THEN
         IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint
-            WHERE conname = 'messages_body_max_length'
+            SELECT 1 FROM pg_constraint c
+            JOIN pg_namespace n ON n.oid = c.connamespace
+            WHERE c.conname = 'messages_body_max_length'
+              AND n.nspname = 'public'
         ) THEN
             ALTER TABLE public.messages
                 ADD CONSTRAINT messages_body_max_length
@@ -50,8 +52,10 @@ BEGIN
           AND column_name = 'content'
     ) THEN
         IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint
-            WHERE conname = 'messages_body_max_length'
+            SELECT 1 FROM pg_constraint c
+            JOIN pg_namespace n ON n.oid = c.connamespace
+            WHERE c.conname = 'messages_body_max_length'
+              AND n.nspname = 'public'
         ) THEN
             ALTER TABLE public.messages
                 ADD CONSTRAINT messages_body_max_length
@@ -82,14 +86,16 @@ BEGIN
         END IF;
 
         IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint
-            WHERE conname = 'profiles_interests_limits'
+            SELECT 1 FROM pg_constraint c
+            JOIN pg_namespace n ON n.oid = c.connamespace
+            WHERE c.conname = 'profiles_interests_limits'
+              AND n.nspname = 'public'
         ) THEN
             ALTER TABLE public.profiles
                 ADD CONSTRAINT profiles_interests_limits
                 CHECK (
                     cardinality(interests) <= 5
-                    AND check_array_element_lengths(interests, 25)
+                    AND public.check_array_element_lengths(interests, 25)
                 );
         END IF;
     END IF;
