@@ -15,7 +15,8 @@ import {
   BookOpen,
   Sparkles,
   MessageCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Clock,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import { ChatView } from '@/components/chat';
@@ -86,6 +87,14 @@ import {
   extractWeatherSummary,
   normalizeNoiseCategory,
 } from '@/lib/dashboard/connectionExtras';
+import {
+  connectionRecordToArchiveRow,
+  formatArchiveCountdownLabel,
+  getArchiveCountdown,
+  isActiveChatListStatus,
+  normalizeConnectionStatus,
+  shouldShowArchiveWarning,
+} from '@/lib/dashboard/connectionStatus';
 
 type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
 
@@ -134,6 +143,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [callOverlayState, setCallOverlayState] = useState<WebCallOverlayState>(IDLE_CALL_OVERLAY);
   const [activeCallState, setActiveCallState] = useState<WebActiveCallState>(IDLE_ACTIVE_CALL);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  /** Re-render countdown labels periodically */
+  const [archiveCountdownTick, setArchiveCountdownTick] = useState(0);
   const outboundCallChannelsRef = useRef<Map<string, any>>(new Map());
   const activeInviteRef = useRef<WebCallInvite | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -977,7 +988,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     const loadChatMetadata = async () => {
       const connectionIds = connectionRecords
-        .filter((connection) => connection.status === 'kept' || connection.status === 'pending')
+        .filter((connection) => isActiveChatListStatus(connection.status))
         .map((connection) => connection.id);
 
       if (connectionIds.length === 0) {
@@ -1236,6 +1247,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
             'Connection';
 
           const raw = conn as Record<string, unknown>;
+          const createdMs =
+            typeof conn.created === 'number' && Number.isFinite(conn.created)
+              ? conn.created
+              : new Date(conn.created_utc || conn.created_at || 0).getTime();
 
           return {
             id: conn.id,
@@ -1248,7 +1263,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
             weatherSummary: extractWeatherSummary(raw),
             noiseSummary: extractNoiseSummary(raw),
             noiseCategory: normalizeNoiseCategory(raw),
-            status: conn.status || 'kept',
+            status: normalizeConnectionStatus(raw),
+            lastMessageAt:
+              typeof conn.last_message_at === 'number' && Number.isFinite(conn.last_message_at)
+                ? conn.last_message_at
+                : null,
+            connectionCreatedMs: Number.isFinite(createdMs) ? createdMs : undefined,
+            hasBegun: conn.has_begun === true,
+            expiryState: typeof conn.expiry_state === 'string' ? conn.expiry_state : null,
             geo_location: geoLoc,
           };
         });
@@ -1422,6 +1444,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [archiveStorageKey, archiveTableAvailable, isMissingArchiveTableError, user?.id, writeArchivedToLocalStorage]);
 
   useEffect(() => {
+    const id = setInterval(() => setArchiveCountdownTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedConnection) return;
+    if (!connectionRecords.some((c) => c.id === selectedConnection.id)) {
+      setSelectedConnection(null);
+    }
+  }, [connectionRecords, selectedConnection]);
+
+  useEffect(() => {
     if (!user?.id) return;
 
     const loadBlocks = async () => {
@@ -1542,9 +1576,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const removeConnection = useCallback(async (connectionId: string): Promise<boolean> => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return false;
-
     const prev = connectionRecords;
     setConnectionRecords((records) => records.filter((record) => record.id !== connectionId));
     updateArchivedIds((ids) => {
@@ -1554,22 +1585,26 @@ export default function DashboardView({ user }: DashboardViewProps) {
     });
 
     try {
-      const { error } = await supabase
-        .from('connections')
-        .delete()
-        .eq('id', connectionId);
-
-      if (error) {
-        throw error;
+      const headers = await getAuthHeaders();
+      const res = await fetch(
+        `/api/connections?connectionId=${encodeURIComponent(connectionId)}`,
+        { method: 'DELETE', headers },
+      );
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || 'Remove failed');
       }
       setMenuConnectionId(null);
+      if (selectedConnection?.id === connectionId) {
+        setSelectedConnection(null);
+      }
       return true;
     } catch (err) {
       console.error('Error removing connection:', err);
       setConnectionRecords(prev);
       return false;
     }
-  }, [connectionRecords, updateArchivedIds]);
+  }, [connectionRecords, getAuthHeaders, selectedConnection?.id, updateArchivedIds]);
 
   const reportConnection = useCallback(async (connectionId: string, reason: string): Promise<boolean> => {
     const trimmedReason = reason.trim();
@@ -1669,7 +1704,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const chatCandidates = useMemo(
     () => connectionRecords
-      .filter((c) => c.status === 'kept' || c.status === 'pending')
+      .filter((c) => isActiveChatListStatus(c.status))
       .map((connection) => {
         const metadata = chatMetadataByConnectionId[connection.id];
         return {
@@ -2051,6 +2086,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                               const isArchived = archivedConnectionIds.has(conn.id);
                               const previewText = conn.chatPreview?.trim() || 'No messages yet';
                               const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
+                              const archiveRow = connectionRecordToArchiveRow(conn);
+                              const archiveInfo = getArchiveCountdown(archiveRow);
+                              const archiveWarning =
+                                archiveInfo && shouldShowArchiveWarning(archiveInfo)
+                                  ? formatArchiveCountdownLabel(archiveInfo)
+                                  : null;
                               const menuOpensUpward = index >= visibleChatConnections.length - 2;
                               const listPeerId =
                                 conn.otherUserId ??
@@ -2112,6 +2153,16 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
+                                      {archiveWarning && !isArchived ? (
+                                        <p
+                                          className={`mt-1.5 flex items-center gap-1 truncate pr-2 text-[11px] ${
+                                            archiveInfo?.isUrgent ? 'text-amber-300' : 'text-zinc-500'
+                                          }`}
+                                        >
+                                          <Clock className="h-3 w-3 shrink-0" aria-hidden />
+                                          <span className="truncate">{archiveWarning}</span>
+                                        </p>
+                                      ) : null}
                                     </div>
                                     <div className="flex shrink-0 items-center self-start pt-0.5 pl-2">
                                       <div className="flex min-w-0 items-center justify-end gap-2">

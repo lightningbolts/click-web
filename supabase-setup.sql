@@ -34,3 +34,38 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT INSERT ON public.waitlist TO anon;
 GRANT SELECT ON public.waitlist TO authenticated;
 
+-- ─── Connections lifecycle (`status`) ────────────────────────────────────────
+-- Mobile auto-archive sets `archived`; user removal sets `removed`.
+-- Run on existing projects that already have `public.connections`.
+
+DO $$ BEGIN
+  CREATE TYPE public.connection_lifecycle_status AS ENUM (
+    'pending',
+    'active',
+    'kept',
+    'archived',
+    'removed'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE public.connections
+  ADD COLUMN IF NOT EXISTS status public.connection_lifecycle_status;
+
+COMMENT ON COLUMN public.connections.status IS
+  'Lifecycle: pending → active/kept; auto-archived after inactivity; removed = soft delete for analytics.';
+
+-- Default legacy rows to a sensible state (nullable column stays allowed for older clients).
+UPDATE public.connections
+SET status = 'pending'
+WHERE status IS NULL AND COALESCE(has_begun, false) = false;
+
+UPDATE public.connections
+SET status = 'kept'
+WHERE status IS NULL AND expiry_state = 'kept';
+
+UPDATE public.connections
+SET status = 'active'
+WHERE status IS NULL AND COALESCE(has_begun, false) = true AND expiry_state IS DISTINCT FROM 'kept';
+

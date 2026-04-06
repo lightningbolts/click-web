@@ -2,12 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import type { ConnectionLifecycleStatus } from '@/types/connection';
 
 /**
  * Connections API
  *
- * GET  → Fetch connections for the authenticated user
- * POST → Create a new connection with proximity validation (Layers 2 & 3)
+ * GET    → Fetch connections for the authenticated user
+ * POST   → Create a new connection with proximity validation (Layers 2 & 3)
+ * DELETE → Soft-remove: set `status` to `removed` (retains row for analytics)
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -266,6 +268,13 @@ async function enrichMemoryCapsuleWeather(
 
 // ─── GET — fetch user's connections ──────────────────────────────────────────
 
+const INSIGHTS_QUERY_PARAM = 'includeInsights';
+
+function isInsightsScope(searchParams: URLSearchParams): boolean {
+  const v = searchParams.get(INSIGHTS_QUERY_PARAM);
+  return v === '1' || v?.toLowerCase() === 'true';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseSSRClient();
@@ -275,12 +284,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch connections for the user
-    const { data: connections, error } = await supabase
+    const insights = isInsightsScope(request.nextUrl.searchParams);
+
+    // Active dashboard/chat views omit auto-archived and user-removed rows.
+    // Business Insights callers pass `?includeInsights=1` to include every lifecycle state.
+    let query = supabase
       .from('connections')
       .select('*')
       .contains('user_ids', [user.id])
       .order('created', { ascending: false });
+
+    if (!insights) {
+      // Omit server-side archived/removed; legacy null `status` stays visible.
+      query = query.or('status.is.null,status.eq.pending,status.eq.active,status.eq.kept');
+    }
+
+    const { data: connections, error } = await query;
 
     if (error) {
       console.error('Error fetching connections:', error);
@@ -290,6 +309,61 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ connections: connections || [] });
   } catch (error) {
     console.error('Server error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ─── DELETE — soft remove (status = removed) ─────────────────────────────────
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createSupabaseSSRClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const connectionId =
+      request.nextUrl.searchParams.get('connectionId') ??
+      request.nextUrl.searchParams.get('id');
+    if (!connectionId?.trim()) {
+      return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: row, error: fetchError } = await adminClient
+      .from('connections')
+      .select('id, user_ids')
+      .eq('id', connectionId.trim())
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('Connection lookup error:', fetchError);
+      return NextResponse.json({ error: fetchError.message }, { status: 400 });
+    }
+
+    const ids = (row?.user_ids as string[] | null) ?? [];
+    if (!row || !ids.includes(user.id)) {
+      return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
+    }
+
+    const removedStatus: ConnectionLifecycleStatus = 'removed';
+    const { data: updated, error: updateError } = await adminClient
+      .from('connections')
+      .update({ status: removedStatus })
+      .eq('id', connectionId.trim())
+      .select()
+      .maybeSingle();
+
+    if (updateError) {
+      console.error('Connection soft-delete error:', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, connection: updated });
+  } catch (error) {
+    console.error('Connection DELETE error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -338,13 +412,22 @@ export async function POST(request: NextRequest) {
     const adminClient = createAdminClient();
 
     // Check if connection already exists
-    const { data: existing } = await adminClient
+    const { data: existingRows, error: existingErr } = await adminClient
       .from('connections')
-      .select('id')
-      .contains('user_ids', [userId1, userId2])
-      .maybeSingle();
+      .select('id, status')
+      .contains('user_ids', [userId1, userId2]);
 
-    if (existing) {
+    if (existingErr) {
+      console.error('Connection duplicate check error:', existingErr);
+      return NextResponse.json({ error: existingErr.message }, { status: 500 });
+    }
+
+    const blocksNewConnection = (existingRows ?? []).some((r) => {
+      const s = r.status as string | null | undefined;
+      return s !== 'removed' && s !== 'archived';
+    });
+
+    if (blocksNewConnection) {
       return NextResponse.json({ error: 'Connection already exists' }, { status: 409 });
     }
 
@@ -430,6 +513,7 @@ export async function POST(request: NextRequest) {
       expiry,
       should_continue: [false, false],
       has_begun: false,
+      status: 'pending' as ConnectionLifecycleStatus,
       expiry_state: 'pending',
       proximity_confidence: proximityConfidence,
       proximity_signals: proximitySignals,
