@@ -95,7 +95,9 @@ export function buildDashboardMetrics(connections: ConnectionRecord[], now = new
   const thisMonth = countConnectionsThisMonth(connections, now);
   const lastMonth = countConnectionsLastMonth(connections, now);
   const streak = computeConnectionStreak(connections);
-  const keptCount = connections.filter((c) => c.status === 'kept').length;
+  const keptCount = connections.filter(
+    (c) => c.status === 'kept' || c.status === 'active',
+  ).length;
   const retentionRate =
     totalConnections > 0 ? Math.round((keptCount / totalConnections) * 100) : 0;
   const thisMonthTrendPercent = computeThisMonthVsLastMonthPercent(thisMonth, lastMonth);

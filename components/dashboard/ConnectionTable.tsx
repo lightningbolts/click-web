@@ -15,6 +15,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
+import type { ConnectionDisplayStatus } from '@/lib/dashboard/connectionStatus';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -34,7 +35,13 @@ export interface ConnectionRecord {
   noiseSummary?: string;
   /** Tier for volume-bar display (1 / 2 / 3 bars) */
   noiseCategory?: NoiseLevelKey;
-  status: 'kept' | 'expired' | 'pending';
+  status: ConnectionDisplayStatus;
+  /** Server `last_message_at` (ms) for auto-archive countdowns in the dashboard */
+  lastMessageAt?: number | null;
+  /** Raw `created` (ms) from Supabase when available */
+  connectionCreatedMs?: number;
+  hasBegun?: boolean;
+  expiryState?: string | null;
   avatarUrl?: string;
   geo_location?: {
     latitude: number;
@@ -82,7 +89,9 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('dateMet');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'kept' | 'expired' | 'pending'>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'kept' | 'active' | 'pending' | 'archived' | 'removed' | 'expired'
+  >('all');
 
   // Filter and sort connections
   const filteredConnections = useMemo(() => {
@@ -150,6 +159,27 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
             Kept
           </span>
         );
+      case 'active':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">
+            <MessageCircle className="w-3 h-3" />
+            Active
+          </span>
+        );
+      case 'archived':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-600/20 text-zinc-300 border border-zinc-600/30">
+            <Calendar className="w-3 h-3" />
+            Archived
+          </span>
+        );
+      case 'removed':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-red-500/10 text-red-300 border border-red-500/20">
+            <XCircle className="w-3 h-3" />
+            Removed
+          </span>
+        );
       case 'expired':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
@@ -178,9 +208,9 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
   // Stats
   const stats = {
     total: connections.length,
-    kept: connections.filter(c => c.status === 'kept').length,
-    expired: connections.filter(c => c.status === 'expired').length,
-    pending: connections.filter(c => c.status === 'pending').length,
+    kept: connections.filter((c) => c.status === 'kept').length,
+    active: connections.filter((c) => c.status === 'active').length,
+    pending: connections.filter((c) => c.status === 'pending').length,
   };
 
   return (
@@ -195,6 +225,10 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           <div className="text-sm">
             <span className="text-zinc-500">Kept:</span>{' '}
             <span className="text-green-400 font-semibold">{stats.kept}</span>
+          </div>
+          <div className="text-sm">
+            <span className="text-zinc-500">Active:</span>{' '}
+            <span className="text-sky-300 font-semibold">{stats.active}</span>
           </div>
           <div className="text-sm">
             <span className="text-zinc-500">Pending:</span>{' '}
@@ -236,8 +270,11 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           >
             <option value="all">All Status</option>
             <option value="kept">Kept</option>
+            <option value="active">Active</option>
             <option value="pending">Pending</option>
+            <option value="archived">Archived</option>
             <option value="expired">Expired</option>
+            <option value="removed">Removed</option>
           </select>
         </div>
       </div>

@@ -259,9 +259,11 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
       <AnimatePresence>
         {selectedChapter && (() => {
           const conns = selectedChapter.connections ?? [];
-          const kept    = conns.filter(c => c.status === 'kept').length;
-          const pending = conns.filter(c => c.status === 'pending').length;
-          const expired = conns.filter(c => c.status === 'expired').length;
+          const kept = conns.filter((c) => c.status === 'kept').length;
+          const active = conns.filter((c) => c.status === 'active').length;
+          const pending = conns.filter((c) => c.status === 'pending').length;
+          const archived = conns.filter((c) => c.status === 'archived').length;
+          const expired = conns.filter((c) => c.status === 'expired').length;
 
           // Unique active days
           const activeDays = new Set(conns.map(c =>
@@ -297,11 +299,13 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                 </div>
 
                 {/* Activity stats — kept / pending / expired / active days */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {[
-                    { label: 'Kept',    value: kept,       color: 'text-green-400',   bg: 'bg-green-500/10' },
-                    { label: 'Pending', value: pending,    color: 'text-amber-400',   bg: 'bg-amber-500/10' },
-                    { label: 'Expired', value: expired,    color: 'text-zinc-500',    bg: 'bg-zinc-700/30'  },
+                    { label: 'Kept', value: kept, color: 'text-green-400', bg: 'bg-green-500/10' },
+                    { label: 'Active', value: active, color: 'text-sky-300', bg: 'bg-sky-500/10' },
+                    { label: 'Pending', value: pending, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+                    { label: 'Archived', value: archived, color: 'text-zinc-400', bg: 'bg-zinc-700/30' },
+                    { label: 'Expired', value: expired, color: 'text-zinc-500', bg: 'bg-zinc-800/40' },
                     { label: 'Active days', value: activeDays, color: 'text-[#8338EC]', bg: 'bg-[#8338EC]/10' },
                   ].map(({ label, value, color, bg }) => (
                     <div key={label} className={`${bg} rounded-xl p-3 text-center`}>
@@ -366,15 +370,26 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                             </span>
                           )}
                           {/* Status */}
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
-                            conn.status === 'kept'    ? 'bg-green-500/10 text-green-400' :
-                            conn.status === 'pending' ? 'bg-amber-500/10 text-amber-400' :
-                                                        'bg-zinc-700/40 text-zinc-500'
-                          }`}>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
+                              conn.status === 'kept'
+                                ? 'bg-green-500/10 text-green-400'
+                                : conn.status === 'active'
+                                  ? 'bg-sky-500/10 text-sky-300'
+                                  : conn.status === 'pending'
+                                    ? 'bg-amber-500/10 text-amber-400'
+                                    : conn.status === 'archived' || conn.status === 'removed'
+                                      ? 'bg-zinc-700/50 text-zinc-400'
+                                      : 'bg-zinc-700/40 text-zinc-500'
+                            }`}
+                          >
                             {conn.status}
                           </span>
                           {/* Chat CTA — visible on hover */}
-                          {onConnectionClick && conn.status !== 'expired' && (
+                          {onConnectionClick &&
+                            conn.status !== 'expired' &&
+                            conn.status !== 'archived' &&
+                            conn.status !== 'removed' && (
                             <button
                               onClick={() => onConnectionClick(conn)}
                               className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC] text-white shrink-0 transition-opacity"

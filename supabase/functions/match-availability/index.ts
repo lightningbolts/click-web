@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
 
   const { data: connections, error: connErr } = await admin
     .from('connections')
-    .select('id, user_ids, should_continue, expiry_state')
+    .select('id, user_ids, should_continue, expiry_state, status')
     .contains('user_ids', [userId]);
 
   if (connErr) {
@@ -104,6 +104,8 @@ Deno.serve(async (req) => {
   const connectionByPeer = new Map<string, string>();
 
   for (const row of connections ?? []) {
+    const st = (row as { status?: string | null }).status;
+    if (st === 'archived' || st === 'removed') continue;
     if (!isMutuallyKept(row)) continue;
     const ids = (row.user_ids as string[] | null) ?? [];
     const peer = ids.find((id) => id !== userId);
