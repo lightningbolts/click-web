@@ -1,12 +1,17 @@
 /**
- * Renders the Click squircle logo (SVG) to PNGs in public/ and a multi-size favicon.ico.
+ * Renders app/favicon.ico to PNGs in public/ and a multi-size favicon.ico.
  * Run: node scripts/generate-brand-icons.mjs
- * Replace the SVG paths if swapping in exported art from ClickLogo2.png.
+ *
+ * Sharp cannot read BMP-embedded .ico files; decode-ico expands them to raw RGBA / PNG payloads.
  */
+import { createRequire } from 'module';
 import sharp from 'sharp';
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+
+const require = createRequire(import.meta.url);
+const decodeIco = require('decode-ico');
 
 /** Single-file .ico containing one or more embedded PNGs (Windows 7+). */
 function icoFromPngs(images) {
@@ -37,30 +42,47 @@ function icoFromPngs(images) {
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const publicDir = join(__dirname, '..', 'public');
+const rootDir = join(__dirname, '..');
+const appDir = join(rootDir, 'app');
+const publicDir = join(rootDir, 'public');
+const sourceIco = join(appDir, 'favicon.ico');
 
-const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4c1d95"/>
-      <stop offset="55%" style="stop-color:#7c3aed"/>
-      <stop offset="100%" style="stop-color:#a78bfa"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
-  <path fill="#ffffff" d="M96 416 L96 256 L256 96 L416 256 L416 416 L320 416 L320 288 L256 222 L192 288 L192 416 Z"/>
-</svg>`;
+/** Largest image in the ICO as a sharp instance (RGBA or embedded PNG). */
+function sharpFromIcoFile(path) {
+  const buf = readFileSync(path);
+  const images = decodeIco(buf);
+  if (!images.length) {
+    throw new Error(`No images in ${path}`);
+  }
+  const best = images.reduce((a, b) =>
+    a.width * a.height >= b.width * b.height ? a : b,
+  );
+  if (best.type === 'png') {
+    return sharp(Buffer.from(best.data)).ensureAlpha();
+  }
+  return sharp(Buffer.from(best.data), {
+    raw: {
+      width: best.width,
+      height: best.height,
+      channels: 4,
+    },
+  }).ensureAlpha();
+}
 
 async function main() {
-  const buf = Buffer.from(svg);
+  if (!existsSync(sourceIco)) {
+    console.error(`Missing source favicon: ${sourceIco}`);
+    process.exit(1);
+  }
 
-  await sharp(buf).resize(512, 512).png().toFile(join(publicDir, 'icon.png'));
-  await sharp(buf).resize(180, 180).png().toFile(join(publicDir, 'apple-touch-icon.png'));
+  const base = sharpFromIcoFile(sourceIco);
 
-  const png16 = await sharp(buf).resize(16, 16).png().toBuffer();
-  const png32 = await sharp(buf).resize(32, 32).png().toBuffer();
-  const png48 = await sharp(buf).resize(48, 48).png().toBuffer();
+  await base.clone().resize(512, 512).png().toFile(join(publicDir, 'icon.png'));
+  await base.clone().resize(180, 180).png().toFile(join(publicDir, 'apple-touch-icon.png'));
+
+  const png16 = await base.clone().resize(16, 16).png().toBuffer();
+  const png32 = await base.clone().resize(32, 32).png().toBuffer();
+  const png48 = await base.clone().resize(48, 48).png().toBuffer();
 
   writeFileSync(
     join(publicDir, 'favicon.ico'),
@@ -71,7 +93,7 @@ async function main() {
     ]),
   );
 
-  console.log('Wrote public/icon.png, apple-touch-icon.png, favicon.ico');
+  console.log('Wrote public/icon.png, apple-touch-icon.png, favicon.ico (from app/favicon.ico)');
 }
 
 main().catch((e) => {
