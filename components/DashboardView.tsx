@@ -2087,7 +2087,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                               const previewText = conn.chatPreview?.trim() || 'No messages yet';
                               const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
                               const archiveRow = connectionRecordToArchiveRow(conn);
-                              const archiveInfo = getArchiveCountdown(archiveRow);
+                              const archiveInfo = getArchiveCountdown(archiveRow, Date.now());
                               const archiveWarning =
                                 archiveInfo && shouldShowArchiveWarning(archiveInfo)
                                   ? formatArchiveCountdownLabel(archiveInfo)
