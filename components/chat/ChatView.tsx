@@ -35,6 +35,12 @@ import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
 import { useAuth } from '@/lib/AuthContext';
 import { replySnippetForSend } from '@/lib/chat/reply';
+import {
+  AVAILABILITY_INTENT_BUBBLE_CLASS,
+  INTEREST_TAG_BUBBLE_CLASS,
+  SHARED_INTEREST_BUBBLE_CLASS,
+  humanizeAvailabilityTimeframe,
+} from '@/lib/userProfile/availabilityIntentDisplay';
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -178,7 +184,12 @@ export default function ChatView({
   const [mediaBusy, setMediaBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
+  const [peerInterestTags, setPeerInterestTags] = useState<string[]>([]);
   const [sharedInterestTags, setSharedInterestTags] = useState<string[]>([]);
+  const [peerAvailabilityIntents, setPeerAvailabilityIntents] = useState<
+    { id: string; timeframe: string; intent_tag: string; expires_at: string }[]
+  >([]);
+  const [peerIntentSweepExpired, setPeerIntentSweepExpired] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -315,7 +326,10 @@ export default function ChatView({
 
   useEffect(() => {
     if (!peerUserId) {
+      setPeerInterestTags([]);
       setSharedInterestTags([]);
+      setPeerAvailabilityIntents([]);
+      setPeerIntentSweepExpired(false);
       return;
     }
     let cancelled = false;
@@ -327,16 +341,45 @@ export default function ChatView({
           { headers },
         );
         const json = (await res.json().catch(() => ({}))) as {
+          tags?: unknown;
           sharedInterestTags?: unknown;
+          availabilityIntents?: unknown;
+          intent_sweep_expired?: unknown;
         };
         if (!res.ok || cancelled) return;
-        const raw = json.sharedInterestTags;
-        const tags = Array.isArray(raw)
-          ? raw.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        const rawPeer = json.tags;
+        const peerTags = Array.isArray(rawPeer)
+          ? rawPeer.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
           : [];
-        if (!cancelled) setSharedInterestTags(tags);
+        const rawShared = json.sharedInterestTags;
+        const shared = Array.isArray(rawShared)
+          ? rawShared.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+          : [];
+        const rawIntents = json.availabilityIntents;
+        const intents = Array.isArray(rawIntents)
+          ? rawIntents.filter(
+              (r): r is { id: string; timeframe: string; intent_tag: string; expires_at: string } =>
+                !!r &&
+                typeof r === 'object' &&
+                typeof (r as { id?: string }).id === 'string' &&
+                typeof (r as { timeframe?: string }).timeframe === 'string' &&
+                typeof (r as { intent_tag?: string }).intent_tag === 'string' &&
+                typeof (r as { expires_at?: string }).expires_at === 'string',
+            )
+          : [];
+        if (!cancelled) {
+          setPeerInterestTags(peerTags);
+          setSharedInterestTags(shared);
+          setPeerAvailabilityIntents(intents);
+          setPeerIntentSweepExpired(json.intent_sweep_expired === true);
+        }
       } catch {
-        if (!cancelled) setSharedInterestTags([]);
+        if (!cancelled) {
+          setPeerInterestTags([]);
+          setSharedInterestTags([]);
+          setPeerAvailabilityIntents([]);
+          setPeerIntentSweepExpired(false);
+        }
       }
     })();
     return () => {
@@ -1215,27 +1258,70 @@ export default function ChatView({
         </div>
       </div>
 
-      {sharedInterestTags.length > 0 && (
-        <div className="glass mb-3 shrink-0 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
+      <div className="mb-3 shrink-0 space-y-3">
+        <div className="glass rounded-2xl border border-zinc-800/90 bg-zinc-900/35 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Interests</p>
+          {peerInterestTags.length === 0 ? (
+            <p className="mt-1 text-[11px] text-zinc-500">They have not shared interests yet</p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {peerInterestTags.map((t) => (
+                <span key={t} className={INTEREST_TAG_BUBBLE_CLASS}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="glass rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200/90">
             <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Conversation starters
+            Shared interests
           </div>
           <p className="mt-1 text-[11px] text-zinc-500">
-            Shared interests — try weaving one into your next message
+            Compared with your tags — conversation starters you both listed
           </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {sharedInterestTags.map((t) => (
-              <span
-                key={t}
-                className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-100"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
+          {sharedInterestTags.length === 0 ? (
+            <p className="mt-2 text-[11px] text-zinc-500">No overlap yet</p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {sharedInterestTags.map((t) => (
+                <span key={t} className={SHARED_INTEREST_BUBBLE_CLASS}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="glass rounded-2xl border border-[#3A86FF]/15 bg-[#3A86FF]/[0.05] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-200/85">
+            Availability intents
+          </p>
+          {peerIntentSweepExpired ? (
+            <p className="mt-1 text-[11px] text-amber-200/90">
+              Their availability is being refreshed — nothing active to show.
+            </p>
+          ) : peerAvailabilityIntents.length === 0 ? (
+            <p className="mt-1 text-[11px] text-zinc-500">No intents shared yet</p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {peerAvailabilityIntents.map((row) => (
+                <span
+                  key={row.id}
+                  className={`inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 ${AVAILABILITY_INTENT_BUBBLE_CLASS}`}
+                >
+                  <span className="font-medium">{row.intent_tag.trim()}</span>
+                  <span className="text-[10px] text-sky-200/75">
+                    {humanizeAvailabilityTimeframe(row.timeframe)}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── Messages area ── */}
       <div

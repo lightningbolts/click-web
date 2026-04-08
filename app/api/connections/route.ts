@@ -10,7 +10,10 @@ import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatu
  *
  * GET    → Fetch connections for the authenticated user
  * POST   → Create a new connection with proximity validation (Layers 2 & 3)
- * DELETE → Soft-remove: set `status` to `removed` (retains row for analytics)
+ * DELETE → Per-user hide: insert `connection_hidden` (no `connections` row delete)
+ *
+ * Visibility uses junction tables `connection_archives` and `connection_hidden`, not
+ * `connections.status` values `archived` / `removed`.
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -210,6 +213,40 @@ function toIconCode(weatherCode: number): string {
   return 'clear';
 }
 
+async function fetchConnectionIdsForUser(
+  adminClient: ReturnType<typeof createAdminClient>,
+  table: 'connection_archives' | 'connection_hidden',
+  userId: string,
+): Promise<Set<string>> {
+  const { data, error } = await adminClient.from(table).select('connection_id').eq('user_id', userId);
+  if (error) {
+    console.error(`connections API: ${table} lookup`, error);
+    return new Set();
+  }
+  return new Set(
+    (data ?? [])
+      .map((row: { connection_id?: string }) =>
+        typeof row.connection_id === 'string' ? row.connection_id : '',
+      )
+      .filter(Boolean),
+  );
+}
+
+function filterConnectionsByVisibility(
+  rows: Record<string, unknown>[],
+  hiddenIds: Set<string>,
+  archivedIds: Set<string>,
+  mode: 'active' | 'archived',
+): Record<string, unknown>[] {
+  return rows.filter((row) => {
+    const id = typeof row.id === 'string' ? row.id : '';
+    if (!id || hiddenIds.has(id)) return false;
+    const isLegacyArchived = row.status === 'archived';
+    if (mode === 'active') return !archivedIds.has(id) && !isLegacyArchived;
+    return archivedIds.has(id) || isLegacyArchived;
+  });
+}
+
 async function enrichMemoryCapsuleWeather(
   adminClient: ReturnType<typeof createAdminClient>,
   connectionId: string,
@@ -290,31 +327,45 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const insights = isInsightsScope(searchParams);
 
-    // Active dashboard/chat views omit auto-archived and user-removed rows.
-    // Archived tab: `?statusScope=archived`. Insights: `?includeInsights=1` for every lifecycle state.
     let query = supabase
       .from('connections')
       .select('*')
       .contains('user_ids', [user.id])
       .order('created', { ascending: false });
 
+    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
+
     if (!insights) {
-      const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
       if (scope === 'archived') {
-        query = query.eq('status', 'archived');
+        query = query.or(`${ACTIVE_CONNECTIONS_DB_OR_FILTER},status.eq.archived`);
       } else {
         query = query.or(ACTIVE_CONNECTIONS_DB_OR_FILTER);
       }
     }
 
-    const { data: connections, error } = await query;
+    const { data: connectionsRaw, error } = await query;
 
     if (error) {
       console.error('Error fetching connections:', error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ connections: connections || [] });
+    const rows = (connectionsRaw ?? []) as Record<string, unknown>[];
+
+    if (insights) {
+      return NextResponse.json({ connections: rows });
+    }
+
+    const adminClient = createAdminClient();
+    const [hiddenIds, archivedIds] = await Promise.all([
+      fetchConnectionIdsForUser(adminClient, 'connection_hidden', user.id),
+      fetchConnectionIdsForUser(adminClient, 'connection_archives', user.id),
+    ]);
+
+    const mode = scope === 'archived' ? 'archived' : 'active';
+    const connections = filterConnectionsByVisibility(rows, hiddenIds, archivedIds, mode);
+
+    return NextResponse.json({ connections });
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -371,24 +422,42 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    if (row.status !== 'archived') {
-      return NextResponse.json(
-        { error: 'Only archived connections can be restored' },
-        { status: 409 },
-      );
+    const { error: delArchiveErr } = await adminClient
+      .from('connection_archives')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('connection_id', connectionId);
+
+    if (delArchiveErr) {
+      console.error('Connection restore (archive junction) error:', delArchiveErr);
+      return NextResponse.json({ error: delArchiveErr.message }, { status: 400 });
     }
 
-    const activeStatus: ConnectionLifecycleStatus = 'active';
-    const { data: updated, error: updateError } = await adminClient
-      .from('connections')
-      .update({ status: activeStatus })
-      .eq('id', connectionId)
-      .select()
-      .maybeSingle();
-
-    if (updateError) {
-      console.error('Connection restore error:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    let updated: Record<string, unknown> | null = null;
+    if (row.status === 'archived') {
+      const activeStatus: ConnectionLifecycleStatus = 'active';
+      const { data: rowUpdated, error: updateError } = await adminClient
+        .from('connections')
+        .update({ status: activeStatus })
+        .eq('id', connectionId)
+        .select()
+        .maybeSingle();
+      if (updateError) {
+        console.error('Connection restore status error:', updateError);
+        return NextResponse.json({ error: updateError.message }, { status: 400 });
+      }
+      updated = rowUpdated as Record<string, unknown> | null;
+    } else {
+      const { data: refreshed, error: fetchErr } = await adminClient
+        .from('connections')
+        .select('*')
+        .eq('id', connectionId)
+        .maybeSingle();
+      if (fetchErr) {
+        console.error('Connection restore fetch error:', fetchErr);
+        return NextResponse.json({ error: fetchErr.message }, { status: 400 });
+      }
+      updated = refreshed as Record<string, unknown> | null;
     }
 
     return NextResponse.json({ success: true, connection: updated });
@@ -398,7 +467,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// ─── DELETE — soft remove (status = removed) ─────────────────────────────────
+// ─── DELETE — per-user hide (`connection_hidden`) ────────────────────────────
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -416,11 +485,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     const adminClient = createAdminClient();
+    const cid = connectionId.trim();
 
     const { data: row, error: fetchError } = await adminClient
       .from('connections')
       .select('id, user_ids')
-      .eq('id', connectionId.trim())
+      .eq('id', cid)
       .maybeSingle();
 
     if (fetchError) {
@@ -433,17 +503,34 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    const removedStatus: ConnectionLifecycleStatus = 'removed';
-    const { data: updated, error: updateError } = await adminClient
+    const { error: delArchiveErr } = await adminClient
+      .from('connection_archives')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('connection_id', cid);
+    if (delArchiveErr) {
+      console.error('connection_archives cleanup on hide:', delArchiveErr);
+    }
+
+    const { error: insertErr } = await adminClient.from('connection_hidden').insert({
+      user_id: user.id,
+      connection_id: cid,
+    });
+
+    if (insertErr && insertErr.code !== '23505') {
+      console.error('connection_hidden insert error:', insertErr);
+      return NextResponse.json({ error: insertErr.message }, { status: 400 });
+    }
+
+    const { data: updated, error: refetchErr } = await adminClient
       .from('connections')
-      .update({ status: removedStatus })
-      .eq('id', connectionId.trim())
-      .select()
+      .select('*')
+      .eq('id', cid)
       .maybeSingle();
 
-    if (updateError) {
-      console.error('Connection soft-delete error:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    if (refetchErr) {
+      console.error('Connection refetch after hide:', refetchErr);
+      return NextResponse.json({ error: refetchErr.message }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, connection: updated });
@@ -507,6 +594,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: existingErr.message }, { status: 500 });
     }
 
+    // Per-user `connection_hidden` must not allow a second row: the connection is shared;
+    // the other party would still see the original. Reconnect after hide requires un-hiding
+    // or a dedicated product flow, not a duplicate insert.
     const blocksNewConnection = (existingRows ?? []).some((r) => {
       const s = r.status as string | null | undefined;
       return s !== 'removed' && s !== 'archived';

@@ -40,7 +40,7 @@ export async function GET(
     const [userRes, interestsRes, availRes] = await Promise.all([
       supabase
         .from('users')
-        .select('id, first_name, last_name, name, full_name, birthday, image, email')
+        .select('id, first_name, last_name, name, full_name, birthday, image, email, last_intent_update_at')
         .eq('id', userId)
         .maybeSingle(),
       supabase.from('user_interests').select('tags').eq('user_id', userId).maybeSingle(),
@@ -49,20 +49,34 @@ export async function GET(
 
     const profileTags = (interestsRes.data as { tags?: string[] } | null)?.tags ?? [];
 
+    const lastIntentUpdateAt =
+      userRes.data &&
+      typeof (userRes.data as { last_intent_update_at?: string }).last_intent_update_at === 'string'
+        ? (userRes.data as { last_intent_update_at: string }).last_intent_update_at
+        : null;
+
+    const MS_24H = 24 * 60 * 60 * 1000;
+    const intentSweepExpired =
+      !!lastIntentUpdateAt &&
+      Number.isFinite(Date.parse(lastIntentUpdateAt)) &&
+      Date.now() - Date.parse(lastIntentUpdateAt) >= MS_24H;
+
     let availabilityIntents: AvailabilityIntentPayload[] = [];
     try {
-      const admin = createAdminClient();
-      const { data: intentRows, error: intentErr } = await admin
-        .from('availability_intents')
-        .select('id, timeframe, intent_tag, expires_at')
-        .eq('user_id', userId)
-        .gt('expires_at', new Date().toISOString())
-        .order('expires_at', { ascending: true });
+      if (!intentSweepExpired) {
+        const admin = createAdminClient();
+        const { data: intentRows, error: intentErr } = await admin
+          .from('availability_intents')
+          .select('id, timeframe, intent_tag, expires_at')
+          .eq('user_id', userId)
+          .gt('expires_at', new Date().toISOString())
+          .order('expires_at', { ascending: true });
 
-      if (!intentErr && intentRows) {
-        availabilityIntents = intentRows as AvailabilityIntentPayload[];
-      } else if (intentErr) {
-        console.warn('profile availability_intents:', intentErr.message);
+        if (!intentErr && intentRows) {
+          availabilityIntents = intentRows as AvailabilityIntentPayload[];
+        } else if (intentErr) {
+          console.warn('profile availability_intents:', intentErr.message);
+        }
       }
     } catch (e) {
       console.warn('profile availability_intents fetch failed:', e);
@@ -113,6 +127,8 @@ export async function GET(
       tags: profileTags,
       availability: availRes.data ?? null,
       availabilityIntents,
+      last_intent_update_at: lastIntentUpdateAt,
+      intent_sweep_expired: intentSweepExpired,
       viewerInterestTags,
       sharedInterestTags,
       sharedConnection,
