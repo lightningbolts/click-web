@@ -1282,17 +1282,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
           (typeof otherUserName === 'string' && otherUserName.trim()) ||
           'Connection';
 
+        const rawDateValue = conn.created_utc || conn.created || conn.created_at || 0;
         const createdMs =
           typeof conn.created === 'number' && Number.isFinite(conn.created)
             ? conn.created
-            : new Date(String(conn.created_utc || conn.created_at || 0)).getTime();
+            : new Date(typeof rawDateValue === 'number' ? rawDateValue : String(rawDateValue)).getTime();
 
+        const dateMetValue = conn.created_utc || conn.created || conn.created_at;
         return {
           id: String(conn.id),
           otherUserId,
           userIds,
           name: displayName,
-          dateMet: new Date(String(conn.created_utc || conn.created || conn.created_at)),
+          dateMet: new Date(typeof dateMetValue === 'number' ? dateMetValue : String(dateMetValue ?? 0)),
           location:
             (typeof conn.semantic_location === 'string' && conn.semantic_location) || 'Unknown location',
           context: extractEventContext(conn),
