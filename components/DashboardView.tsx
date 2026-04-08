@@ -88,6 +88,7 @@ import {
   normalizeNoiseCategory,
 } from '@/lib/dashboard/connectionExtras';
 import {
+  ACTIVE_CONNECTIONS_DB_OR_FILTER,
   connectionRecordToArchiveRow,
   formatArchiveCountdownLabel,
   getArchiveCountdown,
@@ -988,7 +989,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     const loadChatMetadata = async () => {
       const connectionIds = connectionRecords
-        .filter((connection) => isActiveChatListStatus(connection.status))
+        .filter(
+          (connection) =>
+            isActiveChatListStatus(connection.status) || connection.status === 'archived',
+        )
         .map((connection) => connection.id);
 
       if (connectionIds.length === 0) {
@@ -1151,135 +1155,170 @@ export default function DashboardView({ user }: DashboardViewProps) {
     };
 
     try {
-      const { data, error } = await supabase
+      const activeQuery = supabase
         .from('connections')
         .select('*')
         .contains('user_ids', [user.id])
+        .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
         .order('created', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching connections:', error.message || error);
-        setEmptyConnections();
-      } else if (data && data.length > 0) {
-        // Resolve other user names from the users table
-        const otherUserIds = data.flatMap((conn: any) =>
-          (conn.user_ids || []).filter((id: string) => id !== user.id)
-        ).filter((id: string, i: number, arr: string[]) => arr.indexOf(id) === i);
+      const archivedQuery = supabase
+        .from('connections')
+        .select('*')
+        .contains('user_ids', [user.id])
+        .eq('status', 'archived')
+        .order('created', { ascending: false });
 
-        let userNameMap: Record<string, string> = {};
-        if (otherUserIds.length > 0) {
-          // Resolve names through the server so we can fall back to auth metadata
-          // when profile rows are incomplete.
-          try {
-            const nameRes = await fetch('/api/users/display-names', {
-              method: 'POST',
-              headers: await getAuthHeaders(),
-              body: JSON.stringify({ userIds: otherUserIds }),
-            });
-            if (nameRes.ok) {
-              const payload = await nameRes.json();
-              userNameMap = payload?.names ?? {};
-            }
-          } catch {
-            // Fall through to direct DB lookup below.
+      const [activeRes, archivedRes] = await Promise.all([activeQuery, archivedQuery]);
+
+      if (activeRes.error) {
+        console.error('Error fetching connections:', activeRes.error.message || activeRes.error);
+        setEmptyConnections();
+        return;
+      }
+
+      if (archivedRes.error) {
+        console.warn('Archived connections fetch skipped:', archivedRes.error.message || archivedRes.error);
+      }
+
+      const mergedById = new Map<string, Record<string, unknown>>();
+      for (const row of (activeRes.data ?? []) as Record<string, unknown>[]) {
+        const id = row.id;
+        if (typeof id === 'string') mergedById.set(id, row);
+      }
+      for (const row of (archivedRes.data ?? []) as Record<string, unknown>[]) {
+        const id = row.id;
+        if (typeof id === 'string' && !mergedById.has(id)) mergedById.set(id, row);
+      }
+
+      const merged = Array.from(mergedById.values());
+      if (merged.length === 0) {
+        setEmptyConnections();
+        return;
+      }
+
+      const otherUserIds = merged
+        .flatMap((conn) => {
+          const ids = conn.user_ids;
+          if (!Array.isArray(ids)) return [] as string[];
+          return ids.filter((x): x is string => typeof x === 'string' && x !== user.id);
+        })
+        .filter((id, i, arr) => arr.indexOf(id) === i);
+
+      let userNameMap: Record<string, string> = {};
+      if (otherUserIds.length > 0) {
+        try {
+          const nameRes = await fetch('/api/users/display-names', {
+            method: 'POST',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ userIds: otherUserIds }),
+          });
+          if (nameRes.ok) {
+            const payload = await nameRes.json();
+            userNameMap = payload?.names ?? {};
+          }
+        } catch {
+          // Fall through to direct DB lookup below.
+        }
+
+        if (Object.keys(userNameMap).length === 0) {
+          let usersData: any[] | null = null;
+          const { data: d1, error: e1 } = await supabase
+            .from('users')
+            .select('id, name, full_name, first_name, last_name, email')
+            .in('id', otherUserIds);
+          if (!e1 && d1) {
+            usersData = d1;
+          } else {
+            const { data: d2 } = await supabase
+              .from('users')
+              .select('id, name, email')
+              .in('id', otherUserIds);
+            usersData = d2;
           }
 
-          if (Object.keys(userNameMap).length === 0) {
-            // Fallback path if the server helper is unavailable.
-            let usersData: any[] | null = null;
-            const { data: d1, error: e1 } = await supabase
-              .from('users')
-              .select('id, name, full_name, first_name, last_name, email')
-              .in('id', otherUserIds);
-            if (!e1 && d1) {
-              usersData = d1;
-            } else {
-              const { data: d2 } = await supabase
-                .from('users')
-                .select('id, name, email')
-                .in('id', otherUserIds);
-              usersData = d2;
-            }
+          if (usersData) {
+            userNameMap = Object.fromEntries(
+              usersData.map((u: any) => {
+                const fromParts = [u.first_name, u.last_name]
+                  .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
+                  .join(' ')
+                  .trim();
+                const resolvedName =
+                  fromParts ||
+                  (typeof u.full_name === 'string' && u.full_name.trim()) ||
+                  (typeof u.name === 'string' && u.name.trim()) ||
+                  (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
+                  '';
+                return [u.id, resolvedName];
+              })
+            );
+          }
+        }
+      }
 
-            if (usersData) {
-              userNameMap = Object.fromEntries(
-                usersData.map((u: any) => {
-                  const fromParts = [u.first_name, u.last_name]
-                    .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
-                    .join(' ')
-                    .trim();
-                  const resolvedName =
-                    fromParts ||
-                    (typeof u.full_name === 'string' && u.full_name.trim()) ||
-                    (typeof u.name === 'string' && u.name.trim()) ||
-                    (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
-                    '';
-                  return [u.id, resolvedName];
-                })
-              );
-            }
+      const mapRowToRecord = (conn: Record<string, unknown>): ConnectionRecord => {
+        const userIds = (conn.user_ids as string[] | undefined) ?? [];
+        const otherUserId = userIds.find((id) => id !== user.id);
+        const otherUserName = (otherUserId && userNameMap[otherUserId]) || null;
+
+        let geoLoc: { latitude: number; longitude: number } | undefined;
+        const geo = conn.geo_location as Record<string, unknown> | null | undefined;
+        if (geo && typeof geo === 'object') {
+          const rawLat = geo.lat ?? geo.latitude;
+          const rawLon = geo.lon ?? geo.longitude ?? geo.lng ?? geo.long;
+          const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+          const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
+          if (
+            typeof lat === 'number' && typeof lon === 'number' &&
+            isFinite(lat) && isFinite(lon) &&
+            !(lat === 0 && lon === 0)
+          ) {
+            geoLoc = { latitude: lat, longitude: lon };
           }
         }
 
-        const records: ConnectionRecord[] = data.map((conn: any) => {
-          // Resolve the other user's name
-          const otherUserId = (conn.user_ids || []).find((id: string) => id !== user.id);
-          const otherUserName = (otherUserId && userNameMap[otherUserId]) || null;
+        const displayName =
+          (typeof otherUserName === 'string' && otherUserName.trim()) ||
+          'Connection';
 
-          // Parse geo_location — DB stores { lat, lon }, filter out invalid coords
-          let geoLoc: { latitude: number; longitude: number } | undefined;
-          if (conn.geo_location) {
-            const rawLat = conn.geo_location.lat ?? conn.geo_location.latitude;
-            const rawLon = conn.geo_location.lon ?? conn.geo_location.longitude ?? conn.geo_location.lng ?? conn.geo_location.long;
-            const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
-            const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
-            if (
-              typeof lat === 'number' && typeof lon === 'number' &&
-              isFinite(lat) && isFinite(lon) &&
-              !(lat === 0 && lon === 0)
-            ) {
-              geoLoc = { latitude: lat, longitude: lon };
-            }
-          }
+        const rawDateValue = conn.created_utc || conn.created || conn.created_at || 0;
+        const createdMs =
+          typeof conn.created === 'number' && Number.isFinite(conn.created)
+            ? conn.created
+            : new Date(typeof rawDateValue === 'number' ? rawDateValue : String(rawDateValue)).getTime();
 
-          const displayName =
-            (typeof otherUserName === 'string' && otherUserName.trim()) ||
-            'Connection';
+        const dateMetValue = conn.created_utc || conn.created || conn.created_at;
+        return {
+          id: String(conn.id),
+          otherUserId,
+          userIds,
+          name: displayName,
+          dateMet: new Date(typeof dateMetValue === 'number' ? dateMetValue : String(dateMetValue ?? 0)),
+          location:
+            (typeof conn.semantic_location === 'string' && conn.semantic_location) || 'Unknown location',
+          context: extractEventContext(conn),
+          weatherSummary: extractWeatherSummary(conn),
+          noiseSummary: extractNoiseSummary(conn),
+          noiseCategory: normalizeNoiseCategory(conn),
+          status: normalizeConnectionStatus(conn),
+          lastMessageAt:
+            typeof conn.last_message_at === 'number' && Number.isFinite(conn.last_message_at)
+              ? conn.last_message_at
+              : null,
+          connectionCreatedMs: Number.isFinite(createdMs) ? createdMs : undefined,
+          hasBegun: conn.has_begun === true,
+          expiryState: typeof conn.expiry_state === 'string' ? conn.expiry_state : null,
+          geo_location: geoLoc,
+        };
+      };
 
-          const raw = conn as Record<string, unknown>;
-          const createdMs =
-            typeof conn.created === 'number' && Number.isFinite(conn.created)
-              ? conn.created
-              : new Date(conn.created_utc || conn.created_at || 0).getTime();
+      const records: ConnectionRecord[] = merged
+        .map(mapRowToRecord)
+        .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
 
-          return {
-            id: conn.id,
-            otherUserId,
-            userIds: conn.user_ids || [],
-            name: displayName,
-            dateMet: new Date(conn.created_utc || conn.created || conn.created_at),
-            location: conn.semantic_location || 'Unknown location',
-            context: extractEventContext(raw),
-            weatherSummary: extractWeatherSummary(raw),
-            noiseSummary: extractNoiseSummary(raw),
-            noiseCategory: normalizeNoiseCategory(raw),
-            status: normalizeConnectionStatus(raw),
-            lastMessageAt:
-              typeof conn.last_message_at === 'number' && Number.isFinite(conn.last_message_at)
-                ? conn.last_message_at
-                : null,
-            connectionCreatedMs: Number.isFinite(createdMs) ? createdMs : undefined,
-            hasBegun: conn.has_begun === true,
-            expiryState: typeof conn.expiry_state === 'string' ? conn.expiry_state : null,
-            geo_location: geoLoc,
-          };
-        });
-
-        setConnectionRecords(records);
-        setChapters(generateChaptersFromConnections(records));
-      } else {
-        setEmptyConnections();
-      }
+      setConnectionRecords(records);
+      setChapters(generateChaptersFromConnections(records));
     } catch (err) {
       console.error('Unexpected error fetching connections:', err);
       setEmptyConnections();
@@ -1538,38 +1577,73 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
   }, [archiveTableAvailable, isMissingArchiveTableError, updateArchivedIds, user?.id]);
 
-  const unarchiveConnection = useCallback(async (connectionId: string): Promise<boolean> => {
-    updateArchivedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(connectionId);
-      return next;
-    });
-    setMenuConnectionId(null);
-    setChatListTab('active');
+  const unarchiveConnection = useCallback(
+    async (connectionId: string, rowStatus?: ConnectionRecord['status']): Promise<boolean> => {
+      updateArchivedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(connectionId);
+        return next;
+      });
+      setMenuConnectionId(null);
+      setChatListTab('active');
 
-    const supabase = getSupabaseClient();
-    if (!supabase || !user?.id || !archiveTableAvailable) return true;
-    try {
-      const { error } = await supabase
-        .from('connection_archives')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('connection_id', connectionId);
+      const fromRecord = connectionRecords.find((c) => c.id === connectionId);
+      const effectiveStatus = rowStatus ?? fromRecord?.status;
 
-      if (error) {
-        if (isMissingArchiveTableError(error)) {
-          setArchiveTableAvailable(false);
+      if (effectiveStatus === 'archived') {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch('/api/connections', {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restore', connectionId }),
+          });
+          if (!res.ok) {
+            const payload = await res.json().catch(() => ({}));
+            console.error('Server restore failed:', payload.error || res.statusText);
+            return false;
+          }
+          void loadConnections();
           return true;
+        } catch (e) {
+          console.error('Unexpected server restore error:', e);
+          return false;
         }
-        console.error('Error unarchiving connection:', error.message || error);
+      }
+
+      const supabase = getSupabaseClient();
+      if (!supabase || !user?.id || !archiveTableAvailable) return true;
+      try {
+        const { error } = await supabase
+          .from('connection_archives')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('connection_id', connectionId);
+
+        if (error) {
+          if (isMissingArchiveTableError(error)) {
+            setArchiveTableAvailable(false);
+            return true;
+          }
+          console.error('Error unarchiving connection:', error.message || error);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error('Unexpected unarchive error:', err);
         return false;
       }
-      return true;
-    } catch (err) {
-      console.error('Unexpected unarchive error:', err);
-      return false;
-    }
-  }, [archiveTableAvailable, isMissingArchiveTableError, updateArchivedIds, user?.id]);
+    },
+    [
+      archiveTableAvailable,
+      connectionRecords,
+      getAuthHeaders,
+      isMissingArchiveTableError,
+      loadConnections,
+      updateArchivedIds,
+      user?.id,
+    ],
+  );
 
   const openActionMenu = useCallback((connectionId: string) => {
     setMenuConnectionId((prev) => (prev === connectionId ? null : connectionId));
@@ -1704,7 +1778,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const chatCandidates = useMemo(
     () => connectionRecords
-      .filter((c) => isActiveChatListStatus(c.status))
+      .filter((c) => isActiveChatListStatus(c.status) || c.status === 'archived')
       .map((connection) => {
         const metadata = chatMetadataByConnectionId[connection.id];
         return {
@@ -1723,14 +1797,28 @@ export default function DashboardView({ user }: DashboardViewProps) {
   );
 
   const activeConnections = useMemo(
-    () => chatCandidates.filter((c) => !archivedConnectionIds.has(c.id)),
-    [chatCandidates, archivedConnectionIds]
+    () =>
+      chatCandidates.filter(
+        (c) => !archivedConnectionIds.has(c.id) && c.status !== 'archived',
+      ),
+    [archivedConnectionIds, chatCandidates],
   );
 
-  const archivedConnections = useMemo(
-    () => chatCandidates.filter((c) => archivedConnectionIds.has(c.id)),
-    [chatCandidates, archivedConnectionIds]
-  );
+  const archivedConnections = useMemo(() => {
+    const serverArchived = chatCandidates.filter((c) => c.status === 'archived');
+    const userArchivedOnly = chatCandidates.filter(
+      (c) => archivedConnectionIds.has(c.id) && c.status !== 'archived',
+    );
+    const byId = new Map<string, (typeof chatCandidates)[number]>();
+    for (const c of [...serverArchived, ...userArchivedOnly]) {
+      if (!byId.has(c.id)) byId.set(c.id, c);
+    }
+    return Array.from(byId.values()).sort((a, b) => {
+      const left = a.chatLastMessageAt ?? a.chatUpdatedAt ?? a.dateMet.getTime();
+      const right = b.chatLastMessageAt ?? b.chatUpdatedAt ?? b.dateMet.getTime();
+      return right - left;
+    });
+  }, [archivedConnectionIds, chatCandidates]);
 
   const dashboardMetrics = useMemo(
     () => buildDashboardMetrics(connectionRecords),
@@ -1979,10 +2067,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         connection={selectedConnection}
                         currentUserId={user.id}
                         otherUserName={selectedConnection.name}
-                        isArchived={archivedConnectionIds.has(selectedConnection.id)}
+                        isArchived={
+                          archivedConnectionIds.has(selectedConnection.id) ||
+                          selectedConnection.status === 'archived'
+                        }
                         isBlocked={selectedConnection.otherUserId ? blockedUserIds.has(selectedConnection.otherUserId) : false}
                         onArchive={() => archiveConnection(selectedConnection.id)}
-                        onUnarchive={() => unarchiveConnection(selectedConnection.id)}
+                        onUnarchive={() =>
+                          unarchiveConnection(selectedConnection.id, selectedConnection.status)
+                        }
                         onRemove={() => removeConnection(selectedConnection.id)}
                         onReport={(reason) => reportConnection(selectedConnection.id, reason)}
                         onBlock={() => blockUser(selectedConnection)}
@@ -2077,13 +2170,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
                             <p className="text-zinc-400">
                               {chatListTab === 'active'
                                 ? 'Start meeting people and your chats will appear here!'
-                                : 'Archived chats will appear here.'}
+                                : 'Auto-archived chats and conversations you hid appear here. Tap Restore to move them back to Active.'}
                             </p>
                           </div>
                         ) : (
                           <div className="glass overflow-visible rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
                             {visibleChatConnections.map((conn, index) => {
-                              const isArchived = archivedConnectionIds.has(conn.id);
+                              const isUserArchived = archivedConnectionIds.has(conn.id);
+                              const isServerArchived = conn.status === 'archived';
+                              const isArchived = isUserArchived || isServerArchived;
                               const previewText = conn.chatPreview?.trim() || 'No messages yet';
                               const activityLabel = formatChatActivity(conn.chatLastMessageAt ?? conn.chatUpdatedAt);
                               const archiveRow = connectionRecordToArchiveRow(conn);
@@ -2153,7 +2248,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
-                                      {archiveWarning && !isArchived ? (
+                                      {archiveWarning && !isServerArchived && !isUserArchived ? (
                                         <p
                                           className={`mt-1.5 flex items-center gap-1 truncate pr-2 text-[11px] ${
                                             archiveInfo?.isUrgent ? 'text-amber-300' : 'text-zinc-500'
@@ -2174,7 +2269,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         <div className="flex flex-wrap items-center justify-end gap-2">
                                           {isArchived ? (
                                             <span className="shrink-0 rounded-full border border-zinc-600/40 bg-zinc-700/30 px-2 py-0.5 text-[10px] text-zinc-300">
-                                              Archived
+                                              {isServerArchived ? 'Auto-archived' : 'Archived'}
                                             </span>
                                           ) : null}
                                         </div>
@@ -2212,10 +2307,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       </button>
                                       {isArchived ? (
                                         <button
-                                          onClick={() => unarchiveConnection(conn.id)}
+                                          onClick={() =>
+                                            unarchiveConnection(conn.id, conn.status)
+                                          }
                                           className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
                                         >
-                                          Unarchive
+                                          {isServerArchived ? 'Restore' : 'Unarchive'}
                                         </button>
                                       ) : (
                                         <button

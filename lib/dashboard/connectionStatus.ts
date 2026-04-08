@@ -53,6 +53,10 @@ export function normalizeConnectionStatus(row: Record<string, unknown>): Connect
   return 'pending';
 }
 
+/** PostgREST `.or()` filter for rows visible in the main connections / chat list (matches GET default). */
+export const ACTIVE_CONNECTIONS_DB_OR_FILTER =
+  'status.is.null,status.eq.pending,status.eq.active,status.eq.kept';
+
 /** Shown in active chat lists (not removed/archived by server or legacy expired). */
 export function isActiveChatListStatus(status: ConnectionDisplayStatus): boolean {
   if (status === 'removed' || status === 'archived' || status === 'expired') return false;

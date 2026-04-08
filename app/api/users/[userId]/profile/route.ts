@@ -3,8 +3,26 @@
  * Returns joined profile for a user (respects RLS — typically connections only).
  */
 
+import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import { getSharedInterestTags } from '@/lib/userProfile/sharedInterests';
+
+function createAdminClient() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } },
+  );
+}
+
+export type AvailabilityIntentPayload = {
+  id: string;
+  timeframe: string;
+  intent_tag: string;
+  expires_at: string;
+};
 
 export async function GET(
   req: NextRequest,
@@ -28,6 +46,39 @@ export async function GET(
       supabase.from('user_interests').select('tags').eq('user_id', userId).maybeSingle(),
       supabase.from('user_availability').select('*').eq('user_id', userId).maybeSingle(),
     ]);
+
+    const profileTags = (interestsRes.data as { tags?: string[] } | null)?.tags ?? [];
+
+    let availabilityIntents: AvailabilityIntentPayload[] = [];
+    try {
+      const admin = createAdminClient();
+      const { data: intentRows, error: intentErr } = await admin
+        .from('availability_intents')
+        .select('id, timeframe, intent_tag, expires_at')
+        .eq('user_id', userId)
+        .gt('expires_at', new Date().toISOString())
+        .order('expires_at', { ascending: true });
+
+      if (!intentErr && intentRows) {
+        availabilityIntents = intentRows as AvailabilityIntentPayload[];
+      } else if (intentErr) {
+        console.warn('profile availability_intents:', intentErr.message);
+      }
+    } catch (e) {
+      console.warn('profile availability_intents fetch failed:', e);
+    }
+
+    let viewerInterestTags: string[] = [];
+    let sharedInterestTags: string[] = [];
+    if (user.id !== userId) {
+      const { data: myRow } = await supabase
+        .from('user_interests')
+        .select('tags')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      viewerInterestTags = (myRow as { tags?: string[] } | null)?.tags ?? [];
+      sharedInterestTags = getSharedInterestTags(viewerInterestTags, profileTags);
+    }
 
     if (userRes.error) {
       return NextResponse.json({ error: userRes.error.message }, { status: 500 });
@@ -59,8 +110,11 @@ export async function GET(
 
     return NextResponse.json({
       user: userRes.data,
-      tags: (interestsRes.data as { tags?: string[] } | null)?.tags ?? [],
+      tags: profileTags,
       availability: availRes.data ?? null,
+      availabilityIntents,
+      viewerInterestTags,
+      sharedInterestTags,
       sharedConnection,
     });
   } catch (e: unknown) {
