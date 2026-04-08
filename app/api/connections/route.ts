@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import type { ConnectionLifecycleStatus } from '@/types/connection';
+import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatus';
 
 /**
  * Connections API
@@ -269,6 +270,8 @@ async function enrichMemoryCapsuleWeather(
 // ─── GET — fetch user's connections ──────────────────────────────────────────
 
 const INSIGHTS_QUERY_PARAM = 'includeInsights';
+/** `active` (default) | `archived` — ignored when `includeInsights` is set */
+const STATUS_SCOPE_PARAM = 'statusScope';
 
 function isInsightsScope(searchParams: URLSearchParams): boolean {
   const v = searchParams.get(INSIGHTS_QUERY_PARAM);
@@ -284,10 +287,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const insights = isInsightsScope(request.nextUrl.searchParams);
+    const searchParams = request.nextUrl.searchParams;
+    const insights = isInsightsScope(searchParams);
 
     // Active dashboard/chat views omit auto-archived and user-removed rows.
-    // Business Insights callers pass `?includeInsights=1` to include every lifecycle state.
+    // Archived tab: `?statusScope=archived`. Insights: `?includeInsights=1` for every lifecycle state.
     let query = supabase
       .from('connections')
       .select('*')
@@ -295,8 +299,12 @@ export async function GET(request: NextRequest) {
       .order('created', { ascending: false });
 
     if (!insights) {
-      // Omit server-side archived/removed; legacy null `status` stays visible.
-      query = query.or('status.is.null,status.eq.pending,status.eq.active,status.eq.kept');
+      const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
+      if (scope === 'archived') {
+        query = query.eq('status', 'archived');
+      } else {
+        query = query.or(ACTIVE_CONNECTIONS_DB_OR_FILTER);
+      }
     }
 
     const { data: connections, error } = await query;
@@ -309,6 +317,83 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ connections: connections || [] });
   } catch (error) {
     console.error('Server error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ─── PATCH — restore server-archived connection back to active ───────────────
+
+type PatchBody = {
+  action?: string;
+  connectionId?: string;
+  id?: string;
+};
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createSupabaseSSRClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let body: PatchBody;
+    try {
+      body = (await request.json()) as PatchBody;
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    if (body.action !== 'restore') {
+      return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+    }
+
+    const connectionId = (body.connectionId ?? body.id)?.trim();
+    if (!connectionId) {
+      return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: row, error: fetchError } = await adminClient
+      .from('connections')
+      .select('id, user_ids, status')
+      .eq('id', connectionId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('Connection restore lookup error:', fetchError);
+      return NextResponse.json({ error: fetchError.message }, { status: 400 });
+    }
+
+    const ids = (row?.user_ids as string[] | null) ?? [];
+    if (!row || !ids.includes(user.id)) {
+      return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
+    }
+
+    if (row.status !== 'archived') {
+      return NextResponse.json(
+        { error: 'Only archived connections can be restored' },
+        { status: 409 },
+      );
+    }
+
+    const activeStatus: ConnectionLifecycleStatus = 'active';
+    const { data: updated, error: updateError } = await adminClient
+      .from('connections')
+      .update({ status: activeStatus })
+      .eq('id', connectionId)
+      .select()
+      .maybeSingle();
+
+    if (updateError) {
+      console.error('Connection restore error:', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, connection: updated });
+  } catch (error) {
+    console.error('Connection PATCH error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

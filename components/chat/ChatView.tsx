@@ -11,6 +11,7 @@ import {
   ChevronDown,
   MapPin,
   Calendar,
+  Sparkles,
   MoreHorizontal,
   Archive,
   UserMinus,
@@ -177,6 +178,7 @@ export default function ChatView({
   const [mediaBusy, setMediaBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
+  const [sharedInterestTags, setSharedInterestTags] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -310,6 +312,37 @@ export default function ChatView({
       deriveKeysForConnection(connection.id, userIds).then(setE2eKeys);
     }
   }, [connection.id, connection.userIds, connection.otherUserId, currentUserId]);
+
+  useEffect(() => {
+    if (!peerUserId) {
+      setSharedInterestTags([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(
+          `/api/users/${encodeURIComponent(peerUserId)}/profile`,
+          { headers },
+        );
+        const json = (await res.json().catch(() => ({}))) as {
+          sharedInterestTags?: unknown;
+        };
+        if (!res.ok || cancelled) return;
+        const raw = json.sharedInterestTags;
+        const tags = Array.isArray(raw)
+          ? raw.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+          : [];
+        if (!cancelled) setSharedInterestTags(tags);
+      } catch {
+        if (!cancelled) setSharedInterestTags([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAuthHeaders, peerUserId]);
 
   useEffect(() => {
     if (!replyingTo || replyingTo.message_type === 'call_log') {
@@ -1076,15 +1109,24 @@ export default function ChatView({
                   <button
                     onClick={async () => {
                       const success = await onUnarchive();
+                      const restored = connection.status === 'archived';
                       setActionToast(success
-                        ? { type: 'success', message: 'Conversation unarchived' }
-                        : { type: 'error', message: 'Could not unarchive conversation' }
+                        ? {
+                            type: 'success',
+                            message: restored ? 'Connection restored to active' : 'Conversation unarchived',
+                          }
+                        : {
+                            type: 'error',
+                            message: restored
+                              ? 'Could not restore connection'
+                              : 'Could not unarchive conversation',
+                          }
                       );
                       setShowHeaderMenu(false);
                     }}
                     className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
                   >
-                    Unarchive
+                    {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
                   </button>
                 ) : (
                   <button
@@ -1172,6 +1214,28 @@ export default function ChatView({
           </div>
         </div>
       </div>
+
+      {sharedInterestTags.length > 0 && (
+        <div className="glass mb-3 shrink-0 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200/90">
+            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Conversation starters
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-500">
+            Shared interests — try weaving one into your next message
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {sharedInterestTags.map((t) => (
+              <span
+                key={t}
+                className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-100"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Messages area ── */}
       <div

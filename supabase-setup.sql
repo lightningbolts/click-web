@@ -69,3 +69,6 @@ UPDATE public.connections
 SET status = 'active'
 WHERE status IS NULL AND COALESCE(has_begun, false) = true AND expiry_state IS DISTINCT FROM 'kept';
 
+-- `availability_intents` (see migrations) is owner-only by default. For profile surfaces that
+-- list another user’s intents, add a read policy (e.g. mutual connection) or use a service-role
+-- API route — `/api/users/[userId]/profile` uses the service role when configured.
