@@ -588,15 +588,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: existingErr.message }, { status: 500 });
     }
 
-    const hiddenForUser = await fetchConnectionIdsForUser(
-      adminClient,
-      'connection_hidden',
-      user.id,
-    );
-
+    // Per-user `connection_hidden` must not allow a second row: the connection is shared;
+    // the other party would still see the original. Reconnect after hide requires un-hiding
+    // or a dedicated product flow, not a duplicate insert.
     const blocksNewConnection = (existingRows ?? []).some((r) => {
-      const id = typeof r.id === 'string' ? r.id : '';
-      if (!id || hiddenForUser.has(id)) return false;
       const s = r.status as string | null | undefined;
       return s !== 'removed' && s !== 'archived';
     });
