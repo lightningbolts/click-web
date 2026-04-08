@@ -7,6 +7,7 @@ type TeamMember = {
   name: string;
   initials: string;
   subtitle: string;
+  text?: string;
   email?: string;
   gradient: string;
 };
@@ -15,35 +16,40 @@ const TEAM: TeamMember[] = [
   {
     name: 'Kairui Cheng',
     initials: 'K',
-    subtitle: 'Computer Science, UW',
+    subtitle: 'Paul Allen School of Computer Science, UW 2029',
+    text: 'Frustrated by adding people on Instagram and never talking again, I led product development for both the Click mobile app and website. Kairui has experience in developing full stack applications, utilized by journalists, advocacy groups, and lawyers from across the nation.',
     email: 'kcheng29@uw.edu',
     gradient: 'from-[#8338EC] to-purple-600',
   },
   {
     name: 'Matthew Epshtein',
     initials: 'M',
-    subtitle: 'Computer Science, UW',
+    subtitle: 'Paul Allen School of Computer Science, UW 2029',
+    text: 'I helped with product design and development, motivated by an experience at UW\'s orientation and Dawg Daze events which left me wanting more. Matthew has experience in mobile and server-side development, as well as in leadership, project management and technical writing.',
     email: 'mepsht@uw.edu',
     gradient: 'from-purple-600 to-pink-600',
   },
   {
     name: 'Rayan Rizwan',
     initials: 'R',
-    subtitle: 'Computer Science, UW',
+    subtitle: 'Paul Allen School of Computer Science, UW 2029',
+    text: 'Click\'s idea resonates with me because I believe that it helps businesses connect with students, ensuring a symbiotic relationship. Rayan has experience with financial planning, managing small businesses, project management and research.',
     email: 'rayanr@uw.edu',
     gradient: 'from-pink-600 to-red-600',
   },
   {
     name: 'Andrew Lu',
     initials: 'A',
-    subtitle: 'Computer Science, UW',
+    subtitle: 'Paul Allen School of Computer Science, UW 2029',
+    text: 'I heard the idea from Kairui and found it compelling. I\'ve always found that messaging with online strangers never sat right with me. Andrew has worked with teams on fine-tuning LLMs and has web development experience through previous projects.',
     email: 'luand29@uw.edu',
     gradient: 'from-emerald-600 to-teal-600',
   },
   {
     name: 'Jaret Zhang',
     initials: 'J',
-    subtitle: 'Computer Science, UW',
+    subtitle: 'Paul Allen School of Computer Science, UW 2029',
+    text: 'The idea of Click resonated with me as I\'ve always struggled with maintaining relationships between recent acquaintances. Jaret has experience with full stack development as well as game design from previous projects.',
     email: 'jaretz@uw.edu',
     gradient: 'from-sky-600 to-indigo-600',
   },
@@ -105,6 +111,9 @@ export default function About() {
                   </div>
                   <h3 className="mb-2 text-2xl font-bold">{member.name}</h3>
                   <p className="text-zinc-400">{member.subtitle}</p>
+                  {member.text && (
+                    <p className="mt-4 text-left text-sm leading-relaxed text-zinc-500">{member.text}</p>
+                  )}
                   {member.email && (
                     <a
                       href={`mailto:${member.email}`}
