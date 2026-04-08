@@ -1,6 +1,9 @@
 /**
  * Documented shapes for `public.connections` used by the web app and API.
  * Regenerate from Supabase CLI when the schema changes.
+ *
+ * Per-user archive/hide uses `connection_archives` and `connection_hidden`, not
+ * `status = 'archived' | 'removed'` on this table.
  */
 import type { ConnectionLifecycleStatus } from '@/types/connection';
 
