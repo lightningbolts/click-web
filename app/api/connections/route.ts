@@ -241,8 +241,9 @@ function filterConnectionsByVisibility(
   return rows.filter((row) => {
     const id = typeof row.id === 'string' ? row.id : '';
     if (!id || hiddenIds.has(id)) return false;
-    if (mode === 'active') return !archivedIds.has(id);
-    return archivedIds.has(id);
+    const isLegacyArchived = row.status === 'archived';
+    if (mode === 'active') return !archivedIds.has(id) && !isLegacyArchived;
+    return archivedIds.has(id) || isLegacyArchived;
   });
 }
 
@@ -332,8 +333,14 @@ export async function GET(request: NextRequest) {
       .contains('user_ids', [user.id])
       .order('created', { ascending: false });
 
+    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
+
     if (!insights) {
-      query = query.or(ACTIVE_CONNECTIONS_DB_OR_FILTER);
+      if (scope === 'archived') {
+        query = query.or(`${ACTIVE_CONNECTIONS_DB_OR_FILTER},status.eq.archived`);
+      } else {
+        query = query.or(ACTIVE_CONNECTIONS_DB_OR_FILTER);
+      }
     }
 
     const { data: connectionsRaw, error } = await query;
@@ -355,7 +362,6 @@ export async function GET(request: NextRequest) {
       fetchConnectionIdsForUser(adminClient, 'connection_archives', user.id),
     ]);
 
-    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
     const mode = scope === 'archived' ? 'archived' : 'active';
     const connections = filterConnectionsByVisibility(rows, hiddenIds, archivedIds, mode);
 

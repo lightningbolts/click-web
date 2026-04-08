@@ -1156,15 +1156,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     try {
       const headers = await getAuthHeaders();
-      const [activeRes, archivedRes, legacyArchivedRes] = await Promise.all([
+      const [activeRes, archivedRes] = await Promise.all([
         fetch('/api/connections', { headers }),
         fetch('/api/connections?statusScope=archived', { headers }),
-        supabase
-          .from('connections')
-          .select('*')
-          .contains('user_ids', [user.id])
-          .eq('status', 'archived')
-          .order('created', { ascending: false }),
       ]);
 
       const activeJson = await activeRes.json().catch(() => ({}));
@@ -1182,10 +1176,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       const activeRows = (activeJson.connections ?? []) as Record<string, unknown>[];
       const archivedRows = (archivedJson.connections ?? []) as Record<string, unknown>[];
-      const legacyArchivedRows =
-        !legacyArchivedRes.error && legacyArchivedRes.data
-          ? (legacyArchivedRes.data as Record<string, unknown>[])
-          : [];
 
       const mergedById = new Map<string, Record<string, unknown>>();
       for (const row of activeRows) {
@@ -1193,10 +1183,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         if (typeof id === 'string') mergedById.set(id, row);
       }
       for (const row of archivedRows) {
-        const id = row.id;
-        if (typeof id === 'string' && !mergedById.has(id)) mergedById.set(id, row);
-      }
-      for (const row of legacyArchivedRows) {
         const id = row.id;
         if (typeof id === 'string' && !mergedById.has(id)) mergedById.set(id, row);
       }
