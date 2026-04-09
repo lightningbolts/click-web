@@ -1,10 +1,31 @@
 /**
- * Documented shapes for `public.connections` used by the web app and API.
+ * Documented shapes for `public.connections` and per-user junction tables used by the web app and API.
  * Regenerate from Supabase CLI when the schema changes.
+ *
+ * Archiving and explicit removal are **not** expressed as `connections.status = 'archived' | 'removed'`.
+ * Visibility is driven by:
+ * - `connection_archives` — standard / auto-archive for a user
+ * - `connection_hidden` — explicit “remove” (soft delete) for a user
  */
 import type { ConnectionLifecycleStatus } from '@/types/connection';
 
 export type ConnectionLifecycleStatusColumn = ConnectionLifecycleStatus;
+
+/** Row in `public.connection_archives`. */
+export type ConnectionArchiveRow = {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  archived_at: string;
+};
+
+/** Row in `public.connection_hidden` (per-user removal). */
+export type ConnectionHiddenRow = {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  hidden_at: string;
+};
 
 /** Row shape returned by `/api/connections` (subset used on the client). */
 export type ConnectionsApiRow = {

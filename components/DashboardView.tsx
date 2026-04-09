@@ -89,7 +89,6 @@ import {
   normalizeNoiseCategory,
 } from '@/lib/dashboard/connectionExtras';
 import {
-  ACTIVE_CONNECTIONS_DB_OR_FILTER,
   connectionRecordToArchiveRow,
   formatArchiveCountdownLabel,
   getArchiveCountdown,
@@ -1143,51 +1142,64 @@ export default function DashboardView({ user }: DashboardViewProps) {
   };
 
   const loadConnections = useCallback(async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase || !user?.id) {
+    if (!user?.id) {
       setConnectionRecords([]);
       setChapters(generateChaptersFromConnections([]));
+      setArchivedConnectionIds(new Set());
       return;
     }
+
+    const supabase = getSupabaseClient();
 
     const setEmptyConnections = () => {
       setConnectionRecords([]);
       setChapters(generateChaptersFromConnections([]));
+      setArchivedConnectionIds(new Set());
     };
 
     try {
-      const activeQuery = supabase
-        .from('connections')
-        .select('*')
-        .contains('user_ids', [user.id])
-        .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
-        .order('created', { ascending: false });
+      const headers = await getAuthHeaders();
+      const [activeRes, archivedRes] = await Promise.all([
+        fetch('/api/connections', { headers, cache: 'no-store' }),
+        fetch('/api/connections?statusScope=archived', { headers, cache: 'no-store' }),
+      ]);
 
-      const archivedQuery = supabase
-        .from('connections')
-        .select('*')
-        .contains('user_ids', [user.id])
-        .eq('status', 'archived')
-        .order('created', { ascending: false });
-
-      const [activeRes, archivedRes] = await Promise.all([activeQuery, archivedQuery]);
-
-      if (activeRes.error) {
-        console.error('Error fetching connections:', activeRes.error.message || activeRes.error);
+      if (!activeRes.ok) {
+        const errPayload = (await activeRes.json().catch(() => ({}))) as { error?: string };
+        console.error('Error fetching connections:', errPayload.error || activeRes.statusText);
         setEmptyConnections();
         return;
       }
 
-      if (archivedRes.error) {
-        console.warn('Archived connections fetch skipped:', archivedRes.error.message || archivedRes.error);
+      if (!archivedRes.ok) {
+        console.warn('Archived connections fetch skipped:', archivedRes.statusText);
+      }
+
+      const activePayload = (await activeRes.json()) as { connections?: Record<string, unknown>[] };
+      const archivedPayload = archivedRes.ok
+        ? ((await archivedRes.json()) as { connections?: Record<string, unknown>[] })
+        : { connections: [] };
+
+      const activeRows = activePayload.connections ?? [];
+      const archivedRows = archivedPayload.connections ?? [];
+
+      const archivedIds = new Set(
+        archivedRows
+          .map((r) => r.id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      );
+      setArchivedConnectionIds(archivedIds);
+      const archiveKey = user.id ? `click:archived-connections:${user.id}` : null;
+      if (archiveKey && typeof window !== 'undefined') {
+        localStorage.setItem(archiveKey, JSON.stringify(Array.from(archivedIds)));
       }
 
       const mergedById = new Map<string, Record<string, unknown>>();
-      for (const row of (activeRes.data ?? []) as Record<string, unknown>[]) {
+      for (const row of activeRows) {
         const id = row.id;
         if (typeof id === 'string') mergedById.set(id, row);
       }
-      for (const row of (archivedRes.data ?? []) as Record<string, unknown>[]) {
+      for (const row of archivedRows) {
         const id = row.id;
         if (typeof id === 'string' && !mergedById.has(id)) mergedById.set(id, row);
       }
@@ -1222,7 +1234,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
           // Fall through to direct DB lookup below.
         }
 
-        if (Object.keys(userNameMap).length === 0) {
+        if (Object.keys(userNameMap).length === 0 && supabase) {
           let usersData: any[] | null = null;
           const { data: d1, error: e1 } = await supabase
             .from('users')
@@ -1324,7 +1336,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       console.error('Unexpected error fetching connections:', err);
       setEmptyConnections();
     }
-  }, [user, getAuthHeaders]);
+  }, [user?.id, getAuthHeaders]);
 
   // Fetch user connections (initial load)
   useEffect(() => {
@@ -1343,6 +1355,20 @@ export default function DashboardView({ user }: DashboardViewProps) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'connections' },
+        () => {
+          void loadConnections();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'connection_archives' },
+        () => {
+          void loadConnections();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'connection_hidden' },
         () => {
           void loadConnections();
         },
@@ -1397,91 +1423,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const isMissingArchiveTableError = useCallback((error: any) => {
     const code = error?.code;
     const message = String(error?.message || '').toLowerCase();
-    return code === 'PGRST205' ||
+    return (
+      code === 'PGRST205' ||
       message.includes('connection_archives') ||
-      message.includes('schema cache');
+      message.includes('connection_hidden') ||
+      message.includes('schema cache')
+    );
   }, []);
 
   const writeArchivedToLocalStorage = useCallback((ids: Set<string>) => {
     if (!archiveStorageKey || typeof window === 'undefined') return;
     localStorage.setItem(archiveStorageKey, JSON.stringify(Array.from(ids)));
   }, [archiveStorageKey]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const loadArchived = async () => {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        if (archiveStorageKey && typeof window !== 'undefined') {
-          const raw = localStorage.getItem(archiveStorageKey);
-          if (raw) {
-            try {
-              setArchivedConnectionIds(new Set(JSON.parse(raw)));
-            } catch {
-              setArchivedConnectionIds(new Set());
-            }
-          }
-        }
-        return;
-      }
-
-      try {
-        if (!archiveTableAvailable) {
-          if (archiveStorageKey && typeof window !== 'undefined') {
-            const raw = localStorage.getItem(archiveStorageKey);
-            if (raw) {
-              try {
-                setArchivedConnectionIds(new Set(JSON.parse(raw)));
-              } catch {
-                setArchivedConnectionIds(new Set());
-              }
-            }
-          }
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('connection_archives')
-          .select('connection_id')
-          .eq('user_id', user.id);
-
-        if (error) {
-          if (isMissingArchiveTableError(error)) {
-            setArchiveTableAvailable(false);
-          }
-          if (archiveStorageKey && typeof window !== 'undefined') {
-            const raw = localStorage.getItem(archiveStorageKey);
-            if (raw) {
-              try {
-                setArchivedConnectionIds(new Set(JSON.parse(raw)));
-              } catch {
-                setArchivedConnectionIds(new Set());
-              }
-            }
-          }
-          return;
-        }
-
-        const ids = new Set<string>((data ?? []).map((row: any) => row.connection_id));
-        setArchivedConnectionIds(ids);
-        writeArchivedToLocalStorage(ids);
-      } catch {
-        if (archiveStorageKey && typeof window !== 'undefined') {
-          const raw = localStorage.getItem(archiveStorageKey);
-          if (raw) {
-            try {
-              setArchivedConnectionIds(new Set(JSON.parse(raw)));
-            } catch {
-              setArchivedConnectionIds(new Set());
-            }
-          }
-        }
-      }
-    };
-
-    loadArchived();
-  }, [archiveStorageKey, archiveTableAvailable, isMissingArchiveTableError, user?.id, writeArchivedToLocalStorage]);
 
   useEffect(() => {
     const id = setInterval(() => setArchiveCountdownTick((t) => t + 1), 60_000);
@@ -1579,71 +1532,30 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [archiveTableAvailable, isMissingArchiveTableError, updateArchivedIds, user?.id]);
 
   const unarchiveConnection = useCallback(
-    async (connectionId: string, rowStatus?: ConnectionRecord['status']): Promise<boolean> => {
-      updateArchivedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(connectionId);
-        return next;
-      });
+    async (connectionId: string): Promise<boolean> => {
       setMenuConnectionId(null);
       setChatListTab('active');
 
-      const fromRecord = connectionRecords.find((c) => c.id === connectionId);
-      const effectiveStatus = rowStatus ?? fromRecord?.status;
-
-      if (effectiveStatus === 'archived') {
-        try {
-          const headers = await getAuthHeaders();
-          const res = await fetch('/api/connections', {
-            method: 'PATCH',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'restore', connectionId }),
-          });
-          if (!res.ok) {
-            const payload = await res.json().catch(() => ({}));
-            console.error('Server restore failed:', payload.error || res.statusText);
-            return false;
-          }
-          void loadConnections();
-          return true;
-        } catch (e) {
-          console.error('Unexpected server restore error:', e);
-          return false;
-        }
-      }
-
-      const supabase = getSupabaseClient();
-      if (!supabase || !user?.id || !archiveTableAvailable) return true;
       try {
-        const { error } = await supabase
-          .from('connection_archives')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('connection_id', connectionId);
-
-        if (error) {
-          if (isMissingArchiveTableError(error)) {
-            setArchiveTableAvailable(false);
-            return true;
-          }
-          console.error('Error unarchiving connection:', error.message || error);
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/connections', {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'restore', connectionId }),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          console.error('Restore failed:', payload.error || res.statusText);
           return false;
         }
+        void loadConnections();
         return true;
-      } catch (err) {
-        console.error('Unexpected unarchive error:', err);
+      } catch (e) {
+        console.error('Unexpected restore error:', e);
         return false;
       }
     },
-    [
-      archiveTableAvailable,
-      connectionRecords,
-      getAuthHeaders,
-      isMissingArchiveTableError,
-      loadConnections,
-      updateArchivedIds,
-      user?.id,
-    ],
+    [getAuthHeaders, loadConnections],
   );
 
   const openActionMenu = useCallback((connectionId: string) => {
@@ -1651,7 +1563,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const removeConnection = useCallback(async (connectionId: string): Promise<boolean> => {
-    const prev = connectionRecords;
+    const prevRecords = connectionRecords;
+    const prevArchived = new Set(archivedConnectionIds);
     setConnectionRecords((records) => records.filter((record) => record.id !== connectionId));
     updateArchivedIds((ids) => {
       const next = new Set(ids);
@@ -1676,10 +1589,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
       return true;
     } catch (err) {
       console.error('Error removing connection:', err);
-      setConnectionRecords(prev);
+      setConnectionRecords(prevRecords);
+      setArchivedConnectionIds(prevArchived);
+      writeArchivedToLocalStorage(prevArchived);
       return false;
     }
-  }, [connectionRecords, getAuthHeaders, selectedConnection?.id, updateArchivedIds]);
+  }, [
+    archivedConnectionIds,
+    connectionRecords,
+    getAuthHeaders,
+    selectedConnection?.id,
+    updateArchivedIds,
+    writeArchivedToLocalStorage,
+  ]);
 
   const reportConnection = useCallback(async (connectionId: string, reason: string): Promise<boolean> => {
     const trimmedReason = reason.trim();
@@ -2076,9 +1998,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         }
                         isBlocked={selectedConnection.otherUserId ? blockedUserIds.has(selectedConnection.otherUserId) : false}
                         onArchive={() => archiveConnection(selectedConnection.id)}
-                        onUnarchive={() =>
-                          unarchiveConnection(selectedConnection.id, selectedConnection.status)
-                        }
+                        onUnarchive={() => unarchiveConnection(selectedConnection.id)}
                         onRemove={() => removeConnection(selectedConnection.id)}
                         onReport={(reason) => reportConnection(selectedConnection.id, reason)}
                         onBlock={() => blockUser(selectedConnection)}
@@ -2173,7 +2093,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                             <p className="text-zinc-400">
                               {chatListTab === 'active'
                                 ? 'Start meeting people and your chats will appear here!'
-                                : 'Auto-archived chats and conversations you hid appear here. Tap Restore to move them back to Active.'}
+                                : 'Auto-archived chats and conversations you moved to Archived appear here. Tap Restore to move them back to Active.'}
                             </p>
                           </div>
                         ) : (
@@ -2310,9 +2230,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       </button>
                                       {isArchived ? (
                                         <button
-                                          onClick={() =>
-                                            unarchiveConnection(conn.id, conn.status)
-                                          }
+                                          onClick={() => unarchiveConnection(conn.id)}
                                           className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
                                         >
                                           {isServerArchived ? 'Restore' : 'Unarchive'}

@@ -1,16 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
-import { createServerClient } from '@supabase/ssr';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import type { ConnectionLifecycleStatus } from '@/types/connection';
 import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatus';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 /**
  * Connections API
  *
- * GET    → Fetch connections for the authenticated user
+ * GET    → Fetch connections for the authenticated user (active vs archived via `statusScope`)
  * POST   → Create a new connection with proximity validation (Layers 2 & 3)
- * DELETE → Soft-remove: set `status` to `removed` (retains row for analytics)
+ * DELETE → Per-user hide: insert into `connection_hidden` (no `connections` row delete, no `status = removed`)
+ * PATCH  → Restore from archive: delete `connection_archives` row (legacy `status = archived` fallback)
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -21,24 +21,6 @@ function createAdminClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } }
-  );
-}
-
-async function createSupabaseSSRClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll(); },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    }
   );
 }
 
@@ -278,7 +260,7 @@ function isInsightsScope(searchParams: URLSearchParams): boolean {
   return v === '1' || v?.toLowerCase() === 'true';
 }
 
-type SsrSupabase = Awaited<ReturnType<typeof createSupabaseSSRClient>>;
+type UserScopedSupabase = SupabaseClient;
 
 /**
  * Per-user junction rows (`connection_archives`, `connection_hidden`).
@@ -295,7 +277,7 @@ function isJunctionTableOptionalError(error: { code?: string; message?: string }
 }
 
 async function fetchJunctionConnectionIds(
-  supabase: SsrSupabase,
+  supabase: UserScopedSupabase,
   table: 'connection_archives' | 'connection_hidden',
   userId: string,
 ): Promise<string[]> {
@@ -323,9 +305,7 @@ function dedupeIds(ids: string[]): string[] {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseSSRClient();
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { supabase, user, authError: userError } = await getSupabaseFromRouteRequest(request);
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -406,7 +386,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── PATCH — restore server-archived connection back to active ───────────────
+// ─── PATCH — restore: remove `connection_archives` row (legacy `status` fallback) ─
 
 type PatchBody = {
   action?: string;
@@ -416,8 +396,7 @@ type PatchBody = {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createSupabaseSSRClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { user, authError: userError } = await getSupabaseFromRouteRequest(request);
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -456,39 +435,59 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    if (row.status !== 'archived') {
-      return NextResponse.json(
-        { error: 'Only archived connections can be restored' },
-        { status: 409 },
-      );
+    const { data: removedArchiveRows, error: archiveDeleteError } = await adminClient
+      .from('connection_archives')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('connection_id', connectionId)
+      .select('id');
+
+    if (archiveDeleteError && !isJunctionTableOptionalError(archiveDeleteError)) {
+      console.error('Connection archive restore error:', archiveDeleteError);
+      return NextResponse.json({ error: archiveDeleteError.message }, { status: 400 });
     }
 
-    const activeStatus: ConnectionLifecycleStatus = 'active';
-    const { data: updated, error: updateError } = await adminClient
-      .from('connections')
-      .update({ status: activeStatus })
-      .eq('id', connectionId)
-      .select()
-      .maybeSingle();
-
-    if (updateError) {
-      console.error('Connection restore error:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    if ((removedArchiveRows?.length ?? 0) > 0) {
+      const { data: connection } = await adminClient
+        .from('connections')
+        .select('*')
+        .eq('id', connectionId)
+        .maybeSingle();
+      return NextResponse.json({ success: true, connection });
     }
 
-    return NextResponse.json({ success: true, connection: updated });
+    if (row.status === 'archived') {
+      const activeStatus: ConnectionLifecycleStatus = 'active';
+      const { data: updated, error: updateError } = await adminClient
+        .from('connections')
+        .update({ status: activeStatus })
+        .eq('id', connectionId)
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        console.error('Connection legacy restore error:', updateError);
+        return NextResponse.json({ error: updateError.message }, { status: 400 });
+      }
+
+      return NextResponse.json({ success: true, connection: updated });
+    }
+
+    return NextResponse.json(
+      { error: 'Connection is not archived for this user' },
+      { status: 409 },
+    );
   } catch (error) {
     console.error('Connection PATCH error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ─── DELETE — soft remove (status = removed) ─────────────────────────────────
+// ─── DELETE — per-user hide (`connection_hidden`, not `connections` delete) ─
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createSupabaseSSRClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { user, authError: userError } = await getSupabaseFromRouteRequest(request);
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -501,11 +500,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     const adminClient = createAdminClient();
+    const trimmedId = connectionId.trim();
 
     const { data: row, error: fetchError } = await adminClient
       .from('connections')
       .select('id, user_ids')
-      .eq('id', connectionId.trim())
+      .eq('id', trimmedId)
       .maybeSingle();
 
     if (fetchError) {
@@ -518,20 +518,31 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
-    const removedStatus: ConnectionLifecycleStatus = 'removed';
-    const { data: updated, error: updateError } = await adminClient
-      .from('connections')
-      .update({ status: removedStatus })
-      .eq('id', connectionId.trim())
-      .select()
-      .maybeSingle();
+    const hiddenAt = new Date().toISOString();
+    const { error: insertError } = await adminClient.from('connection_hidden').insert({
+      user_id: user.id,
+      connection_id: trimmedId,
+      hidden_at: hiddenAt,
+    });
 
-    if (updateError) {
-      console.error('Connection soft-delete error:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    if (!insertError) {
+      return NextResponse.json({ success: true, connectionId: trimmedId });
     }
 
-    return NextResponse.json({ success: true, connection: updated });
+    if (insertError.code === '23505') {
+      return NextResponse.json({ success: true, connectionId: trimmedId, alreadyHidden: true });
+    }
+
+    if (isJunctionTableOptionalError(insertError)) {
+      console.error('connection_hidden unavailable:', insertError.message);
+      return NextResponse.json(
+        { error: 'Hide is not available (database configuration)' },
+        { status: 503 },
+      );
+    }
+
+    console.error('Connection hide error:', insertError);
+    return NextResponse.json({ error: insertError.message }, { status: 400 });
   } catch (error) {
     console.error('Connection DELETE error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -542,7 +553,11 @@ export async function DELETE(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseSSRClient();
+    const { user, authError: userError } = await getSupabaseFromRouteRequest(request);
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
@@ -562,12 +577,6 @@ export async function POST(request: NextRequest) {
       responder_id,
       noiseLevelCategory,
     } = body;
-
-    // Auth check
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     // Validate required fields
     if (!userId1 || !userId2) {

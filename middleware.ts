@@ -50,7 +50,12 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  if (isConnectionsApiPath(request.nextUrl.pathname) && connectionsRateLimitExceeded(getClientIp(request))) {
+  // Dashboard loads use GET /api/connections twice per refresh (active + archived) plus Realtime-driven
+  // refetches; implicit-flow auth is Bearer-based. Only throttle abuse-prone mutations.
+  const connectionsMutation =
+    isConnectionsApiPath(request.nextUrl.pathname) &&
+    ['POST', 'PATCH', 'DELETE'].includes(request.method);
+  if (connectionsMutation && connectionsRateLimitExceeded(getClientIp(request))) {
     return NextResponse.json(
       { error: 'Too many requests' },
       {
