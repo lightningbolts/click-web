@@ -19,6 +19,7 @@ import {
   Clock,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
+import LoadingScreen from '@/components/LoadingScreen';
 import { ChatView } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import { deriveKeysForConnection, decryptContent, isEncrypted } from '@/lib/chat/crypto';
@@ -164,6 +165,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+
+  /** Avoid painting stats at 0 before the first `/api/connections` response (hydrates real counts). */
+  const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useState(false);
+  const connectionsLoadUserIdRef = useRef<string | null>(null);
 
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     const supabase = getSupabaseClient();
@@ -1142,10 +1147,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
   };
 
   const loadConnections = useCallback(async () => {
+    const markInitialLoadComplete = () => {
+      setConnectionsInitialLoadComplete(true);
+    };
+
     if (!user?.id) {
       setConnectionRecords([]);
       setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
+      markInitialLoadComplete();
       return;
     }
 
@@ -1335,14 +1345,23 @@ export default function DashboardView({ user }: DashboardViewProps) {
     } catch (err) {
       console.error('Unexpected error fetching connections:', err);
       setEmptyConnections();
+    } finally {
+      markInitialLoadComplete();
     }
   }, [user?.id, getAuthHeaders]);
 
-  // Fetch user connections (initial load)
+  // Fetch user connections (initial load + refetch). Reset gate when the signed-in user changes.
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
+    if (connectionsLoadUserIdRef.current !== user.id) {
+      connectionsLoadUserIdRef.current = user.id;
+      setConnectionsInitialLoadComplete(false);
+      setConnectionRecords([]);
+      setChapters(generateChaptersFromConnections([]));
+      setArchivedConnectionIds(new Set());
+    }
     void loadConnections();
-  }, [user, loadConnections]);
+  }, [user?.id, loadConnections]);
 
   // Stay in sync when a new connection is created or updated (e.g. app user scans this user’s web QR)
   useEffect(() => {
@@ -1825,6 +1844,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
     { id: 'identity', label: 'QR Identity', icon: QrCode },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  if (!connectionsInitialLoadComplete) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
