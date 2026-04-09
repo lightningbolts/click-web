@@ -17,6 +17,7 @@ import {
   Users2,
   MessageSquare,
   Radio,
+  Radar,
   ChevronLeft,
   LogOut,
   Sparkles,
@@ -42,6 +43,12 @@ const navItems = [
     href: "/insights/vibe-stream",
     label: "Vibe Stream",
     icon: MessageSquare,
+    exact: false,
+  },
+  {
+    href: "/insights/vibe-radar",
+    label: "Vibe Radar",
+    icon: Radar,
     exact: false,
   },
   {
