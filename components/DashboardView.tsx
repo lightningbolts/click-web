@@ -1350,8 +1350,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
+    const uid = user.id;
     const channel = supabase
-      .channel(`dashboard-connections:${user.id}`)
+      .channel(`dashboard-connections:${uid}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'connections' },
@@ -1361,14 +1362,48 @@ export default function DashboardView({ user }: DashboardViewProps) {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'connection_archives' },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'connection_archives',
+          filter: `user_id=eq.${uid}`,
+        },
         () => {
           void loadConnections();
         },
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'connection_hidden' },
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'connection_archives',
+          filter: `user_id=eq.${uid}`,
+        },
+        () => {
+          void loadConnections();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'connection_hidden',
+          filter: `user_id=eq.${uid}`,
+        },
+        () => {
+          void loadConnections();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'connection_hidden',
+          filter: `user_id=eq.${uid}`,
+        },
         () => {
           void loadConnections();
         },

@@ -519,18 +519,17 @@ export async function DELETE(request: NextRequest) {
     }
 
     const hiddenAt = new Date().toISOString();
-    const { error: insertError } = await adminClient.from('connection_hidden').insert({
-      user_id: user.id,
+    const hiddenRows = ids.map((participantId) => ({
+      user_id: participantId,
       connection_id: trimmedId,
       hidden_at: hiddenAt,
-    });
+    }));
+    const { error: insertError } = await adminClient
+      .from('connection_hidden')
+      .upsert(hiddenRows, { onConflict: 'user_id,connection_id' });
 
     if (!insertError) {
       return NextResponse.json({ success: true, connectionId: trimmedId });
-    }
-
-    if (insertError.code === '23505') {
-      return NextResponse.json({ success: true, connectionId: trimmedId, alreadyHidden: true });
     }
 
     if (isJunctionTableOptionalError(insertError)) {
@@ -590,26 +589,6 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient();
 
-    // Check if connection already exists
-    const { data: existingRows, error: existingErr } = await adminClient
-      .from('connections')
-      .select('id, status')
-      .contains('user_ids', [userId1, userId2]);
-
-    if (existingErr) {
-      console.error('Connection duplicate check error:', existingErr);
-      return NextResponse.json({ error: existingErr.message }, { status: 500 });
-    }
-
-    const blocksNewConnection = (existingRows ?? []).some((r) => {
-      const s = r.status as string | null | undefined;
-      return s !== 'removed' && s !== 'archived';
-    });
-
-    if (blocksNewConnection) {
-      return NextResponse.json({ error: 'Connection already exists' }, { status: 409 });
-    }
-
     // ── Layer 2: GPS proximity validation ──
 
     const loc1Valid = location1 && isFinite(location1.lat) && isFinite(location1.lon) &&
@@ -649,6 +628,27 @@ export async function POST(request: NextRequest) {
       gpsAvailable,
     });
 
+    const { data: existingRows, error: existingErr } = await adminClient
+      .from('connections')
+      .select('id, status, user_ids, last_message_at, should_continue, has_begun')
+      .contains('user_ids', [userId1, userId2]);
+
+    if (existingErr) {
+      console.error('Connection existing row lookup error:', existingErr);
+      return NextResponse.json({ error: existingErr.message }, { status: 500 });
+    }
+
+    const existing = (existingRows ?? [])[0] as
+      | {
+          id: string;
+          status: string | null;
+          user_ids: string[];
+          last_message_at: number | null;
+          should_continue: boolean[] | null;
+          has_begun: boolean | null;
+        }
+      | undefined;
+
     // Compute geo_location without midpoint averaging to preserve real observed points.
     // If both are available, prefer initiator location1.
     let geoLocation: { lat: number; lon: number };
@@ -683,17 +683,31 @@ export async function POST(request: NextRequest) {
       noiseLevelCategory: resolvedNoiseLevel,
     };
 
+    const userIdsForRow = existing?.user_ids ?? [userId1, userId2];
+    const restoredStatus: ConnectionLifecycleStatus = existing
+      ? existing.status === 'kept'
+        ? 'kept'
+        : existing.last_message_at != null
+          ? 'active'
+          : 'pending'
+      : 'pending';
+    const expiryStateForRow: ConnectionLifecycleStatus =
+      restoredStatus === 'kept' ? 'kept' : restoredStatus === 'active' ? 'active' : 'pending';
+
     const connectionData = {
-      user_ids: [userId1, userId2],
+      user_ids: userIdsForRow,
       geo_location: geoLocation,
       created: now,
       created_utc: createdUtc,
       time_of_day_utc: timeOfDayUtc,
       expiry,
-      should_continue: [false, false],
-      has_begun: false,
-      status: 'pending' as ConnectionLifecycleStatus,
-      expiry_state: 'pending',
+      should_continue:
+        existing && Array.isArray(existing.should_continue) && existing.should_continue.length >= 2
+          ? existing.should_continue
+          : [false, false],
+      has_begun: existing?.has_begun === true,
+      status: restoredStatus,
+      expiry_state: expiryStateForRow,
       proximity_confidence: proximityConfidence,
       proximity_signals: proximitySignals,
       connection_method: connectionMethod,
@@ -704,15 +718,59 @@ export async function POST(request: NextRequest) {
       noise_level: resolvedNoiseLevel,
     };
 
-    const { data: connection, error: insertError } = await adminClient
-      .from('connections')
-      .insert(connectionData)
-      .select()
-      .single();
+    let connection: { id: string };
 
-    if (insertError) {
-      console.error('Connection insert error:', insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (existing) {
+      const pairIds = (existing.user_ids ?? []).filter((x): x is string => typeof x === 'string' && x.length > 0);
+      if (pairIds.length >= 2) {
+        const { error: hidDelErr } = await adminClient
+          .from('connection_hidden')
+          .delete()
+          .eq('connection_id', existing.id)
+          .in('user_id', pairIds);
+        if (hidDelErr && !isJunctionTableOptionalError(hidDelErr)) {
+          console.error('connection_hidden clear on restore:', hidDelErr);
+        }
+        const { error: archDelErr } = await adminClient
+          .from('connection_archives')
+          .delete()
+          .eq('connection_id', existing.id)
+          .in('user_id', pairIds);
+        if (archDelErr && !isJunctionTableOptionalError(archDelErr)) {
+          console.error('connection_archives clear on restore:', archDelErr);
+        }
+      }
+
+      const { data: updated, error: updateError } = await adminClient
+        .from('connections')
+        .update(connectionData)
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Connection restore update error:', updateError);
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+      connection = updated;
+    } else {
+      const { data: inserted, error: insertError } = await adminClient
+        .from('connections')
+        .insert({
+          ...connectionData,
+          status: 'pending' as ConnectionLifecycleStatus,
+          expiry_state: 'pending',
+          should_continue: [false, false],
+          has_begun: false,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Connection insert error:', insertError);
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+      connection = inserted;
     }
 
     // Also create a chat row for this connection (so it shows in the chat list)
