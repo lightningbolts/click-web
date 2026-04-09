@@ -8,12 +8,17 @@ type AuthenticatedSupabaseResult = {
 };
 
 function extractBearerToken(req: NextRequest): string | null {
+  const authHeader = req.headers.get('Authorization');
+  const fromHeader = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : authHeader?.trim() || null;
+  if (fromHeader) return fromHeader;
+
   const authCookie =
     req.cookies.get('sb-access-token') ||
     req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token');
 
-  const authHeader = req.headers.get('Authorization');
-  return authCookie?.value ?? authHeader?.replace('Bearer ', '') ?? null;
+  return authCookie?.value ?? null;
 }
 
 function createSupabaseClient(token?: string | null): SupabaseClient {

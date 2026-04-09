@@ -7,13 +7,10 @@ import {
   buildProfileConnectionLines,
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
+import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
+import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 
-export type AvailabilityIntentRow = {
-  id: string;
-  timeframe: string;
-  intent_tag: string;
-  expires_at: string;
-};
+export type { AvailabilityIntentRow };
 
 export type UserProfilePayload = {
   user: {
@@ -41,14 +38,6 @@ export type UserProfilePayload = {
   /** Mutual `connections` row for viewer + profile user. */
   sharedConnection?: SharedConnectionPayload | null;
 };
-
-function humanizeTimeframe(value: string): string {
-  const s = value.trim();
-  if (!s) return '';
-  return s
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 function displayName(u: UserProfilePayload['user']): string {
   const fn = u.first_name?.trim();
@@ -304,82 +293,6 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                     )}
                   </section>
 
-                  <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
-                      Availability
-                    </h3>
-                    {(() => {
-                      const intents = data.availabilityIntents ?? [];
-                      const hasLegacySchedule =
-                        !!data.availability &&
-                        (!!data.availability.available_days?.length ||
-                          !!data.availability.preferred_activities?.length ||
-                          !!data.availability.custom_status);
-
-                      if (intents.length === 0 && !hasLegacySchedule) {
-                        return (
-                          <p className="text-sm text-zinc-500">No availability shared yet</p>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-4 text-sm text-zinc-300">
-                          {intents.length > 0 ? (
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
-                                Open to
-                              </p>
-                              <ul className="flex flex-col gap-2">
-                                {intents.map((row) => (
-                                  <li
-                                    key={row.id}
-                                    className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2"
-                                  >
-                                    <span className="rounded-full border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2.5 py-0.5 text-xs text-sky-200">
-                                      {row.intent_tag.trim()}
-                                    </span>
-                                    <span className="text-xs text-zinc-500">
-                                      {humanizeTimeframe(row.timeframe)}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-
-                          {hasLegacySchedule && data.availability ? (
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
-                                Schedule
-                              </p>
-                              <div className="space-y-2">
-                                {!!data.availability.available_days?.length && (
-                                  <p className="text-zinc-400">
-                                    <span className="text-zinc-500">Days: </span>
-                                    {data.availability.available_days
-                                      .map((d) => d.charAt(0).toUpperCase() + d.slice(1))
-                                      .join(', ')}
-                                  </p>
-                                )}
-                                {!!data.availability.preferred_activities?.length && (
-                                  <p className="text-zinc-400">
-                                    <span className="text-zinc-500">Activities: </span>
-                                    {data.availability.preferred_activities.join(', ')}
-                                  </p>
-                                )}
-                                {data.availability.custom_status && (
-                                  <p className="text-zinc-200 border-l-2 border-[#8338EC]/50 pl-3">
-                                    {data.availability.custom_status}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })()}
-                  </section>
-
                   {!!data.sharedInterestTags?.length && (
                     <section>
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
@@ -400,6 +313,16 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                       </div>
                     </section>
                   )}
+
+                  <section>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                      Availability
+                    </h3>
+                    <CurrentAvailabilitySection
+                      availability={data.availability}
+                      availabilityIntents={data.availabilityIntents}
+                    />
+                  </section>
                 </motion.div>
               )}
             </div>

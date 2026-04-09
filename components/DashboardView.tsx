@@ -32,8 +32,9 @@ import {
   StatsOverview,
   AchievementBadge,
   MilestoneProgress,
-  ConnectionMap
+  ConnectionMap,
 } from '@/components/dashboard';
+import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import CallOverlay, {
@@ -1956,6 +1957,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     thisMonthTrendPercent={dashboardMetrics.thisMonthTrendPercent}
                   />
                 </section>
+
+                <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
 
                 {/* Achievements & Milestones Row */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">

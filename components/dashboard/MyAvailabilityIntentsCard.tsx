@@ -1,0 +1,214 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { CalendarClock, Loader2, Plus, Trash2 } from 'lucide-react';
+import {
+  AVAILABILITY_INTENT_DURATION_PRESETS,
+  DEFAULT_AVAILABILITY_INTENT_DURATION_MS,
+} from '@/lib/availabilityIntentDurations';
+
+type IntentRow = {
+  id: string;
+  timeframe: string;
+  intent_tag: string;
+  expires_at: string;
+};
+
+const DURATION_OPTIONS = AVAILABILITY_INTENT_DURATION_PRESETS;
+
+type Props = {
+  getAuthHeaders: () => Promise<HeadersInit>;
+};
+
+/**
+ * Memory Box card: shows your active availability intents and lets you add one (matches mobile presets).
+ */
+export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
+  const [intents, setIntents] = useState<IntentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tag, setTag] = useState('');
+  const [durationMs, setDurationMs] = useState(DEFAULT_AVAILABILITY_INTENT_DURATION_MS);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/user/availability-intents', { headers });
+      const json = (await res.json().catch(() => ({}))) as { intents?: IntentRow[]; error?: string };
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      setIntents(Array.isArray(json.intents) ? json.intents : []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not load availability');
+      setIntents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = tag.trim();
+    if (!trimmed || trimmed.length > 25) {
+      setError(trimmed ? 'Tag must be 25 characters or less' : 'Enter what you’re open to');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/user/availability-intents', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          intent_tag: trimmed,
+          durationMs,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      setTag('');
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    setDeletingId(id);
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/user/availability-intents?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      setIntents((prev) => prev.filter((r) => r.id !== id));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not remove');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="glass rounded-3xl border border-zinc-800 p-6"
+    >
+      <div className="flex items-start gap-3 mb-4">
+        <div className="p-2 bg-sky-500/15 rounded-xl shrink-0">
+          <CalendarClock className="w-5 h-5 text-sky-400" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold text-white">Open to meet</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">
+            Share a short intent (coffee, study, walk…). Connections see it on your profile while it’s active.
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-zinc-500 py-4">
+          <Loader2 className="w-4 h-4 animate-spin text-[#8338EC]" />
+          Loading…
+        </div>
+      ) : (
+        <>
+          {intents.length > 0 ? (
+            <div className="mb-5 space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Active now</p>
+              <ul className="space-y-2">
+                {intents.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2"
+                  >
+                    <div className="min-w-0 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2.5 py-0.5 text-xs text-sky-200 truncate max-w-[200px]">
+                        {row.intent_tag.trim()}
+                      </span>
+                      <span className="text-xs text-zinc-500">{row.timeframe}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => remove(row.id)}
+                      disabled={deletingId === row.id}
+                      className="shrink-0 rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-red-300 transition-colors disabled:opacity-50"
+                      aria-label="Remove intent"
+                    >
+                      {deletingId === row.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="mb-5 rounded-xl border border-zinc-800/80 bg-zinc-900/30 px-3 py-3 text-sm text-zinc-500">
+              No active intent — add one below so friends know what you’re up for.
+            </div>
+          )}
+
+          <form
+            onSubmit={submit}
+            className={`space-y-3 ${intents.length > 0 ? 'mt-4 border-t border-zinc-800/80 pt-4' : ''}`}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Add intent</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={tag}
+                onChange={(e) => setTag(e.target.value.slice(0, 25))}
+                placeholder="e.g. Coffee, Study session"
+                maxLength={25}
+                className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-[#8338EC]/50"
+              />
+              <select
+                value={durationMs}
+                onChange={(e) => setDurationMs(Number(e.target.value))}
+                className="rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]/50 sm:min-w-[140px]"
+              >
+                {DURATION_OPTIONS.map((o) => (
+                  <option key={o.ms} value={o.ms}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={saving || !tag.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8338EC] to-[#6520c0] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-opacity"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Share availability
+            </button>
+          </form>
+        </>
+      )}
+
+      {error && (
+        <p className="mt-3 text-sm text-red-400" role="alert">
+          {error}
+        </p>
+      )}
+    </motion.section>
+  );
+}

@@ -278,6 +278,49 @@ function isInsightsScope(searchParams: URLSearchParams): boolean {
   return v === '1' || v?.toLowerCase() === 'true';
 }
 
+type SsrSupabase = Awaited<ReturnType<typeof createSupabaseSSRClient>>;
+
+/**
+ * Per-user junction rows (`connection_archives`, `connection_hidden`).
+ * If a table is missing from the schema cache, return [] so the main connections query still works.
+ */
+function isJunctionTableOptionalError(error: { code?: string; message?: string }): boolean {
+  const code = error.code;
+  const msg = String(error.message || '').toLowerCase();
+  return (
+    code === 'PGRST205' ||
+    msg.includes('schema cache') ||
+    msg.includes('does not exist')
+  );
+}
+
+async function fetchJunctionConnectionIds(
+  supabase: SsrSupabase,
+  table: 'connection_archives' | 'connection_hidden',
+  userId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase.from(table).select('connection_id').eq('user_id', userId);
+
+  if (!error) {
+    const ids = (data ?? [])
+      .map((row: { connection_id?: string }) => row.connection_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    return [...new Set(ids)];
+  }
+
+  if (isJunctionTableOptionalError(error)) {
+    console.warn(`[connections GET] ${table} optional junction unavailable:`, error.message);
+    return [];
+  }
+
+  console.error(`[connections GET] ${table} query failed:`, error.message);
+  return [];
+}
+
+function dedupeIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseSSRClient();
@@ -290,21 +333,63 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const insights = isInsightsScope(searchParams);
 
-    // Active dashboard/chat views omit auto-archived and user-removed rows.
-    // Archived tab: `?statusScope=archived`. Insights: `?includeInsights=1` for every lifecycle state.
+    // Insights: full history — no junction filtering (avoids hiding rows from analytics views).
+    if (insights) {
+      const { data: connections, error } = await supabase
+        .from('connections')
+        .select('*')
+        .contains('user_ids', [user.id])
+        .order('created', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching connections:', error);
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      return NextResponse.json({ connections: connections || [] });
+    }
+
+    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
+
+    const [archivedForUser, hiddenForUser] = await Promise.all([
+      fetchJunctionConnectionIds(supabase, 'connection_archives', user.id),
+      fetchJunctionConnectionIds(supabase, 'connection_hidden', user.id),
+    ]);
+
+    // ─── Archived channel: `connection_archives` ids minus `connection_hidden`, then `.in('id', …)` ───
+    if (scope === 'archived') {
+      const hiddenSet = new Set(hiddenForUser);
+      const includeIds = archivedForUser.filter((id) => !hiddenSet.has(id));
+
+      if (includeIds.length === 0) {
+        return NextResponse.json({ connections: [] });
+      }
+
+      const { data: connections, error } = await supabase
+        .from('connections')
+        .select('*')
+        .contains('user_ids', [user.id])
+        .in('id', includeIds)
+        .order('created', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching archived connections:', error);
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      return NextResponse.json({ connections: connections || [] });
+    }
+
+    // ─── Active channel: visible lifecycle states, excluding archived ∪ hidden junction ids ───
+    const excludedIds = dedupeIds([...archivedForUser, ...hiddenForUser]);
+
     let query = supabase
       .from('connections')
       .select('*')
       .contains('user_ids', [user.id])
+      .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
       .order('created', { ascending: false });
 
-    if (!insights) {
-      const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
-      if (scope === 'archived') {
-        query = query.eq('status', 'archived');
-      } else {
-        query = query.or(ACTIVE_CONNECTIONS_DB_OR_FILTER);
-      }
+    if (excludedIds.length > 0) {
+      query = query.not('id', 'in', `(${excludedIds.join(',')})`);
     }
 
     const { data: connections, error } = await query;

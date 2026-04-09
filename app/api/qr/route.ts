@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
+import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -14,27 +13,6 @@ import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
  * Old format: click://connect/{userId}  (static, vulnerable to screenshots)
  * New format: JSON with { token, userId, exp } (single-use, expires)
  */
-
-// Helper: create a Supabase SSR client from cookies
-async function createSupabaseSSRClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-}
 
 // Helper: create an admin Supabase client (bypasses RLS for token ops)
 function createAdminClient() {
@@ -65,10 +43,8 @@ function createAdminClient() {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseSSRClient();
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const { user } = await getAuthenticatedSupabase(request);
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }
@@ -163,12 +139,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createSupabaseSSRClient();
+    const { user, supabase } = await getAuthenticatedSupabase(request);
     const body = await request.json();
 
-    // Get the current user (the scanner)
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in' },
         { status: 401 }

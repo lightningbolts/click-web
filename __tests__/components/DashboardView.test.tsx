@@ -74,6 +74,11 @@ jest.mock('@/components/dashboard', () => ({
   ConnectionMap: () => <div data-testid="connection-map" />,
 }));
 
+jest.mock('@/components/dashboard/MyAvailabilityIntentsCard', () => ({
+  __esModule: true,
+  default: () => <div data-testid="my-availability-intents" />,
+}));
+
 jest.mock('@/lib/dashboard/mockData', () => ({
   mockConnections: [],
   mockChapters: [],

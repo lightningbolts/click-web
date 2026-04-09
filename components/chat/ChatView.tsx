@@ -1215,27 +1215,65 @@ export default function ChatView({
         </div>
       </div>
 
-      {sharedInterestTags.length > 0 && (
-        <div className="glass mb-3 shrink-0 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200/90">
-            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Conversation starters
-          </div>
-          <p className="mt-1 text-[11px] text-zinc-500">
-            Shared interests — try weaving one into your next message
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {sharedInterestTags.map((t) => (
-              <span
-                key={t}
-                className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-100"
+      <AnimatePresence>
+        {sharedInterestTags.length > 0 && (
+          <motion.div
+            key={`conversation-starters-${peerUserId ?? 'unknown'}`}
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{
+              type: 'spring',
+              stiffness: 420,
+              damping: 32,
+              mass: 0.85,
+            }}
+            className="glass mb-3 shrink-0 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3 overflow-hidden"
+          >
+            <motion.div
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05, duration: 0.25 }}
+              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200/90"
+            >
+              <motion.span
+                initial={{ rotate: -12, scale: 0.8 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 18, delay: 0.08 }}
               >
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+                <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              </motion.span>
+              Conversation starters
+            </motion.div>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.12, duration: 0.2 }}
+              className="mt-1 text-[11px] text-zinc-500"
+            >
+              Shared interests — try weaving one into your next message
+            </motion.p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {sharedInterestTags.map((t, i) => (
+                <motion.span
+                  key={t}
+                  initial={{ opacity: 0, y: 6, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 28,
+                    delay: 0.14 + i * 0.045,
+                  }}
+                  className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-100"
+                >
+                  {t}
+                </motion.span>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Messages area ── */}
       <div

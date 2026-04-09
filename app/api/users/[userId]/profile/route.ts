@@ -6,6 +6,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import {
+  normalizeAvailabilityIntentRows,
+  normalizeLegacyAvailabilityRecord,
+  type AvailabilityIntentRow,
+} from '@/lib/userProfile/availability';
 import { getSharedInterestTags } from '@/lib/userProfile/sharedInterests';
 
 function createAdminClient() {
@@ -17,12 +22,7 @@ function createAdminClient() {
   );
 }
 
-export type AvailabilityIntentPayload = {
-  id: string;
-  timeframe: string;
-  intent_tag: string;
-  expires_at: string;
-};
+export type AvailabilityIntentPayload = AvailabilityIntentRow;
 
 export async function GET(
   req: NextRequest,
@@ -49,7 +49,7 @@ export async function GET(
 
     const profileTags = (interestsRes.data as { tags?: string[] } | null)?.tags ?? [];
 
-    let availabilityIntents: AvailabilityIntentPayload[] = [];
+    let availabilityIntents: AvailabilityIntentRow[] = [];
     try {
       const admin = createAdminClient();
       const { data: intentRows, error: intentErr } = await admin
@@ -60,7 +60,7 @@ export async function GET(
         .order('expires_at', { ascending: true });
 
       if (!intentErr && intentRows) {
-        availabilityIntents = intentRows as AvailabilityIntentPayload[];
+        availabilityIntents = normalizeAvailabilityIntentRows(intentRows);
       } else if (intentErr) {
         console.warn('profile availability_intents:', intentErr.message);
       }
@@ -111,7 +111,7 @@ export async function GET(
     return NextResponse.json({
       user: userRes.data,
       tags: profileTags,
-      availability: availRes.data ?? null,
+      availability: normalizeLegacyAvailabilityRecord(availRes.data ?? null),
       availabilityIntents,
       viewerInterestTags,
       sharedInterestTags,
