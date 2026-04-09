@@ -276,6 +276,23 @@ function isJunctionTableOptionalError(error: { code?: string; message?: string }
   );
 }
 
+/**
+ * Lazy-sweep stale rows into `connection_archives` for this user before any connections read.
+ * Must run while the caller still holds a valid JWT so `auth.uid()` matches in the RPC.
+ */
+async function sweepStaleConnectionsForUser(
+  supabase: UserScopedSupabase,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { error } = await supabase.rpc('sweep_stale_connections_for_user', {
+    target_user_id: userId,
+  });
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+  return { ok: true };
+}
+
 async function fetchJunctionConnectionIds(
   supabase: UserScopedSupabase,
   table: 'connection_archives' | 'connection_hidden',
@@ -308,6 +325,12 @@ export async function GET(request: NextRequest) {
     const { supabase, user, authError: userError } = await getSupabaseFromRouteRequest(request);
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
+    if (!sweep.ok) {
+      console.error('[connections GET] sweep_stale_connections_for_user failed:', sweep.message);
+      return NextResponse.json({ error: sweep.message }, { status: 400 });
     }
 
     const searchParams = request.nextUrl.searchParams;
