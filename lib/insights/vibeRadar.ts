@@ -67,7 +67,7 @@ export function parseVibeRadarRpcPayload(
     clusters: [] as VibeRadarCluster[],
     categoryTotals: [] as VibeRadarCategoryTotal[],
     venueCenter: { lat: null as number | null, lng: null as number | null },
-    radiusMeters: 1609.34,
+    radiusMeters: 804.67,
     status: "parse_error",
   };
 
@@ -78,7 +78,7 @@ export function parseVibeRadarRpcPayload(
   const o = raw as Record<string, unknown>;
   const status = typeof o.status === "string" ? o.status : "unknown";
   const radiusMeters =
-    typeof o.radiusMeters === "number" && Number.isFinite(o.radiusMeters) ? o.radiusMeters : 1609.34;
+    typeof o.radiusMeters === "number" && Number.isFinite(o.radiusMeters) ? o.radiusMeters : 804.67;
 
   let lat: number | null = null;
   let lng: number | null = null;
@@ -163,7 +163,7 @@ export function demoVibeRadarResponse(): Omit<VibeRadarApiResponse, "venueId"> {
     clusters,
     categoryTotals,
     venueCenter: DEMO_CENTER,
-    radiusMeters: 1609.34,
+    radiusMeters: 804.67,
     status: "ok",
   };
 }
