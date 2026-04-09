@@ -10,6 +10,10 @@ import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
  * GET  → Generate a time-bounded, single-use QR token (90s TTL)
  * POST → Redeem a QR token (atomic, race-condition safe)
  *
+ * Persisting a `connections` row (including reconnect after soft-remove) is handled by
+ * `POST /api/connections` — not this route. That endpoint performs the pair lookup,
+ * junction cleanup, and restore-before-insert flow for `unique_user_pair`.
+ *
  * Old format: click://connect/{userId}  (static, vulnerable to screenshots)
  * New format: JSON with { token, userId, exp } (single-use, expires)
  */

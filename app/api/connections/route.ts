@@ -7,7 +7,7 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 /**
  * Connections API
  *
- * GET    → Fetch connections for the authenticated user (active vs archived via `statusScope`)
+ * GET    → Fetch connections (`statusScope`: default active | `archived` | `map` = all non-hidden for memory map)
  * POST   → Create a new connection with proximity validation (Layers 2 & 3)
  * DELETE → Per-user hide: insert into `connection_hidden` (no `connections` row delete, no `status = removed`)
  * PATCH  → Restore from archive: delete `connection_archives` row (legacy `status = archived` fallback)
@@ -358,6 +358,29 @@ export async function GET(request: NextRequest) {
       fetchJunctionConnectionIds(supabase, 'connection_hidden', user.id),
     ]);
 
+    // ─── Memory map: every connection the user is on, minus `connection_hidden` only (no archive filter) ───
+    if (scope === 'map') {
+      const hiddenSet = new Set(hiddenForUser);
+      let mapQuery = supabase
+        .from('connections')
+        .select('*')
+        .contains('user_ids', [user.id])
+        .order('created', { ascending: false });
+
+      if (hiddenSet.size > 0) {
+        mapQuery = mapQuery.not('id', 'in', `(${[...hiddenSet].join(',')})`);
+      }
+
+      const { data: mapConnections, error: mapError } = await mapQuery;
+
+      if (mapError) {
+        console.error('Error fetching map connections:', mapError);
+        return NextResponse.json({ error: mapError.message }, { status: 400 });
+      }
+
+      return NextResponse.json({ connections: mapConnections || [] });
+    }
+
     // ─── Archived channel: `connection_archives` ids minus `connection_hidden`, then `.in('id', …)` ───
     if (scope === 'archived') {
       const hiddenSet = new Set(hiddenForUser);
@@ -471,19 +494,28 @@ export async function PATCH(request: NextRequest) {
     }
 
     if ((removedArchiveRows?.length ?? 0) > 0) {
-      const { data: connection } = await adminClient
+      // Manual unarchive: `kept` shields the row from sweep_stale_connections_for_user (pending/active only).
+      const keptStatus: ConnectionLifecycleStatus = 'kept';
+      const { data: connection, error: keepUpdateError } = await adminClient
         .from('connections')
-        .select('*')
+        .update({ status: keptStatus })
         .eq('id', connectionId)
+        .select()
         .maybeSingle();
+
+      if (keepUpdateError) {
+        console.error('Connection unarchive status update error:', keepUpdateError);
+        return NextResponse.json({ error: keepUpdateError.message }, { status: 400 });
+      }
+
       return NextResponse.json({ success: true, connection });
     }
 
     if (row.status === 'archived') {
-      const activeStatus: ConnectionLifecycleStatus = 'active';
+      const keptStatus: ConnectionLifecycleStatus = 'kept';
       const { data: updated, error: updateError } = await adminClient
         .from('connections')
-        .update({ status: activeStatus })
+        .update({ status: keptStatus })
         .eq('id', connectionId)
         .select()
         .maybeSingle();
@@ -651,17 +683,20 @@ export async function POST(request: NextRequest) {
       gpsAvailable,
     });
 
-    const { data: existingRows, error: existingErr } = await adminClient
+    const { data: pairCandidates, error: existingErr } = await adminClient
       .from('connections')
       .select('id, status, user_ids, last_message_at, should_continue, has_begun')
-      .contains('user_ids', [userId1, userId2]);
+      .contains('user_ids', [userId1]);
 
     if (existingErr) {
       console.error('Connection existing row lookup error:', existingErr);
       return NextResponse.json({ error: existingErr.message }, { status: 500 });
     }
 
-    const existing = (existingRows ?? [])[0] as
+    const existing = (pairCandidates ?? []).find((row) => {
+      const ids = (row.user_ids as string[] | null) ?? [];
+      return ids.includes(userId1) && ids.includes(userId2);
+    }) as
       | {
           id: string;
           status: string | null;
@@ -707,17 +742,8 @@ export async function POST(request: NextRequest) {
     };
 
     const userIdsForRow = existing?.user_ids ?? [userId1, userId2];
-    const restoredStatus: ConnectionLifecycleStatus = existing
-      ? existing.status === 'kept'
-        ? 'kept'
-        : existing.last_message_at != null
-          ? 'active'
-          : 'pending'
-      : 'pending';
-    const expiryStateForRow: ConnectionLifecycleStatus =
-      restoredStatus === 'kept' ? 'kept' : restoredStatus === 'active' ? 'active' : 'pending';
 
-    const connectionData = {
+    const sharedConnectionFields = {
       user_ids: userIdsForRow,
       geo_location: geoLocation,
       created: now,
@@ -729,8 +755,6 @@ export async function POST(request: NextRequest) {
           ? existing.should_continue
           : [false, false],
       has_begun: existing?.has_begun === true,
-      status: restoredStatus,
-      expiry_state: expiryStateForRow,
       proximity_confidence: proximityConfidence,
       proximity_signals: proximitySignals,
       connection_method: connectionMethod,
@@ -739,6 +763,24 @@ export async function POST(request: NextRequest) {
       initiator_id: resolvedInitiatorId,
       responder_id: resolvedResponderId,
       noise_level: resolvedNoiseLevel,
+    };
+
+    const activeLifecycle: ConnectionLifecycleStatus = 'active';
+
+    /** Soft-delete / reconnect: always revive as active + bump timestamps (see unique_user_pair restore path). */
+    const restorationConnectionData = {
+      ...sharedConnectionFields,
+      status: activeLifecycle,
+      expiry_state: activeLifecycle,
+      last_message_at: now,
+    };
+
+    const newConnectionData = {
+      ...sharedConnectionFields,
+      status: 'pending' as ConnectionLifecycleStatus,
+      expiry_state: 'pending' as ConnectionLifecycleStatus,
+      should_continue: [false, false] as boolean[],
+      has_begun: false,
     };
 
     let connection: { id: string };
@@ -766,7 +808,7 @@ export async function POST(request: NextRequest) {
 
       const { data: updated, error: updateError } = await adminClient
         .from('connections')
-        .update(connectionData)
+        .update(restorationConnectionData)
         .eq('id', existing.id)
         .select()
         .single();
@@ -779,13 +821,7 @@ export async function POST(request: NextRequest) {
     } else {
       const { data: inserted, error: insertError } = await adminClient
         .from('connections')
-        .insert({
-          ...connectionData,
-          status: 'pending' as ConnectionLifecycleStatus,
-          expiry_state: 'pending',
-          should_continue: [false, false],
-          has_begun: false,
-        })
+        .insert(newConnectionData)
         .select()
         .single();
 

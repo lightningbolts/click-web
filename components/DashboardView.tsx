@@ -129,6 +129,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
+  /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
+  const [mapConnectionRecords, setMapConnectionRecords] = useState<ConnectionRecord[]>([]);
   const [chapters, setChapters] = useState<TimelineChapter[]>([]);
   /** The connection whose chat is currently open, or null */
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
@@ -1153,6 +1155,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     if (!user?.id) {
       setConnectionRecords([]);
+      setMapConnectionRecords([]);
       setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
       markInitialLoadComplete();
@@ -1163,15 +1166,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     const setEmptyConnections = () => {
       setConnectionRecords([]);
+      setMapConnectionRecords([]);
       setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
     };
 
     try {
       const headers = await getAuthHeaders();
-      const [activeRes, archivedRes] = await Promise.all([
+      const [activeRes, archivedRes, mapRes] = await Promise.all([
         fetch('/api/connections', { headers, cache: 'no-store' }),
         fetch('/api/connections?statusScope=archived', { headers, cache: 'no-store' }),
+        fetch('/api/connections?statusScope=map', { headers, cache: 'no-store' }),
       ]);
 
       if (!activeRes.ok) {
@@ -1185,13 +1190,21 @@ export default function DashboardView({ user }: DashboardViewProps) {
         console.warn('Archived connections fetch skipped:', archivedRes.statusText);
       }
 
+      if (!mapRes.ok) {
+        console.warn('Map connections fetch skipped:', mapRes.statusText);
+      }
+
       const activePayload = (await activeRes.json()) as { connections?: Record<string, unknown>[] };
       const archivedPayload = archivedRes.ok
         ? ((await archivedRes.json()) as { connections?: Record<string, unknown>[] })
         : { connections: [] };
+      const mapPayload = mapRes.ok
+        ? ((await mapRes.json()) as { connections?: Record<string, unknown>[] })
+        : { connections: [] };
 
       const activeRows = activePayload.connections ?? [];
       const archivedRows = archivedPayload.connections ?? [];
+      const mapRows = mapPayload.connections ?? [];
 
       const archivedIds = new Set(
         archivedRows
@@ -1220,7 +1233,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
         return;
       }
 
-      const otherUserIds = merged
+      const mergedIdSet = new Set(merged.map((r) => r.id).filter((id): id is string => typeof id === 'string'));
+      const rowsForDisplayNames = [...merged, ...mapRows.filter((r) => typeof r.id === 'string' && !mergedIdSet.has(r.id))];
+
+      const otherUserIds = rowsForDisplayNames
         .flatMap((conn) => {
           const ids = conn.user_ids;
           if (!Array.isArray(ids)) return [] as string[];
@@ -1340,7 +1356,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
         .map(mapRowToRecord)
         .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
 
+      const mapRecords: ConnectionRecord[] = mapRows
+        .map(mapRowToRecord)
+        .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
+
       setConnectionRecords(records);
+      setMapConnectionRecords(mapRes.ok ? mapRecords : records);
       setChapters(generateChaptersFromConnections(records));
     } catch (err) {
       console.error('Unexpected error fetching connections:', err);
@@ -1357,6 +1378,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       connectionsLoadUserIdRef.current = user.id;
       setConnectionsInitialLoadComplete(false);
       setConnectionRecords([]);
+      setMapConnectionRecords([]);
       setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
     }
@@ -2022,7 +2044,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   </div>
                 </div>
 
-                <ConnectionMap connections={connectionRecords} onConnectionClick={handleOpenChat} />
+                <ConnectionMap connections={mapConnectionRecords} onConnectionClick={handleOpenChat} />
               </motion.div>
             )}
 

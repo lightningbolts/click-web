@@ -96,8 +96,11 @@ const spreadOverlappingConnections = (input: ConnectionRecord[]): PositionedConn
 };
 
 /**
- * ConnectionMap - MapLibre GL map component for displaying connection locations
- * Separated into its own component for better isolation and rendering
+ * MapLibre GL map for connection locations.
+ *
+ * **Data contract:** pass rows from `GET /api/connections?statusScope=map` (or equivalent):
+ * every connection the user participates in **except** those in `connection_hidden`.
+ * That includes per-user archived and legacy server-archived rows so the memory map matches full history.
  */
 export default function ConnectionMap({ connections, onConnectionClick }: ConnectionMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
