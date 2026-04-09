@@ -1,5 +1,4 @@
--- Lazy-sweep: archive stale connections for one user into connection_archives (per-user junction).
--- Replaces reliance on pg_cron; clients call this RPC immediately before fetching connections.
+-- Fix remaining uuid = text: auth.uid() is text; comparing directly to uuid parameter failed.
 
 CREATE OR REPLACE FUNCTION public.sweep_stale_connections_for_user(target_user_id uuid)
 RETURNS void
@@ -12,7 +11,6 @@ DECLARE
     forty_eight_hours_ms bigint := 48 * 60 * 60 * 1000;
     seven_days_ms bigint := 7 * 24 * 60 * 60 * 1000;
 BEGIN
-    -- auth.uid() is text in Supabase; target_user_id is uuid — compare as text to avoid uuid = text errors.
     IF auth.uid() IS NULL OR auth.uid()::text <> target_user_id::text THEN
         RAISE EXCEPTION 'not authorized'
             USING ERRCODE = '42501';
@@ -21,7 +19,6 @@ BEGIN
     INSERT INTO public.connection_archives (user_id, connection_id)
     SELECT target_user_id, c.id
     FROM public.connections c
-    -- connections.user_ids is TEXT[] (see migrate_to_python_schema); compare as text like RLS policies.
     WHERE target_user_id::text = ANY (c.user_ids)
       AND c.status IN ('pending', 'active')
       AND (
@@ -34,8 +31,3 @@ BEGIN
     ON CONFLICT (user_id, connection_id) DO NOTHING;
 END;
 $$;
-
-COMMENT ON FUNCTION public.sweep_stale_connections_for_user(uuid) IS
-    'Inserts connection_archives rows for target_user_id on stale pending/active connections (48h pending, 7d idle, or past expiry). Caller must be that user.';
-
-GRANT EXECUTE ON FUNCTION public.sweep_stale_connections_for_user(uuid) TO authenticated;
