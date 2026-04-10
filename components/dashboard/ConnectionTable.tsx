@@ -13,11 +13,19 @@ import {
   ChevronDown,
   Filter,
   MessageCircle,
+  Zap,
 } from 'lucide-react';
 import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
 import type { ConnectionDisplayStatus } from '@/lib/dashboard/connectionStatus';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { useAuth } from '@/lib/AuthContext';
+
+export interface ConnectionEncounterBrief {
+  id: string;
+  encounteredAt: Date;
+  locationName: string;
+  contextTags: string[];
+}
 
 export interface ConnectionRecord {
   id: string;
@@ -56,6 +64,10 @@ export interface ConnectionRecord {
   chatPreview?: string | null;
   chatLastMessageAt?: number | null;
   chatUpdatedAt?: number | null;
+  /** Newest-first timeline from `connection_encounters`, when present */
+  encounters?: ConnectionEncounterBrief[];
+  /** When viewer and peer share an active intent tag or timeframe */
+  intentOverlapLabel?: string | null;
 }
 
 interface ConnectionTableProps {
@@ -108,7 +120,8 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
         conn.location.toLowerCase().includes(q) ||
         (conn.context?.toLowerCase().includes(q) ?? false) ||
         (conn.weatherSummary?.toLowerCase().includes(q) ?? false) ||
-        (conn.noiseSummary?.toLowerCase().includes(q) ?? false);
+        (conn.noiseSummary?.toLowerCase().includes(q) ?? false) ||
+        (conn.intentOverlapLabel?.toLowerCase().includes(q) ?? false);
       
       const matchesStatus = statusFilter === 'all' || conn.status === statusFilter;
       
@@ -383,9 +396,20 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                           />
                         )}
                         <div className="min-w-0">
-                          <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug">
-                            {connection.name}
-                          </p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug truncate">
+                              {connection.name}
+                            </p>
+                            {connection.intentOverlapLabel ? (
+                              <span
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                                title={`Vibes match: ${connection.intentOverlapLabel}`}
+                              >
+                                <Zap className="h-3 w-3 text-amber-300" aria-hidden />
+                                <span className="max-w-[7rem] truncate">{connection.intentOverlapLabel}</span>
+                              </span>
+                            ) : null}
+                          </div>
                           {connection.chatPreview != null && connection.chatPreview.trim() !== '' ? (
                             <p className="mt-0.5 truncate text-xs text-zinc-500">{connection.chatPreview.trim()}</p>
                           ) : null}

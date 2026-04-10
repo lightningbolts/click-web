@@ -91,9 +91,7 @@ export async function GET(
     if (user.id !== userId) {
       const { data: mutualRows, error: mutualErr } = await supabase
         .from('connections')
-        .select(
-          'id, created, created_utc, time_of_day_utc, semantic_location, full_location, geo_location, weather_condition, noise_level, exact_noise_level_db, memory_capsule, context_tag_id, last_message_at',
-        )
+        .select('id, created, created_utc, time_of_day_utc, last_message_at, connection_encounters(*)')
         .contains('user_ids', [user.id, userId]);
       if (mutualErr) {
         console.warn('profile mutual connection:', mutualErr.message);

@@ -192,7 +192,7 @@ function toIconCode(weatherCode: number): string {
   return 'clear';
 }
 
-async function enrichMemoryCapsuleWeather(
+async function enrichEncounterWeather(
   adminClient: ReturnType<typeof createAdminClient>,
   connectionId: string,
   lat: number,
@@ -233,16 +233,28 @@ async function enrichMemoryCapsuleWeather(
       },
     };
 
+    const { data: latestEnc, error: encLookupErr } = await adminClient
+      .from('connection_encounters')
+      .select('id')
+      .eq('connection_id', connectionId)
+      .order('encountered_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (encLookupErr || !latestEnc?.id) {
+      if (encLookupErr) console.error('Encounter lookup for weather:', encLookupErr);
+      return;
+    }
+
     const { error } = await adminClient
-      .from('connections')
+      .from('connection_encounters')
       .update({
-        memory_capsule: enrichedCapsule,
-        weather_condition: enrichedCapsule.weatherSnapshot?.condition ?? null,
+        weather_snapshot: enrichedCapsule.weatherSnapshot,
       })
-      .eq('id', connectionId);
+      .eq('id', latestEnc.id);
 
     if (error) {
-      console.error('Memory capsule weather update error:', error);
+      console.error('Encounter weather update error:', error);
     }
   } catch (error) {
     console.error('Memory capsule weather fetch error:', error);
@@ -340,7 +352,7 @@ export async function GET(request: NextRequest) {
     if (insights) {
       const { data: connections, error } = await supabase
         .from('connections')
-        .select('*')
+        .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id])
         .order('created', { ascending: false });
 
@@ -363,7 +375,7 @@ export async function GET(request: NextRequest) {
       const hiddenSet = new Set(hiddenForUser);
       let mapQuery = supabase
         .from('connections')
-        .select('*')
+        .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id])
         .order('created', { ascending: false });
 
@@ -392,7 +404,7 @@ export async function GET(request: NextRequest) {
 
       const { data: connections, error } = await supabase
         .from('connections')
-        .select('*')
+        .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id])
         .in('id', includeIds)
         .order('created', { ascending: false });
@@ -409,7 +421,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('connections')
-      .select('*')
+      .select('*, connection_encounters(*)')
       .contains('user_ids', [user.id])
       .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
       .order('created', { ascending: false });
@@ -745,7 +757,6 @@ export async function POST(request: NextRequest) {
 
     const sharedConnectionFields = {
       user_ids: userIdsForRow,
-      geo_location: geoLocation,
       created: now,
       created_utc: createdUtc,
       time_of_day_utc: timeOfDayUtc,
@@ -759,10 +770,8 @@ export async function POST(request: NextRequest) {
       proximity_signals: proximitySignals,
       connection_method: connectionMethod,
       flagged: proximityConfidence < 20,
-      context_tag_id: resolvedContextTagId,
       initiator_id: resolvedInitiatorId,
       responder_id: resolvedResponderId,
-      noise_level: resolvedNoiseLevel,
     };
 
     const activeLifecycle: ConnectionLifecycleStatus = 'active';
@@ -851,16 +860,34 @@ export async function POST(request: NextRequest) {
       ...memoryCapsuleBase,
     };
 
-    const { error: memoryCapsuleError } = await adminClient
-      .from('connections')
-      .update({ memory_capsule: memoryCapsule })
-      .eq('id', connection.id);
-
-    if (memoryCapsuleError) {
-      console.error('Memory capsule base update error:', memoryCapsuleError);
+    const encounterInsert: Record<string, unknown> = {
+      connection_id: connection.id,
+      encountered_at: new Date(now).toISOString(),
+      location_name: memoryCapsule.locationName,
+      context_tags: resolvedContextTagId ? [resolvedContextTagId] : [],
+      noise_level: resolvedNoiseLevel,
+      weather_snapshot: memoryCapsule.weatherSnapshot,
+    };
+    if (
+      Number.isFinite(geoLocation.lat) &&
+      Number.isFinite(geoLocation.lon) &&
+      !(geoLocation.lat === 0 && geoLocation.lon === 0)
+    ) {
+      encounterInsert.gps_lat = geoLocation.lat;
+      encounterInsert.gps_lon = geoLocation.lon;
     }
 
-    void enrichMemoryCapsuleWeather(
+    const { error: encounterErr } = await adminClient.from('connection_encounters').insert(encounterInsert);
+    if (encounterErr) {
+      const msg = encounterErr.message ?? '';
+      if (msg.includes('encounter_rate_limit_3h')) {
+        await adminClient.from('chats').update({ updated_at: now }).eq('connection_id', connection.id);
+      } else {
+        console.error('connection_encounters insert error:', encounterErr);
+      }
+    }
+
+    void enrichEncounterWeather(
       adminClient,
       connection.id,
       geoLocation.lat,

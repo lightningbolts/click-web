@@ -4,7 +4,11 @@
  * Export all dashboard components for the user experience
  */
 
-export { default as ConnectionTable, type ConnectionRecord } from './ConnectionTable';
+export {
+  default as ConnectionTable,
+  type ConnectionRecord,
+  type ConnectionEncounterBrief,
+} from './ConnectionTable';
 export { default as TimeCapsule, type TimelineChapter } from './TimeCapsule';
 export { default as QRIdentityCard } from './QRIdentityCard';
 export { default as StatsOverview, AchievementBadge, MilestoneProgress } from './StatsOverview';

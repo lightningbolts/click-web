@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   Clock,
   X,
+  Zap,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -102,6 +103,12 @@ import {
   extractWeatherSummary,
   normalizeNoiseCategory,
 } from '@/lib/dashboard/connectionExtras';
+import { parseConnectionEncounters } from '@/lib/dashboard/connectionEncounters';
+import { computeIntentOverlapLabel } from '@/lib/dashboard/intentOverlap';
+import {
+  normalizeAvailabilityIntentRows,
+  type AvailabilityIntentRow,
+} from '@/lib/userProfile/availability';
 import {
   connectionRecordToArchiveRow,
   formatArchiveCountdownLabel,
@@ -1655,24 +1662,73 @@ export default function DashboardView({ user }: DashboardViewProps) {
         }
       }
 
+      let selfIntentRows: AvailabilityIntentRow[] = [];
+      const peerIntentByUserId = new Map<string, AvailabilityIntentRow[]>();
+      if (supabase) {
+        try {
+          const { data: mine } = await supabase
+            .from('availability_intents')
+            .select('id,timeframe,intent_tag,expires_at')
+            .eq('user_id', user.id);
+          selfIntentRows = normalizeAvailabilityIntentRows(mine ?? []);
+
+          if (otherUserIds.length > 0) {
+            const { data: peerRows, error: peerIntentErr } = await supabase
+              .from('availability_intents')
+              .select('user_id,id,timeframe,intent_tag,expires_at')
+              .in('user_id', otherUserIds);
+            if (!peerIntentErr && peerRows) {
+              const acc = new Map<string, unknown[]>();
+              for (const row of peerRows as Record<string, unknown>[]) {
+                const uid = row.user_id;
+                if (typeof uid !== 'string' || !uid.trim()) continue;
+                const cur = acc.get(uid) ?? [];
+                cur.push(row);
+                acc.set(uid, cur);
+              }
+              for (const [uid, rows] of acc) {
+                peerIntentByUserId.set(uid, normalizeAvailabilityIntentRows(rows));
+              }
+            }
+          }
+        } catch {
+          /* overlap badges are optional */
+        }
+      }
+
       const mapRowToRecord = (conn: Record<string, unknown>): ConnectionRecord => {
         const userIds = (conn.user_ids as string[] | undefined) ?? [];
         const otherUserId = userIds.find((id) => id !== user.id);
         const otherUserName = (otherUserId && userNameMap[otherUserId]) || null;
 
+        const encs = parseConnectionEncounters(conn);
+        const latestEnc = encs[0];
+        const originEnc = encs.length > 0 ? encs[encs.length - 1] : undefined;
+
         let geoLoc: { latitude: number; longitude: number } | undefined;
-        const geo = conn.geo_location as Record<string, unknown> | null | undefined;
-        if (geo && typeof geo === 'object') {
-          const rawLat = geo.lat ?? geo.latitude;
-          const rawLon = geo.lon ?? geo.longitude ?? geo.lng ?? geo.long;
-          const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
-          const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
-          if (
-            typeof lat === 'number' && typeof lon === 'number' &&
-            isFinite(lat) && isFinite(lon) &&
-            !(lat === 0 && lon === 0)
-          ) {
-            geoLoc = { latitude: lat, longitude: lon };
+        if (
+          latestEnc &&
+          typeof latestEnc.gpsLat === 'number' &&
+          typeof latestEnc.gpsLon === 'number' &&
+          Number.isFinite(latestEnc.gpsLat) &&
+          Number.isFinite(latestEnc.gpsLon) &&
+          !(latestEnc.gpsLat === 0 && latestEnc.gpsLon === 0)
+        ) {
+          geoLoc = { latitude: latestEnc.gpsLat, longitude: latestEnc.gpsLon };
+        } else {
+          const geo = conn.geo_location as Record<string, unknown> | null | undefined;
+          if (geo && typeof geo === 'object') {
+            const rawLat = geo.lat ?? geo.latitude;
+            const rawLon = geo.lon ?? geo.longitude ?? geo.lng ?? geo.long;
+            const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+            const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
+            if (
+              typeof lat === 'number' && typeof lon === 'number' &&
+              isFinite(lat) && isFinite(lon) &&
+              !(lat === 0 && lon === 0)
+            ) {
+              geoLoc = { latitude: lat, longitude: lon };
+            }
           }
         }
 
@@ -1686,7 +1742,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
             ? conn.created
             : new Date(typeof rawDateValue === 'number' ? rawDateValue : String(rawDateValue)).getTime();
 
-        const dateMetValue = conn.created_utc || conn.created || conn.created_at;
+        const dateMetValue =
+          originEnc?.encounteredAt ??
+          conn.created_utc ??
+          conn.created ??
+          conn.created_at ??
+          0;
+
+        const overlapLabel =
+          otherUserId != null && otherUserId.length > 0
+            ? computeIntentOverlapLabel(selfIntentRows, peerIntentByUserId.get(otherUserId) ?? [])
+            : null;
+
         return {
           id: String(conn.id),
           otherUserId,
@@ -1694,7 +1761,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
           name: displayName,
           dateMet: new Date(typeof dateMetValue === 'number' ? dateMetValue : String(dateMetValue ?? 0)),
           location:
-            (typeof conn.semantic_location === 'string' && conn.semantic_location) || 'Unknown location',
+            latestEnc?.locationName ??
+            originEnc?.locationName ??
+            ((typeof conn.semantic_location === 'string' && conn.semantic_location.trim())
+              ? conn.semantic_location.trim()
+              : 'Unknown location'),
           context: extractEventContext(conn),
           weatherSummary: extractWeatherSummary(conn),
           noiseSummary: extractNoiseSummary(conn),
@@ -1708,6 +1779,16 @@ export default function DashboardView({ user }: DashboardViewProps) {
           hasBegun: conn.has_begun === true,
           expiryState: typeof conn.expiry_state === 'string' ? conn.expiry_state : null,
           geo_location: geoLoc,
+          encounters:
+            encs.length > 0
+              ? encs.map((e) => ({
+                  id: e.id,
+                  encounteredAt: new Date(e.encounteredAt),
+                  locationName: e.locationName,
+                  contextTags: e.contextTags,
+                }))
+              : undefined,
+          intentOverlapLabel: overlapLabel,
         };
       };
 
@@ -2677,7 +2758,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       </div>
                                     )}
                                     <div className="min-w-0 flex-1">
-                                      <p className="truncate pr-2 font-semibold text-white">{conn.name}</p>
+                                      <div className="flex min-w-0 items-center gap-2 pr-2">
+                                        <p className="truncate font-semibold text-white">{conn.name}</p>
+                                        {!isGroupCliqueRow && conn.intentOverlapLabel ? (
+                                          <span
+                                            className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
+                                            title={`Vibes match: ${conn.intentOverlapLabel}`}
+                                          >
+                                            <Zap className="h-3 w-3" aria-hidden />
+                                          </span>
+                                        ) : null}
+                                      </div>
                                       <p className="mt-0.5 truncate pr-2 text-sm text-zinc-300">
                                         {previewText}
                                       </p>

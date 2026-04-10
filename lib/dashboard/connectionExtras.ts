@@ -1,7 +1,9 @@
 /**
  * Derives human-readable “moment” metadata from Supabase connection rows
- * (memory_capsule JSON + top-level columns). Used by the web dashboard.
+ * (`connection_encounters` embed + legacy memory_capsule / top-level columns). Used by the web dashboard.
  */
+
+import { latestEncounter } from '@/lib/dashboard/connectionEncounters';
 
 /** Escape text embedded in map popup HTML */
 export function escapeHtml(s: string): string {
@@ -47,6 +49,9 @@ export function noiseLevelToBarCount(level: NoiseLevelKey): 1 | 2 | 3 {
 }
 
 export function normalizeNoiseCategory(conn: Record<string, unknown>): NoiseLevelKey | undefined {
+  const enc = latestEncounter(conn);
+  const fromEncounter = enc?.noiseLevel && typeof enc.noiseLevel === 'string' ? enc.noiseLevel : null;
+
   const capsule = conn.memory_capsule;
   const fromCapsule =
     capsule && typeof capsule === 'object' && capsule !== null && 'noiseLevelCategory' in capsule
@@ -54,6 +59,7 @@ export function normalizeNoiseCategory(conn: Record<string, unknown>): NoiseLeve
       : null;
 
   const raw =
+    (typeof fromEncounter === 'string' ? fromEncounter : null) ??
     (typeof fromCapsule === 'string' ? fromCapsule : null) ??
     (typeof conn.noise_level === 'string' ? conn.noise_level : null);
 
@@ -69,6 +75,12 @@ export function normalizeNoiseCategory(conn: Record<string, unknown>): NoiseLeve
 }
 
 export function extractEventContext(conn: Record<string, unknown>): string | undefined {
+  const enc = latestEncounter(conn);
+  if (enc?.contextTags?.length) {
+    const t = enc.contextTags.find((x) => x.trim().length > 0);
+    if (t) return t.trim();
+  }
+
   const capsule = conn.memory_capsule;
   if (capsule && typeof capsule === 'object' && capsule !== null && 'contextTag' in capsule) {
     const tag = (capsule as { contextTag?: unknown }).contextTag;
@@ -95,6 +107,24 @@ export function extractEventContext(conn: Record<string, unknown>): string | und
 }
 
 export function extractWeatherSummary(conn: Record<string, unknown>): string | undefined {
+  const enc = latestEncounter(conn);
+  const wsEnc = enc?.weatherSnapshot;
+  if (wsEnc && typeof wsEnc === 'object' && wsEnc !== null) {
+    const condition = (wsEnc as { condition?: unknown }).condition;
+    const temp = (wsEnc as { temperatureCelsius?: unknown }).temperatureCelsius;
+    const parts: string[] = [];
+    if (typeof condition === 'string' && condition.trim()) {
+      parts.push(condition.trim());
+    }
+    if (typeof temp === 'number' && Number.isFinite(temp)) {
+      const f = celsiusToFahrenheit(temp);
+      parts.push(`${Math.round(f)}°F`);
+    }
+    if (parts.length > 0) {
+      return parts.join(' · ');
+    }
+  }
+
   const capsule = conn.memory_capsule;
   const ws =
     capsule && typeof capsule === 'object' && capsule !== null && 'weatherSnapshot' in capsule
@@ -126,6 +156,9 @@ export function extractWeatherSummary(conn: Record<string, unknown>): string | u
 }
 
 export function extractNoiseSummary(conn: Record<string, unknown>): string | undefined {
+  const enc = latestEncounter(conn);
+  const fromEncounterNoise = enc?.noiseLevel;
+
   const capsule = conn.memory_capsule;
   const fromCapsule =
     capsule && typeof capsule === 'object' && capsule !== null && 'noiseLevelCategory' in capsule
@@ -133,6 +166,7 @@ export function extractNoiseSummary(conn: Record<string, unknown>): string | und
       : null;
 
   const rawCategory =
+    (typeof fromEncounterNoise === 'string' ? fromEncounterNoise : null) ??
     (typeof fromCapsule === 'string' ? fromCapsule : null) ??
     (typeof conn.noise_level === 'string' ? conn.noise_level : null);
 

@@ -362,6 +362,35 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                 />
                               </div>
                             )}
+                            {conn.encounters && conn.encounters.length > 1 ? (
+                              <div className="mt-2 space-y-1.5 border-t border-zinc-800/60 pt-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                  You&apos;ve crossed paths {conn.encounters.length} times
+                                </p>
+                                <ul className="scrollbar-thin max-h-36 space-y-1 overflow-y-auto pr-1">
+                                  {conn.encounters.map((enc) => (
+                                    <li
+                                      key={enc.id}
+                                      className="flex flex-col rounded-md bg-zinc-950/60 px-2 py-1.5 text-[10px] text-zinc-400"
+                                    >
+                                      <span className="font-medium text-zinc-200">
+                                        {enc.encounteredAt.toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric',
+                                        })}
+                                      </span>
+                                      <span className="truncate">{enc.locationName}</span>
+                                      {enc.contextTags.length > 0 ? (
+                                        <span className="truncate text-[#C4B5FD]">
+                                          {enc.contextTags.join(' · ')}
+                                        </span>
+                                      ) : null}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
                           </div>
                           {/* Context tag */}
                           {conn.context && (

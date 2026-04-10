@@ -197,6 +197,44 @@ Deno.serve(async (req) => {
   }
 
   const ids = [...matchedIds];
+
+  async function connectionIdForPair(peerId: string): Promise<string | null> {
+    const { data, error } = await admin
+      .from('connections')
+      .select('id, user_ids')
+      .contains('user_ids', [uid, peerId]);
+    if (error || !data?.length) return null;
+    const row = (data as { id: string; user_ids?: string[] }[]).find((r) => {
+      const u = r.user_ids ?? [];
+      return u.includes(uid) && u.includes(peerId);
+    });
+    return row?.id ?? null;
+  }
+
+  for (const peerId of ids) {
+    const connectionId = await connectionIdForPair(peerId);
+    if (!connectionId) continue;
+    const insertRow: Record<string, unknown> = {
+      connection_id: connectionId,
+      encountered_at: new Date().toISOString(),
+      context_tags: [],
+    };
+    if (lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0)) {
+      insertRow.gps_lat = lat;
+      insertRow.gps_lon = lon;
+    }
+    const { error: encErr } = await admin.from('connection_encounters').insert(insertRow);
+    if (encErr) {
+      const msg = encErr.message ?? '';
+      if (msg.includes('encounter_rate_limit_3h')) {
+        const nowMs = Date.now();
+        await admin.from('chats').update({ updated_at: nowMs }).eq('connection_id', connectionId);
+      } else {
+        console.warn('bind-proximity-connection encounter:', encErr.message);
+      }
+    }
+  }
+
   const { data: users, error: uErr } = await admin
     .from('users')
     .select('id, name, email, image, created_at')
