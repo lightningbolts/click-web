@@ -68,7 +68,7 @@ function computeProximityScore(params: {
   let score = 0;
 
   // Connection method baseline
-  if (connectionMethod === 'nfc') {
+  if (connectionMethod === 'nfc' || connectionMethod === 'proximity') {
     score += 50;
   }
 
