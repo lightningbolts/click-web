@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
-import { ChatView, CreateVerifiedClickDialog } from '@/components/chat';
+import { ChatView, CreateVerifiedClickDialog, memberSetKeySorted } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import {
   deriveKeysForConnection,
@@ -151,6 +151,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
   const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useState<Record<string, ChatListMetadata>>({});
   const [groupCliqueRecords, setGroupCliqueRecords] = useState<ConnectionRecord[]>([]);
+  const [verifiedClickMemberSetKeys, setVerifiedClickMemberSetKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [groupClicksReloadNonce, setGroupClicksReloadNonce] = useState(0);
   const [createClickOpen, setCreateClickOpen] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -399,11 +402,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
   useEffect(() => {
     if (!user?.id) {
       setGroupCliqueRecords([]);
+      setVerifiedClickMemberSetKeys(new Set());
       return;
     }
     const supabase = getSupabaseClient();
     if (!supabase) {
       setGroupCliqueRecords([]);
+      setVerifiedClickMemberSetKeys(new Set());
       return;
     }
     let cancelled = false;
@@ -414,21 +419,51 @@ export default function DashboardView({ user }: DashboardViewProps) {
           .select('group_id')
           .eq('user_id', user.id);
         if (memErr || cancelled) {
-          if (!cancelled) setGroupCliqueRecords([]);
+          if (!cancelled) {
+            setGroupCliqueRecords([]);
+            setVerifiedClickMemberSetKeys(new Set());
+          }
           return;
         }
         const groupIds = [...new Set((memberships ?? []).map((m: { group_id: string }) => m.group_id))];
         if (groupIds.length === 0) {
-          if (!cancelled) setGroupCliqueRecords([]);
+          if (!cancelled) {
+            setGroupCliqueRecords([]);
+            setVerifiedClickMemberSetKeys(new Set());
+          }
           return;
         }
-        const [{ data: chats, error: chatErr }, { data: groups, error: groupErr }] = await Promise.all([
+        const [
+          { data: chats, error: chatErr },
+          { data: groups, error: groupErr },
+          { data: allMembers, error: membersKeyErr },
+        ] = await Promise.all([
           supabase.from('chats').select('id, group_id, updated_at').in('group_id', groupIds),
           supabase.from('groups').select('id, name').in('id', groupIds),
+          supabase.from('group_members').select('group_id, user_id').in('group_id', groupIds),
         ]);
         if (chatErr || groupErr || cancelled) {
-          if (!cancelled) setGroupCliqueRecords([]);
+          if (!cancelled) {
+            setGroupCliqueRecords([]);
+            setVerifiedClickMemberSetKeys(new Set());
+          }
           return;
+        }
+        const memberKeys = new Set<string>();
+        if (!membersKeyErr && allMembers?.length) {
+          const byGroup = new Map<string, string[]>();
+          for (const row of allMembers as { group_id: string; user_id: string }[]) {
+            if (!row.group_id || !row.user_id) continue;
+            const arr = byGroup.get(row.group_id) ?? [];
+            arr.push(row.user_id);
+            byGroup.set(row.group_id, arr);
+          }
+          for (const gid of groupIds) {
+            const ids = byGroup.get(gid);
+            if (ids?.length) {
+              memberKeys.add(memberSetKeySorted(ids));
+            }
+          }
         }
         const nameById = new Map((groups ?? []).map((g: { id: string; name: string }) => [g.id, g.name]));
         const rows: ConnectionRecord[] = (chats ?? [])
@@ -446,9 +481,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
               status: 'active',
             };
           });
-        if (!cancelled) setGroupCliqueRecords(rows);
+        if (!cancelled) {
+          setGroupCliqueRecords(rows);
+          setVerifiedClickMemberSetKeys(memberKeys);
+        }
       } catch {
-        if (!cancelled) setGroupCliqueRecords([]);
+        if (!cancelled) {
+          setGroupCliqueRecords([]);
+          setVerifiedClickMemberSetKeys(new Set());
+        }
       }
     })();
     return () => {
@@ -2110,6 +2151,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
           supabase={getSupabaseClient()!}
           currentUserId={user.id}
           friends={clickFriendOptions}
+          existingVerifiedMemberSetKeys={verifiedClickMemberSetKeys}
           onCreated={() => setGroupClicksReloadNonce((n) => n + 1)}
         />
       ) : null}
