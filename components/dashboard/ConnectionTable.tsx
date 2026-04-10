@@ -402,11 +402,10 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                             </p>
                             {connection.intentOverlapLabel ? (
                               <span
-                                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
                                 title={`Vibes match: ${connection.intentOverlapLabel}`}
                               >
                                 <Zap className="h-3 w-3 text-amber-300" aria-hidden />
-                                <span className="max-w-[7rem] truncate">{connection.intentOverlapLabel}</span>
                               </span>
                             ) : null}
                           </div>

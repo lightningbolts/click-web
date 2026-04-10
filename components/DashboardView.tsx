@@ -1940,6 +1940,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
     [chatMetadataByConnectionId, connectionRecords],
   );
 
+  const homeAvailabilityOverlapLines = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of connectionRecords) {
+      if (!c.otherUserId || !c.intentOverlapLabel) continue;
+      if (seen.has(c.otherUserId)) continue;
+      seen.add(c.otherUserId);
+      const first = c.name.trim().split(/\s+/)[0] || 'them';
+      out.push(`You and ${first} are both available right now!`);
+    }
+    return out;
+  }, [connectionRecords]);
+
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
 
@@ -2448,6 +2461,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
                 <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
 
+                {homeAvailabilityOverlapLines.length > 0 ? (
+                  <div className="space-y-2">
+                    {homeAvailabilityOverlapLines.map((line, i) => (
+                      <p
+                        key={`${line}-${i}`}
+                        className="text-sm font-medium text-amber-100/95"
+                      >
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+
                 {/* Achievements & Milestones Row */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
@@ -2762,11 +2788,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         <p className="truncate font-semibold text-white">{conn.name}</p>
                                         {!isGroupCliqueRow && conn.intentOverlapLabel ? (
                                           <span
-                                            className="inline-flex max-w-[min(12rem,46vw)] shrink-0 items-center gap-1 rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-100 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
+                                            className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
                                             title={`Vibes match: ${conn.intentOverlapLabel}`}
                                           >
-                                            <Zap className="h-3 w-3 shrink-0 text-amber-300" aria-hidden />
-                                            <span className="truncate">{conn.intentOverlapLabel}</span>
+                                            <Zap className="h-3 w-3" aria-hidden />
                                           </span>
                                         ) : null}
                                       </div>
