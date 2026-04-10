@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CalendarClock, Loader2, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Loader2, Plus, Trash2, Zap } from 'lucide-react';
 import {
   AVAILABILITY_INTENT_DURATION_PRESETS,
   DEFAULT_AVAILABILITY_INTENT_DURATION_MS,
@@ -119,6 +119,18 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
           <h2 className="text-xl font-bold text-white">Open to meet</h2>
           <p className="text-sm text-zinc-500 mt-0.5">
             Share a short intent (coffee, study, walk…). Connections see it on your profile while it’s active.
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-5 flex gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+        <Zap className="h-5 w-5 shrink-0 text-amber-300" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-amber-100">When intents overlap</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
+            If a connection posts something compatible with yours in the same window, Click highlights a{' '}
+            <span className="font-medium">gold “vibes match”</span> on Home connections and in chat — not just a tiny
+            lightning badge.
           </p>
         </div>
       </div>

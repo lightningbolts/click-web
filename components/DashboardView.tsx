@@ -2762,10 +2762,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         <p className="truncate font-semibold text-white">{conn.name}</p>
                                         {!isGroupCliqueRow && conn.intentOverlapLabel ? (
                                           <span
-                                            className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
+                                            className="inline-flex max-w-[min(12rem,46vw)] shrink-0 items-center gap-1 rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-100 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
                                             title={`Vibes match: ${conn.intentOverlapLabel}`}
                                           >
-                                            <Zap className="h-3 w-3" aria-hidden />
+                                            <Zap className="h-3 w-3 shrink-0 text-amber-300" aria-hidden />
+                                            <span className="truncate">{conn.intentOverlapLabel}</span>
                                           </span>
                                         ) : null}
                                       </div>
