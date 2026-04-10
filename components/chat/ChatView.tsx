@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   Archive,
   UserMinus,
+  Users,
   Flag,
   Shield,
   ShieldOff,
@@ -32,7 +33,18 @@ import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import { deriveKeysForConnection, encryptContent, decryptContent, isEncrypted, type DerivedKeys } from '@/lib/chat/crypto';
+import {
+  deriveKeysForConnection,
+  encryptContent,
+  decryptContent,
+  isEncrypted,
+  isGroupMessageEncrypted,
+  isAnyE2eeWireContent,
+  encryptGroupMessageContent,
+  decryptGroupMessageContent,
+  type DerivedKeys,
+} from '@/lib/chat/crypto';
+import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 import { useAuth } from '@/lib/AuthContext';
 import { replySnippetForSend } from '@/lib/chat/reply';
 
@@ -145,12 +157,15 @@ export default function ChatView({
   onOpenProfile,
 }: ChatViewProps) {
   const { onlineUserIds } = useAuth();
+  const isGroupClique = connection.chatKind === 'group_clique';
+
   const peerUserId = useMemo(() => {
+    if (isGroupClique) return undefined;
     if (connection.otherUserId) return connection.otherUserId;
     const ids = connection.userIds;
     if (!ids?.length) return undefined;
     return ids.find((id) => id !== currentUserId);
-  }, [connection.otherUserId, connection.userIds, currentUserId]);
+  }, [connection.otherUserId, connection.userIds, currentUserId, isGroupClique]);
   const peerIsOnline = !!(peerUserId && onlineUserIds.has(peerUserId));
 
   const [chatId, setChatId] = useState<string | null>(null);
@@ -174,6 +189,9 @@ export default function ChatView({
   const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showCallMenu, setShowCallMenu] = useState(false);
   const [e2eKeys, setE2eKeys] = useState<DerivedKeys | null>(null);
+  /** Raw 32-byte AES group master for verified clique chats (matches mobile `MessageCrypto`). */
+  const [groupMasterKey, setGroupMasterKey] = useState<ArrayBuffer | null>(null);
+  const [groupKeyError, setGroupKeyError] = useState<string | null>(null);
   const [replyBannerText, setReplyBannerText] = useState('');
   const [mediaBusy, setMediaBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -276,7 +294,9 @@ export default function ChatView({
     async (meta: Record<string, unknown>): Promise<Record<string, unknown>> => {
       if (!replyingTo || replyingTo.message_type === 'call_log') return meta;
       let snippetSource = replyingTo.content;
-      if (e2eKeys && isEncrypted(replyingTo.content)) {
+      if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(replyingTo.content)) {
+        snippetSource = await decryptGroupMessageContent(replyingTo.content, groupMasterKey);
+      } else if (e2eKeys && isEncrypted(replyingTo.content)) {
         snippetSource = await decryptContent(replyingTo.content, e2eKeys);
       }
       const replyLabel =
@@ -289,7 +309,7 @@ export default function ChatView({
         reply_to_content: replySnippetForSend(replyLabel, 140),
       };
     },
-    [replyingTo, e2eKeys],
+    [replyingTo, e2eKeys, groupMasterKey, isGroupClique],
   );
 
   // ─────────────────────────── helpers ────────────────────────────────────
@@ -307,11 +327,53 @@ export default function ChatView({
   // ─────────────────────────── E2EE key derivation ────────────────────────
 
   useEffect(() => {
+    if (isGroupClique) {
+      setE2eKeys(null);
+      return;
+    }
     const userIds = connection.userIds ?? (connection.otherUserId ? [currentUserId, connection.otherUserId] : []);
     if (userIds.length >= 2) {
       deriveKeysForConnection(connection.id, userIds).then(setE2eKeys);
     }
-  }, [connection.id, connection.userIds, connection.otherUserId, currentUserId]);
+  }, [connection.id, connection.userIds, connection.otherUserId, currentUserId, isGroupClique]);
+
+  useEffect(() => {
+    if (!isGroupClique) {
+      setGroupMasterKey(null);
+      setGroupKeyError(null);
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setGroupKeyError('Sign in required');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const master = await unwrapGroupMasterKeyBytes(supabase, {
+          groupId: connection.id,
+          viewerUserId: currentUserId,
+        });
+        if (cancelled) return;
+        if (!master) {
+          setGroupKeyError('Could not unlock group encryption for this device.');
+          setGroupMasterKey(null);
+          return;
+        }
+        setGroupKeyError(null);
+        setGroupMasterKey(master);
+      } catch {
+        if (!cancelled) {
+          setGroupKeyError('Could not unlock group encryption.');
+          setGroupMasterKey(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connection.id, currentUserId, isGroupClique]);
 
   useEffect(() => {
     if (!peerUserId) {
@@ -351,9 +413,29 @@ export default function ChatView({
     }
     if (replyingTo.message_type === 'image' || replyingTo.message_type === 'audio') {
       const raw = replyingTo.content;
-      if (!isEncrypted(raw)) {
+      if (!isAnyE2eeWireContent(raw)) {
         setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: raw }));
         return;
+      }
+      if (isGroupClique) {
+        if (!groupMasterKey || !isGroupMessageEncrypted(raw)) {
+          setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: '' }));
+          return;
+        }
+        let cancelled = false;
+        decryptGroupMessageContent(raw, groupMasterKey).then(
+          (plain) => {
+            if (!cancelled) {
+              setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: plain }));
+            }
+          },
+          () => {
+            if (!cancelled) setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: '' }));
+          },
+        );
+        return () => {
+          cancelled = true;
+        };
       }
       if (!e2eKeys) {
         setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: '' }));
@@ -375,9 +457,27 @@ export default function ChatView({
       };
     }
     const raw = replyingTo.content;
-    if (!isEncrypted(raw)) {
+    if (!isAnyE2eeWireContent(raw)) {
       setReplyBannerText(replySnippetForSend(raw, 120));
       return;
+    }
+    if (isGroupClique) {
+      if (!groupMasterKey || !isGroupMessageEncrypted(raw)) {
+        setReplyBannerText('Encrypted message');
+        return;
+      }
+      let cancelledG = false;
+      decryptGroupMessageContent(raw, groupMasterKey).then(
+        (plain) => {
+          if (!cancelledG) setReplyBannerText(replySnippetForSend(plain, 120));
+        },
+        () => {
+          if (!cancelledG) setReplyBannerText('Encrypted message');
+        },
+      );
+      return () => {
+        cancelledG = true;
+      };
     }
     if (!e2eKeys) {
       setReplyBannerText('Encrypted message');
@@ -395,7 +495,7 @@ export default function ChatView({
     return () => {
       cancelled = true;
     };
-  }, [replyingTo, e2eKeys]);
+  }, [replyingTo, e2eKeys, groupMasterKey, isGroupClique]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -412,8 +512,15 @@ export default function ChatView({
   useEffect(() => {
     const init = async () => {
       try {
+        if (isGroupClique && connection.groupChatId) {
+          setChatId(connection.groupChatId);
+          return;
+        }
         const headers = await getAuthHeaders();
-        const res = await fetch(`/api/chat?connectionId=${connection.id}`, { headers });
+        const qs = isGroupClique
+          ? `groupId=${encodeURIComponent(connection.id)}`
+          : `connectionId=${encodeURIComponent(connection.id)}`;
+        const res = await fetch(`/api/chat?${qs}`, { headers });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? 'Failed to load chat');
         setChatId(json.chat.id);
@@ -423,7 +530,7 @@ export default function ChatView({
       }
     };
     init();
-  }, [connection.id]);
+  }, [connection.id, connection.groupChatId, isGroupClique]);
 
   // ─────────────────────────── load messages ───────────────────────────────
 
@@ -440,16 +547,27 @@ export default function ChatView({
       .reverse()
       .map(normalizeDbMessage);
 
+    if (isGroupClique) {
+      if (!groupMasterKey) return raw;
+      return Promise.all(
+        raw.map(async (m) => {
+          if (m.message_type === 'call_log' || !isGroupMessageEncrypted(m.content)) return m;
+          const plaintext = await decryptGroupMessageContent(m.content, groupMasterKey);
+          return { ...m, content: plaintext };
+        }),
+      );
+    }
+
     if (!e2eKeys) return raw;
     const decrypted = await Promise.all(
       raw.map(async (m) => {
         if (m.message_type === 'call_log' || !isEncrypted(m.content)) return m;
         const plaintext = await decryptContent(m.content, e2eKeys);
         return { ...m, content: plaintext };
-      })
+      }),
     );
     return decrypted;
-  }, [e2eKeys]);
+  }, [e2eKeys, groupMasterKey, isGroupClique]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -467,7 +585,7 @@ export default function ChatView({
       }
     };
     load();
-  }, [chatId, fetchMessages, scrollToBottom]);
+  }, [chatId, fetchMessages, scrollToBottom, groupMasterKey]);
 
   // ─────────────────────────── load older messages ─────────────────────────
 
@@ -506,6 +624,9 @@ export default function ChatView({
     if (!supabase) return;
 
     const decryptIfNeeded = async (content: string): Promise<string> => {
+      if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(content)) {
+        return decryptGroupMessageContent(content, groupMasterKey);
+      }
       if (e2eKeys && isEncrypted(content)) {
         return decryptContent(content, e2eKeys);
       }
@@ -611,7 +732,7 @@ export default function ChatView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatId, currentUserId, scrollToBottom, e2eKeys]);
+  }, [chatId, currentUserId, scrollToBottom, e2eKeys, groupMasterKey, isGroupClique]);
 
   // ─────────────────────────── scroll event ────────────────────────────────
 
@@ -638,7 +759,12 @@ export default function ChatView({
     inputRef.current?.focus();
 
     try {
-      const wireContent = e2eKeys ? await encryptContent(content, e2eKeys) : content;
+      const wireContent =
+        isGroupClique && groupMasterKey
+          ? await encryptGroupMessageContent(content, groupMasterKey)
+          : e2eKeys
+            ? await encryptContent(content, e2eKeys)
+            : content;
       const headers = await getAuthHeaders();
       const metadata =
         replyingTo && replyingTo.message_type !== 'call_log'
@@ -649,7 +775,7 @@ export default function ChatView({
         headers,
         body: JSON.stringify({
           chatId,
-          connectionId: connection.id,
+          ...(!isGroupClique ? { connectionId: connection.id } : {}),
           content: wireContent,
           ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
         }),
@@ -669,6 +795,8 @@ export default function ChatView({
     mediaBusy,
     isRecording,
     e2eKeys,
+    groupMasterKey,
+    isGroupClique,
     replyingTo,
     connection.id,
     getAuthHeaders,
@@ -683,7 +811,11 @@ export default function ChatView({
         const caption = inputTextRef.current.trim();
         setInputText('');
         const wireContent =
-          e2eKeys && caption ? await encryptContent(caption, e2eKeys) : caption;
+          isGroupClique && groupMasterKey && caption
+            ? await encryptGroupMessageContent(caption, groupMasterKey)
+            : e2eKeys && caption
+              ? await encryptContent(caption, e2eKeys)
+              : caption;
         const { publicUrl } = await uploadChatMediaBlob(
           currentUserId,
           blob,
@@ -699,7 +831,7 @@ export default function ChatView({
           headers,
           body: JSON.stringify({
             chatId,
-            connectionId: connection.id,
+            ...(!isGroupClique ? { connectionId: connection.id } : {}),
             content: wireContent,
             message_type: 'audio',
             metadata,
@@ -719,6 +851,8 @@ export default function ChatView({
       currentUserId,
       connection.id,
       e2eKeys,
+      groupMasterKey,
+      isGroupClique,
       getAuthHeaders,
       appendReplyToMetadata,
     ],
@@ -802,7 +936,11 @@ export default function ChatView({
         const caption = inputTextRef.current.trim();
         setInputText('');
         const wireContent =
-          e2eKeys && caption ? await encryptContent(caption, e2eKeys) : caption;
+          isGroupClique && groupMasterKey && caption
+            ? await encryptGroupMessageContent(caption, groupMasterKey)
+            : e2eKeys && caption
+              ? await encryptContent(caption, e2eKeys)
+              : caption;
         const headers = await getAuthHeaders();
         const metadata = await appendReplyToMetadata({ media_url: publicUrl });
         const res = await fetch('/api/chat/messages', {
@@ -810,7 +948,7 @@ export default function ChatView({
           headers,
           body: JSON.stringify({
             chatId,
-            connectionId: connection.id,
+            ...(!isGroupClique ? { connectionId: connection.id } : {}),
             content: wireContent,
             message_type: 'image',
             metadata,
@@ -832,6 +970,8 @@ export default function ChatView({
       isRecording,
       currentUserId,
       e2eKeys,
+      groupMasterKey,
+      isGroupClique,
       connection.id,
       getAuthHeaders,
       appendReplyToMetadata,
@@ -879,7 +1019,12 @@ export default function ChatView({
     setEditingId(null);
     setEditText('');
 
-    const wireContent = e2eKeys ? await encryptContent(newContent, e2eKeys) : newContent;
+    const wireContent =
+      isGroupClique && groupMasterKey
+        ? await encryptGroupMessageContent(newContent, groupMasterKey)
+        : e2eKeys
+          ? await encryptContent(newContent, e2eKeys)
+          : newContent;
     const headers = await getAuthHeaders();
     const res = await fetch('/api/chat/messages', {
       method: 'PATCH',
@@ -892,7 +1037,7 @@ export default function ChatView({
         m.id === previous.id ? previous : m
       )));
     }
-  }, [editingId, editText, getAuthHeaders, messages, e2eKeys]);
+  }, [editingId, editText, getAuthHeaders, messages, e2eKeys, groupMasterKey, isGroupClique]);
 
   // ─────────────────────────── delete message ──────────────────────────────
 
@@ -978,6 +1123,11 @@ export default function ChatView({
     <div className="flex flex-col h-full min-h-0 overflow-visible">
       {/* ── Header ── */}
       <div className="glass relative z-50 rounded-2xl mb-4 shrink-0 overflow-visible">
+        {isGroupClique && groupKeyError ? (
+          <div className="mx-4 mt-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
+            {groupKeyError}
+          </div>
+        ) : null}
         <div className="flex items-center gap-4 px-5 py-4">
           <button
             onClick={onClose}
@@ -990,15 +1140,15 @@ export default function ChatView({
             type="button"
             className="relative shrink-0 rounded-full border-0 bg-transparent p-0 cursor-pointer"
             onClick={() => peerUserId && onOpenProfile?.(peerUserId)}
-            disabled={!peerUserId || !onOpenProfile}
+            disabled={isGroupClique || !peerUserId || !onOpenProfile}
           >
             <div
               className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
               text-sm font-bold glow-violet"
             >
-              {otherInitial}
+              {isGroupClique ? <Users className="h-5 w-5 text-white" aria-hidden /> : otherInitial}
             </div>
-            {peerIsOnline && (
+            {!isGroupClique && peerIsOnline && (
               <span
                 className="absolute bottom-0.5 right-0.5 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950/90"
                 aria-hidden
@@ -1018,205 +1168,218 @@ export default function ChatView({
             </div>
           </div>
 
-          {/* Connection status badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full 
-            bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC] text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#8338EC] animate-pulse" />
-            Connected
+          {/* Connection / clique status badge */}
+          <div
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+              isGroupClique
+                ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200'
+                : 'bg-[#8338EC]/10 border-[#8338EC]/20 text-[#8338EC]'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                isGroupClique ? 'bg-emerald-400' : 'bg-[#8338EC]'
+              }`}
+            />
+            {isGroupClique ? 'Verified clique' : 'Connected'}
           </div>
 
-          <div className="relative" ref={callMenuAnchorRef}>
-            <button
-              onClick={() => {
-                setShowCallMenu((prev) => !prev);
-                setShowHeaderMenu(false);
-              }}
-              className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
-              aria-label="Call options"
-            >
-              <Phone className="w-5 h-5" />
-            </button>
+          {!isGroupClique ? (
+            <div className="relative" ref={callMenuAnchorRef}>
+              <button
+                onClick={() => {
+                  setShowCallMenu((prev) => !prev);
+                  setShowHeaderMenu(false);
+                }}
+                className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+                aria-label="Call options"
+              >
+                <Phone className="w-5 h-5" />
+              </button>
 
-            {showCallMenu &&
-              callMenuPos &&
-              typeof document !== 'undefined' &&
-              createPortal(
-                <>
-                  <button
-                    type="button"
-                    aria-label="Dismiss menu"
-                    className="fixed inset-0 z-[240] cursor-default bg-transparent"
-                    onClick={() => setShowCallMenu(false)}
-                  />
-                  <div
-                    className="fixed z-[250] min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden"
-                    style={{ top: callMenuPos.top, left: callMenuPos.left }}
-                  >
+              {showCallMenu &&
+                callMenuPos &&
+                typeof document !== 'undefined' &&
+                createPortal(
+                  <>
                     <button
-                      onClick={() => {
-                        setShowCallMenu(false);
-                        onStartCall(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                      type="button"
+                      aria-label="Dismiss menu"
+                      className="fixed inset-0 z-[240] cursor-default bg-transparent"
+                      onClick={() => setShowCallMenu(false)}
+                    />
+                    <div
+                      className="fixed z-[250] min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden"
+                      style={{ top: callMenuPos.top, left: callMenuPos.left }}
                     >
-                      <Phone className="h-4 w-4" />
-                      Voice call
-                    </button>
+                      <button
+                        onClick={() => {
+                          setShowCallMenu(false);
+                          onStartCall(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                      >
+                        <Phone className="h-4 w-4" />
+                        Voice call
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCallMenu(false);
+                          onStartCall(true);
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                      >
+                        <Video className="h-4 w-4" />
+                        Video call
+                      </button>
+                    </div>
+                  </>,
+                  document.body,
+                )}
+            </div>
+          ) : null}
+
+          {!isGroupClique ? (
+            <div className="relative" ref={headerMenuAnchorRef}>
+              <button
+                onClick={() => {
+                  setShowHeaderMenu((prev) => !prev);
+                  setShowCallMenu(false);
+                }}
+                className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+                aria-label="Chat actions"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+
+              {showHeaderMenu &&
+                headerMenuPos &&
+                typeof document !== 'undefined' &&
+                createPortal(
+                  <>
                     <button
-                      onClick={() => {
-                        setShowCallMenu(false);
-                        onStartCall(true);
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                      type="button"
+                      aria-label="Dismiss menu"
+                      className="fixed inset-0 z-[240] cursor-default bg-transparent"
+                      onClick={() => setShowHeaderMenu(false)}
+                    />
+                    <div
+                      className="fixed z-[250] min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
+                      style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
                     >
-                      <Video className="h-4 w-4" />
-                      Video call
-                    </button>
-                  </div>
-                </>,
-                document.body,
-              )}
-          </div>
+                      {isArchived ? (
+                        <button
+                          onClick={async () => {
+                            const success = await onUnarchive();
+                            const restored = connection.status === 'archived';
+                            setActionToast(success
+                              ? {
+                                  type: 'success',
+                                  message: restored ? 'Connection restored to active' : 'Conversation unarchived',
+                                }
+                              : {
+                                  type: 'error',
+                                  message: restored
+                                    ? 'Could not restore connection'
+                                    : 'Could not unarchive conversation',
+                                }
+                            );
+                            setShowHeaderMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                        >
+                          {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            const success = await onArchive();
+                            setActionToast(success
+                              ? { type: 'success', message: 'Conversation archived' }
+                              : { type: 'error', message: 'Could not archive conversation' }
+                            );
+                            setShowHeaderMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2"
+                        >
+                          <Archive className="w-4 h-4" /> Archive
+                        </button>
+                      )}
 
-          <div className="relative" ref={headerMenuAnchorRef}>
-            <button
-              onClick={() => {
-                setShowHeaderMenu((prev) => !prev);
-                setShowCallMenu(false);
-              }}
-              className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
-              aria-label="Chat actions"
-            >
-              <MoreHorizontal className="w-5 h-5" />
-            </button>
+                      <button
+                        onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
+                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800 flex items-center gap-2"
+                      >
+                        <Flag className="w-4 h-4" /> Report
+                      </button>
 
-            {showHeaderMenu &&
-              headerMenuPos &&
-              typeof document !== 'undefined' &&
-              createPortal(
-                <>
-                  <button
-                    type="button"
-                    aria-label="Dismiss menu"
-                    className="fixed inset-0 z-[240] cursor-default bg-transparent"
-                    onClick={() => setShowHeaderMenu(false)}
-                  />
-                  <div
-                    className="fixed z-[250] min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
-                    style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
-                  >
-                {isArchived ? (
-                  <button
-                    onClick={async () => {
-                      const success = await onUnarchive();
-                      const restored = connection.status === 'archived';
-                      setActionToast(success
-                        ? {
-                            type: 'success',
-                            message: restored ? 'Connection restored to active' : 'Conversation unarchived',
+                      {isBlocked ? (
+                        <button
+                          onClick={async () => {
+                            const success = await onUnblock();
+                            setActionToast(success
+                              ? { type: 'success', message: 'User unblocked' }
+                              : { type: 'error', message: 'Could not unblock user' }
+                            );
+                            setShowHeaderMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                        >
+                          <ShieldOff className="w-4 h-4" /> Unblock
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Block ${otherUserName} and remove this connection?`)) {
+                              setShowHeaderMenu(false);
+                              return;
+                            }
+                            const success = await onBlock();
+                            setActionToast(success
+                              ? { type: 'success', message: 'User blocked and connection removed' }
+                              : { type: 'error', message: 'Could not block user' }
+                            );
+                            if (success) {
+                              setTimeout(() => onClose(), 700);
+                            }
+                            setShowHeaderMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                        >
+                          <Shield className="w-4 h-4" /> Block
+                        </button>
+                      )}
+
+                      <button
+                        onClick={async () => {
+                          setShowHeaderMenu(false);
+                          if (!window.confirm(`Remove your connection with ${otherUserName}?`)) {
+                            return;
                           }
-                        : {
-                            type: 'error',
-                            message: restored
-                              ? 'Could not restore connection'
-                              : 'Could not unarchive conversation',
+                          const success = await onRemove();
+                          setActionToast(success
+                            ? { type: 'success', message: 'Connection removed' }
+                            : { type: 'error', message: 'Could not remove connection' }
+                          );
+                          if (success) {
+                            setTimeout(() => onClose(), 700);
                           }
-                      );
-                      setShowHeaderMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
-                  >
-                    {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      const success = await onArchive();
-                      setActionToast(success
-                        ? { type: 'success', message: 'Conversation archived' }
-                        : { type: 'error', message: 'Could not archive conversation' }
-                      );
-                      setShowHeaderMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2"
-                  >
-                    <Archive className="w-4 h-4" /> Archive
-                  </button>
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                      >
+                        <UserMinus className="w-4 h-4" /> Remove connection
+                      </button>
+                    </div>
+                  </>,
+                  document.body,
                 )}
-
-                <button
-                  onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
-                  className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800 flex items-center gap-2"
-                >
-                  <Flag className="w-4 h-4" /> Report
-                </button>
-
-                {isBlocked ? (
-                  <button
-                    onClick={async () => {
-                      const success = await onUnblock();
-                      setActionToast(success
-                        ? { type: 'success', message: 'User unblocked' }
-                        : { type: 'error', message: 'Could not unblock user' }
-                      );
-                      setShowHeaderMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
-                  >
-                    <ShieldOff className="w-4 h-4" /> Unblock
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      if (!window.confirm(`Block ${otherUserName} and remove this connection?`)) {
-                        setShowHeaderMenu(false);
-                        return;
-                      }
-                      const success = await onBlock();
-                      setActionToast(success
-                        ? { type: 'success', message: 'User blocked and connection removed' }
-                        : { type: 'error', message: 'Could not block user' }
-                      );
-                      if (success) {
-                        setTimeout(() => onClose(), 700);
-                      }
-                      setShowHeaderMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
-                  >
-                    <Shield className="w-4 h-4" /> Block
-                  </button>
-                )}
-
-                <button
-                  onClick={async () => {
-                    setShowHeaderMenu(false);
-                    if (!window.confirm(`Remove your connection with ${otherUserName}?`)) {
-                      return;
-                    }
-                    const success = await onRemove();
-                    setActionToast(success
-                      ? { type: 'success', message: 'Connection removed' }
-                      : { type: 'error', message: 'Could not remove connection' }
-                    );
-                    if (success) {
-                      setTimeout(() => onClose(), 700);
-                    }
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
-                >
-                  <UserMinus className="w-4 h-4" /> Remove connection
-                </button>
-                  </div>
-                </>,
-                document.body,
-              )}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
       <AnimatePresence>
-        {sharedInterestTags.length > 0 && (
+        {!isGroupClique && sharedInterestTags.length > 0 && (
           <motion.div
             key={`conversation-starters-${peerUserId ?? 'unknown'}`}
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
@@ -1328,9 +1491,20 @@ export default function ChatView({
                 👋
               </div>
               <div>
-                <p className="font-semibold text-white text-lg">Say hello to {otherUserName}!</p>
+                <p className="font-semibold text-white text-lg">
+                  {isGroupClique ? `Welcome to ${otherUserName}` : `Say hello to ${otherUserName}!`}
+                </p>
                 <p className="text-sm text-zinc-500 max-w-xs mt-1">
-                  You met at <span className="text-[#8338EC]">{connection.location}</span>. Start the conversation!
+                  {isGroupClique ? (
+                    <>
+                      Everyone here is part of a <span className="text-emerald-400/95">mathematically verified</span>{' '}
+                      clique — start the thread.
+                    </>
+                  ) : (
+                    <>
+                      You met at <span className="text-[#8338EC]">{connection.location}</span>. Start the conversation!
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -1382,7 +1556,12 @@ export default function ChatView({
                   isMine={entry.message.user_id === currentUserId}
                   currentUserId={currentUserId}
                   senderInitial={otherInitial}
-                  showSenderOnline={peerIsOnline && entry.message.user_id === peerUserId}
+                  senderLabel={
+                    isGroupClique && entry.message.user_id !== currentUserId
+                      ? entry.message.user_id.replace(/-/g, '').slice(0, 2).toUpperCase()
+                      : undefined
+                  }
+                  showSenderOnline={!isGroupClique && peerIsOnline && entry.message.user_id === peerUserId}
                   portalsBoundsRef={messagesPanelRef}
                   onReact={handleReact}
                   onEdit={startEdit}
@@ -1415,9 +1594,9 @@ export default function ChatView({
                     className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
                     text-[10px] font-bold"
                   >
-                    {otherInitial}
+                    {isGroupClique ? '⋯' : otherInitial}
                   </div>
-                  {peerIsOnline && (
+                  {!isGroupClique && peerIsOnline && (
                     <span
                       className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
                       aria-hidden

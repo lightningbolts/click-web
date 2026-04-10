@@ -16,7 +16,8 @@ export interface UserPublicRow {
 
 export interface Chat {
   id: string;
-  connection_id: string;
+  connection_id?: string | null;
+  group_id?: string | null;
   created_at: number;
   updated_at: number;
 }

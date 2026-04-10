@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
+import { parseMicroCommunitiesRpc } from '@/lib/insights/microCommunities';
 
 /**
  * Insights API — returns anonymized, aggregated analytics for a venue.
@@ -102,6 +103,23 @@ export async function GET(
             .rpc('get_venue_top_tags', { venue_location: semanticLocation })
             .limit(10);
 
+        let microCommunities: ReturnType<typeof parseMicroCommunitiesRpc> = [];
+        const { data: venueManagerRow } = await supabase
+            .from('venue_managers')
+            .select('venue_id')
+            .eq('venue_id', venueId)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (venueManagerRow?.venue_id) {
+            const { data: mcJson, error: mcErr } = await supabase.rpc('insights_venue_micro_communities', {
+                venue_id_param: venueManagerRow.venue_id,
+            });
+            if (!mcErr && mcJson != null) {
+                microCommunities = parseMicroCommunitiesRpc(mcJson);
+            }
+        }
+
         return NextResponse.json({
             venueName,
             totalConnections,
@@ -112,6 +130,7 @@ export async function GET(
             busiestDay,
             keptRatio: totalConnections > 0 ? +(keptCount / totalConnections).toFixed(2) : 0,
             topTags: tagData || [],
+            microCommunities,
             status: 'success',
         });
     } catch (error) {

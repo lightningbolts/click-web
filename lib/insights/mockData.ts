@@ -56,6 +56,10 @@ export interface TribeBubble {
   color: string;
   connections: number; // connections within tribe
   overlap?: string[]; // IDs of overlapping tribes
+  /** Verified clique members on-premise (B2B micro-community). */
+  isMicroCommunity?: boolean;
+  /** Aggregated interest tags for this micro-community (no user IDs). */
+  interestTags?: { tag: string; count: number }[];
 }
 
 export interface VibeMessage {

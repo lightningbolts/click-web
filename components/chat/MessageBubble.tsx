@@ -34,6 +34,8 @@ interface MessageBubbleProps {
   currentUserId: string;
   /** Show the sender's first initial avatar */
   senderInitial?: string;
+  /** Short label for group chats (first two chars of user id) when not the viewer. */
+  senderLabel?: string;
   /** Green online dot on the sender avatar (Realtime `room:presence`). */
   showSenderOnline?: boolean;
   onReply?: (message: Message) => void;
@@ -89,6 +91,7 @@ export default function MessageBubble({
   isMine,
   currentUserId,
   senderInitial = '?',
+  senderLabel,
   showSenderOnline = false,
   onReply,
   onReact,
@@ -312,7 +315,7 @@ export default function MessageBubble({
             className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
             text-xs font-bold shadow-[0_0_12px_rgba(131,56,236,0.3)]"
           >
-            {senderInitial}
+            {senderLabel ?? senderInitial}
           </div>
           {showSenderOnline && (
             <span

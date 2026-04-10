@@ -22,7 +22,14 @@ import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
 import { ChatView } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
-import { deriveKeysForConnection, decryptContent, isEncrypted } from '@/lib/chat/crypto';
+import {
+  deriveKeysForConnection,
+  decryptContent,
+  isEncrypted,
+  decryptGroupMessageContent,
+  isGroupMessageEncrypted,
+} from '@/lib/chat/crypto';
+import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 
 // Digital Memory Box components
@@ -143,6 +150,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const seenConnectionIdsRef = useRef<Set<string> | null>(null);
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
   const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useState<Record<string, ChatListMetadata>>({});
+  const [groupCliqueRecords, setGroupCliqueRecords] = useState<ConnectionRecord[]>([]);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [callOverlayState, setCallOverlayState] = useState<WebCallOverlayState>(IDLE_CALL_OVERLAY);
   const [activeCallState, setActiveCallState] = useState<WebActiveCallState>(IDLE_ACTIVE_CALL);
@@ -385,6 +393,66 @@ export default function DashboardView({ user }: DashboardViewProps) {
   useEffect(() => {
     connectionMapRef.current = new Map(connectionRecords.map((connection) => [connection.id, connection]));
   }, [connectionRecords]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setGroupCliqueRecords([]);
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setGroupCliqueRecords([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: memberships, error: memErr } = await supabase
+          .from('group_members')
+          .select('group_id')
+          .eq('user_id', user.id);
+        if (memErr || cancelled) {
+          if (!cancelled) setGroupCliqueRecords([]);
+          return;
+        }
+        const groupIds = [...new Set((memberships ?? []).map((m: { group_id: string }) => m.group_id))];
+        if (groupIds.length === 0) {
+          if (!cancelled) setGroupCliqueRecords([]);
+          return;
+        }
+        const [{ data: chats, error: chatErr }, { data: groups, error: groupErr }] = await Promise.all([
+          supabase.from('chats').select('id, group_id, updated_at').in('group_id', groupIds),
+          supabase.from('groups').select('id, name').in('id', groupIds),
+        ]);
+        if (chatErr || groupErr || cancelled) {
+          if (!cancelled) setGroupCliqueRecords([]);
+          return;
+        }
+        const nameById = new Map((groups ?? []).map((g: { id: string; name: string }) => [g.id, g.name]));
+        const rows: ConnectionRecord[] = (chats ?? [])
+          .filter((c: { group_id: string | null }) => c.group_id)
+          .map((c: { id: string; group_id: string; updated_at: number | null }) => {
+            const gid = c.group_id as string;
+            const title = (nameById.get(gid) as string | undefined)?.trim() || 'Clique';
+            return {
+              id: gid,
+              chatKind: 'group_clique' as const,
+              groupChatId: c.id,
+              name: title,
+              dateMet: new Date(),
+              location: 'Verified clique',
+              status: 'active',
+            };
+          });
+        if (!cancelled) setGroupCliqueRecords(rows);
+      } catch {
+        if (!cancelled) setGroupCliqueRecords([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const showBrowserNotification = useCallback((
     title: string,
@@ -1117,6 +1185,133 @@ export default function DashboardView({ user }: DashboardViewProps) {
     };
   }, [connectionRecords, selectedConnection, user?.id]);
 
+  useEffect(() => {
+    if (!user?.id || groupCliqueRecords.length === 0) {
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    const loadGroupChatMetadata = async () => {
+      try {
+        const entries = await Promise.all(
+          groupCliqueRecords.map(async (row) => {
+            const chatId = row.groupChatId;
+            if (!chatId) {
+              return {
+                groupId: row.id,
+                preview: null as string | null,
+                lastMessageAt: null as number | null,
+                chatUpdatedAt: null as number | null,
+              };
+            }
+            const { data: chatRow } = await supabase
+              .from('chats')
+              .select('updated_at')
+              .eq('id', chatId)
+              .maybeSingle();
+            const { data: message, error: messageError } = await supabase
+              .from('messages')
+              .select('content, time_created, message_type')
+              .eq('chat_id', chatId)
+              .order('time_created', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (messageError) {
+              return {
+                groupId: row.id,
+                preview: null,
+                lastMessageAt: null,
+                chatUpdatedAt:
+                  typeof (chatRow as { updated_at?: number } | null)?.updated_at === 'number'
+                    ? (chatRow as { updated_at: number }).updated_at
+                    : null,
+              };
+            }
+
+            if (!message) {
+              return {
+                groupId: row.id,
+                preview: null,
+                lastMessageAt: null,
+                chatUpdatedAt:
+                  typeof (chatRow as { updated_at?: number } | null)?.updated_at === 'number'
+                    ? (chatRow as { updated_at: number }).updated_at
+                    : null,
+              };
+            }
+
+            let raw: string = typeof message.content === 'string' ? message.content : '';
+            let decryptFailed = false;
+            if (raw.length > 0 && isGroupMessageEncrypted(raw)) {
+              try {
+                const master = await unwrapGroupMasterKeyBytes(supabase, {
+                  groupId: row.id,
+                  viewerUserId: user.id,
+                });
+                if (master) {
+                  raw = await decryptGroupMessageContent(raw, master);
+                } else {
+                  decryptFailed = true;
+                  raw = '';
+                }
+              } catch {
+                decryptFailed = true;
+                raw = '';
+              }
+            }
+
+            const messageType = coerceMessageType(message.message_type);
+            let preview: string | null;
+            if (decryptFailed && messageType === 'text') {
+              preview = 'Tap to view message';
+            } else {
+              preview = previewLabelForMessage({
+                message_type: messageType,
+                content: raw,
+              });
+            }
+
+            return {
+              groupId: row.id,
+              preview,
+              lastMessageAt: typeof message.time_created === 'number' ? message.time_created : null,
+              chatUpdatedAt:
+                typeof (chatRow as { updated_at?: number } | null)?.updated_at === 'number'
+                  ? (chatRow as { updated_at: number }).updated_at
+                  : null,
+            };
+          }),
+        );
+
+        if (cancelled) return;
+
+        setChatMetadataByConnectionId((prev) => {
+          const next = { ...prev };
+          for (const e of entries) {
+            next[e.groupId] = {
+              preview: e.preview,
+              lastMessageAt: e.lastMessageAt,
+              chatUpdatedAt: e.chatUpdatedAt,
+            };
+          }
+          return next;
+        });
+      } catch (error) {
+        console.error('Unexpected group chat metadata load error:', error);
+      }
+    };
+
+    void loadGroupChatMetadata();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [groupCliqueRecords, user?.id]);
+
   const handleTagsComplete = async (tags: string[]) => {
     const supabase = getSupabaseClient();
     if (supabase) {
@@ -1519,10 +1714,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   useEffect(() => {
     if (!selectedConnection) return;
-    if (!connectionRecords.some((c) => c.id === selectedConnection.id)) {
+    const known =
+      connectionRecords.some((c) => c.id === selectedConnection.id) ||
+      groupCliqueRecords.some((c) => c.id === selectedConnection.id);
+    if (!known) {
       setSelectedConnection(null);
     }
-  }, [connectionRecords, selectedConnection]);
+  }, [connectionRecords, groupCliqueRecords, selectedConnection]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1776,23 +1974,28 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const chatCandidates = useMemo(
-    () => connectionRecords
-      .filter((c) => isActiveChatListStatus(c.status) || c.status === 'archived')
-      .map((connection) => {
-        const metadata = chatMetadataByConnectionId[connection.id];
-        return {
-          ...connection,
-          chatPreview: metadata?.preview ?? null,
-          chatLastMessageAt: metadata?.lastMessageAt ?? null,
-          chatUpdatedAt: metadata?.chatUpdatedAt ?? null,
-        };
-      })
-      .sort((left, right) => {
-        const leftTimestamp = left.chatLastMessageAt ?? left.chatUpdatedAt ?? left.dateMet.getTime();
-        const rightTimestamp = right.chatLastMessageAt ?? right.chatUpdatedAt ?? right.dateMet.getTime();
-        return rightTimestamp - leftTimestamp;
-      }),
-    [chatMetadataByConnectionId, connectionRecords]
+    () =>
+      [...connectionRecords, ...groupCliqueRecords]
+        .filter((c) =>
+          c.chatKind === 'group_clique'
+            ? isActiveChatListStatus(c.status)
+            : isActiveChatListStatus(c.status) || c.status === 'archived',
+        )
+        .map((connection) => {
+          const metadata = chatMetadataByConnectionId[connection.id];
+          return {
+            ...connection,
+            chatPreview: metadata?.preview ?? null,
+            chatLastMessageAt: metadata?.lastMessageAt ?? null,
+            chatUpdatedAt: metadata?.chatUpdatedAt ?? null,
+          };
+        })
+        .sort((left, right) => {
+          const leftTimestamp = left.chatLastMessageAt ?? left.chatUpdatedAt ?? left.dateMet.getTime();
+          const rightTimestamp = right.chatLastMessageAt ?? right.chatUpdatedAt ?? right.dateMet.getTime();
+          return rightTimestamp - leftTimestamp;
+        }),
+    [chatMetadataByConnectionId, connectionRecords, groupCliqueRecords],
   );
 
   const activeConnections = useMemo(

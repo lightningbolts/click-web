@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Users2, Link2, TrendingUp, Info } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import TribeChart from '@/components/insights/TribeChart';
 import { mockVenueInsights, type TribeBubble } from '@/lib/insights/mockData';
 import { DemoBanner } from '@/components/insights/DemoBanner';
 import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
+import { useAuth } from '@/lib/AuthContext';
+import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
+import useSWR from 'swr';
+import {
+  microCommunitiesToTribeBubbles,
+  type VenueMicroCommunity,
+} from '@/lib/insights/microCommunities';
 import {
   RadarChart,
   Radar,
@@ -32,9 +40,30 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
+interface InsightsTribesPayload {
+  microCommunities?: unknown;
+  status?: string;
+}
+
+const tribesFetcher = (url: string) => fetchInsightsApiJson<InsightsTribesPayload>(url);
+
 export default function TribesPage() {
   const { demoMode } = useInsightsDemo();
-  const tribes: TribeBubble[] = demoMode ? mockVenueInsights.tribes : [];
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const venueId = searchParams.get('venue_id') ?? undefined;
+  const insightsUrl = venueId ? `/api/insights/${venueId}` : null;
+  const { data: apiPayload } = useSWR(user && insightsUrl ? insightsUrl : null, tribesFetcher);
+
+  const tribes: TribeBubble[] = useMemo(() => {
+    if (demoMode) return mockVenueInsights.tribes;
+    const raw = apiPayload?.microCommunities;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return microCommunitiesToTribeBubbles(raw as VenueMicroCommunity[]);
+    }
+    return [];
+  }, [apiPayload?.microCommunities, demoMode]);
+
   const [selected, setSelected] = useState<TribeBubble | null>(null);
 
   const sorted = [...tribes].sort((a, b) => b.connections - a.connections);
@@ -42,7 +71,7 @@ export default function TribesPage() {
   const avgConnections =
     tribes.length > 0 ? Math.round(totalConnections / tribes.length) : 0;
   const mostOverlapping =
-    tribes.length > 0
+    tribes.length > 0 && !tribes.some((t) => t.isMicroCommunity)
       ? tribes.reduce((max, t) =>
           (t.overlap?.length ?? 0) > (max.overlap?.length ?? 0) ? t : max,
         tribes[0],
@@ -136,7 +165,9 @@ export default function TribesPage() {
       <motion.div variants={itemVariants}>
         {tribes.length === 0 ? (
           <GlassPanel className="p-8 text-center text-sm text-zinc-500">
-            Tribe clustering will show here once interest-tag data is available for your venue.
+            {demoMode
+              ? 'Enable demo mode to preview tribe bubbles, or open this page with a venue that has on-premise micro-community signals.'
+              : 'Tribe clustering and verified micro-communities appear when guests with shared interests check in at your venue.'}
           </GlassPanel>
         ) : (
           <TribeChart tribes={tribes} />
@@ -172,9 +203,14 @@ export default function TribesPage() {
                       {tribe.connections} connections
                     </span>
                   </div>
-                  {selected?.id === tribe.id && tribe.overlap && (
+                  {selected?.id === tribe.id && tribe.overlap && !tribe.isMicroCommunity && (
                     <p className="text-[10px] text-zinc-500 mt-1">
                       Overlaps with: {tribe.overlap.join(', ')}
+                    </p>
+                  )}
+                  {selected?.id === tribe.id && tribe.isMicroCommunity && tribe.interestTags && tribe.interestTags.length > 0 && (
+                    <p className="text-[10px] text-emerald-200/90 mt-1">
+                      Top tags: {tribe.interestTags.slice(0, 6).map((t) => t.tag).join(', ')}
                     </p>
                   )}
                 </div>

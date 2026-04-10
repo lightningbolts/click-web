@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -51,6 +51,11 @@ import type { VibeMessage } from "@/lib/insights/mockData";
 import { DemoBanner } from "./DemoBanner";
 import { useInsightsDemo } from "./InsightsDemoContext";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
+import type { TribeBubble } from "@/lib/insights/mockData";
+import {
+  microCommunitiesToTribeBubbles,
+  type VenueMicroCommunity,
+} from "@/lib/insights/microCommunities";
 import AdvancedMetricsGrid from "./AdvancedMetricsGrid";
 import EnvironmentalMetrics from "./EnvironmentalMetrics";
 import { GlassPanel } from "./GlassPanel";
@@ -64,6 +69,7 @@ interface InsightsResponse {
   busiestDay: string;
   status?: string;
   message?: string;
+  microCommunities?: unknown;
 }
 
 const fetcher = (url: string) => fetchInsightsApiJson<InsightsResponse>(url);
@@ -146,6 +152,15 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
   const liveForView = isDemoFallback ? mockVenueInsights.liveCount : emptyLiveCount;
   const vibeMessages: VibeMessage[] = isDemoFallback ? mockVenueInsights.vibeStream : [];
   const advancedVenueId = venueId ?? (isDemoFallback ? "demo" : undefined);
+
+  const tribeChartTribes: TribeBubble[] = useMemo(() => {
+    if (isDemoFallback) return mockVenueInsights.tribes;
+    const raw = data?.microCommunities;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return microCommunitiesToTribeBubbles(raw as VenueMicroCommunity[]);
+    }
+    return [];
+  }, [data?.microCommunities, isDemoFallback]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -312,7 +327,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"
       >
         <HeatmapView zones={isDemoFallback ? mockVenueInsights.heatmapZones : []} />
-        <TribeChart tribes={isDemoFallback ? mockVenueInsights.tribes : []} />
+        <TribeChart tribes={tribeChartTribes} />
       </motion.div>
 
       {/* THIRD ROW: Historical Charts + Vibe Stream */}

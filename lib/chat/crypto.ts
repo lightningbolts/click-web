@@ -12,9 +12,12 @@
  */
 
 const E2EE_PREFIX = 'e2e:';
+/** Group clique message wire format (matches KMP `MessageCrypto`). */
+export const E2EE_GROUP_MSG_PREFIX = 'e2e_grp:';
 const IV_LENGTH = 16;
 const HMAC_LENGTH = 32;
 const E2EE_SALT = 'click-platforms-e2ee-v1-2024';
+export const GROUP_MASTER_KEY_BYTES = 32;
 
 export interface DerivedKeys {
   encKey: CryptoKey;
@@ -68,6 +71,42 @@ function fromBase64(b64: string): Bytes {
   return bytes;
 }
 
+/**
+ * Per-message AES/HMAC keys derived from the 32-byte shared group master (same derivation as KMP).
+ */
+export async function deriveKeysFromGroupMaster(groupMaster32: ArrayBuffer): Promise<DerivedKeys> {
+  const master = new Uint8Array(groupMaster32) as Bytes;
+  if (master.byteLength !== GROUP_MASTER_KEY_BYTES) {
+    throw new Error(`Group master key must be ${GROUP_MASTER_KEY_BYTES} bytes`);
+  }
+  const encKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x01]) as Bytes));
+  const macKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x02]) as Bytes));
+
+  const encKey = await crypto.subtle.importKey('raw', encKeyRaw, { name: 'AES-CBC' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+
+  const macKey = await crypto.subtle.importKey(
+    'raw',
+    macKeyRaw,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  );
+
+  return { encKey, macKey, encKeyRaw, macKeyRaw };
+}
+
+/** Decode standard Base64 group master (32 raw bytes) after 1:1 unwrap from `encrypted_group_key`. */
+export function decodeGroupMasterKeyBase64(b64: string): ArrayBuffer {
+  const bytes = fromBase64(b64.trim());
+  if (bytes.byteLength !== GROUP_MASTER_KEY_BYTES) {
+    throw new Error(`Decoded group key must be ${GROUP_MASTER_KEY_BYTES} bytes`);
+  }
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+
 export async function deriveKeysForConnection(
   connectionId: string,
   userIds: string[]
@@ -113,11 +152,23 @@ export async function encryptContent(plaintext: string, keys: DerivedKeys): Prom
   return E2EE_PREFIX + toBase64(payload);
 }
 
-export async function decryptContent(content: string, keys: DerivedKeys): Promise<string> {
-  if (!content.startsWith(E2EE_PREFIX)) return content;
+async function encryptWithPrefix(plaintext: string, keys: DerivedKeys, prefix: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH)) as Bytes;
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, keys.encKey, toUtf8(plaintext))
+  ) as Bytes;
+  const hmac = new Uint8Array(
+    await crypto.subtle.sign('HMAC', keys.macKey, concatBuffers(iv, ciphertext))
+  ) as Bytes;
+  const payload = concatBuffers(iv, hmac, ciphertext);
+  return prefix + toBase64(payload);
+}
+
+async function decryptWithPrefix(content: string, keys: DerivedKeys, prefix: string): Promise<string> {
+  if (!content.startsWith(prefix)) return content;
 
   try {
-    const payload = fromBase64(content.slice(E2EE_PREFIX.length));
+    const payload = fromBase64(content.slice(prefix.length));
     if (payload.length < IV_LENGTH + HMAC_LENGTH + 1) return content;
 
     const iv = payload.slice(0, IV_LENGTH);
@@ -143,6 +194,34 @@ export async function decryptContent(content: string, keys: DerivedKeys): Promis
   }
 }
 
+export async function decryptContent(content: string, keys: DerivedKeys): Promise<string> {
+  return decryptWithPrefix(content, keys, E2EE_PREFIX);
+}
+
+export async function encryptGroupMessageContent(
+  plaintext: string,
+  groupMasterKey32: ArrayBuffer,
+): Promise<string> {
+  const keys = await deriveKeysFromGroupMaster(groupMasterKey32);
+  return encryptWithPrefix(plaintext, keys, E2EE_GROUP_MSG_PREFIX);
+}
+
+export async function decryptGroupMessageContent(
+  content: string,
+  groupMasterKey32: ArrayBuffer,
+): Promise<string> {
+  const keys = await deriveKeysFromGroupMaster(groupMasterKey32);
+  return decryptWithPrefix(content, keys, E2EE_GROUP_MSG_PREFIX);
+}
+
 export function isEncrypted(content: string): boolean {
   return content.startsWith(E2EE_PREFIX);
+}
+
+export function isGroupMessageEncrypted(content: string): boolean {
+  return content.startsWith(E2EE_GROUP_MSG_PREFIX);
+}
+
+export function isAnyE2eeWireContent(content: string): boolean {
+  return isEncrypted(content) || isGroupMessageEncrypted(content);
 }

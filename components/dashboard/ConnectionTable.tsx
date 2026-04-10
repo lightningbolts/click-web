@@ -21,6 +21,10 @@ import { useAuth } from '@/lib/AuthContext';
 
 export interface ConnectionRecord {
   id: string;
+  /** Direct 1:1 vs mathematically verified group clique chat */
+  chatKind?: 'direct' | 'group_clique';
+  /** When [chatKind] is `group_clique`, the `public.chats.id` for this group (messages + realtime). */
+  groupChatId?: string;
   otherUserId?: string;
   /** Both user IDs from the connection (needed for E2EE key derivation) */
   userIds?: string[];

@@ -37,15 +37,45 @@ async function getOrCreateChat(supabase: SupabaseClient<any>, connectionId: stri
 
 export async function GET(req: NextRequest) {
   const connectionId = req.nextUrl.searchParams.get('connectionId');
-  if (!connectionId) {
-    return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });
+  const groupId = req.nextUrl.searchParams.get('groupId');
+
+  if (!connectionId && !groupId) {
+    return NextResponse.json(
+      { error: 'connectionId or groupId is required' },
+      { status: 400 },
+    );
   }
 
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const chat = await getOrCreateChat(supabase, connectionId);
+    if (groupId) {
+      const { data: member, error: memErr } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('group_id', groupId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (memErr || !member) {
+        return NextResponse.json({ error: 'Group not found or access denied' }, { status: 404 });
+      }
+
+      const { data: chat, error: chatErr } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('group_id', groupId)
+        .maybeSingle();
+
+      if (chatErr || !chat) {
+        return NextResponse.json({ error: 'Chat not found for this group' }, { status: 404 });
+      }
+
+      return NextResponse.json({ chat });
+    }
+
+    const chat = await getOrCreateChat(supabase, connectionId!);
     return NextResponse.json({ chat });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

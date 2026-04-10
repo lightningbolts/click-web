@@ -215,9 +215,22 @@ export default function TribeChart({ tribes }: TribeChartProps) {
               </div>
               <div className="flex items-center gap-4 text-xs">
                 <span className="text-zinc-300">
-                  <span className="font-bold text-white">{hoveredTribe.connections}</span> connections
+                  {hoveredTribe.isMicroCommunity ? (
+                    <>
+                      <span className="font-bold text-white">{hoveredTribe.connections}</span> checked in
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-white">{hoveredTribe.connections}</span> connections
+                    </>
+                  )}
                 </span>
-                {hoveredTribe.overlap && hoveredTribe.overlap.length > 0 && (
+                {hoveredTribe.isMicroCommunity ? (
+                  <span className="rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/95">
+                    Verified clique
+                  </span>
+                ) : null}
+                {!hoveredTribe.isMicroCommunity && hoveredTribe.overlap && hoveredTribe.overlap.length > 0 && (
                   <span className="text-zinc-400">
                     Overlaps with: {hoveredTribe.overlap.map(id => 
                       tribes.find(t => t.id === id)?.name
@@ -225,6 +238,21 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                   </span>
                 )}
               </div>
+              {hoveredTribe.isMicroCommunity &&
+                hoveredTribe.interestTags &&
+                hoveredTribe.interestTags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {hoveredTribe.interestTags.slice(0, 10).map((t) => (
+                      <span
+                        key={`${hoveredTribe.id}-${t.tag}`}
+                        className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-zinc-200"
+                      >
+                        {t.tag}
+                        <span className="ml-1 text-zinc-500">×{t.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
             </motion.div>
           )}
         </AnimatePresence>
