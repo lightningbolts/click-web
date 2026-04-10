@@ -153,7 +153,7 @@ export default function CreateVerifiedClickDialog({
       {open ? (
         <motion.div
           key="create-verified-click-overlay"
-          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-4 sm:items-center"
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-4 pb-6 pt-14 sm:items-center sm:py-10 sm:pb-10"
           role="presentation"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -164,25 +164,33 @@ export default function CreateVerifiedClickDialog({
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-click-title"
-            className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl"
+            className="flex max-h-[min(420px,calc(100dvh-9rem))] w-full max-w-md flex-col rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl sm:max-h-[min(480px,calc(100dvh-10rem))]"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 14 }}
+            exit={{ opacity: 0, y: 56 }}
             transition={{ duration: 0.28, ease: overlayEase }}
+            style={{ willChange: 'transform, opacity' }}
           >
-            <h2 id="create-click-title" className="text-lg font-semibold text-white">
-              Create verified click
-            </h2>
-            <p className="mt-2 text-sm text-zinc-400">
-              Pick friends who are pairwise connected (active or kept). Server verifies every edge.
-            </p>
-            {!eligibilityReady && friends.length > 0 ? (
-              <p className="mt-2 text-xs text-[#8338EC]">Checking who can join…</p>
-            ) : null}
-            {duplicateMemberSet ? (
-              <p className="mt-2 text-xs text-red-400">You already have a verified click with this group.</p>
-            ) : null}
-            <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+            <div className="shrink-0">
+              <h2 id="create-click-title" className="text-lg font-semibold text-white">
+                Create verified click
+              </h2>
+              <p className="mt-2 text-sm text-zinc-400">
+                Pick friends who are pairwise connected (active or kept). Server verifies every edge.
+              </p>
+              <p
+                className={`mt-2 min-h-[1.25rem] text-xs text-[#8338EC] ${
+                  !eligibilityReady && friends.length > 0 ? 'visible' : 'invisible'
+                }`}
+                aria-live="polite"
+              >
+                Checking who can join…
+              </p>
+              {duplicateMemberSet ? (
+                <p className="mt-2 text-xs text-red-400">You already have a verified click with this group.</p>
+              ) : null}
+            </div>
+            <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {friends.length === 0 ? (
                 <p className="text-sm text-zinc-500">No active 1:1 connections yet.</p>
               ) : (
@@ -209,8 +217,8 @@ export default function CreateVerifiedClickDialog({
                 })
               )}
             </div>
-            {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
-            <div className="mt-5 flex justify-end gap-2">
+            {err ? <p className="mt-3 shrink-0 text-sm text-red-400">{err}</p> : null}
+            <div className="mt-5 flex shrink-0 justify-end gap-2">
               <button
                 type="button"
                 className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"

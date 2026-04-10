@@ -604,6 +604,14 @@ export default function ChatView({
   // ─────────────────────────── init: get/create chat ───────────────────────
 
   useEffect(() => {
+    setChatId(null);
+    setLoading(true);
+    setMessages([]);
+    setError(null);
+    setHasMore(true);
+  }, [connection.id, connection.groupChatId, isGroupClique]);
+
+  useEffect(() => {
     const init = async () => {
       try {
         if (isGroupClique && connection.groupChatId) {
@@ -666,6 +674,15 @@ export default function ChatView({
   useEffect(() => {
     if (!chatId) return;
 
+    const ids =
+      connection.userIds ??
+      (connection.otherUserId ? [currentUserId, connection.otherUserId] : []);
+    const awaitingPairwiseKeys = !isGroupClique && ids.length >= 2 && e2eKeys === null;
+    const awaitingGroupKey = isGroupClique && groupMasterKey === null && groupKeyError === null;
+    if (awaitingPairwiseKeys || awaitingGroupKey) {
+      return;
+    }
+
     const load = async () => {
       try {
         const msgs = await fetchMessages(chatId);
@@ -679,7 +696,18 @@ export default function ChatView({
       }
     };
     load();
-  }, [chatId, fetchMessages, scrollToBottom, groupMasterKey]);
+  }, [
+    chatId,
+    connection.otherUserId,
+    connection.userIds,
+    currentUserId,
+    e2eKeys,
+    fetchMessages,
+    groupKeyError,
+    groupMasterKey,
+    isGroupClique,
+    scrollToBottom,
+  ]);
 
   // ─────────────────────────── load older messages ─────────────────────────
 

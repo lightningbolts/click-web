@@ -182,6 +182,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const notificationPreferencesRef = useRef<NotificationPreferences>(notificationPreferences);
   const connectionMapRef = useRef<Map<string, ConnectionRecord>>(new Map());
   const chatConnectionMapRef = useRef<Map<string, string>>(new Map());
+  /** Verified clique rows keyed by `chats.id` (group message realtime + previews). */
+  const groupRecordByChatIdRef = useRef<Map<string, ConnectionRecord>>(new Map());
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
@@ -443,6 +445,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
   useEffect(() => {
     connectionMapRef.current = new Map(connectionRecords.map((connection) => [connection.id, connection]));
   }, [connectionRecords]);
+
+  useEffect(() => {
+    groupRecordByChatIdRef.current = new Map(
+      groupCliqueRecords
+        .filter((r) => typeof r.groupChatId === 'string' && r.groupChatId.length > 0)
+        .map((r) => [r.groupChatId as string, r]),
+    );
+  }, [groupCliqueRecords]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -974,7 +984,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, insertDeclinedCallLog, joinCall, playRingtone, sendSignal, showBrowserNotification, stopRingtone, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || connectionRecords.length === 0) {
+    if (!user?.id || (connectionRecords.length === 0 && groupCliqueRecords.length === 0)) {
       chatConnectionMapRef.current = new Map();
       return;
     }
@@ -987,17 +997,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     const primeChatMap = async () => {
       const connectionIds = connectionRecords.map((connection) => connection.id);
-      const { data, error } = await supabase
-        .from('chats')
-        .select('id, connection_id')
-        .in('connection_id', connectionIds);
+      if (connectionIds.length > 0) {
+        const { data, error } = await supabase
+          .from('chats')
+          .select('id, connection_id')
+          .in('connection_id', connectionIds);
 
-      if (error) {
-        console.error('Error priming chat notification map:', error.message || error);
-      } else if (!cancelled) {
-        chatConnectionMapRef.current = new Map(
-          (data ?? []).map((chat: any) => [String(chat.id), String(chat.connection_id)])
-        );
+        if (error) {
+          console.error('Error priming chat notification map:', error.message || error);
+        } else if (!cancelled) {
+          chatConnectionMapRef.current = new Map(
+            (data ?? []).map((chat: any) => [String(chat.id), String(chat.connection_id)]),
+          );
+        }
       }
 
       channel = supabase
@@ -1012,6 +1024,64 @@ export default function DashboardView({ user }: DashboardViewProps) {
               message_type?: string;
             };
             if (!message || message.user_id === user.id) return;
+
+            const groupConn = groupRecordByChatIdRef.current.get(message.chat_id);
+            if (groupConn) {
+              let raw = typeof message.content === 'string' ? message.content : '';
+              let decryptFailed = false;
+              if (raw.length > 0 && isGroupMessageEncrypted(raw)) {
+                try {
+                  const master = await unwrapGroupMasterKeyBytes(supabase, {
+                    groupId: groupConn.id,
+                    viewerUserId: user.id,
+                  });
+                  if (master) {
+                    raw = await decryptGroupMessageContent(raw, master);
+                  } else {
+                    decryptFailed = true;
+                    raw = '';
+                  }
+                } catch {
+                  decryptFailed = true;
+                  raw = '';
+                }
+              }
+              const mt = coerceMessageType(message.message_type);
+              const listPreview =
+                decryptFailed && mt === 'text'
+                  ? 'Tap to view message'
+                  : previewLabelForMessage({
+                      message_type: mt,
+                      content: raw,
+                    });
+              setChatMetadataByConnectionId((current) => ({
+                ...current,
+                [groupConn.id]: {
+                  preview: listPreview,
+                  lastMessageAt: message.time_created,
+                  chatUpdatedAt: message.time_created,
+                },
+              }));
+              const isActiveVisibleChat =
+                activeTabRef.current === 'chat' &&
+                selectedConnectionRef.current?.id === groupConn.id &&
+                typeof document !== 'undefined' &&
+                document.visibilityState === 'visible';
+              if (!notificationPreferencesRef.current.messagePushEnabled || isActiveVisibleChat) {
+                return;
+              }
+              const preview =
+                listPreview.length > 140 ? `${listPreview.slice(0, 137)}...` : listPreview;
+              showBrowserNotification(
+                groupConn.name,
+                preview,
+                () => {
+                  setSelectedConnection(groupConn);
+                  setActiveTab('chat');
+                },
+              );
+              return;
+            }
 
             let connectionId = chatConnectionMapRef.current.get(message.chat_id);
             if (!connectionId) {
@@ -1102,7 +1172,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         supabase.removeChannel(channel);
       }
     };
-  }, [connectionRecords, showBrowserNotification, user?.id]);
+  }, [connectionRecords, groupCliqueRecords, showBrowserNotification, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -1146,7 +1216,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [user]);
 
   useEffect(() => {
-    if (!user?.id || connectionRecords.length === 0) {
+    if (!user?.id) {
       setChatMetadataByConnectionId({});
       return;
     }
@@ -1168,7 +1238,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         .map((connection) => connection.id);
 
       if (connectionIds.length === 0) {
-        if (!cancelled) setChatMetadataByConnectionId({});
         return;
       }
 
@@ -1180,12 +1249,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
         if (chatError) {
           console.error('Error fetching chats for dashboard list:', chatError.message || chatError);
-          if (!cancelled) setChatMetadataByConnectionId({});
           return;
         }
 
         if (!chats || chats.length === 0) {
-          if (!cancelled) setChatMetadataByConnectionId({});
           return;
         }
 
@@ -1259,19 +1326,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
         if (cancelled) return;
 
-        setChatMetadataByConnectionId(
-          latestMessages.reduce<Record<string, ChatListMetadata>>((acc, entry) => {
-            acc[entry.connectionId] = {
+        setChatMetadataByConnectionId((prev) => {
+          const next = { ...prev };
+          for (const entry of latestMessages) {
+            next[entry.connectionId] = {
               preview: entry.preview,
               lastMessageAt: entry.lastMessageAt,
               chatUpdatedAt: entry.chatUpdatedAt,
             };
-            return acc;
-          }, {})
-        );
+          }
+          return next;
+        });
       } catch (error) {
         console.error('Unexpected chat metadata load error:', error);
-        if (!cancelled) setChatMetadataByConnectionId({});
       }
     };
 
@@ -1782,6 +1849,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setSelectedConnection(conn);
     setActiveTab('chat');
   }, []);
+
+  const connectionRecordsWithChatPreview = useMemo(
+    () =>
+      connectionRecords.map((c) => ({
+        ...c,
+        chatPreview: chatMetadataByConnectionId[c.id]?.preview ?? c.chatPreview ?? null,
+      })),
+    [chatMetadataByConnectionId, connectionRecords],
+  );
 
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
@@ -2338,7 +2414,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     </div>
                   </div>
                   <ConnectionTable
-                    connections={connectionRecords}
+                    connections={connectionRecordsWithChatPreview}
                     onExport={handleExport}
                     onSelect={handleOpenChat}
                     onOpenProfile={(id) => setProfileUserId(id)}

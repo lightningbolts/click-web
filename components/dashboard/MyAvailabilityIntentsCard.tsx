@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarClock, Loader2, Plus, Trash2 } from 'lucide-react';
 import {
   AVAILABILITY_INTENT_DURATION_PRESETS,
@@ -16,6 +16,8 @@ type IntentRow = {
 };
 
 const DURATION_OPTIONS = AVAILABILITY_INTENT_DURATION_PRESETS;
+
+const easeOut = [0.22, 1, 0.36, 1] as const;
 
 type Props = {
   getAuthHeaders: () => Promise<HeadersInit>;
@@ -106,7 +108,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
     <motion.section
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.35, ease: easeOut }}
       className="glass rounded-3xl border border-zinc-800 p-6"
     >
       <div className="flex items-start gap-3 mb-4">
@@ -127,46 +129,74 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
           Loading…
         </div>
       ) : (
-        <>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.32, ease: easeOut }}
+        >
           {intents.length > 0 ? (
             <div className="mb-5 space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Active now</p>
+              <motion.p
+                className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.28, delay: 0.04, ease: easeOut }}
+              >
+                Active now
+              </motion.p>
               <ul className="space-y-2">
-                {intents.map((row) => (
-                  <li
-                    key={row.id}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2"
-                  >
-                    <div className="min-w-0 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2.5 py-0.5 text-xs text-sky-200 truncate max-w-[200px]">
-                        {row.intent_tag.trim()}
-                      </span>
-                      <span className="text-xs text-zinc-500">{row.timeframe}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => remove(row.id)}
-                      disabled={deletingId === row.id}
-                      className="shrink-0 rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-red-300 transition-colors disabled:opacity-50"
-                      aria-label="Remove intent"
+                <AnimatePresence initial={false} mode="popLayout">
+                  {intents.map((row, i) => (
+                    <motion.li
+                      key={row.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: i * 0.055,
+                        ease: easeOut,
+                        layout: { duration: 0.22, ease: easeOut },
+                      }}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2"
                     >
-                      {deletingId === row.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </li>
-                ))}
+                      <div className="min-w-0 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2.5 py-0.5 text-xs text-sky-200 truncate max-w-[200px]">
+                          {row.intent_tag.trim()}
+                        </span>
+                        <span className="text-xs text-zinc-500">{row.timeframe}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => remove(row.id)}
+                        disabled={deletingId === row.id}
+                        className="shrink-0 rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-red-300 transition-colors disabled:opacity-50"
+                        aria-label="Remove intent"
+                      >
+                        {deletingId === row.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
               </ul>
             </div>
           ) : (
-            <div className="mb-5 rounded-xl border border-zinc-800/80 bg-zinc-900/30 px-3 py-3 text-sm text-zinc-500">
+            <motion.div
+              className="mb-5 rounded-xl border border-zinc-800/80 bg-zinc-900/30 px-3 py-3 text-sm text-zinc-500"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: easeOut }}
+            >
               No active intent — add one below so friends know what you’re up for.
-            </div>
+            </motion.div>
           )}
 
-          <form
+          <motion.form
             onSubmit={submit}
             className={`space-y-3 ${intents.length > 0 ? 'mt-4 border-t border-zinc-800/80 pt-4' : ''}`}
           >
@@ -200,8 +230,8 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Share availability
             </button>
-          </form>
-        </>
+          </motion.form>
+        </motion.div>
       )}
 
       {error && (

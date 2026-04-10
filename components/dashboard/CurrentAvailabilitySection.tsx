@@ -1,9 +1,12 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import {
   normalizeAvailabilityIntentRows,
   normalizeLegacyAvailabilityRecord,
 } from '@/lib/userProfile/availability';
+
+const easeOut = [0.22, 1, 0.36, 1] as const;
 
 type LegacyAvailability = NonNullable<
   ReturnType<typeof normalizeLegacyAvailabilityRecord>
@@ -50,24 +53,36 @@ export default function CurrentAvailabilitySection({
   return (
     <div className="space-y-4 text-sm text-zinc-300">
       {intents.length > 0 ? (
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease: easeOut }}
+        >
+          <motion.p
+            className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.25, delay: 0.04, ease: easeOut }}
+          >
             Open to
-          </p>
+          </motion.p>
           <ul className="flex flex-col gap-2">
-            {intents.map((row) => (
-              <li
+            {intents.map((row, i) => (
+              <motion.li
                 key={row.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: 0.06 + i * 0.05, ease: easeOut }}
                 className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2"
               >
                 <span className="rounded-full border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2.5 py-0.5 text-xs text-sky-200">
                   {row.intent_tag.trim()}
                 </span>
                 <span className="text-xs text-zinc-500">{humanizeTimeframe(row.timeframe)}</span>
-              </li>
+              </motion.li>
             ))}
           </ul>
-        </div>
+        </motion.div>
       ) : null}
 
       {hasLegacySchedule && legacy ? (

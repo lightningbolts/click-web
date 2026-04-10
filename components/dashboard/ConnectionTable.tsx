@@ -382,9 +382,14 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                             showOnline={peerOnline}
                           />
                         )}
-                        <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug">
-                          {connection.name}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug">
+                            {connection.name}
+                          </p>
+                          {connection.chatPreview != null && connection.chatPreview.trim() !== '' ? (
+                            <p className="mt-0.5 truncate text-xs text-zinc-500">{connection.chatPreview.trim()}</p>
+                          ) : null}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-4 align-top">

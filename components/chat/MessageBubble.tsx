@@ -18,6 +18,7 @@ import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
 import { LinkifiedText } from '@/lib/chat/linkify';
 import { durationSecondsFromMetadata, mediaUrlFromMetadata } from '@/lib/chat/mediaMetadata';
+import { isAnyE2eeWireContent } from '@/lib/chat/crypto';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
@@ -285,6 +286,8 @@ export default function MessageBubble({
   const linkVariant = isMine ? 'mine' : 'theirs';
   const captionText = message.content.trim();
   const showCaption = captionText.length > 0;
+  const captionLooksEncrypted =
+    message.message_type === 'text' && showCaption && isAnyE2eeWireContent(captionText);
   const isImage = message.message_type === 'image';
   const isAudio = message.message_type === 'audio';
   const textBubbleClass = isMine
@@ -416,7 +419,15 @@ export default function MessageBubble({
               <div
                 className={`relative max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${textBubbleClass}`}
               >
-                <LinkifiedText text={message.content} variant={linkVariant} />
+                {captionLooksEncrypted ? (
+                  <div
+                    className="h-4 max-w-[12rem] rounded-md bg-white/15 animate-pulse"
+                    aria-busy
+                    aria-label="Decrypting message"
+                  />
+                ) : (
+                  <LinkifiedText text={message.content} variant={linkVariant} />
+                )}
               </div>
             )}
           </div>
@@ -440,7 +451,15 @@ export default function MessageBubble({
                 <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
               </div>
             )}
-            <LinkifiedText text={message.content} variant={linkVariant} />
+            {message.message_type === 'text' && isAnyE2eeWireContent(message.content) ? (
+              <div
+                className="h-4 max-w-[14rem] rounded-md bg-white/15 animate-pulse"
+                aria-busy
+                aria-label="Decrypting message"
+              />
+            ) : (
+              <LinkifiedText text={message.content} variant={linkVariant} />
+            )}
           </div>
         )}
 
