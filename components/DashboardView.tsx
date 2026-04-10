@@ -17,6 +17,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Clock,
+  X,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -180,6 +181,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [groupMemberPickerRows, setGroupMemberPickerRows] = useState<{ userId: string; label: string }[]>([]);
+  const [showGroupMemberPicker, setShowGroupMemberPicker] = useState(false);
+  const [groupMemberPickerBusy, setGroupMemberPickerBusy] = useState(false);
 
   /** Avoid painting stats at 0 before the first `/api/connections` response (hydrates real counts). */
   const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useState(false);
@@ -193,6 +197,38 @@ export default function DashboardView({ user }: DashboardViewProps) {
       'Content-Type': 'application/json',
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     };
+  }, []);
+
+  const openVerifiedCliqueMemberPicker = useCallback(async (memberUserIds: string[]) => {
+    const ids = [...new Set(memberUserIds)].filter(Boolean).sort();
+    if (ids.length === 0) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    setGroupMemberPickerBusy(true);
+    try {
+      type UserMini = { id: string; name?: string | null; first_name?: string | null };
+      let usersData: UserMini[] | null = null;
+      const r1 = await supabase.from('users').select('id, name, full_name, first_name, last_name').in('id', ids);
+      if (!r1.error && r1.data) {
+        usersData = r1.data as UserMini[];
+      } else {
+        const r2 = await supabase.from('users').select('id, name').in('id', ids);
+        if (!r2.error && r2.data) usersData = r2.data as UserMini[];
+      }
+      const labelFor = (u: { first_name?: string | null; name?: string | null }) => {
+        const fn = u.first_name?.trim();
+        if (fn) return fn;
+        const n = u.name?.trim();
+        if (n) return n.split(/\s+/)[0] ?? n;
+        return 'Member';
+      };
+      const byId = new Map((usersData ?? []).map((u) => [u.id, labelFor(u)]));
+      const rows = ids.map((id) => ({ userId: id, label: byId.get(id) ?? 'Member' }));
+      setGroupMemberPickerRows(rows);
+      setShowGroupMemberPicker(true);
+    } finally {
+      setGroupMemberPickerBusy(false);
+    }
   }, []);
 
   const tryInsertCompletedCallLog = useCallback(
@@ -449,20 +485,20 @@ export default function DashboardView({ user }: DashboardViewProps) {
           }
           return;
         }
-        const memberKeys = new Set<string>();
+        const byGroup = new Map<string, string[]>();
         if (!membersKeyErr && allMembers?.length) {
-          const byGroup = new Map<string, string[]>();
           for (const row of allMembers as { group_id: string; user_id: string }[]) {
             if (!row.group_id || !row.user_id) continue;
             const arr = byGroup.get(row.group_id) ?? [];
             arr.push(row.user_id);
             byGroup.set(row.group_id, arr);
           }
-          for (const gid of groupIds) {
-            const ids = byGroup.get(gid);
-            if (ids?.length) {
-              memberKeys.add(memberSetKeySorted(ids));
-            }
+        }
+        const memberKeys = new Set<string>();
+        for (const gid of groupIds) {
+          const ids = byGroup.get(gid);
+          if (ids?.length) {
+            memberKeys.add(memberSetKeySorted(ids));
           }
         }
         const groupMetaById = new Map(
@@ -477,11 +513,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
             const gid = c.group_id as string;
             const meta = groupMetaById.get(gid) as { name: string; createdBy?: string } | undefined;
             const title = meta?.name?.trim() || 'Click';
+            const memberIds = (byGroup.get(gid) ?? []).slice().sort();
             return {
               id: gid,
               chatKind: 'group_clique' as const,
               groupChatId: c.id,
               groupCreatedByUserId: meta?.createdBy,
+              userIds: memberIds,
               name: title,
               dateMet: new Date(),
               location: 'Verified click',
@@ -2486,6 +2524,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                   ? formatArchiveCountdownLabel(archiveInfo)
                                   : null;
                               const menuOpensUpward = index >= visibleChatConnections.length - 2;
+                              const isGroupCliqueRow = conn.chatKind === 'group_clique';
+                              const groupMemberIds = conn.userIds ?? [];
                               const listPeerId =
                                 conn.otherUserId ??
                                 (user?.id ? conn.userIds?.find((id) => id !== user.id) : undefined);
@@ -2521,7 +2561,20 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     onTouchCancel={endLongPress}
                                     className="w-full flex cursor-pointer items-start gap-4 px-5 py-4 pr-16 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]/50"
                                   >
-                                    {listPeerId ? (
+                                    {isGroupCliqueRow ? (
+                                      <button
+                                        type="button"
+                                        disabled={groupMemberPickerBusy || groupMemberIds.length === 0}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void openVerifiedCliqueMemberPicker(groupMemberIds);
+                                        }}
+                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC] disabled:cursor-not-allowed disabled:opacity-40"
+                                        aria-label="View verified clique members"
+                                      >
+                                        <Users className="h-5 w-5" aria-hidden />
+                                      </button>
+                                    ) : listPeerId ? (
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -2726,6 +2779,58 @@ export default function DashboardView({ user }: DashboardViewProps) {
         onToggleMicrophone={toggleMicrophone}
         onToggleCamera={toggleCamera}
       />
+
+      <AnimatePresence>
+        {showGroupMemberPicker && groupMemberPickerRows.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setShowGroupMemberPicker(false)}
+            role="presentation"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Members</h3>
+                  <p className="mt-1 text-xs text-zinc-400">Choose someone to view their profile.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGroupMemberPicker(false)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <ul className="mt-4 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-1">
+                {groupMemberPickerRows.map((row) => (
+                  <li key={row.userId}>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
+                      onClick={() => {
+                        setProfileUserId(row.userId);
+                        setShowGroupMemberPicker(false);
+                      }}
+                    >
+                      {row.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <UserProfileModal
         userId={profileUserId}

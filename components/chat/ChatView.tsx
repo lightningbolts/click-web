@@ -199,6 +199,8 @@ export default function ChatView({
   const [showRenameGroupModal, setShowRenameGroupModal] = useState(false);
   const [renameGroupInput, setRenameGroupInput] = useState('');
   const [groupMenuBusy, setGroupMenuBusy] = useState(false);
+  const [groupMemberProfileRows, setGroupMemberProfileRows] = useState<{ userId: string; label: string }[]>([]);
+  const [showGroupMemberPicker, setShowGroupMemberPicker] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDeleteMessageId, setPendingDeleteMessageId] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -397,6 +399,7 @@ export default function ChatView({
       setGroupHeaderSubtitle(null);
       setGroupCreatorId(null);
       setDisplayGroupName(null);
+      setGroupMemberProfileRows([]);
       return;
     }
     const supabase = getSupabaseClient();
@@ -446,11 +449,19 @@ export default function ChatView({
           .slice()
           .sort()
           .map((id) => byId.get(id) ?? 'Member');
+        const profileRows = ids
+          .slice()
+          .sort()
+          .map((id) => ({ userId: id, label: byId.get(id) ?? 'Member' }));
         if (!cancelled) {
           setGroupHeaderSubtitle(`${ids.length} Members: ${labels.join(', ')}`);
+          setGroupMemberProfileRows(profileRows);
         }
       } catch {
-        if (!cancelled) setGroupHeaderSubtitle(null);
+        if (!cancelled) {
+          setGroupHeaderSubtitle(null);
+          setGroupMemberProfileRows([]);
+        }
       }
     })();
     return () => {
@@ -1223,8 +1234,21 @@ export default function ChatView({
           <button
             type="button"
             className="relative shrink-0 rounded-full border-0 bg-transparent p-0 cursor-pointer"
-            onClick={() => peerUserId && onOpenProfile?.(peerUserId)}
-            disabled={isGroupClique || !peerUserId || !onOpenProfile}
+            onClick={() => {
+              if (isGroupClique) {
+                if (onOpenProfile && groupMemberProfileRows.length > 0) {
+                  setShowGroupMemberPicker(true);
+                }
+              } else if (peerUserId && onOpenProfile) {
+                onOpenProfile(peerUserId);
+              }
+            }}
+            disabled={
+              isGroupClique
+                ? !onOpenProfile || groupMemberProfileRows.length === 0
+                : !peerUserId || !onOpenProfile
+            }
+            aria-label={isGroupClique ? 'View members' : 'View profile'}
           >
             <div
               className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
@@ -2083,6 +2107,58 @@ export default function ChatView({
                   Save
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showGroupMemberPicker && groupMemberProfileRows.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setShowGroupMemberPicker(false)}
+            role="presentation"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Members</h3>
+                  <p className="mt-1 text-xs text-zinc-400">Choose someone to view their profile.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGroupMemberPicker(false)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <ul className="mt-4 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-1">
+                {groupMemberProfileRows.map((row) => (
+                  <li key={row.userId}>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
+                      onClick={() => {
+                        onOpenProfile?.(row.userId);
+                        setShowGroupMemberPicker(false);
+                      }}
+                    >
+                      {row.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </motion.div>
           </motion.div>
         )}
