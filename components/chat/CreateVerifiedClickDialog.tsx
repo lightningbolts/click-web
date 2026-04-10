@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  buildInitialVerifiedClickName,
   createVerifiedClickFromConnections,
   verifiedCliqueEdgesExist,
 } from '@/lib/chat/createVerifiedClick';
@@ -20,6 +21,8 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   supabase: SupabaseClient;
   currentUserId: string;
+  /** Display label for the signed-in user (first word used in the default group name). */
+  currentUserLabel: string;
   friends: ClickFriendOption[];
   /** Sorted member-set keys for verified clicks the user already belongs to. */
   existingVerifiedMemberSetKeys?: ReadonlySet<string>;
@@ -31,6 +34,7 @@ export default function CreateVerifiedClickDialog({
   onOpenChange,
   supabase,
   currentUserId,
+  currentUserLabel,
   friends,
   existingVerifiedMemberSetKeys = new Set<string>(),
   onCreated,
@@ -115,7 +119,19 @@ export default function CreateVerifiedClickDialog({
     setBusy(true);
     setErr(null);
     try {
-      await createVerifiedClickFromConnections(supabase, currentUserId, Array.from(selected));
+      const friendNameById = Object.fromEntries(friends.map((f) => [f.userId, f.name]));
+      const initialName = buildInitialVerifiedClickName(
+        currentUserId,
+        currentUserLabel,
+        Array.from(selected),
+        friendNameById,
+      );
+      await createVerifiedClickFromConnections(
+        supabase,
+        currentUserId,
+        Array.from(selected),
+        initialName,
+      );
       onCreated();
       onOpenChange(false);
     } catch (e) {

@@ -25,6 +25,9 @@ import {
   Mic,
   Square,
   X,
+  Pencil,
+  LogOut,
+  Trash2,
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
@@ -47,6 +50,11 @@ import {
 import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 import { useAuth } from '@/lib/AuthContext';
 import { replySnippetForSend } from '@/lib/chat/reply';
+import {
+  deleteCliqueRpc,
+  leaveCliqueRpc,
+  renameCliqueRpc,
+} from '@/lib/chat/createVerifiedClick';
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -65,6 +73,8 @@ interface ChatViewProps {
   onClose: () => void;
   /** Open profile sheet for the given user (e.g. peer avatar tap). */
   onOpenProfile?: (userId: string) => void;
+  /** After leave/delete verified click; parent should refresh group list. */
+  onGroupChatChanged?: () => void;
 }
 
 type ChatTimelineEntry =
@@ -155,6 +165,7 @@ export default function ChatView({
   onStartCall,
   onClose,
   onOpenProfile,
+  onGroupChatChanged,
 }: ChatViewProps) {
   const { onlineUserIds } = useAuth();
   const isGroupClique = connection.chatKind === 'group_clique';
@@ -182,6 +193,12 @@ export default function ChatView({
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [typingIndicator, setTypingIndicator] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [groupHeaderSubtitle, setGroupHeaderSubtitle] = useState<string | null>(null);
+  const [groupCreatorId, setGroupCreatorId] = useState<string | null>(null);
+  const [displayGroupName, setDisplayGroupName] = useState<string | null>(null);
+  const [showRenameGroupModal, setShowRenameGroupModal] = useState(false);
+  const [renameGroupInput, setRenameGroupInput] = useState('');
+  const [groupMenuBusy, setGroupMenuBusy] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDeleteMessageId, setPendingDeleteMessageId] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -374,6 +391,72 @@ export default function ChatView({
       cancelled = true;
     };
   }, [connection.id, currentUserId, isGroupClique]);
+
+  useEffect(() => {
+    if (!isGroupClique) {
+      setGroupHeaderSubtitle(null);
+      setGroupCreatorId(null);
+      setDisplayGroupName(null);
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: g, error: ge } = await supabase
+          .from('groups')
+          .select('name, created_by')
+          .eq('id', connection.id)
+          .maybeSingle();
+        if (ge || !g || cancelled) return;
+        const nm = typeof g.name === 'string' ? g.name.trim() : '';
+        if (!cancelled) {
+          setDisplayGroupName(nm || otherUserName);
+          setGroupCreatorId(
+            (typeof g.created_by === 'string' ? g.created_by : null) ??
+              connection.groupCreatedByUserId ??
+              null,
+          );
+        }
+        const { data: mems } = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', connection.id);
+        const ids = (mems ?? []).map((m: { user_id: string }) => m.user_id).filter(Boolean);
+        if (ids.length === 0 || cancelled) return;
+        type UserMini = { id: string; name?: string | null; first_name?: string | null };
+        let usersData: UserMini[] | null = null;
+        const r1 = await supabase.from('users').select('id, name, full_name, first_name, last_name').in('id', ids);
+        if (!r1.error && r1.data) {
+          usersData = r1.data as UserMini[];
+        } else {
+          const r2 = await supabase.from('users').select('id, name').in('id', ids);
+          if (!r2.error && r2.data) usersData = r2.data as UserMini[];
+        }
+        const labelFor = (u: { first_name?: string | null; name?: string | null }) => {
+          const fn = u.first_name?.trim();
+          if (fn) return fn;
+          const n = u.name?.trim();
+          if (n) return n.split(/\s+/)[0] ?? n;
+          return 'Member';
+        };
+        const byId = new Map((usersData ?? []).map((u) => [u.id, labelFor(u)]));
+        const labels = ids
+          .slice()
+          .sort()
+          .map((id) => byId.get(id) ?? 'Member');
+        if (!cancelled) {
+          setGroupHeaderSubtitle(`${ids.length} Members: ${labels.join(', ')}`);
+        }
+      } catch {
+        if (!cancelled) setGroupHeaderSubtitle(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGroupClique, connection.id, connection.groupCreatedByUserId, otherUserName]);
 
   useEffect(() => {
     if (!peerUserId) {
@@ -1114,6 +1197,7 @@ export default function ChatView({
   // ─────────────────────────── render ──────────────────────────────────────
 
   const otherInitial = otherUserName.charAt(0).toUpperCase();
+  const headerTitle = isGroupClique ? (displayGroupName ?? otherUserName) : otherUserName;
   const metDate = connection.dateMet.toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
@@ -1157,15 +1241,34 @@ export default function ChatView({
           </button>
 
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-white truncate text-lg">{otherUserName}</p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3 shrink-0 text-zinc-500" /> {connection.location}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3 shrink-0 text-zinc-500" /> {metDate}
-              </span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="font-semibold text-white truncate text-lg min-w-0">{headerTitle}</p>
+              {isGroupClique ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenameGroupInput(headerTitle);
+                    setShowRenameGroupModal(true);
+                  }}
+                  className="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5"
+                  aria-label="Rename group"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              ) : null}
             </div>
+            {isGroupClique && groupHeaderSubtitle ? (
+              <p className="text-xs text-zinc-400 mt-1 leading-snug line-clamp-2">{groupHeaderSubtitle}</p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 shrink-0 text-zinc-500" /> {connection.location}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3 shrink-0 text-zinc-500" /> {metDate}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Connection / clique status badge */}
@@ -1239,142 +1342,216 @@ export default function ChatView({
             </div>
           ) : null}
 
-          {!isGroupClique ? (
-            <div className="relative" ref={headerMenuAnchorRef}>
-              <button
-                onClick={() => {
-                  setShowHeaderMenu((prev) => !prev);
-                  setShowCallMenu(false);
-                }}
-                className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
-                aria-label="Chat actions"
-              >
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
+          <div className="relative" ref={headerMenuAnchorRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowHeaderMenu((prev) => !prev);
+                setShowCallMenu(false);
+              }}
+              className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+              aria-label="Chat actions"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
 
-              {showHeaderMenu &&
-                headerMenuPos &&
-                typeof document !== 'undefined' &&
-                createPortal(
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Dismiss menu"
-                      className="fixed inset-0 z-[240] cursor-default bg-transparent"
-                      onClick={() => setShowHeaderMenu(false)}
-                    />
-                    <div
-                      className="fixed z-[250] min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
-                      style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
-                    >
-                      {isArchived ? (
+            {showHeaderMenu &&
+              headerMenuPos &&
+              typeof document !== 'undefined' &&
+              createPortal(
+                <>
+                  <button
+                    type="button"
+                    aria-label="Dismiss menu"
+                    className="fixed inset-0 z-[240] cursor-default bg-transparent"
+                    onClick={() => setShowHeaderMenu(false)}
+                  />
+                  <div
+                    className="fixed z-[250] min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
+                    style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
+                  >
+                    {isGroupClique ? (
+                      <>
                         <button
+                          type="button"
+                          disabled={groupMenuBusy}
                           onClick={async () => {
-                            const success = await onUnarchive();
-                            const restored = connection.status === 'archived';
-                            setActionToast(success
-                              ? {
-                                  type: 'success',
-                                  message: restored ? 'Connection restored to active' : 'Conversation unarchived',
-                                }
-                              : {
-                                  type: 'error',
-                                  message: restored
-                                    ? 'Could not restore connection'
-                                    : 'Could not unarchive conversation',
-                                }
-                            );
-                            setShowHeaderMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
-                        >
-                          {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            const success = await onArchive();
-                            setActionToast(success
-                              ? { type: 'success', message: 'Conversation archived' }
-                              : { type: 'error', message: 'Could not archive conversation' }
-                            );
-                            setShowHeaderMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2"
-                        >
-                          <Archive className="w-4 h-4" /> Archive
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
-                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800 flex items-center gap-2"
-                      >
-                        <Flag className="w-4 h-4" /> Report
-                      </button>
-
-                      {isBlocked ? (
-                        <button
-                          onClick={async () => {
-                            const success = await onUnblock();
-                            setActionToast(success
-                              ? { type: 'success', message: 'User unblocked' }
-                              : { type: 'error', message: 'Could not unblock user' }
-                            );
-                            setShowHeaderMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
-                        >
-                          <ShieldOff className="w-4 h-4" /> Unblock
-                        </button>
-                      ) : (
-                        <button
-                          onClick={async () => {
-                            if (!window.confirm(`Block ${otherUserName} and remove this connection?`)) {
+                            if (!window.confirm('Leave this verified click? You can rejoin only if someone adds you again.')) {
                               setShowHeaderMenu(false);
                               return;
                             }
-                            const success = await onBlock();
+                            const supabase = getSupabaseClient();
+                            if (!supabase) return;
+                            setGroupMenuBusy(true);
+                            try {
+                              await leaveCliqueRpc(supabase, connection.id);
+                              setActionToast({ type: 'success', message: 'You left the group' });
+                              setShowHeaderMenu(false);
+                              onGroupChatChanged?.();
+                              setTimeout(() => onClose(), 400);
+                            } catch (e: unknown) {
+                              setActionToast({
+                                type: 'error',
+                                message: e instanceof Error ? e.message : 'Could not leave group',
+                              });
+                            } finally {
+                              setGroupMenuBusy(false);
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2 disabled:opacity-40"
+                        >
+                          <LogOut className="w-4 h-4" /> Leave group
+                        </button>
+                        {groupCreatorId === currentUserId ? (
+                          <button
+                            type="button"
+                            disabled={groupMenuBusy}
+                            onClick={async () => {
+                              if (!window.confirm('Permanently delete this verified click for everyone?')) {
+                                setShowHeaderMenu(false);
+                                return;
+                              }
+                              const supabase = getSupabaseClient();
+                              if (!supabase) return;
+                              setGroupMenuBusy(true);
+                              try {
+                                await deleteCliqueRpc(supabase, connection.id);
+                                setActionToast({ type: 'success', message: 'Group deleted' });
+                                setShowHeaderMenu(false);
+                                onGroupChatChanged?.();
+                                setTimeout(() => onClose(), 400);
+                              } catch (e: unknown) {
+                                setActionToast({
+                                  type: 'error',
+                                  message: e instanceof Error ? e.message : 'Could not delete group',
+                                });
+                              } finally {
+                                setGroupMenuBusy(false);
+                              }
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2 disabled:opacity-40"
+                          >
+                            <Trash2 className="w-4 h-4" /> Delete group
+                          </button>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        {isArchived ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const success = await onUnarchive();
+                              const restored = connection.status === 'archived';
+                              setActionToast(success
+                                ? {
+                                    type: 'success',
+                                    message: restored ? 'Connection restored to active' : 'Conversation unarchived',
+                                  }
+                                : {
+                                    type: 'error',
+                                    message: restored
+                                      ? 'Could not restore connection'
+                                      : 'Could not unarchive conversation',
+                                  }
+                              );
+                              setShowHeaderMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                          >
+                            {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const success = await onArchive();
+                              setActionToast(success
+                                ? { type: 'success', message: 'Conversation archived' }
+                                : { type: 'error', message: 'Could not archive conversation' }
+                              );
+                              setShowHeaderMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2"
+                          >
+                            <Archive className="w-4 h-4" /> Archive
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
+                          className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800 flex items-center gap-2"
+                        >
+                          <Flag className="w-4 h-4" /> Report
+                        </button>
+
+                        {isBlocked ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const success = await onUnblock();
+                              setActionToast(success
+                                ? { type: 'success', message: 'User unblocked' }
+                                : { type: 'error', message: 'Could not unblock user' }
+                              );
+                              setShowHeaderMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                          >
+                            <ShieldOff className="w-4 h-4" /> Unblock
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm(`Block ${otherUserName} and remove this connection?`)) {
+                                setShowHeaderMenu(false);
+                                return;
+                              }
+                              const success = await onBlock();
+                              setActionToast(success
+                                ? { type: 'success', message: 'User blocked and connection removed' }
+                                : { type: 'error', message: 'Could not block user' }
+                              );
+                              if (success) {
+                                setTimeout(() => onClose(), 700);
+                              }
+                              setShowHeaderMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                          >
+                            <Shield className="w-4 h-4" /> Block
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setShowHeaderMenu(false);
+                            if (!window.confirm(`Remove your connection with ${otherUserName}?`)) {
+                              return;
+                            }
+                            const success = await onRemove();
                             setActionToast(success
-                              ? { type: 'success', message: 'User blocked and connection removed' }
-                              : { type: 'error', message: 'Could not block user' }
+                              ? { type: 'success', message: 'Connection removed' }
+                              : { type: 'error', message: 'Could not remove connection' }
                             );
                             if (success) {
                               setTimeout(() => onClose(), 700);
                             }
-                            setShowHeaderMenu(false);
                           }}
                           className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
                         >
-                          <Shield className="w-4 h-4" /> Block
+                          <UserMinus className="w-4 h-4" /> Remove connection
                         </button>
-                      )}
-
-                      <button
-                        onClick={async () => {
-                          setShowHeaderMenu(false);
-                          if (!window.confirm(`Remove your connection with ${otherUserName}?`)) {
-                            return;
-                          }
-                          const success = await onRemove();
-                          setActionToast(success
-                            ? { type: 'success', message: 'Connection removed' }
-                            : { type: 'error', message: 'Could not remove connection' }
-                          );
-                          if (success) {
-                            setTimeout(() => onClose(), 700);
-                          }
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
-                      >
-                        <UserMinus className="w-4 h-4" /> Remove connection
-                      </button>
-                    </div>
-                  </>,
-                  document.body,
-                )}
-            </div>
-          ) : null}
+                      </>
+                    )}
+                  </div>
+                </>,
+                document.body,
+              )}
+          </div>
         </div>
       </div>
 
@@ -1722,7 +1899,9 @@ export default function ChatView({
               placeholder={
                 isRecording
                   ? 'Optional caption…'
-                  : `Message ${otherUserName}…`
+                  : isGroupClique
+                    ? 'Message the group…'
+                    : `Message ${otherUserName}…`
               }
               rows={1}
               className="w-full resize-none bg-transparent text-sm text-white placeholder-zinc-600 
@@ -1841,6 +2020,67 @@ export default function ChatView({
                   className="px-3 py-2 rounded-xl bg-amber-600 text-white hover:bg-amber-500"
                 >
                   Submit report
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRenameGroupModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-[92%] max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5"
+            >
+              <h3 className="text-base font-semibold text-white">Rename group</h3>
+              <textarea
+                value={renameGroupInput}
+                onChange={(e) => setRenameGroupInput(e.target.value)}
+                rows={2}
+                className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                placeholder="Group name"
+              />
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRenameGroupModal(false)}
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!renameGroupInput.trim()}
+                  onClick={async () => {
+                    const supabase = getSupabaseClient();
+                    if (!supabase) return;
+                    const next = renameGroupInput.trim();
+                    if (!next) return;
+                    try {
+                      await renameCliqueRpc(supabase, connection.id, next);
+                      setDisplayGroupName(next);
+                      setActionToast({ type: 'success', message: 'Group renamed' });
+                      setShowRenameGroupModal(false);
+                      onGroupChatChanged?.();
+                    } catch (e: unknown) {
+                      setActionToast({
+                        type: 'error',
+                        message: e instanceof Error ? e.message : 'Could not rename group',
+                      });
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-[#8338EC] text-white hover:opacity-90 disabled:opacity-40"
+                >
+                  Save
                 </button>
               </div>
             </motion.div>

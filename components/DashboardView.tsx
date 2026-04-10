@@ -439,7 +439,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
           { data: allMembers, error: membersKeyErr },
         ] = await Promise.all([
           supabase.from('chats').select('id, group_id, updated_at').in('group_id', groupIds),
-          supabase.from('groups').select('id, name').in('id', groupIds),
+          supabase.from('groups').select('id, name, created_by').in('id', groupIds),
           supabase.from('group_members').select('group_id, user_id').in('group_id', groupIds),
         ]);
         if (chatErr || groupErr || cancelled) {
@@ -465,16 +465,23 @@ export default function DashboardView({ user }: DashboardViewProps) {
             }
           }
         }
-        const nameById = new Map((groups ?? []).map((g: { id: string; name: string }) => [g.id, g.name]));
+        const groupMetaById = new Map(
+          (groups ?? []).map((g: { id: string; name: string; created_by?: string }) => [
+            g.id,
+            { name: g.name, createdBy: g.created_by as string | undefined },
+          ]),
+        );
         const rows: ConnectionRecord[] = (chats ?? [])
           .filter((c: { group_id: string | null }) => c.group_id)
           .map((c: { id: string; group_id: string; updated_at: number | null }) => {
             const gid = c.group_id as string;
-            const title = (nameById.get(gid) as string | undefined)?.trim() || 'Click';
+            const meta = groupMetaById.get(gid) as { name: string; createdBy?: string } | undefined;
+            const title = meta?.name?.trim() || 'Click';
             return {
               id: gid,
               chatKind: 'group_clique' as const,
               groupChatId: c.id,
+              groupCreatedByUserId: meta?.createdBy,
               name: title,
               dateMet: new Date(),
               location: 'Verified click',
@@ -2150,6 +2157,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
           onOpenChange={setCreateClickOpen}
           supabase={getSupabaseClient()!}
           currentUserId={user.id}
+          currentUserLabel={userName}
           friends={clickFriendOptions}
           existingVerifiedMemberSetKeys={verifiedClickMemberSetKeys}
           onCreated={() => setGroupClicksReloadNonce((n) => n + 1)}
@@ -2360,6 +2368,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         onStartCall={(videoEnabled) => startOutgoingCall(selectedConnection, videoEnabled)}
                         onClose={() => setSelectedConnection(null)}
                         onOpenProfile={(id) => setProfileUserId(id)}
+                        onGroupChatChanged={() => {
+                          setGroupClicksReloadNonce((n) => n + 1);
+                        }}
                       />
                     </motion.div>
                   ) : (

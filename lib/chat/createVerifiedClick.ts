@@ -40,10 +40,33 @@ export async function verifiedCliqueEdgesExist(
 /**
  * Creates a verified group chat ("click") via `create_verified_clique` (same wrapping as KMP).
  */
+function firstToken(label: string): string {
+  const t = label.trim();
+  if (!t) return 'Friend';
+  return t.split(/\s+/)[0] ?? t;
+}
+
+/** Comma-separated first tokens of display names, sorted by user id (matches mobile RPC ordering). */
+export function buildInitialVerifiedClickName(
+  currentUserId: string,
+  currentUserLabel: string,
+  selectedFriendIds: string[],
+  friendNameById: Record<string, string>,
+): string {
+  const members = [...new Set([currentUserId, ...selectedFriendIds])].sort();
+  return members
+    .map((id) => {
+      if (id === currentUserId) return firstToken(currentUserLabel);
+      return firstToken(friendNameById[id] ?? 'Friend');
+    })
+    .join(', ');
+}
+
 export async function createVerifiedClickFromConnections(
   supabase: SupabaseClient,
   currentUserId: string,
   selectedFriendIds: string[],
+  initialGroupName?: string,
 ): Promise<string> {
   const members = [...new Set([currentUserId, ...selectedFriendIds])].sort();
   if (members.length < 2) {
@@ -62,12 +85,37 @@ export async function createVerifiedClickFromConnections(
     const keys = await deriveKeysForConnection(connId, [m, wrapPeer].sort());
     encrypted[m] = await encryptContent(b64, keys);
   }
+  const label = initialGroupName?.trim() || 'Clique';
+
   const { data, error } = await supabase.rpc('create_verified_clique', {
     target_user_ids: members,
     encrypted_keys: encrypted,
+    initial_group_name: label,
   });
   if (error) throw new Error(error.message);
   const raw = typeof data === 'string' ? data.trim() : String(data ?? '').trim();
   if (!raw) throw new Error('Unexpected RPC response');
   return raw.replace(/^"|"$/g, '');
+}
+
+export async function leaveCliqueRpc(supabase: SupabaseClient, groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_clique', { target_group_id: groupId });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteCliqueRpc(supabase: SupabaseClient, groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_clique', { target_group_id: groupId });
+  if (error) throw new Error(error.message);
+}
+
+export async function renameCliqueRpc(
+  supabase: SupabaseClient,
+  groupId: string,
+  newName: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('rename_clique', {
+    target_group_id: groupId,
+    new_name: newName,
+  });
+  if (error) throw new Error(error.message);
 }

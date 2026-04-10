@@ -25,6 +25,8 @@ export interface ConnectionRecord {
   chatKind?: 'direct' | 'group_clique';
   /** When [chatKind] is `group_clique`, the `public.chats.id` for this group (messages + realtime). */
   groupChatId?: string;
+  /** `public.groups.created_by` when [chatKind] is `group_clique`. */
+  groupCreatedByUserId?: string;
   otherUserId?: string;
   /** Both user IDs from the connection (needed for E2EE key derivation) */
   userIds?: string[];
