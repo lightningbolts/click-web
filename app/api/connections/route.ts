@@ -354,7 +354,8 @@ export async function GET(request: NextRequest) {
         .from('connections')
         .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id])
-        .order('created', { ascending: false });
+        .order('created', { ascending: false })
+        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
 
       if (error) {
         console.error('Error fetching connections:', error);
@@ -377,7 +378,8 @@ export async function GET(request: NextRequest) {
         .from('connections')
         .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id])
-        .order('created', { ascending: false });
+        .order('created', { ascending: false })
+        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
 
       if (hiddenSet.size > 0) {
         mapQuery = mapQuery.not('id', 'in', `(${[...hiddenSet].join(',')})`);
@@ -407,7 +409,8 @@ export async function GET(request: NextRequest) {
         .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id])
         .in('id', includeIds)
-        .order('created', { ascending: false });
+        .order('created', { ascending: false })
+        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
 
       if (error) {
         console.error('Error fetching archived connections:', error);
@@ -424,7 +427,8 @@ export async function GET(request: NextRequest) {
       .select('*, connection_encounters(*)')
       .contains('user_ids', [user.id])
       .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
-      .order('created', { ascending: false });
+      .order('created', { ascending: false })
+      .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
 
     if (excludedIds.length > 0) {
       query = query.not('id', 'in', `(${excludedIds.join(',')})`);
@@ -642,6 +646,8 @@ export async function POST(request: NextRequest) {
       initiator_id,
       responder_id,
       noiseLevelCategory,
+      exactNoiseLevelDb,
+      exactBarometricElevationMeters,
     } = body;
 
     // Validate required fields
@@ -876,6 +882,17 @@ export async function POST(request: NextRequest) {
       encounterInsert.gps_lat = geoLocation.lat;
       encounterInsert.gps_lon = geoLocation.lon;
     }
+
+    const encDb =
+      typeof exactNoiseLevelDb === 'number' && Number.isFinite(exactNoiseLevelDb)
+        ? exactNoiseLevelDb
+        : null;
+    const encElev =
+      typeof exactBarometricElevationMeters === 'number' && Number.isFinite(exactBarometricElevationMeters)
+        ? exactBarometricElevationMeters
+        : null;
+    if (encDb != null) encounterInsert.exact_noise_level_db = encDb;
+    if (encElev != null) encounterInsert.exact_barometric_elevation_m = encElev;
 
     const { error: encounterErr } = await adminClient.from('connection_encounters').insert(encounterInsert);
     if (encounterErr) {

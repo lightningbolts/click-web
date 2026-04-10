@@ -1705,6 +1705,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
         const latestEnc = encs[0];
         const originEnc = encs.length > 0 ? encs[encs.length - 1] : undefined;
 
+        const semanticFromEncounter = latestEnc?.locationName?.trim();
+        const hasExistingSemantic =
+          typeof conn.semantic_location === 'string' && conn.semantic_location.trim().length > 0;
+        const connForExtras: Record<string, unknown> =
+          hasExistingSemantic || !semanticFromEncounter
+            ? conn
+            : { ...conn, semantic_location: semanticFromEncounter };
+
         let geoLoc: { latitude: number; longitude: number } | undefined;
         if (
           latestEnc &&
@@ -1763,13 +1771,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
           location:
             latestEnc?.locationName ??
             originEnc?.locationName ??
-            ((typeof conn.semantic_location === 'string' && conn.semantic_location.trim())
-              ? conn.semantic_location.trim()
+            ((typeof connForExtras.semantic_location === 'string' && connForExtras.semantic_location.trim())
+              ? connForExtras.semantic_location.trim()
               : 'Unknown location'),
-          context: extractEventContext(conn),
-          weatherSummary: extractWeatherSummary(conn),
-          noiseSummary: extractNoiseSummary(conn),
-          noiseCategory: normalizeNoiseCategory(conn),
+          context: extractEventContext(connForExtras),
+          weatherSummary: extractWeatherSummary(connForExtras),
+          noiseSummary: extractNoiseSummary(connForExtras),
+          noiseCategory: normalizeNoiseCategory(connForExtras),
           status: normalizeConnectionStatus(conn),
           lastMessageAt:
             typeof conn.last_message_at === 'number' && Number.isFinite(conn.last_message_at)
@@ -1784,7 +1792,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
               ? encs.map((e) => ({
                   id: e.id,
                   encounteredAt: new Date(e.encounteredAt),
-                  locationName: e.locationName,
+                  locationName: e.locationName?.trim() || 'Unknown location',
                   contextTags: e.contextTags,
                 }))
               : undefined,

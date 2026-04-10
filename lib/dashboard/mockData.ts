@@ -11,6 +11,7 @@ import {
   extractWeatherSummary,
   normalizeNoiseCategory,
 } from '@/lib/dashboard/connectionExtras';
+import { latestEncounter } from '@/lib/dashboard/connectionEncounters';
 
 // Generate mock connections with full geolocation data following the connection schema
 export const mockConnections: ConnectionRecord[] = [
@@ -220,12 +221,19 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
   const longitude = typeof rawLon === 'number' ? rawLon : Number(rawLon);
   const hasValidGeo = Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0);
   const raw = rawConnection as Record<string, unknown>;
+  const latest = latestEncounter(raw);
+  const semantic =
+    (typeof rawConnection.semantic_location === 'string' && rawConnection.semantic_location.trim()
+      ? rawConnection.semantic_location.trim()
+      : null) ??
+    latest?.locationName?.trim() ??
+    '';
 
   return {
     id: rawConnection.id,
-    name: otherUserName || rawConnection.semantic_location || 'Unknown',
+    name: otherUserName || semantic || 'Unknown',
     dateMet: new Date(rawConnection.created_utc || rawConnection.created || rawConnection.created_at),
-    location: rawConnection.semantic_location || 'Unknown location',
+    location: semantic || 'Unknown location',
     context: extractEventContext(raw),
     weatherSummary: extractWeatherSummary(raw),
     noiseSummary: extractNoiseSummary(raw),

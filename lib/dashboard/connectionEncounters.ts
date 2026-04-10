@@ -5,12 +5,15 @@
 export type ConnectionEncounterRow = {
   id: string;
   encounteredAt: string;
-  locationName: string;
+  /** Present when `location_name` was captured for this crossing. */
+  locationName?: string;
   gpsLat?: number;
   gpsLon?: number;
   weatherSnapshot: unknown;
   noiseLevel?: string;
   elevationCategory?: string;
+  exactNoiseLevelDb?: number;
+  exactBarometricElevationM?: number;
   contextTags: string[];
 };
 
@@ -40,7 +43,8 @@ export function parseConnectionEncounters(conn: Record<string, unknown>): Connec
     out.push({
       id,
       encounteredAt,
-      locationName: typeof r.location_name === 'string' && r.location_name.trim() ? r.location_name.trim() : 'Unknown location',
+      locationName:
+        typeof r.location_name === 'string' && r.location_name.trim() ? r.location_name.trim() : undefined,
       gpsLat: numOrUndef(r.gps_lat),
       gpsLon: numOrUndef(r.gps_lon),
       weatherSnapshot: r.weather_snapshot,
@@ -49,6 +53,8 @@ export function parseConnectionEncounters(conn: Record<string, unknown>): Connec
         typeof r.elevation_category === 'string' && r.elevation_category.trim()
           ? r.elevation_category.trim()
           : undefined,
+      exactNoiseLevelDb: numOrUndef(r.exact_noise_level_db),
+      exactBarometricElevationM: numOrUndef(r.exact_barometric_elevation_m),
       contextTags,
     });
   }

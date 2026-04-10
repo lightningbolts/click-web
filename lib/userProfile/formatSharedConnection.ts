@@ -8,6 +8,7 @@ import {
   extractNoiseSummary,
   extractWeatherSummary,
 } from '@/lib/dashboard/connectionExtras';
+import { latestEncounter } from '@/lib/dashboard/connectionEncounters';
 
 export type SharedConnectionPayload = {
   id: string;
@@ -23,6 +24,7 @@ export type SharedConnectionPayload = {
   memory_capsule?: unknown;
   context_tag_id?: string | null;
   last_message_at?: number | null;
+  connection_encounters?: unknown;
 };
 
 export type ProfileConnectionLines = {
@@ -84,7 +86,9 @@ export function formatProfileWhenLine(c: SharedConnectionPayload): string | unde
 export function buildProfileConnectionLines(c: SharedConnectionPayload): ProfileConnectionLines {
   const raw = asRecord(c);
   const context = extractEventContext(raw);
-  const semantic = typeof c.semantic_location === 'string' ? c.semantic_location.trim() : '';
+  const encPlace = latestEncounter(raw)?.locationName?.trim();
+  const semantic =
+    (typeof c.semantic_location === 'string' ? c.semantic_location.trim() : '') || encPlace || '';
   const addressDetail = formatFullLocation(c.full_location ?? undefined);
 
   let place = semantic || addressDetail;
