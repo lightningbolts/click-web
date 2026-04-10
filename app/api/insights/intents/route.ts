@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         clusters: [],
         categoryTotals: [],
         venueCenter: { lat: null, lng: null },
-        radiusMeters: 804.67,
+        radiusMeters: 160.934,
         status: "no_venue",
         message: "Link a venue to load Vibe Radar.",
       };

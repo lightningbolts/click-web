@@ -1,5 +1,4 @@
--- Narrow Vibe Radar proximity from 1 mi to ½ mi (idempotent CREATE OR REPLACE).
--- Safe if 20260409120000 already defined the function with either radius.
+-- Patch Vibe Radar RPC radius (idempotent CREATE OR REPLACE).
 
 CREATE OR REPLACE FUNCTION public.insights_vibe_radar_data (venue_id_param UUID)
 RETURNS JSONB
@@ -17,8 +16,8 @@ DECLARE
 
     totals JSONB;
 
-    radius_m CONSTANT DOUBLE PRECISION := 804.67;
-    -- ~½ mile (1609.34 m/mi ÷ 2)
+    radius_m CONSTANT DOUBLE PRECISION := 160.934;
+    -- ~0.1 mi (1609.34 m/mi ÷ 10)
 BEGIN
     PERFORM public._assert_venue_manager_for_metrics (venue_id_param);
 
@@ -152,4 +151,4 @@ REVOKE ALL ON FUNCTION public.insights_vibe_radar_data (UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.insights_vibe_radar_data (UUID) TO authenticated;
 
 COMMENT ON FUNCTION public.insights_vibe_radar_data (UUID) IS
-    'Anonymized intent clusters and category totals near a venue (½ mi); managers only.';
+    'Anonymized intent clusters and category totals near a venue (~1/10 mi); managers only.';

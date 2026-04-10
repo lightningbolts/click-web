@@ -67,7 +67,7 @@ export function parseVibeRadarRpcPayload(
     clusters: [] as VibeRadarCluster[],
     categoryTotals: [] as VibeRadarCategoryTotal[],
     venueCenter: { lat: null as number | null, lng: null as number | null },
-    radiusMeters: 804.67,
+    radiusMeters: 160.934,
     status: "parse_error",
   };
 
@@ -78,7 +78,7 @@ export function parseVibeRadarRpcPayload(
   const o = raw as Record<string, unknown>;
   const status = typeof o.status === "string" ? o.status : "unknown";
   const radiusMeters =
-    typeof o.radiusMeters === "number" && Number.isFinite(o.radiusMeters) ? o.radiusMeters : 804.67;
+    typeof o.radiusMeters === "number" && Number.isFinite(o.radiusMeters) ? o.radiusMeters : 160.934;
 
   let lat: number | null = null;
   let lng: number | null = null;
@@ -128,29 +128,29 @@ export function demoVibeRadarResponse(): Omit<VibeRadarApiResponse, "venueId"> {
       hex_id: "8a2a1072b59ffff",
       category: "Coffee",
       count: 42,
-      approx_lng: lng + 0.008,
-      approx_lat: lat + 0.004,
+      approx_lng: lng + 0.0009,
+      approx_lat: lat + 0.00045,
     },
     {
       hex_id: "8a2a1072b597fff",
       category: "Live Music",
       count: 78,
-      approx_lng: lng - 0.006,
-      approx_lat: lat + 0.007,
+      approx_lng: lng - 0.00065,
+      approx_lat: lat + 0.00075,
     },
     {
       hex_id: "8a2a1072b5a7fff",
       category: "Drinks",
       count: 150,
-      approx_lng: lng + 0.003,
-      approx_lat: lat - 0.005,
+      approx_lng: lng + 0.00035,
+      approx_lat: lat - 0.00055,
     },
     {
       hex_id: "8a2a1072b593fff",
       category: "Quiet work",
       count: 28,
-      approx_lng: lng - 0.01,
-      approx_lat: lat - 0.003,
+      approx_lng: lng - 0.00085,
+      approx_lat: lat - 0.00035,
     },
   ];
   const categoryTotals: VibeRadarCategoryTotal[] = [
@@ -163,7 +163,7 @@ export function demoVibeRadarResponse(): Omit<VibeRadarApiResponse, "venueId"> {
     clusters,
     categoryTotals,
     venueCenter: DEMO_CENTER,
-    radiusMeters: 804.67,
+    radiusMeters: 160.934,
     status: "ok",
   };
 }

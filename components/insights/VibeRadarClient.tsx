@@ -72,7 +72,7 @@ export default function VibeRadarClient({
 
   const effectiveVenueId = view?.venueId ?? null;
   const demoLocked = demoMode && (!!view && view.status === "no_venue");
-  const radiusMiles = (view?.radiusMeters ?? 804.67) / 1609.34;
+  const radiusMiles = (view?.radiusMeters ?? 160.934) / 1609.34;
 
   const onBeaconSuccess = useCallback((_beacon: VenuePopUpHubBeacon) => {
     setBeaconPulse(true);
