@@ -17,7 +17,7 @@ export default function TermsOfService() {
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             Terms of <span className="text-[#8338EC]">Service</span>
           </h1>
-          <p className="text-zinc-400 mb-12">Last updated: December 2025</p>
+          <p className="text-zinc-400 mb-12">Last updated: April 2026</p>
 
           <div className="space-y-8 text-zinc-300 leading-relaxed">
             <section>
@@ -36,9 +36,14 @@ export default function TermsOfService() {
                 lasting digital connections. We provide:
               </p>
               <ul className="mt-4 space-y-3 list-disc list-inside">
-                <li>NFC/QR-based instant profile exchange</li>
-                <li>48-hour "Say Hi" window to start conversations</li>
-                <li>Optional 30-minute "Vibe Check" for live chats</li>
+                <li>
+                  Proximity Tap: co-presence verification (for example Bluetooth and inaudible audio) before instant profile
+                  exchange; optional connection methods such as QR may also be offered where available
+                </li>
+                <li>Multi-Tap: synchronized group connections and verified group chats where the product supports them</li>
+                <li>Availability intents: time-limited signals you choose to share with your connections</li>
+                <li>48-hour &quot;Say Hi&quot; window to start conversations</li>
+                <li>Optional 30-minute &quot;Vibe Check&quot; for live chats</li>
                 <li>Contextual tagging (where and when you met)</li>
                 <li>Privacy-first, ad-free experience</li>
               </ul>
@@ -103,8 +108,11 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">Business Accounts</h2>
               <p>
-                Organizations can use Click to facilitate connections at events. Business accounts
-                receive aggregated analytics about connection patterns, but never individual user data.
+                Organizations can use Click to facilitate connections at events. Verified business accounts may receive
+                aggregated analytics about connection patterns, including where the product offers them, signals such as
+                verified group arrivals and anonymized availability-intent summaries (for example Vibe Radar). Partners
+                receive aggregate or operational insight consistent with your settings and applicable law, not individual user
+                identities in Insights.
               </p>
             </section>
 

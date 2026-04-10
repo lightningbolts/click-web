@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Mic2,
   Mountain,
+  Radar,
   Radio,
   Shield,
   Store,
@@ -28,13 +29,21 @@ const AUDIENCES = [
     title: 'Small & growing businesses',
     icon: Store,
     body: 'Pop-ups, studios, local brands, and regional teams use Click when handshakes matter more than impressions. Turn real-world moments into contacts your staff can follow up on, without dictating handles across the counter.',
-    bullets: ['Faster checkout-line exchanges', 'Event and launch-day capture', 'No feed, no algorithm between you and the customer'],
+    bullets: [
+      'Proximity Tap keeps lines moving without username archaeology',
+      'Vibe Radar shows neighborhood demand you can answer with Pop-Up Beacons',
+      'No feed, no algorithm between you and the customer',
+    ],
   },
   {
     title: 'Large organizations & venues',
     icon: Building2,
-    body: 'Conferences, stadiums, hospitality groups, and multi-site operators need one consistent way to exchange identity on the floor. Click keeps the interaction fast for guests while giving you aggregate insight into where connections actually happen.',
-    bullets: ['High-throughput tap and QR', 'Event- and location-aware context', 'Directional analytics for programming decisions'],
+    body: 'Conferences, stadiums, hospitality groups, and multi-site operators need one consistent way to exchange identity on the floor. Click keeps same-room verification fast for guests while giving you aggregate insight into pairs, pulses, and verified micro-communities.',
+    bullets: [
+      'High-throughput Proximity Tap and Multi-Tap group flows',
+      'Event- and location-aware context',
+      'Directional analytics for programming and sponsorship decisions',
+    ],
   },
   {
     title: 'Institutions & education',
@@ -45,8 +54,8 @@ const AUDIENCES = [
 ] as const;
 
 const USE_CASES = [
-  { title: 'Conferences & trade shows', desc: 'Booth staff and attendees connect in seconds; organizers see which touchpoints drove real exchanges.' },
-  { title: 'Campus life & student affairs', desc: 'Clubs, housing, and career fairs where context (event, place, time) prevents the “who was that?” problem later.' },
+  { title: 'Conferences & trade shows', desc: 'Booth staff and attendees connect in seconds with Proximity Tap; organizers see which touchpoints drove real exchanges and which friend clusters stuck together.' },
+  { title: 'Campus life & student affairs', desc: 'Clubs, housing, and career fairs where context (event, place, time) prevents the “who was that?” problem later, plus Multi-Tap for verified study groups and cohort intros.' },
   { title: 'Customer experience & retail', desc: 'High-touch retail, showrooms, and demos: swap contact without breaking the conversation.' },
   { title: 'Membership & alumni', desc: 'Associations, foundations, and advancement teams strengthen ties when every handshake is captured with consent.' },
   { title: 'Public & civic programs', desc: 'Workshops, town halls, and community programs where participants opt in to stay connected beyond a single evening.' },
@@ -57,7 +66,7 @@ const OUTCOME_VERTICALS = [
     title: 'Universities',
     icon: GraduationCap,
     outcome:
-      'Know which dorms are socially isolated before the first midterm — not after the dropout.',
+      'Know which dorms are socially isolated before the first midterm, not after the dropout.',
     metric: 'Connection Velocity (freshman class, first 6 weeks)',
   },
   {
@@ -77,9 +86,9 @@ const OUTCOME_VERTICALS = [
 
 const CAPABILITIES = [
   {
-    title: 'Tap or scan, at crowd speed',
+    title: 'Proximity Tap at crowd speed',
     icon: Users,
-    text: 'NFC and QR flows are built for lines, lobbies, and loud rooms. No username archaeology while someone waits behind you.',
+    text: 'Tri-Factor Handshake flows are built for lines, lobbies, and loud rooms: Bluetooth plus inaudible audio prove co-presence before profiles move. Optional QR remains where you need a visual fallback, without making hardware the hero.',
   },
   {
     title: 'Context that survives the week',
@@ -89,7 +98,7 @@ const CAPABILITIES = [
   {
     title: 'Business Insights workspace',
     icon: BarChart3,
-    text: 'Verified businesses open a full analytics area on the web: social patterns, maps, live pulse, and modules tuned for operators (where enabled). The Business Insights section on this page goes deeper.',
+    text: 'Verified businesses open a full analytics area on the web: social patterns, micro-community graphs, Vibe Radar demand signals, maps, live pulse, and modules tuned for operators (where enabled). The Business Insights section on this page goes deeper.',
   },
   {
     title: 'Privacy-forward by design',
@@ -103,11 +112,11 @@ const INSIGHTS_PILLARS = [
     title: 'Social patterns, not just headcount',
     icon: Activity,
     lead:
-      'Go beyond RSVPs and door counts. Business Insights surfaces how in-person connection actually behaves: bursts of activity, where people tend to meet, and how groups form over a night, a term, or a campaign.',
+      'Go beyond RSVPs and door counts. Business Insights surfaces how in-person connection actually behaves: bursts of activity, where people tend to meet, how pairs repeat, and when mathematically verified friend groups arrive together so you can price sponsorships on real micro-communities.',
     bullets: [
       { icon: Activity, text: 'Social Activity: trends and pulses of connection over time.' },
       { icon: MapPin, text: 'Heatmap: spatial clustering so you see which zones drive real exchanges.' },
-      { icon: Users2, text: 'Tribe Analysis: overlapping circles and repeat overlap, not only one-off taps.' },
+      { icon: Users2, text: 'Micro-Community and Tribe views: overlapping circles, verified Multi-Tap cliques, repeat overlap.' },
       { icon: MessageSquare, text: 'Vibe Stream: encounter-flavored context where users opt in (tone and themes, not DMs).' },
     ],
   },
@@ -115,7 +124,7 @@ const INSIGHTS_PILLARS = [
     title: 'Employees and reps on the same product',
     icon: Users,
     lead:
-      'Floor staff, student ambassadors, booth teams, and member services use the same tap-and-scan experience as guests. That means adoption is measurable: you can see which teams and touchpoints turn into real connections instead of passive handoffs.',
+      'Floor staff, student ambassadors, booth teams, and member services use the same Proximity Tap and Multi-Tap flows as guests. Adoption becomes measurable: you can see which teams and touchpoints turn into real connections instead of passive handoffs.',
     bullets: [
       { icon: Users2, text: 'Align incentives: reward teams that create memorable exchanges, not just scans.' },
       { icon: BarChart3, text: 'Compare segments (shift, location, role) when your contract includes breakdowns.' },
@@ -149,7 +158,7 @@ const FAQ = [
   },
   {
     q: 'What appears in Business Insights?',
-    a: 'Verified business accounts use the Insights area on the web, with views such as Social Activity, Heatmap, Tribe Analysis, Vibe Stream, and Live Metrics. What you see depends on your configuration, data volume, and privacy choices. It is designed for aggregate and operational insight, not for surveilling individuals without consent.',
+    a: 'Verified business accounts use the Insights area on the web, with views such as Social Activity, Heatmap, Tribe and micro-community analysis, Vibe Stream, Vibe Radar (anonymized availability intent heatmaps where enabled), Pop-Up Beacon performance, and Live Metrics. What you see depends on your configuration, data volume, and privacy choices. It is designed for aggregate and operational insight, not for surveilling individuals without consent.',
   },
   {
     q: 'Can we integrate with our CRM or event stack?',
@@ -220,7 +229,7 @@ export default function EnterprisePage() {
               </span>
             </h1>
             <p className="mx-auto mb-10 max-w-3xl text-lg leading-relaxed text-zinc-300 md:text-xl">
-              Click gives Student Affairs offices a real-time connection velocity dashboard — the leading indicator for freshman
+              Click gives Student Affairs offices a real-time connection velocity dashboard: the leading indicator for freshman
               retention that no other platform produces.
             </p>
             <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
@@ -359,7 +368,7 @@ export default function EnterprisePage() {
                 Programs we <span className="text-[#8338EC]">hear about</span> first
               </h2>
               <p className="mx-auto max-w-2xl text-center text-zinc-400">
-                Examples of where tap-to-connect and contextual memory matter most. Your rollout may combine several of these.
+                Examples of where Proximity Tap, Multi-Tap groups, and contextual memory matter most. Your rollout may combine several of these.
               </p>
             </motion.div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -431,6 +440,57 @@ export default function EnterprisePage() {
             </div>
 
             <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.65 }}
+              viewport={{ once: true }}
+              className="mt-12 grid gap-8 lg:grid-cols-2"
+            >
+              <article className="glass flex flex-col rounded-3xl border border-zinc-800 p-8 transition-colors hover:border-[#8338EC]/35">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
+                  <Users2 className="h-6 w-6 text-[#8338EC]" />
+                </div>
+                <h3 className="mb-3 text-xl font-bold leading-snug">Micro-Community Analytics</h3>
+                <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">
+                  Go beyond basic foot traffic. Click mathematically verifies when groups of friends arrive together, not only
+                  isolated visits. See whether your venue behaves like a passive pass-through or a sticky hub for micro-communities,
+                  then package sponsorships that align with real social graphs instead of anonymous impressions.
+                </p>
+                <ul className="mt-auto space-y-2 border-t border-zinc-800/80 pt-6 text-sm text-zinc-500">
+                  <li className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span>Group-level arrival signals where Multi-Tap and graph checks succeed</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span>Compare repeat micro-communities against one-off walkthrough traffic</span>
+                  </li>
+                </ul>
+              </article>
+              <article className="glass flex flex-col rounded-3xl border border-zinc-800 p-8 transition-colors hover:border-[#8338EC]/35">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
+                  <Radar className="h-6 w-6 text-[#8338EC]" />
+                </div>
+                <h3 className="mb-3 text-xl font-bold leading-snug">Vibe Radar and Pop-Up Beacons</h3>
+                <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">
+                  Stop paying for spammy local ads. Vibe Radar surfaces anonymized availability intents on a geographic hexbin so
+                  you can see what people nearby want to do right now. Spot fifty &quot;coffee&quot; intents within a mile? Drop a
+                  temporary Pop-Up Beacon on the Click map with a ten percent perk and pull that demand through your door on purpose.
+                </p>
+                <ul className="mt-auto space-y-2 border-t border-zinc-800/80 pt-6 text-sm text-zinc-500">
+                  <li className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span>Live heatmaps of intent categories, bounded by privacy and policy controls</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span>Time-boxed beacons that turn curiosity into measurable visits</span>
+                  </li>
+                </ul>
+              </article>
+            </motion.div>
+
+            <motion.div
               initial={{ opacity: 0, y: 12 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -444,8 +504,8 @@ export default function EnterprisePage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <p className="max-w-md text-center text-sm text-zinc-500 sm:text-left">
-                Sign in with a verified business account to explore Overview, Social Activity, Heatmap, Tribe Analysis, Vibe
-                Stream, and Live Metrics.
+                Sign in with a verified business account to explore Overview, Social Activity, Heatmap, Tribe and micro-community
+                views, Vibe Stream, Vibe Radar, Pop-Up Beacons, and Live Metrics.
               </p>
             </motion.div>
           </div>

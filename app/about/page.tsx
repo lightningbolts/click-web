@@ -85,6 +85,57 @@ export default function About() {
             .
           </p>
 
+          <section className="mb-20">
+            <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">
+              What we&apos;re <span className="text-[#8338EC]">building</span>
+            </h2>
+            <p className="mx-auto mb-10 max-w-2xl text-center text-zinc-400">
+              Stop scrolling. Start living. Click is a people-first social utility for the seconds when someone in front of you
+              actually matters, backed by room-real tech and math you never have to think about.
+            </p>
+            <div className="grid gap-6 md:grid-cols-3">
+              <motion.div
+                initial={{ y: 24, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.65 }}
+                viewport={{ once: true }}
+                className="glass rounded-3xl border border-zinc-800 p-6 text-left"
+              >
+                <h3 className="mb-2 text-lg font-bold text-white">Proximity Tap</h3>
+                <p className="text-sm leading-relaxed text-zinc-500">
+                  Tri-Factor Handshake: secure Bluetooth and inaudible sound prove you are in the same room before anything
+                  exchanges. No hardware rabbit holes, no awkward phone pass. If you can see them, you can connect.
+                </p>
+              </motion.div>
+              <motion.div
+                initial={{ y: 24, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.65, delay: 0.06 }}
+                viewport={{ once: true }}
+                className="glass rounded-3xl border border-zinc-800 p-6 text-left"
+              >
+                <h3 className="mb-2 text-lg font-bold text-white">Multi-Tap and organic cliques</h3>
+                <p className="text-sm leading-relaxed text-zinc-500">
+                  Whole crew at once? Everyone connects on the same beat. We validate the full set in the background, then open a
+                  verified group chat so the night keeps going in one thread instead of seven stray DMs.
+                </p>
+              </motion.div>
+              <motion.div
+                initial={{ y: 24, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.65, delay: 0.12 }}
+                viewport={{ once: true }}
+                className="glass rounded-3xl border border-zinc-800 p-6 text-left"
+              >
+                <h3 className="mb-2 text-lg font-bold text-white">Availability intents</h3>
+                <p className="text-sm leading-relaxed text-zinc-500">
+                  Broadcast what you are up for for up to twenty-four hours, from coffee runs to study blocks to live music.
+                  When your friends&apos; intents overlap, we let you know. Less guessing, more showing up.
+                </p>
+              </motion.div>
+            </div>
+          </section>
+
           <section>
             <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">
               Meet the <span className="text-[#8338EC]">team</span>

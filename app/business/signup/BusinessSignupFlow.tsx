@@ -199,7 +199,8 @@ export function BusinessSignupFlow() {
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-semibold text-white">Business onboarding</h1>
           <p className="text-zinc-400 text-sm">
-            Create an account, add your venue, then subscribe to unlock Click Insights.
+            Create an account, add your venue, then subscribe to unlock Click Insights with micro-community analytics, Vibe Radar
+            demand signals, and Pop-Up Beacon tools where your plan includes them.
           </p>
         </div>
 

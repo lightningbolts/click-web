@@ -1,8 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Smartphone, Zap, Shield, Users, MapPin, Sparkles, CheckCircle, X, ArrowRight } from 'lucide-react';
+import { Smartphone, Zap, Shield, Users, MapPin, Sparkles, CheckCircle, X, ArrowRight, Megaphone } from 'lucide-react';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import LoadingScreen from '@/components/LoadingScreen';
 import DashboardView from '@/components/DashboardView';
@@ -100,10 +101,10 @@ export default function Home() {
             </h1>
 
             <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto mb-3 leading-relaxed px-4">
-              You know that feeling — great conversation with someone you just met, followed each other on Instagram, never talked again. <span className="text-[#8338EC] font-semibold">Click</span> is built for that moment.
+              You know that feeling: great conversation with someone you just met, you followed each other on Instagram, and you never talked again. <span className="text-[#8338EC] font-semibold">Click</span> is built for that moment.
             </p>
             <p className="text-sm sm:text-base md:text-lg text-zinc-500 max-w-3xl mx-auto mb-12 leading-relaxed px-4">
-              Tap phones. No usernames, no handles, no algorithm. Just the person standing in front of you.
+              Stop scrolling. Start living. Press connect and we use secure Bluetooth plus inaudible sound to prove you share the same room. No passing phones around, no hunting for profiles. If you can see them, you can connect for real.
             </p>
 
             {/* CTA Buttons */}
@@ -271,7 +272,7 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* Card 2: friction of exchanging contact (solution: Tap or Scan) */}
+            {/* Card 2: friction of exchanging contact (solution: Proximity Tap) */}
             <motion.div
               whileHover={{ y: -8, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 300 }}
@@ -359,7 +360,7 @@ export default function Home() {
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* NFC/QR Exchange */}
+            {/* Proximity Tap: Tri-Factor Handshake */}
             <motion.div
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
@@ -372,22 +373,93 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <Smartphone className="w-8 h-8 text-[#8338EC]" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Tap or Scan</h3>
+                <h3 className="text-2xl font-bold mb-4">Proximity Tap</h3>
+                <p className="text-sm font-medium text-[#c4a3ff] mb-2">Tri-Factor Handshake</p>
                 <p className="text-zinc-400 leading-relaxed mb-4">
-                  Pull up a QR code or tap your phone with NFC. Profiles swap instantly. No typing, no spelling things out.
+                  Press connect and let Click run a room-real handshake: secure Bluetooth plus inaudible sound prove you are standing together. Profiles swap when the moment is real, not when someone guessed a handle across the internet.
                 </p>
                 <ul className="space-y-2 text-zinc-500 text-sm">
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">✓</span>
-                    <span>No searching for usernames</span>
+                    <span>No username archaeology in a loud room</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">✓</span>
-                    <span>Works anywhere, syncs blazingly fast</span>
+                    <span>Same-room verification, built for eye contact</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">✓</span>
-                    <span>One scan or tap, instant connection</span>
+                    <span>One gesture, instant connection</span>
+                  </li>
+                </ul>
+              </div>
+            </motion.div>
+
+            {/* Multi-Tap: verified group clique */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.15 }}
+              viewport={{ once: true }}
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
+                  <Users className="w-8 h-8 text-[#8338EC]" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">Multi-Tap Groups</h3>
+                <p className="text-sm font-medium text-[#c4a3ff] mb-2">Organic Cliques</p>
+                <p className="text-zinc-400 leading-relaxed mb-4">
+                  Met a whole group at once? Everyone hits connect at the same beat. Click checks the graph in the background so every person in that window really opted in together, then drops you into a verified group chat. Boom. Instant clique.
+                </p>
+                <ul className="space-y-2 text-zinc-500 text-sm">
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>N-way validation in plain English: everyone matched the same moment</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>No threading DMs to seven people you just met</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>Math-backed trust, magic-backed vibes</span>
+                  </li>
+                </ul>
+              </div>
+            </motion.div>
+
+            {/* Availability Intents */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
+                  <Megaphone className="w-8 h-8 text-[#8338EC]" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">Availability Intents</h3>
+                <p className="text-sm font-medium text-[#c4a3ff] mb-2">The vibe broadcast</p>
+                <p className="text-zinc-400 leading-relaxed mb-4">
+                  Stop guessing who is free. For up to twenty-four hours, broadcast what you are up for, like &quot;Looking for coffee,&quot; &quot;Down to study,&quot; or &quot;Live music.&quot; When your connections&apos; intents overlap, we nudge you both. Less planning theater, more showing up.
+                </p>
+                <ul className="space-y-2 text-zinc-500 text-sm">
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>Signals expire so your status never goes stale</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>Friend-led, not another public feed</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>Overlap alerts only when it actually matches</span>
                   </li>
                 </ul>
               </div>
@@ -397,7 +469,7 @@ export default function Home() {
             <motion.div
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              transition={{ duration: 0.8, delay: 0.25 }}
               viewport={{ once: true }}
               className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
@@ -429,35 +501,39 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* Business Insights */}
+            {/* Event / partner analytics teaser */}
             <motion.div
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
               viewport={{ once: true }}
-              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group lg:col-span-2"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📊</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Event Analytics</h3>
-                <p className="text-zinc-400 leading-relaxed mb-4">
-                  For organizers and companies: see where people are actually meeting and which events are worth throwing again.
+                <h3 className="text-2xl font-bold mb-4">Event and campus partners</h3>
+                <p className="text-zinc-400 leading-relaxed mb-4 max-w-2xl">
+                  Organizers still get the anonymized pulse of where real introductions cluster, including when verified friend groups show up together. Curious about Vibe Radar or sponsorship-grade insights? See the{' '}
+                  <Link href="/enterprise" className="text-[#8338EC] underline-offset-4 hover:underline">
+                    enterprise overview
+                  </Link>
+                  .
                 </p>
-                <ul className="space-y-2 text-zinc-500 text-sm">
+                <ul className="space-y-2 text-zinc-500 text-sm max-w-2xl">
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">•</span>
-                    <span>Connection density heatmaps</span>
+                    <span>Connection density and verified micro-community signals where enabled</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">•</span>
-                    <span>Event analytics & engagement metrics</span>
+                    <span>Event analytics tuned for repeat-worthy programming</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-[#8338EC]">•</span>
-                    <span>All data anonymized & aggregated</span>
+                    <span>Aggregate, consent-forward reporting</span>
                   </li>
                 </ul>
               </div>
@@ -548,7 +624,7 @@ export default function Home() {
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg">
               We&apos;re building Click in the open. Get on the waitlist for early access, or create an account now and
-              start using the web dashboard. Your profile, QR, and connections stay in sync when the mobile app ships.
+              start using the web dashboard. Your profile, intents, and verified connections stay in sync when the mobile app ships.
             </p>
             <ul className="mx-auto mt-8 flex max-w-md flex-col gap-3 text-left text-sm text-zinc-500 sm:mx-auto sm:max-w-lg">
               <li className="flex items-start gap-3">

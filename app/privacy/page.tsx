@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             Privacy <span className="text-[#8338EC]">Policy</span>
           </h1>
-          <p className="text-zinc-400 mb-12">Last updated: March 2026</p>
+          <p className="text-zinc-400 mb-12">Last updated: April 2026</p>
 
           <div className="space-y-8 text-zinc-300 leading-relaxed">
             <section>
@@ -38,7 +38,16 @@ export default function PrivacyPolicy() {
                 <li><strong className="text-white">Interest tags:</strong> Self-selected interests you choose during onboarding</li>
                 <li><strong className="text-white">Connection data:</strong> Records of who you connected with, when, and where (semantic location only, e.g. &quot;Coffee Lab&quot;, not GPS coordinates)</li>
                 <li><strong className="text-white">Messages:</strong> Chat messages sent during active connections</li>
-                <li><strong className="text-white">Device info:</strong> Platform (iOS/Android) for NFC compatibility</li>
+                <li>
+                  <strong className="text-white">Device info:</strong> Platform (iOS/Android), Bluetooth and microphone-related
+                  signals used only to perform co-presence checks and handshakes you initiate, not for continuous recording or
+                  ambient surveillance
+                </li>
+                <li>
+                  <strong className="text-white">Availability intents:</strong> The intent labels and time window you set when
+                  you choose to broadcast (for example up to 24 hours), and records needed to match overlaps with connections
+                  you already have
+                </li>
               </ul>
               <p className="mt-4">
                 We do <strong className="text-white">not</strong> collect: precise GPS location history, contacts, photos,
@@ -49,7 +58,11 @@ export default function PrivacyPolicy() {
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">How We Use Your Data</h2>
               <ul className="space-y-3 list-disc list-inside">
-                <li>Display your profile to connections you&apos;ve approved via NFC/QR tap</li>
+                <li>
+                  Display your profile to people you connect with after you both complete the same-room or group verification
+                  flow (Proximity Tap or Multi-Tap), or through other explicit connection methods we offer
+                </li>
+                <li>Match availability intents among your connections when you opt in and notify you of overlaps</li>
                 <li>Show Common Ground interest overlaps when you meet someone</li>
                 <li>Power the 48-hour &quot;Say Hi&quot; window and connection lifecycle</li>
                 <li>Store messages during the connection lifecycle (deleted on expiry)</li>
@@ -80,6 +93,11 @@ export default function PrivacyPolicy() {
                 <li>Total connection count by day and hour; <strong className="text-white">never</strong> individual identities</li>
                 <li>Aggregated interest tag distributions; <strong className="text-white">never</strong> which specific users</li>
                 <li>Kept ratio (percentage of connections that become permanent); <strong className="text-white">never</strong> which connections</li>
+                <li>
+                  Where enabled, aggregated signals about verified group arrivals (micro-communities) and geographic summaries
+                  of availability intents (for example category counts in a map or hexbin view); <strong className="text-white">never</strong>{' '}
+                  tied to your name, email, or exact one-to-one location trail in partner dashboards
+                </li>
               </ul>
               <p className="mt-4">
                 All analytics queries aggregate before returning data. No user IDs,
