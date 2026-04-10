@@ -31,6 +31,11 @@ import {
   isGroupMessageEncrypted,
 } from '@/lib/chat/crypto';
 import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
+import {
+  deleteCliqueRpc,
+  leaveCliqueRpc,
+  renameCliqueRpc,
+} from '@/lib/chat/createVerifiedClick';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 
 // Digital Memory Box components
@@ -184,6 +189,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [groupMemberPickerRows, setGroupMemberPickerRows] = useState<{ userId: string; label: string }[]>([]);
   const [showGroupMemberPicker, setShowGroupMemberPicker] = useState(false);
   const [groupMemberPickerBusy, setGroupMemberPickerBusy] = useState(false);
+  const [chatListGroupRenameGroupId, setChatListGroupRenameGroupId] = useState<string | null>(null);
+  const [chatListGroupRenameInput, setChatListGroupRenameInput] = useState('');
+  const [chatListGroupRenameBusy, setChatListGroupRenameBusy] = useState(false);
+  const [chatListGroupActionBusyId, setChatListGroupActionBusyId] = useState<string | null>(null);
 
   /** Avoid painting stats at 0 before the first `/api/connections` response (hydrates real counts). */
   const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useState(false);
@@ -2511,7 +2520,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                           </div>
                         ) : (
                           <div className="glass overflow-visible rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
-                            {visibleChatConnections.map((conn, index) => {
+                            {visibleChatConnections.map((conn: ConnectionRecord, index) => {
                               const isUserArchived = archivedConnectionIds.has(conn.id);
                               const isServerArchived = conn.status === 'archived';
                               const isArchived = isUserArchived || isServerArchived;
@@ -2599,7 +2608,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
-                                      {archiveWarning && !isServerArchived && !isUserArchived ? (
+                                      {archiveWarning && !isGroupCliqueRow && !isServerArchived && !isUserArchived ? (
                                         <p
                                           className={`mt-1.5 flex items-center gap-1 truncate pr-2 text-[11px] ${
                                             archiveInfo?.isUrgent ? 'text-amber-300' : 'text-zinc-500'
@@ -2644,10 +2653,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                   {menuConnectionId === conn.id && (
                                     <div
                                       data-connection-menu
-                                      className={`absolute right-4 z-50 min-w-[140px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
+                                      className={`absolute right-4 z-50 min-w-[160px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setSelectedConnection(conn);
                                           setMenuConnectionId(null);
@@ -2656,65 +2666,163 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       >
                                         Open chat
                                       </button>
-                                      {isArchived ? (
-                                        <button
-                                          onClick={() => unarchiveConnection(conn.id)}
-                                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
-                                        >
-                                          {isServerArchived ? 'Restore' : 'Unarchive'}
-                                        </button>
+                                      {isGroupCliqueRow ? (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setChatListGroupRenameGroupId(conn.id);
+                                              setChatListGroupRenameInput(conn.name);
+                                              setMenuConnectionId(null);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+                                          >
+                                            Edit group name
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={chatListGroupActionBusyId === conn.id}
+                                            onClick={async () => {
+                                              if (
+                                                !window.confirm(
+                                                  'Leave this verified clique? You will stop receiving messages in this group.',
+                                                )
+                                              ) {
+                                                return;
+                                              }
+                                              const supabase = getSupabaseClient();
+                                              if (!supabase) {
+                                                window.alert('Sign in required.');
+                                                return;
+                                              }
+                                              setChatListGroupActionBusyId(conn.id);
+                                              try {
+                                                await leaveCliqueRpc(supabase, conn.id);
+                                                if (selectedConnectionRef.current?.id === conn.id) {
+                                                  setSelectedConnection(null);
+                                                }
+                                                setGroupClicksReloadNonce((n) => n + 1);
+                                                setMenuConnectionId(null);
+                                              } catch (e) {
+                                                window.alert(
+                                                  e instanceof Error ? e.message : 'Could not leave group',
+                                                );
+                                              } finally {
+                                                setChatListGroupActionBusyId(null);
+                                              }
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                                          >
+                                            Leave group
+                                          </button>
+                                          {user?.id === conn.groupCreatedByUserId ? (
+                                            <button
+                                              type="button"
+                                              disabled={chatListGroupActionBusyId === conn.id}
+                                              onClick={async () => {
+                                                if (
+                                                  !window.confirm(
+                                                    'Delete this verified clique for everyone? All messages will be removed. This cannot be undone.',
+                                                  )
+                                                ) {
+                                                  return;
+                                                }
+                                                const supabase = getSupabaseClient();
+                                                if (!supabase) {
+                                                  window.alert('Sign in required.');
+                                                  return;
+                                                }
+                                                setChatListGroupActionBusyId(conn.id);
+                                                try {
+                                                  await deleteCliqueRpc(supabase, conn.id);
+                                                  if (selectedConnectionRef.current?.id === conn.id) {
+                                                    setSelectedConnection(null);
+                                                  }
+                                                  setGroupClicksReloadNonce((n) => n + 1);
+                                                  setMenuConnectionId(null);
+                                                } catch (e) {
+                                                  window.alert(
+                                                    e instanceof Error ? e.message : 'Could not delete group',
+                                                  );
+                                                } finally {
+                                                  setChatListGroupActionBusyId(null);
+                                                }
+                                              }}
+                                              className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 disabled:opacity-40"
+                                            >
+                                              Delete group
+                                            </button>
+                                          ) : null}
+                                        </>
                                       ) : (
-                                        <button
-                                          onClick={() => archiveConnection(conn.id)}
-                                          className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-                                        >
-                                          Archive
-                                        </button>
+                                        <>
+                                          {isArchived ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => unarchiveConnection(conn.id)}
+                                              className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                            >
+                                              {isServerArchived ? 'Restore' : 'Unarchive'}
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => archiveConnection(conn.id)}
+                                              className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                                            >
+                                              Archive
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              const reason = window.prompt('Report reason');
+                                              if (!reason) return;
+                                              if (!window.confirm('Submit this report for moderation review?')) return;
+                                              await reportConnection(conn.id, reason);
+                                              setMenuConnectionId(null);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800"
+                                          >
+                                            Report
+                                          </button>
+                                          {conn.otherUserId && blockedUserIds.has(conn.otherUserId) ? (
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                await unblockUser(conn);
+                                                setMenuConnectionId(null);
+                                              }}
+                                              className="w-full text-left px-3 py-2 text-sm text-emerald-300 hover:bg-zinc-800"
+                                            >
+                                              Unblock
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                if (!window.confirm(`Block ${conn.name} and remove this connection?`)) return;
+                                                await blockUser(conn);
+                                                setMenuConnectionId(null);
+                                              }}
+                                              className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-zinc-800"
+                                            >
+                                              Block
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              if (!window.confirm(`Remove your connection with ${conn.name}?`)) return;
+                                              await removeConnection(conn.id);
+                                              setMenuConnectionId(null);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800"
+                                          >
+                                            Remove connection
+                                          </button>
+                                        </>
                                       )}
-                                      <button
-                                        onClick={async () => {
-                                          const reason = window.prompt('Report reason');
-                                          if (!reason) return;
-                                          if (!window.confirm('Submit this report for moderation review?')) return;
-                                          await reportConnection(conn.id, reason);
-                                          setMenuConnectionId(null);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800"
-                                      >
-                                        Report
-                                      </button>
-                                      {conn.otherUserId && blockedUserIds.has(conn.otherUserId) ? (
-                                        <button
-                                          onClick={async () => {
-                                            await unblockUser(conn);
-                                            setMenuConnectionId(null);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-sm text-emerald-300 hover:bg-zinc-800"
-                                        >
-                                          Unblock
-                                        </button>
-                                      ) : (
-                                        <button
-                                          onClick={async () => {
-                                            if (!window.confirm(`Block ${conn.name} and remove this connection?`)) return;
-                                            await blockUser(conn);
-                                            setMenuConnectionId(null);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-zinc-800"
-                                        >
-                                          Block
-                                        </button>
-                                      )}
-                                      <button
-                                        onClick={async () => {
-                                          if (!window.confirm(`Remove your connection with ${conn.name}?`)) return;
-                                          await removeConnection(conn.id);
-                                          setMenuConnectionId(null);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800"
-                                      >
-                                        Remove connection
-                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -2827,6 +2935,83 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   </li>
                 ))}
               </ul>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {chatListGroupRenameGroupId ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => {
+              if (chatListGroupRenameBusy) return;
+              setChatListGroupRenameGroupId(null);
+            }}
+            role="presentation"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-semibold text-white">Edit group name</h3>
+              <textarea
+                value={chatListGroupRenameInput}
+                onChange={(e) => setChatListGroupRenameInput(e.target.value)}
+                rows={2}
+                className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                placeholder="Group name"
+              />
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={chatListGroupRenameBusy}
+                  onClick={() => {
+                    if (chatListGroupRenameBusy) return;
+                    setChatListGroupRenameGroupId(null);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!chatListGroupRenameInput.trim() || chatListGroupRenameBusy}
+                  onClick={async () => {
+                    const gid = chatListGroupRenameGroupId;
+                    if (!gid) return;
+                    const next = chatListGroupRenameInput.trim();
+                    if (!next) return;
+                    const supabase = getSupabaseClient();
+                    if (!supabase) {
+                      window.alert('Sign in required.');
+                      return;
+                    }
+                    setChatListGroupRenameBusy(true);
+                    try {
+                      await renameCliqueRpc(supabase, gid, next);
+                      setSelectedConnection((prev) =>
+                        prev?.id === gid ? { ...prev, name: next } : prev,
+                      );
+                      setChatListGroupRenameGroupId(null);
+                      setGroupClicksReloadNonce((n) => n + 1);
+                    } catch (e) {
+                      window.alert(e instanceof Error ? e.message : 'Could not rename group');
+                    } finally {
+                      setChatListGroupRenameBusy(false);
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-[#8338EC] text-white hover:opacity-90 disabled:opacity-40"
+                >
+                  Save
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         ) : null}
