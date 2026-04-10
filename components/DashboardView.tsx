@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
-import { ChatView } from '@/components/chat';
+import { ChatView, CreateVerifiedClickDialog } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import {
   deriveKeysForConnection,
@@ -151,6 +151,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
   const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useState<Record<string, ChatListMetadata>>({});
   const [groupCliqueRecords, setGroupCliqueRecords] = useState<ConnectionRecord[]>([]);
+  const [groupClicksReloadNonce, setGroupClicksReloadNonce] = useState(0);
+  const [createClickOpen, setCreateClickOpen] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [callOverlayState, setCallOverlayState] = useState<WebCallOverlayState>(IDLE_CALL_OVERLAY);
   const [activeCallState, setActiveCallState] = useState<WebActiveCallState>(IDLE_ACTIVE_CALL);
@@ -433,14 +435,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
           .filter((c: { group_id: string | null }) => c.group_id)
           .map((c: { id: string; group_id: string; updated_at: number | null }) => {
             const gid = c.group_id as string;
-            const title = (nameById.get(gid) as string | undefined)?.trim() || 'Clique';
+            const title = (nameById.get(gid) as string | undefined)?.trim() || 'Click';
             return {
               id: gid,
               chatKind: 'group_clique' as const,
               groupChatId: c.id,
               name: title,
               dateMet: new Date(),
-              location: 'Verified clique',
+              location: 'Verified click',
               status: 'active',
             };
           });
@@ -452,7 +454,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, groupClicksReloadNonce]);
 
   const showBrowserNotification = useCallback((
     title: string,
@@ -2039,6 +2041,22 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const visibleChatConnections = chatListTab === 'active' ? activeConnections : archivedConnections;
 
+  const clickFriendOptions = useMemo(() => {
+    if (!user?.id) return [];
+    return connectionRecords
+      .filter(
+        (c) =>
+          c.chatKind !== 'group_clique' &&
+          isActiveChatListStatus(c.status) &&
+          !!c.otherUserId,
+      )
+      .map((c) => ({
+        connectionId: c.id,
+        userId: c.otherUserId as string,
+        name: c.name,
+      }));
+  }, [connectionRecords, user?.id]);
+
   const formatChatActivity = useCallback((timestamp?: number | null) => {
     if (!timestamp) return null;
 
@@ -2084,6 +2102,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
           canSkip={true}
         />
       )}
+
+      {user?.id && getSupabaseClient() ? (
+        <CreateVerifiedClickDialog
+          open={createClickOpen}
+          onOpenChange={setCreateClickOpen}
+          supabase={getSupabaseClient()!}
+          currentUserId={user.id}
+          friends={clickFriendOptions}
+          onCreated={() => setGroupClicksReloadNonce((n) => n + 1)}
+        />
+      ) : null}
 
       {/* Background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -2300,14 +2329,24 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                       className="space-y-6"
                     >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-[#8338EC]/20 rounded-xl">
-                        <MessageCircle className="w-5 h-5 text-[#8338EC]" />
+                    <div className="flex w-full items-center gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="p-2 bg-[#8338EC]/20 rounded-xl">
+                          <MessageCircle className="w-5 h-5 text-[#8338EC]" />
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="text-xl font-bold">Messages</h2>
+                          <p className="text-sm text-zinc-500">Chat with your Clicks</p>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-xl font-bold">Messages</h2>
-                        <p className="text-sm text-zinc-500">Chat with your Clicks</p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCreateClickOpen(true)}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800/80"
+                      >
+                        <Users className="h-4 w-4" />
+                        New click
+                      </button>
                     </div>
 
                     <div className="inline-flex items-center gap-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
