@@ -14,6 +14,7 @@ export type ConnectionEncounterRow = {
   elevationCategory?: string;
   exactNoiseLevelDb?: number;
   exactBarometricElevationM?: number;
+  relativeAltitudeM?: number;
   contextTags: string[];
 };
 
@@ -55,6 +56,7 @@ export function parseConnectionEncounters(conn: Record<string, unknown>): Connec
           : undefined,
       exactNoiseLevelDb: numOrUndef(r.exact_noise_level_db),
       exactBarometricElevationM: numOrUndef(r.exact_barometric_elevation_m),
+      relativeAltitudeM: numOrUndef(r.relative_altitude_m),
       contextTags,
     });
   }

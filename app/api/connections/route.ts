@@ -124,7 +124,7 @@ type MemoryCapsulePayload = {
   } | null;
   contextTag: ContextTagPayload | null;
   photoUri: string | null;
-  noiseLevelCategory: 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD' | null;
+  noiseLevelCategory: 'VERY_QUIET' | 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD' | null;
 };
 
 function buildUtcTimeOfDayLabel(isoTimestamp: string): string {
@@ -165,7 +165,11 @@ function resolveContextTagId(contextTag: ContextTagPayload | null): string | nul
 }
 
 function normalizeNoiseLevel(value: unknown): MemoryCapsulePayload['noiseLevelCategory'] {
-  return value === 'QUIET' || value === 'MODERATE' || value === 'LOUD' || value === 'VERY_LOUD'
+  return value === 'VERY_QUIET' ||
+    value === 'QUIET' ||
+    value === 'MODERATE' ||
+    value === 'LOUD' ||
+    value === 'VERY_LOUD'
     ? value
     : null;
 }

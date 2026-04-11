@@ -15,6 +15,7 @@ export function escapeHtml(s: string): string {
 }
 
 const NOISE_LABELS: Record<string, string> = {
+  VERY_QUIET: 'Very quiet',
   QUIET: 'Quiet',
   MODERATE: 'Moderate',
   LOUD: 'Loud',
@@ -22,7 +23,7 @@ const NOISE_LABELS: Record<string, string> = {
 };
 
 /** Stored capsule / DB values for noise tier */
-export type NoiseLevelKey = 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD';
+export type NoiseLevelKey = 'VERY_QUIET' | 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD';
 
 export function formatNoiseCategory(raw: string): string {
   const key = raw.trim().toUpperCase().replace(/\s+/g, '_');
@@ -38,6 +39,7 @@ function celsiusToFahrenheit(c: number): number {
  */
 export function noiseLevelToBarCount(level: NoiseLevelKey): 1 | 2 | 3 {
   switch (level) {
+    case 'VERY_QUIET':
     case 'QUIET':
       return 1;
     case 'MODERATE':
@@ -68,7 +70,13 @@ export function normalizeNoiseCategory(conn: Record<string, unknown>): NoiseLeve
   }
 
   const key = raw.trim().toUpperCase().replace(/\s+/g, '_');
-  if (key === 'QUIET' || key === 'MODERATE' || key === 'LOUD' || key === 'VERY_LOUD') {
+  if (
+    key === 'VERY_QUIET' ||
+    key === 'QUIET' ||
+    key === 'MODERATE' ||
+    key === 'LOUD' ||
+    key === 'VERY_LOUD'
+  ) {
     return key;
   }
   return undefined;

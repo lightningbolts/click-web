@@ -1,7 +1,8 @@
 /**
  * Edge Function: bind-proximity-connection
  *
- * POST JSON { my_token, heard_tokens[], latitude?, longitude? }
+ * POST JSON { my_token, heard_tokens[], latitude?, longitude?, gps_lat?, gps_lon?,
+ *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db? }
  * Authorization: Bearer <user JWT>
  *
  * Inserts this device's handshake, then returns other users whose pings overlap in time,
@@ -77,6 +78,30 @@ function twelveHourUtcBlockId(iso: string): number | null {
   return Math.floor(ms / TWELVE_HOURS_MS);
 }
 
+function finiteNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Terrain elevation (m above sea level) at a point from Open-Elevation (SRTM-backed DEM).
+ */
+async function fetchTerrainElevationM(lat: number, lon: number): Promise<number | null> {
+  const url = `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { results?: { elevation?: unknown }[] };
+    const raw = data.results?.[0]?.elevation;
+    return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -117,10 +142,15 @@ Deno.serve(async (req) => {
   const uid = userData.user.id;
 
   let body: {
-    my_token?: string;
+    my_token?: unknown;
     heard_tokens?: unknown[];
-    latitude?: number;
-    longitude?: number;
+    latitude?: unknown;
+    longitude?: unknown;
+    gps_lat?: unknown;
+    gps_lon?: unknown;
+    exact_barometric_elevation_m?: unknown;
+    noise_level?: unknown;
+    exact_noise_level_db?: unknown;
   };
   try {
     body = await req.json();
@@ -143,8 +173,12 @@ Deno.serve(async (req) => {
     .map(normalizeToken)
     .filter((t): t is string => t != null);
 
-  const lat = typeof body.latitude === 'number' && Number.isFinite(body.latitude) ? body.latitude : null;
-  const lon = typeof body.longitude === 'number' && Number.isFinite(body.longitude) ? body.longitude : null;
+  const lat = finiteNumber(body.gps_lat) ?? finiteNumber(body.latitude);
+  const lon = finiteNumber(body.gps_lon) ?? finiteNumber(body.longitude);
+  const exactBarometricElevationM = finiteNumber(body.exact_barometric_elevation_m);
+  const exactNoiseLevelDb = finiteNumber(body.exact_noise_level_db);
+  const noiseLevel =
+    typeof body.noise_level === 'string' && body.noise_level.trim().length > 0 ? body.noise_level.trim() : null;
 
   const cutoffIso = new Date(Date.now() - CLEANUP_GRACE_MS).toISOString();
   await admin.from('proximity_handshake_events').delete().lt('created_at', cutoffIso);
@@ -240,6 +274,19 @@ Deno.serve(async (req) => {
   await admin.from('proximity_handshake_events').delete().eq('id', String(inserted.id));
 
   const ids = [...matchedIds];
+
+  const encLat =
+    lat != null && lon != null && !(lat === 0 && lon === 0) ? lat : null;
+  const encLon =
+    lat != null && lon != null && !(lat === 0 && lon === 0) ? lon : null;
+
+  let relativeAltitudeM: number | null = null;
+  if (exactBarometricElevationM != null && encLat != null && encLon != null) {
+    const terrainM = await fetchTerrainElevationM(encLat, encLon);
+    if (terrainM != null) {
+      relativeAltitudeM = exactBarometricElevationM - terrainM;
+    }
+  }
 
   async function connectionIdForPair(peerId: string): Promise<string | null> {
     const { data, error } = await admin
@@ -357,14 +404,16 @@ Deno.serve(async (req) => {
       encountered_at: new Date().toISOString(),
       context_tags: [],
     };
-    let encLat: number | null = null;
-    let encLon: number | null = null;
-    if (lat != null && lon != null && Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0)) {
-      insertRow.gps_lat = lat;
-      insertRow.gps_lon = lon;
-      encLat = lat;
-      encLon = lon;
+    if (encLat != null && encLon != null) {
+      insertRow.gps_lat = encLat;
+      insertRow.gps_lon = encLon;
     }
+    if (noiseLevel != null) insertRow.noise_level = noiseLevel;
+    if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
+    if (exactBarometricElevationM != null) {
+      insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
+    }
+    if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
     const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
     if (outcome === 'rate_limited') {
       peerEncounterLogged.push({
