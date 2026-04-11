@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactElement } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Clock, 
@@ -45,6 +45,66 @@ interface TimeCapsuleProps {
   onChapterClick?: (chapter: TimelineChapter) => void;
   /** Called when the user clicks "Chat" on a person inside the detail panel */
   onConnectionClick?: (connection: ConnectionRecord) => void;
+}
+
+function encounterTelemetryPills(enc: NonNullable<ConnectionRecord['encounters']>[number]) {
+  const db =
+    typeof enc.exactNoiseLevelDb === 'number' && Number.isFinite(enc.exactNoiseLevelDb)
+      ? enc.exactNoiseLevelDb
+      : null;
+  const elevation =
+    typeof enc.exactBarometricElevationM === 'number' && Number.isFinite(enc.exactBarometricElevationM)
+      ? enc.exactBarometricElevationM
+      : null;
+  const lux =
+    typeof enc.luxLevel === 'number' && Number.isFinite(enc.luxLevel) && enc.luxLevel >= 0 ? enc.luxLevel : null;
+  const motion =
+    typeof enc.motionVariance === 'number' && Number.isFinite(enc.motionVariance) && enc.motionVariance >= 0
+      ? enc.motionVariance
+      : null;
+  const azimuth =
+    typeof enc.compassAzimuth === 'number' && Number.isFinite(enc.compassAzimuth) ? enc.compassAzimuth : null;
+  const battery =
+    typeof enc.batteryLevel === 'number' &&
+    Number.isFinite(enc.batteryLevel) &&
+    enc.batteryLevel >= 0 &&
+    enc.batteryLevel <= 100
+      ? enc.batteryLevel
+      : null;
+
+  return [
+    db != null
+      ? { key: 'db', icon: <Volume2 className="h-2.5 w-2.5 shrink-0 text-violet-300" aria-hidden />, label: `${Math.round(db)} dB` }
+      : null,
+    elevation != null
+      ? { key: 'el', icon: <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-300" aria-hidden />, label: `${Math.round(elevation)} m` }
+      : null,
+    lux != null
+      ? {
+          key: 'lux',
+          icon:
+            lux < 15 ? (
+              <Moon className="h-2.5 w-2.5 shrink-0 text-sky-200" aria-hidden />
+            ) : (
+              <Sun className="h-2.5 w-2.5 shrink-0 text-amber-200" aria-hidden />
+            ),
+          label: `${Math.round(lux)} lx`,
+        }
+      : null,
+    battery != null
+      ? { key: 'bat', icon: <Battery className="h-2.5 w-2.5 shrink-0 text-emerald-300" aria-hidden />, label: `${Math.round(battery)}%` }
+      : null,
+    azimuth != null
+      ? {
+          key: 'az',
+          icon: <Compass className="h-2.5 w-2.5 shrink-0 text-violet-200" aria-hidden />,
+          label: `${Math.round(((azimuth % 360) + 360) % 360)}°`,
+        }
+      : null,
+    motion != null
+      ? { key: 'mv', icon: <Activity className="h-2.5 w-2.5 shrink-0 text-orange-200" aria-hidden />, label: motion.toFixed(2) }
+      : null,
+  ].filter((pill): pill is { key: string; icon: ReactElement; label: string } => pill != null);
 }
 
 /**
@@ -384,119 +444,42 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                 </p>
                                 <ul className="scrollbar-thin max-h-36 space-y-1 overflow-y-auto pr-1">
                                   {conn.encounters.map((enc) => (
-                                    <li
-                                      key={enc.id}
-                                      className="flex flex-col rounded-md bg-zinc-950/60 px-2 py-1.5 text-[10px] text-zinc-400"
-                                    >
-                                      <span className="font-medium text-zinc-200">
-                                        {enc.encounteredAt.toLocaleDateString('en-US', {
-                                          month: 'short',
-                                          day: 'numeric',
-                                          year: 'numeric',
-                                        })}
-                                      </span>
-                                      <span className="truncate">{enc.locationName}</span>
-                                      {enc.contextTags.length > 0 ? (
-                                        <span className="truncate text-[#C4B5FD]">
-                                          {enc.contextTags.join(' · ')}
-                                        </span>
-                                      ) : null}
-                                      {(() => {
-                                        const db =
-                                          enc.exactNoiseLevelDb !== null &&
-                                          enc.exactNoiseLevelDb !== undefined &&
-                                          typeof enc.exactNoiseLevelDb === 'number' &&
-                                          Number.isFinite(enc.exactNoiseLevelDb)
-                                            ? enc.exactNoiseLevelDb
-                                            : null;
-                                        const el =
-                                          enc.exactBarometricElevationM !== null &&
-                                          enc.exactBarometricElevationM !== undefined &&
-                                          typeof enc.exactBarometricElevationM === 'number' &&
-                                          Number.isFinite(enc.exactBarometricElevationM)
-                                            ? enc.exactBarometricElevationM
-                                            : null;
-                                        const lux =
-                                          enc.luxLevel !== null &&
-                                          enc.luxLevel !== undefined &&
-                                          typeof enc.luxLevel === 'number' &&
-                                          Number.isFinite(enc.luxLevel) &&
-                                          enc.luxLevel >= 0
-                                            ? enc.luxLevel
-                                            : null;
-                                        const mv =
-                                          enc.motionVariance !== null &&
-                                          enc.motionVariance !== undefined &&
-                                          typeof enc.motionVariance === 'number' &&
-                                          Number.isFinite(enc.motionVariance) &&
-                                          enc.motionVariance >= 0
-                                            ? enc.motionVariance
-                                            : null;
-                                        const az =
-                                          enc.compassAzimuth !== null &&
-                                          enc.compassAzimuth !== undefined &&
-                                          typeof enc.compassAzimuth === 'number' &&
-                                          Number.isFinite(enc.compassAzimuth)
-                                            ? enc.compassAzimuth
-                                            : null;
-                                        const bat =
-                                          enc.batteryLevel !== null &&
-                                          enc.batteryLevel !== undefined &&
-                                          typeof enc.batteryLevel === 'number' &&
-                                          Number.isFinite(enc.batteryLevel) &&
-                                          enc.batteryLevel >= 0 &&
-                                          enc.batteryLevel <= 100
-                                            ? enc.batteryLevel
-                                            : null;
-                                        if (db === null && el === null && lux === null && mv === null && az === null && bat === null) {
-                                          return null;
-                                        }
-                                        return (
-                                          <div className="mt-1 flex flex-wrap gap-1">
-                                            {db !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                <Volume2 className="h-2.5 w-2.5 shrink-0 text-violet-300" aria-hidden />
-                                                {Math.round(db)} dB
-                                              </span>
-                                            ) : null}
-                                            {el !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-300" aria-hidden />
-                                                {Math.round(el)} m
-                                              </span>
-                                            ) : null}
-                                            {lux !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                {lux < 15 ? (
-                                                  <Moon className="h-2.5 w-2.5 shrink-0 text-sky-200" aria-hidden />
-                                                ) : (
-                                                  <Sun className="h-2.5 w-2.5 shrink-0 text-amber-200" aria-hidden />
-                                                )}
-                                                {Math.round(lux)} lx
-                                              </span>
-                                            ) : null}
-                                            {bat !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                <Battery className="h-2.5 w-2.5 shrink-0 text-emerald-300" aria-hidden />
-                                                {Math.round(bat)}%
-                                              </span>
-                                            ) : null}
-                                            {az !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                <Compass className="h-2.5 w-2.5 shrink-0 text-violet-200" aria-hidden />
-                                                {Math.round(((az % 360) + 360) % 360)}°
-                                              </span>
-                                            ) : null}
-                                            {mv !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                <Activity className="h-2.5 w-2.5 shrink-0 text-orange-200" aria-hidden />
-                                                {mv.toFixed(2)}
-                                              </span>
-                                            ) : null}
-                                          </div>
-                                        );
-                                      })()}
-                                    </li>
+                                    (() => {
+                                      const telemetryPills = encounterTelemetryPills(enc);
+                                      return (
+                                        <li
+                                          key={enc.id}
+                                          className="flex flex-col rounded-md bg-zinc-950/60 px-2 py-1.5 text-[10px] text-zinc-400"
+                                        >
+                                          <span className="font-medium text-zinc-200">
+                                            {enc.encounteredAt.toLocaleDateString('en-US', {
+                                              month: 'short',
+                                              day: 'numeric',
+                                              year: 'numeric',
+                                            })}
+                                          </span>
+                                          <span className="truncate">{enc.locationName}</span>
+                                          {enc.contextTags.length > 0 ? (
+                                            <span className="truncate text-[#C4B5FD]">
+                                              {enc.contextTags.join(' · ')}
+                                            </span>
+                                          ) : null}
+                                          {telemetryPills.length > 0 ? (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                              {telemetryPills.map((pill) => (
+                                                <span
+                                                  key={pill.key}
+                                                  className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200"
+                                                >
+                                                  {pill.icon}
+                                                  {pill.label}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : null}
+                                        </li>
+                                      );
+                                    })()
                                   ))}
                                 </ul>
                               </div>

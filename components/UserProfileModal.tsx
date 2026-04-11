@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import {
   buildProfileConnectionLines,
+  originEncounter as strictProfileOriginEncounter,
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
@@ -212,7 +213,8 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
     const sc = data?.sharedConnection;
     const payload = coerceSharedConnection(sc);
     if (!payload) return null;
-    return buildProfileConnectionLines(payload);
+    const origin = strictProfileOriginEncounter(payload);
+    return buildProfileConnectionLines(payload, origin);
   }, [data?.sharedConnection]);
 
   const hasMoment =
