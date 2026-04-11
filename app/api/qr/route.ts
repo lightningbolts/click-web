@@ -36,6 +36,124 @@ function createAdminClient() {
   );
 }
 
+const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
+const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
+const DISPLAY_LOCATION_FALLBACK = 'A new city';
+
+function finiteNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function finiteBatteryPct(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const rounded = Math.round(v);
+  return rounded >= 0 && rounded <= 100 ? rounded : null;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function firstNonEmptyString(values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function extractDisplayLocation(semanticLocation: Record<string, unknown>): string {
+  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
+  if (!address) return DISPLAY_LOCATION_FALLBACK;
+  const city = firstNonEmptyString([
+    address.city,
+    address.town,
+    address.village,
+    address.hamlet,
+  ]);
+  if (!city) return DISPLAY_LOCATION_FALLBACK;
+  const state = firstNonEmptyString([address.state]);
+  return state ? `${city}, ${state}` : city;
+}
+
+async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
+  semanticLocation: Record<string, unknown> | null;
+  displayLocation: string;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': NOMINATIM_USER_AGENT,
+      },
+    });
+    if (!response.ok) {
+      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    }
+    const payload = (await response.json()) as unknown;
+    if (!isRecord(payload)) {
+      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    }
+    return {
+      semanticLocation: payload,
+      displayLocation: extractDisplayLocation(payload),
+    };
+  } catch {
+    return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeGpsPair(input: {
+  gpsLat: unknown;
+  gpsLon: unknown;
+  scannerLat: unknown;
+  scannerLon: unknown;
+}): { lat: number | null; lon: number | null } {
+  const explicitLat = finiteNumber(input.gpsLat);
+  const explicitLon = finiteNumber(input.gpsLon);
+  if (
+    explicitLat != null &&
+    explicitLon != null &&
+    !(explicitLat === 0 && explicitLon === 0)
+  ) {
+    return { lat: explicitLat, lon: explicitLon };
+  }
+
+  const scannerLat = finiteNumber(input.scannerLat);
+  const scannerLon = finiteNumber(input.scannerLon);
+  if (
+    scannerLat != null &&
+    scannerLon != null &&
+    !(scannerLat === 0 && scannerLon === 0)
+  ) {
+    return { lat: scannerLat, lon: scannerLon };
+  }
+
+  return { lat: null, lon: null };
+}
+
+function isEncounterRateLimitError(err: { message?: string; details?: string; hint?: string } | null): boolean {
+  if (!err) return false;
+  const joined = `${err.message ?? ''} ${err.details ?? ''} ${err.hint ?? ''}`;
+  return joined.includes('encounter_rate_limit_3h');
+}
+
+type QrRedeemRpcResult = {
+  success: boolean;
+  error?: string;
+  user_id?: string;
+  token_age_ms?: number;
+  distance_meters?: number;
+};
+
 /**
  * GET — Generate a QR token for the authenticated user
  *
@@ -144,7 +262,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthenticatedSupabase(request);
-    const body = await request.json();
+    const rawBody = (await request.json()) as unknown;
+    const body = isRecord(rawBody) ? rawBody : {};
 
     if (!user) {
       return NextResponse.json(
@@ -154,21 +273,28 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Token-based redemption (new flow) ──
-    if (body.token) {
-      const { token, scannerLocation } = body;
+    if (typeof body.token === 'string' && body.token.trim().length > 0) {
+      const token = body.token;
+      const scannerLocation = isRecord(body.scannerLocation) ? body.scannerLocation : null;
       const adminClient = createAdminClient();
+
+      const gpsPair = normalizeGpsPair({
+        gpsLat: body.gps_lat,
+        gpsLon: body.gps_lon,
+        scannerLat: scannerLocation?.lat,
+        scannerLon: scannerLocation?.lon,
+      });
+
+      const luxLevel = finiteNumber(body.lux_level);
+      const motionVariance = finiteNumber(body.motion_variance);
+      const compassAzimuth = finiteNumber(body.compass_azimuth);
+      const batteryLevel = finiteBatteryPct(body.battery_level);
 
       // Build RPC params — include scanner GPS for proximity gate
       const rpcParams: Record<string, unknown> = { p_token: token };
-      if (
-        scannerLocation &&
-        typeof scannerLocation.lat === 'number' &&
-        typeof scannerLocation.lon === 'number' &&
-        Number.isFinite(scannerLocation.lat) &&
-        Number.isFinite(scannerLocation.lon)
-      ) {
-        rpcParams.p_scanner_lat = scannerLocation.lat;
-        rpcParams.p_scanner_lon = scannerLocation.lon;
+      if (gpsPair.lat != null && gpsPair.lon != null) {
+        rpcParams.p_scanner_lat = gpsPair.lat;
+        rpcParams.p_scanner_lon = gpsPair.lon;
       }
 
       // Atomically redeem the token via RPC (includes proximity check)
@@ -183,13 +309,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = rpcResult as {
-        success: boolean;
-        error?: string;
-        user_id?: string;
-        token_age_ms?: number;
-        distance_meters?: number;
-      };
+      const result = rpcResult as QrRedeemRpcResult;
 
       if (!result.success) {
         if (result.error === 'proximity_failed') {
@@ -219,27 +339,118 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Look up target user name
+      // Look up target user name and an existing connection row for this user pair.
       const { data: targetUser } = await adminClient
         .from('users')
         .select('id, name')
         .eq('id', targetUserId)
         .maybeSingle();
 
+      const sortedPair = [user.id, targetUserId].sort();
+      const { data: pairRows, error: pairLookupError } = await adminClient
+        .from('connections')
+        .select('id, user_ids')
+        .contains('user_ids', sortedPair)
+        .limit(10);
+
+      if (pairLookupError) {
+        console.error('QR API pair lookup failed:', pairLookupError);
+        return NextResponse.json(
+          { error: 'Failed to validate connection pair' },
+          { status: 500 }
+        );
+      }
+
+      const existingConnection = (pairRows ?? []).find((row) => {
+        const userIds = Array.isArray(row.user_ids)
+          ? row.user_ids.filter((id): id is string => typeof id === 'string')
+          : [];
+        return userIds.length === 2 && userIds.includes(user.id) && userIds.includes(targetUserId);
+      });
+
+      let encounterLogged = true;
+      let encounterReason: string | undefined;
+
+      if (existingConnection?.id) {
+        let semanticLocation: Record<string, unknown> | null = null;
+        let displayLocation = DISPLAY_LOCATION_FALLBACK;
+        if (gpsPair.lat != null && gpsPair.lon != null) {
+          const geocoded = await fetchNominatimReverseGeocode(gpsPair.lat, gpsPair.lon);
+          semanticLocation = geocoded.semanticLocation;
+          displayLocation = geocoded.displayLocation;
+        }
+
+        const encounterInsert: Record<string, unknown> = {
+          connection_id: existingConnection.id,
+          encountered_at: new Date().toISOString(),
+          display_location: displayLocation,
+        };
+        if (gpsPair.lat != null && gpsPair.lon != null) {
+          encounterInsert.gps_lat = gpsPair.lat;
+          encounterInsert.gps_lon = gpsPair.lon;
+        }
+        if (semanticLocation != null) {
+          encounterInsert.semantic_location = semanticLocation;
+        }
+        if (luxLevel != null) encounterInsert.lux_level = luxLevel;
+        if (motionVariance != null) encounterInsert.motion_variance = motionVariance;
+        if (compassAzimuth != null) encounterInsert.compass_azimuth = compassAzimuth;
+        if (batteryLevel != null) encounterInsert.battery_level = batteryLevel;
+
+        const { error: encounterErr } = await adminClient
+          .from('connection_encounters')
+          .insert(encounterInsert);
+
+        if (encounterErr) {
+          if (isEncounterRateLimitError(encounterErr)) {
+            encounterLogged = false;
+            encounterReason = 'rate_limit_active';
+            return NextResponse.json({
+              success: true,
+              encounter_logged: false,
+              reason: encounterReason,
+              connection_id: existingConnection.id,
+              data: {
+                targetUserId,
+                targetUserName: targetUser?.name || 'Click User',
+                initiatorId: user.id,
+                tokenAgeMs,
+                connectionId: existingConnection.id,
+                encounterLogged: false,
+                reason: encounterReason,
+                message: 'Token redeemed — encounter logging is rate limited',
+              },
+            });
+          }
+
+          console.error('QR API encounter insert failed:', encounterErr);
+          return NextResponse.json(
+            { error: 'Failed to log encounter context' },
+            { status: 500 }
+          );
+        }
+      }
+
       return NextResponse.json({
         success: true,
+        encounter_logged: encounterLogged,
+        ...(encounterReason ? { reason: encounterReason } : {}),
+        connection_id: existingConnection?.id ?? null,
         data: {
           targetUserId,
           targetUserName: targetUser?.name || 'Click User',
           initiatorId: user.id,
           tokenAgeMs,
+          connectionId: existingConnection?.id ?? null,
+          encounterLogged,
+          ...(encounterReason ? { reason: encounterReason } : {}),
           message: 'Token redeemed — ready to create connection',
         }
       });
     }
 
     // ── Legacy flow (old click://connect/{userId} format) ──
-    const { targetUserId } = body;
+    const targetUserId = typeof body.targetUserId === 'string' ? body.targetUserId : null;
     if (!targetUserId) {
       return NextResponse.json(
         { error: 'Missing token or targetUserId' },

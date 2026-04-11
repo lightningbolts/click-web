@@ -2,7 +2,8 @@
  * Edge Function: bind-proximity-connection
  *
  * POST JSON { my_token, heard_tokens[], latitude?, longitude?, gps_lat?, gps_lon?,
- *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db? }
+ *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db?,
+ *   lux_level?, motion_variance?, compass_azimuth?, battery_level? }
  * Authorization: Bearer <user JWT>
  *
  * Inserts this device's handshake, then returns other users whose pings overlap in time,
