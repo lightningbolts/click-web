@@ -14,7 +14,6 @@ import {
   TrendingUp,
   Volume2,
   Mountain,
-  Pencil,
 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
@@ -41,29 +40,14 @@ interface TimeCapsuleProps {
   onChapterClick?: (chapter: TimelineChapter) => void;
   /** Called when the user clicks "Chat" on a person inside the detail panel */
   onConnectionClick?: (connection: ConnectionRecord) => void;
-  /** Rename a single crossing’s place label (RPC + parent state update). */
-  onRenameEncounterLocation?: (
-    connectionId: string,
-    encounterId: string,
-    newName: string,
-  ) => Promise<{ ok: boolean; error?: string }>;
 }
 
 /**
  * TimeCapsule - Visual timeline showing distinct "Chapters" of your social journey
  * Part of the Digital Memory Box experience
  */
-export default function TimeCapsule({
-  chapters,
-  onChapterClick,
-  onConnectionClick,
-  onRenameEncounterLocation,
-}: TimeCapsuleProps) {
+export default function TimeCapsule({ chapters, onChapterClick, onConnectionClick }: TimeCapsuleProps) {
   const [selectedChapter, setSelectedChapter] = useState<TimelineChapter | null>(null);
-  const [encounterRenameKey, setEncounterRenameKey] = useState<string | null>(null);
-  const [encounterRenameDraft, setEncounterRenameDraft] = useState('');
-  const [encounterRenameSaving, setEncounterRenameSaving] = useState(false);
-  const [encounterRenameErr, setEncounterRenameErr] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -317,11 +301,7 @@ export default function TimeCapsule({
                     <span className="text-sm font-semibold text-zinc-300">Chapter Breakdown</span>
                   </div>
                   <button
-                    onClick={() => {
-                      setSelectedChapter(null);
-                      setEncounterRenameKey(null);
-                      setEncounterRenameErr(null);
-                    }}
+                    onClick={() => setSelectedChapter(null)}
                     className="text-zinc-500 hover:text-white transition-colors text-lg leading-none"
                   >
                     ✕
@@ -398,145 +378,59 @@ export default function TimeCapsule({
                                   You&apos;ve crossed paths {conn.encounters.length} times
                                 </p>
                                 <ul className="scrollbar-thin max-h-36 space-y-1 overflow-y-auto pr-1">
-                                  {conn.encounters.map((enc) => {
-                                    const encKey = `${conn.id}:${enc.id}`;
-                                    const isEditing = encounterRenameKey === encKey;
-                                    return (
-                                      <li
-                                        key={enc.id}
-                                        className="flex flex-col rounded-md bg-zinc-950/60 px-2 py-1.5 text-[10px] text-zinc-400"
-                                      >
-                                        <div className="flex items-start justify-between gap-1">
-                                          <div className="min-w-0 flex-1">
-                                            <span className="font-medium text-zinc-200">
-                                              {enc.encounteredAt.toLocaleDateString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                              })}
-                                            </span>
-                                            {isEditing ? (
-                                              <div className="mt-1 space-y-1">
-                                                {encounterRenameErr ? (
-                                                  <p className="text-[9px] text-red-400">{encounterRenameErr}</p>
-                                                ) : null}
-                                                <input
-                                                  type="text"
-                                                  className="w-full rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-[11px] text-white"
-                                                  value={encounterRenameDraft}
-                                                  onChange={(e) => setEncounterRenameDraft(e.target.value)}
-                                                  disabled={encounterRenameSaving}
-                                                />
-                                                <div className="flex flex-wrap gap-1.5">
-                                                  <button
-                                                    type="button"
-                                                    disabled={
-                                                      encounterRenameSaving ||
-                                                      encounterRenameDraft.trim().length === 0 ||
-                                                      !onRenameEncounterLocation
-                                                    }
-                                                    onClick={async () => {
-                                                      const name = encounterRenameDraft.trim();
-                                                      if (!name || !onRenameEncounterLocation) return;
-                                                      setEncounterRenameSaving(true);
-                                                      setEncounterRenameErr(null);
-                                                      const r = await onRenameEncounterLocation(
-                                                        conn.id,
-                                                        enc.id,
-                                                        name,
-                                                      );
-                                                      setEncounterRenameSaving(false);
-                                                      if (r.ok) {
-                                                        setEncounterRenameKey(null);
-                                                        setEncounterRenameErr(null);
-                                                      } else {
-                                                        setEncounterRenameErr(r.error ?? 'Could not save');
-                                                      }
-                                                    }}
-                                                    className="rounded bg-[#8338EC] px-2 py-0.5 text-[9px] font-medium text-white disabled:opacity-40"
-                                                  >
-                                                    {encounterRenameSaving ? 'Saving…' : 'Save'}
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    disabled={encounterRenameSaving}
-                                                    onClick={() => {
-                                                      setEncounterRenameKey(null);
-                                                      setEncounterRenameErr(null);
-                                                    }}
-                                                    className="rounded border border-zinc-600 px-2 py-0.5 text-[9px] text-zinc-300 disabled:opacity-40"
-                                                  >
-                                                    Cancel
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <span className="mt-0.5 block truncate">{enc.locationName}</span>
-                                            )}
-                                            {!isEditing && enc.contextTags.length > 0 ? (
-                                              <span className="mt-0.5 block truncate text-[#C4B5FD]">
-                                                {enc.contextTags.join(' · ')}
+                                  {conn.encounters.map((enc) => (
+                                    <li
+                                      key={enc.id}
+                                      className="flex flex-col rounded-md bg-zinc-950/60 px-2 py-1.5 text-[10px] text-zinc-400"
+                                    >
+                                      <span className="font-medium text-zinc-200">
+                                        {enc.encounteredAt.toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric',
+                                        })}
+                                      </span>
+                                      <span className="truncate">{enc.locationName}</span>
+                                      {enc.contextTags.length > 0 ? (
+                                        <span className="truncate text-[#C4B5FD]">
+                                          {enc.contextTags.join(' · ')}
+                                        </span>
+                                      ) : null}
+                                      {(() => {
+                                        const db =
+                                          enc.exactNoiseLevelDb !== null &&
+                                          enc.exactNoiseLevelDb !== undefined &&
+                                          typeof enc.exactNoiseLevelDb === 'number' &&
+                                          Number.isFinite(enc.exactNoiseLevelDb)
+                                            ? enc.exactNoiseLevelDb
+                                            : null;
+                                        const el =
+                                          enc.exactBarometricElevationM !== null &&
+                                          enc.exactBarometricElevationM !== undefined &&
+                                          typeof enc.exactBarometricElevationM === 'number' &&
+                                          Number.isFinite(enc.exactBarometricElevationM)
+                                            ? enc.exactBarometricElevationM
+                                            : null;
+                                        if (db === null && el === null) return null;
+                                        return (
+                                          <div className="mt-1 flex flex-wrap gap-1">
+                                            {db !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Volume2 className="h-2.5 w-2.5 shrink-0 text-violet-300" aria-hidden />
+                                                {Math.round(db)} dB
                                               </span>
                                             ) : null}
-                                            {!isEditing &&
-                                              (() => {
-                                                const db =
-                                                  enc.exactNoiseLevelDb !== null &&
-                                                  enc.exactNoiseLevelDb !== undefined &&
-                                                  typeof enc.exactNoiseLevelDb === 'number' &&
-                                                  Number.isFinite(enc.exactNoiseLevelDb)
-                                                    ? enc.exactNoiseLevelDb
-                                                    : null;
-                                                const el =
-                                                  enc.exactBarometricElevationM !== null &&
-                                                  enc.exactBarometricElevationM !== undefined &&
-                                                  typeof enc.exactBarometricElevationM === 'number' &&
-                                                  Number.isFinite(enc.exactBarometricElevationM)
-                                                    ? enc.exactBarometricElevationM
-                                                    : null;
-                                                if (db === null && el === null) return null;
-                                                return (
-                                                  <div className="mt-1 flex flex-wrap gap-1">
-                                                    {db !== null ? (
-                                                      <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                        <Volume2
-                                                          className="h-2.5 w-2.5 shrink-0 text-violet-300"
-                                                          aria-hidden
-                                                        />
-                                                        {Math.round(db)} dB
-                                                      </span>
-                                                    ) : null}
-                                                    {el !== null ? (
-                                                      <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
-                                                        <Mountain
-                                                          className="h-2.5 w-2.5 shrink-0 text-sky-300"
-                                                          aria-hidden
-                                                        />
-                                                        {Math.round(el)} m
-                                                      </span>
-                                                    ) : null}
-                                                  </div>
-                                                );
-                                              })()}
+                                            {el !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-300" aria-hidden />
+                                                {Math.round(el)} m
+                                              </span>
+                                            ) : null}
                                           </div>
-                                          {!isEditing && onRenameEncounterLocation ? (
-                                            <button
-                                              type="button"
-                                              className="shrink-0 rounded p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200"
-                                              aria-label="Rename place"
-                                              onClick={() => {
-                                                setEncounterRenameKey(encKey);
-                                                setEncounterRenameDraft(enc.locationName);
-                                                setEncounterRenameErr(null);
-                                              }}
-                                            >
-                                              <Pencil className="h-3 w-3" />
-                                            </button>
-                                          ) : null}
-                                        </div>
-                                      </li>
-                                    );
-                                  })}
+                                        );
+                                      })()}
+                                    </li>
+                                  ))}
                                 </ul>
                               </div>
                             ) : null}

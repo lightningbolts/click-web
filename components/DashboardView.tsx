@@ -1940,35 +1940,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
     downloadCSV(connectionRecords, `click-connections-${user.email?.split('@')[0] || 'user'}`);
   }, [connectionRecords, user]);
 
-  const handleRenameEncounterLocation = useCallback(
-    async (
-      connectionId: string,
-      encounterId: string,
-      newName: string,
-    ): Promise<{ ok: boolean; error?: string }> => {
-      const supabase = getSupabaseClient();
-      if (!supabase) return { ok: false, error: 'Not signed in' };
-      const { error } = await supabase.rpc('rename_encounter_location', {
-        encounter_id: encounterId,
-        new_name: newName,
-      });
-      if (error) return { ok: false, error: error.message };
-      const patchEncounters = (c: ConnectionRecord) => {
-        if (c.id !== connectionId || !c.encounters?.length) return c;
-        return {
-          ...c,
-          encounters: c.encounters.map((e) =>
-            e.id === encounterId ? { ...e, locationName: newName } : e,
-          ),
-        };
-      };
-      setConnectionRecords((prev) => prev.map(patchEncounters));
-      setMapConnectionRecords((prev) => prev.map(patchEncounters));
-      return { ok: true };
-    },
-    [],
-  );
-
   // Shared handler: open chat for a specific connection
   const handleOpenChat = useCallback((conn: ConnectionRecord) => {
     setSelectedConnection(conn);
@@ -2550,11 +2521,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
                 {/* Time Capsule Section */}
                 <section className="glass p-6 rounded-3xl border border-zinc-800">
-                  <TimeCapsule
-                    chapters={chapters}
-                    onConnectionClick={handleOpenChat}
-                    onRenameEncounterLocation={handleRenameEncounterLocation}
-                  />
+                  <TimeCapsule chapters={chapters} onConnectionClick={handleOpenChat} />
                 </section>
 
                 {/* Connection Table Section */}
