@@ -2,12 +2,27 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, MapPin, Clock, Cloud, Volume2 } from 'lucide-react';
+import {
+  X,
+  Sparkles,
+  MapPin,
+  Clock,
+  Cloud,
+  Volume2,
+  Mountain,
+  Thermometer,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   buildProfileConnectionLines,
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
+import {
+  originEncounter,
+  parseConnectionEncounters,
+  type ConnectionEncounterRow,
+} from '@/lib/dashboard/connectionEncounters';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 
 export type { AvailabilityIntentRow };
@@ -54,6 +69,38 @@ function coerceSharedConnection(raw: unknown): SharedConnectionPayload | null {
   const cr = o.created;
   const created = typeof cr === 'number' && Number.isFinite(cr) ? cr : 0;
   return { ...(o as object), id, created } as SharedConnectionPayload;
+}
+
+function formatEncounterWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d);
+}
+
+function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon: LucideIcon; label: string }[] {
+  const out: { key: string; Icon: LucideIcon; label: string }[] = [];
+  if (enc.exactNoiseLevelDb != null && Number.isFinite(enc.exactNoiseLevelDb)) {
+    out.push({ key: 'db', Icon: Volume2, label: `${Math.round(enc.exactNoiseLevelDb)} dB` });
+  }
+  if (enc.exactBarometricElevationM != null && Number.isFinite(enc.exactBarometricElevationM)) {
+    out.push({ key: 'el', Icon: Mountain, label: `${Math.round(enc.exactBarometricElevationM)} m` });
+  }
+  const ws = enc.weatherSnapshot;
+  if (ws && typeof ws === 'object' && ws !== null) {
+    const temp = (ws as { temperatureCelsius?: unknown }).temperatureCelsius;
+    if (typeof temp === 'number' && Number.isFinite(temp)) {
+      const f = Math.round((temp * 9) / 5 + 32);
+      out.push({ key: 'temp', Icon: Thermometer, label: `${f}°F` });
+    }
+  }
+  return out;
 }
 
 function ageFromBirthday(birthday?: string | null): number | null {
@@ -146,6 +193,15 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
   const hasMoment =
     !!momentLines &&
     Object.values(momentLines).some((v) => typeof v === 'string' && v.trim().length > 0);
+
+  const encounterTimeline = useMemo(() => {
+    const raw = data?.sharedConnection;
+    if (!raw || typeof raw !== 'object') return null;
+    const conn = raw as Record<string, unknown>;
+    const rows = parseConnectionEncounters(conn);
+    const origin = originEncounter(conn);
+    return { rows, originId: origin?.id ?? null };
+  }, [data?.sharedConnection]);
 
   return (
     <AnimatePresence>
@@ -323,6 +379,74 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                       availabilityIntents={data.availabilityIntents}
                     />
                   </section>
+
+                  {encounterTimeline && (
+                    <section className="relative">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-1">
+                        Our timeline
+                      </h3>
+                      <p className="text-[11px] text-zinc-500 mb-4">
+                        Every time and place you’ve crossed paths
+                      </p>
+                      {encounterTimeline.rows.length === 0 ? (
+                        <p className="text-sm text-zinc-500">
+                          No crossing history on file yet.
+                        </p>
+                      ) : (
+                        <div className="relative pl-1">
+                          <div
+                            className="absolute left-[15px] top-2 bottom-3 w-px bg-zinc-700/85 pointer-events-none"
+                            aria-hidden
+                          />
+                          <ul className="space-y-0">
+                            {encounterTimeline.rows.map((enc) => {
+                              const isOrigin = enc.id === encounterTimeline.originId;
+                              const pills = encounterMetricPills(enc);
+                              const place =
+                                enc.locationName?.trim() || 'Unknown place';
+                              return (
+                                <li key={enc.id} className="relative pb-9 last:pb-1">
+                                  <div
+                                    className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-zinc-950 bg-gradient-to-br from-[#8338EC] to-[#3A86FF] shadow-sm"
+                                    aria-hidden
+                                  />
+                                  <div className="pl-8">
+                                    {isOrigin && (
+                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/95 mb-1">
+                                        Where it started
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-zinc-500 tabular-nums">
+                                      {formatEncounterWhen(enc.encounteredAt)}
+                                    </p>
+                                    <p className="text-sm font-semibold text-white mt-1 leading-snug">
+                                      {place}
+                                    </p>
+                                    {pills.length > 0 && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {pills.map(({ key, Icon, label }) => (
+                                          <span
+                                            key={key}
+                                            className="inline-flex items-center gap-1 rounded-full border border-zinc-700/70 bg-zinc-900/55 px-2.5 py-0.5 text-[11px] text-zinc-300"
+                                          >
+                                            <Icon
+                                              className="h-3 w-3 shrink-0 text-zinc-400"
+                                              aria-hidden
+                                            />
+                                            {label}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </section>
+                  )}
                 </motion.div>
               )}
             </div>

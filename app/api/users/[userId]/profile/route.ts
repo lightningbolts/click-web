@@ -92,7 +92,8 @@ export async function GET(
       const { data: mutualRows, error: mutualErr } = await supabase
         .from('connections')
         .select('id, created, created_utc, time_of_day_utc, last_message_at, connection_encounters(*)')
-        .contains('user_ids', [user.id, userId]);
+        .contains('user_ids', [user.id, userId])
+        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
       if (mutualErr) {
         console.warn('profile mutual connection:', mutualErr.message);
       } else if (mutualRows && mutualRows.length > 0) {
