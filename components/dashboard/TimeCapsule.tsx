@@ -12,6 +12,8 @@ import {
   Calendar,
   MessageCircle,
   TrendingUp,
+  Volume2,
+  Mountain,
 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
@@ -386,6 +388,39 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                           {enc.contextTags.join(' · ')}
                                         </span>
                                       ) : null}
+                                      {(() => {
+                                        const db =
+                                          enc.exactNoiseLevelDb !== null &&
+                                          enc.exactNoiseLevelDb !== undefined &&
+                                          typeof enc.exactNoiseLevelDb === 'number' &&
+                                          Number.isFinite(enc.exactNoiseLevelDb)
+                                            ? enc.exactNoiseLevelDb
+                                            : null;
+                                        const el =
+                                          enc.exactBarometricElevationM !== null &&
+                                          enc.exactBarometricElevationM !== undefined &&
+                                          typeof enc.exactBarometricElevationM === 'number' &&
+                                          Number.isFinite(enc.exactBarometricElevationM)
+                                            ? enc.exactBarometricElevationM
+                                            : null;
+                                        if (db === null && el === null) return null;
+                                        return (
+                                          <div className="mt-1 flex flex-wrap gap-1">
+                                            {db !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Volume2 className="h-2.5 w-2.5 shrink-0 text-violet-300" aria-hidden />
+                                                {Math.round(db)} dB
+                                              </span>
+                                            ) : null}
+                                            {el !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-300" aria-hidden />
+                                                {Math.round(el)} m
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })()}
                                     </li>
                                   ))}
                                 </ul>

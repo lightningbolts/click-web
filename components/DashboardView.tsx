@@ -19,6 +19,8 @@ import {
   Clock,
   X,
   Zap,
+  Volume2,
+  Mountain,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -1794,6 +1796,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   encounteredAt: new Date(e.encounteredAt),
                   locationName: e.locationName?.trim() || 'Unknown location',
                   contextTags: e.contextTags,
+                  ...(typeof e.exactNoiseLevelDb === 'number' && Number.isFinite(e.exactNoiseLevelDb)
+                    ? { exactNoiseLevelDb: e.exactNoiseLevelDb }
+                    : {}),
+                  ...(typeof e.exactBarometricElevationM === 'number' &&
+                  Number.isFinite(e.exactBarometricElevationM)
+                    ? { exactBarometricElevationM: e.exactBarometricElevationM }
+                    : {}),
                 }))
               : undefined,
           intentOverlapLabel: overlapLabel,
@@ -2809,6 +2818,41 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
+                                      {(() => {
+                                        const latest = conn.encounters?.[0];
+                                        if (!latest) return null;
+                                        const db =
+                                          latest.exactNoiseLevelDb !== null &&
+                                          latest.exactNoiseLevelDb !== undefined &&
+                                          typeof latest.exactNoiseLevelDb === 'number' &&
+                                          Number.isFinite(latest.exactNoiseLevelDb)
+                                            ? latest.exactNoiseLevelDb
+                                            : null;
+                                        const el =
+                                          latest.exactBarometricElevationM !== null &&
+                                          latest.exactBarometricElevationM !== undefined &&
+                                          typeof latest.exactBarometricElevationM === 'number' &&
+                                          Number.isFinite(latest.exactBarometricElevationM)
+                                            ? latest.exactBarometricElevationM
+                                            : null;
+                                        if (db === null && el === null) return null;
+                                        return (
+                                          <div className="mt-1.5 flex flex-wrap gap-1 pr-2">
+                                            {db !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200">
+                                                <Volume2 className="h-3 w-3 shrink-0 text-violet-300" aria-hidden />
+                                                {Math.round(db)} dB
+                                              </span>
+                                            ) : null}
+                                            {el !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200">
+                                                <Mountain className="h-3 w-3 shrink-0 text-sky-300" aria-hidden />
+                                                {Math.round(el)} m
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })()}
                                       {archiveWarning && !isGroupCliqueRow && !isServerArchived && !isUserArchived ? (
                                         <p
                                           className={`mt-1.5 flex items-center gap-1 truncate pr-2 text-[11px] ${

@@ -173,7 +173,13 @@ export function extractNoiseSummary(conn: Record<string, unknown>): string | und
   const encDbRaw = enc?.exactNoiseLevelDb;
   const encDb = typeof encDbRaw === 'number' && Number.isFinite(encDbRaw) ? encDbRaw : null;
   const dbRaw = conn.exact_noise_level_db;
-  const dbLegacy = typeof dbRaw === 'number' && Number.isFinite(dbRaw) ? dbRaw : null;
+  const dbLegacyNum =
+    typeof dbRaw === 'number' && Number.isFinite(dbRaw)
+      ? dbRaw
+      : typeof dbRaw === 'string' && dbRaw.trim()
+        ? Number(dbRaw.trim())
+        : NaN;
+  const dbLegacy = Number.isFinite(dbLegacyNum) ? dbLegacyNum : null;
   const db = encDb ?? dbLegacy;
 
   const parts: string[] = [];

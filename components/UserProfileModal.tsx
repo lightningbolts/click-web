@@ -86,11 +86,13 @@ function formatEncounterWhen(iso: string): string {
 
 function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon: LucideIcon; label: string }[] {
   const out: { key: string; Icon: LucideIcon; label: string }[] = [];
-  if (enc.exactNoiseLevelDb != null && Number.isFinite(enc.exactNoiseLevelDb)) {
-    out.push({ key: 'db', Icon: Volume2, label: `${Math.round(enc.exactNoiseLevelDb)} dB` });
+  const dbRaw = enc.exactNoiseLevelDb;
+  if (dbRaw !== null && dbRaw !== undefined && typeof dbRaw === 'number' && Number.isFinite(dbRaw)) {
+    out.push({ key: 'db', Icon: Volume2, label: `${Math.round(dbRaw)} dB` });
   }
-  if (enc.exactBarometricElevationM != null && Number.isFinite(enc.exactBarometricElevationM)) {
-    out.push({ key: 'el', Icon: Mountain, label: `${Math.round(enc.exactBarometricElevationM)} m` });
+  const elRaw = enc.exactBarometricElevationM;
+  if (elRaw !== null && elRaw !== undefined && typeof elRaw === 'number' && Number.isFinite(elRaw)) {
+    out.push({ key: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
   }
   const ws = enc.weatherSnapshot;
   if (ws && typeof ws === 'object' && ws !== null) {
