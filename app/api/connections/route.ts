@@ -24,6 +24,71 @@ function createAdminClient() {
   );
 }
 
+const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
+const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
+const DISPLAY_LOCATION_FALLBACK = 'A new city';
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function firstNonEmptyString(values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function extractDisplayLocation(semanticLocation: Record<string, unknown>): string {
+  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
+  if (!address) return DISPLAY_LOCATION_FALLBACK;
+  const city = firstNonEmptyString([
+    address.city,
+    address.town,
+    address.village,
+    address.hamlet,
+  ]);
+  if (!city) return DISPLAY_LOCATION_FALLBACK;
+  const state = firstNonEmptyString([address.state]);
+  return state ? `${city}, ${state}` : city;
+}
+
+async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
+  semanticLocation: Record<string, unknown> | null;
+  displayLocation: string;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': NOMINATIM_USER_AGENT,
+      },
+    });
+    if (!response.ok) {
+      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    }
+    const payload = (await response.json()) as unknown;
+    if (!isRecord(payload)) {
+      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    }
+    return {
+      semanticLocation: payload,
+      displayLocation: extractDisplayLocation(payload),
+    };
+  } catch {
+    return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Haversine distance in meters between two lat/lon coordinate pairs.
  */
@@ -870,10 +935,23 @@ export async function POST(request: NextRequest) {
       ...memoryCapsuleBase,
     };
 
+    let semanticLocation: Record<string, unknown> | null = null;
+    let displayLocation = DISPLAY_LOCATION_FALLBACK;
+    if (
+      Number.isFinite(geoLocation.lat) &&
+      Number.isFinite(geoLocation.lon) &&
+      !(geoLocation.lat === 0 && geoLocation.lon === 0)
+    ) {
+      const geocoded = await fetchNominatimReverseGeocode(geoLocation.lat, geoLocation.lon);
+      semanticLocation = geocoded.semanticLocation;
+      displayLocation = geocoded.displayLocation;
+    }
+
     const encounterInsert: Record<string, unknown> = {
       connection_id: connection.id,
       encountered_at: new Date(now).toISOString(),
       location_name: memoryCapsule.locationName,
+      display_location: displayLocation,
       context_tags: resolvedContextTagId ? [resolvedContextTagId] : [],
       noise_level: resolvedNoiseLevel,
       weather_snapshot: memoryCapsule.weatherSnapshot,
@@ -886,6 +964,7 @@ export async function POST(request: NextRequest) {
       encounterInsert.gps_lat = geoLocation.lat;
       encounterInsert.gps_lon = geoLocation.lon;
     }
+    if (semanticLocation != null) encounterInsert.semantic_location = semanticLocation;
 
     const encDb =
       typeof exactNoiseLevelDb === 'number' && Number.isFinite(exactNoiseLevelDb)

@@ -27,6 +27,9 @@ const PROXIMITY_MATCH_MAX_M = 15;
 const ENCOUNTER_DEBOUNCE_MAX_M = 50;
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 const EXTENDED_HANGOUT_TAG = 'Extended Hangout';
+const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
+const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
+const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
 type UserProfile = {
   id: string;
@@ -87,6 +90,66 @@ function finiteBatteryPct(v: unknown): number | null {
   const r = Math.round(v);
   if (r < 0 || r > 100) return null;
   return r;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function firstNonEmptyString(values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function extractDisplayLocation(semanticLocation: Record<string, unknown>): string {
+  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
+  if (!address) return DISPLAY_LOCATION_FALLBACK;
+  const city = firstNonEmptyString([
+    address.city,
+    address.town,
+    address.village,
+    address.hamlet,
+  ]);
+  if (!city) return DISPLAY_LOCATION_FALLBACK;
+  const state = firstNonEmptyString([address.state]);
+  return state ? `${city}, ${state}` : city;
+}
+
+async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
+  semanticLocation: Record<string, unknown> | null;
+  displayLocation: string;
+}> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': NOMINATIM_USER_AGENT,
+      },
+    });
+    if (!response.ok) {
+      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    }
+    const payload = (await response.json()) as unknown;
+    if (!isRecord(payload)) {
+      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    }
+    return {
+      semanticLocation: payload,
+      displayLocation: extractDisplayLocation(payload),
+    };
+  } catch {
+    return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Variance of |a| over ~500ms; same units from Android + normalized iOS clients. */
@@ -347,6 +410,14 @@ Deno.serve(async (req) => {
     }
   }
 
+  let semanticLocation: Record<string, unknown> | null = null;
+  let displayLocation = DISPLAY_LOCATION_FALLBACK;
+  if (encLat != null && encLon != null) {
+    const geocoded = await fetchNominatimReverseGeocode(encLat, encLon);
+    semanticLocation = geocoded.semanticLocation;
+    displayLocation = geocoded.displayLocation;
+  }
+
   async function connectionIdForPair(peerId: string): Promise<string | null> {
     const { data, error } = await admin
       .from('connections')
@@ -473,11 +544,13 @@ Deno.serve(async (req) => {
       connection_id: connectionId,
       encountered_at: new Date().toISOString(),
       context_tags: vibeTags,
+      display_location: displayLocation,
     };
     if (encLat != null && encLon != null) {
       insertRow.gps_lat = encLat;
       insertRow.gps_lon = encLon;
     }
+    if (semanticLocation != null) insertRow.semantic_location = semanticLocation;
     if (noiseLevel != null) insertRow.noise_level = noiseLevel;
     if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
     if (exactBarometricElevationM != null) {

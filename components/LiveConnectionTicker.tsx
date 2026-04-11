@@ -8,6 +8,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 /** Must match server max in `get_recent_sanitized_connections` (50). */
 const PAGE_SIZE = 20;
+const TICKER_LOCATION_FALLBACK = 'A new city';
 
 export type SanitizedTickerConnection = {
   id: string;
@@ -68,7 +69,7 @@ export function formatConnectionLocalTime(c: SanitizedTickerConnection): string 
 }
 
 export function formatTickerLine(c: SanitizedTickerConnection): string {
-  const place = c.display_location?.trim() || 'a new city';
+  const place = c.display_location?.trim() || TICKER_LOCATION_FALLBACK;
   const timePart = formatConnectionLocalTime(c);
   const when = timePart ? ` at ${timePart}` : '';
   const w = c.weather_condition?.trim();
@@ -82,13 +83,20 @@ function isRecord(x: unknown): x is Record<string, unknown> {
   return x !== null && typeof x === 'object' && !Array.isArray(x);
 }
 
+function readDisplayLocation(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : TICKER_LOCATION_FALLBACK;
+}
+
 function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
   if (!isRecord(x)) return null;
   const id = x.id;
-  const display_location = x.display_location;
+  // Privacy guard: this public component only reads sanitized `display_location`.
+  const display_location = readDisplayLocation(x.display_location);
   const connection_method = x.connection_method;
   const created = x.created;
-  if (typeof id !== 'string' || typeof display_location !== 'string') return null;
+  if (typeof id !== 'string' || display_location === null) return null;
   if (typeof connection_method !== 'string') return null;
   if (typeof created !== 'number' || !Number.isFinite(created)) return null;
   const weather =
