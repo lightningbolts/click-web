@@ -36,6 +36,7 @@ export type ProfileOriginEncounter = {
   id: string;
   encounteredAt: string;
   locationName?: string | null;
+  displayLocation?: string | null;
   weatherSnapshot?: unknown;
   noiseLevel?: string | null;
   exactNoiseLevelDb?: number | null;
@@ -97,6 +98,7 @@ export function originEncounter(c: SharedConnectionPayload): ProfileOriginEncoun
       id,
       encounteredAt,
       locationName: stringOrNull(encounter.location_name),
+      displayLocation: stringOrNull(encounter.display_location),
       weatherSnapshot: encounter.weather_snapshot,
       noiseLevel: stringOrNull(encounter.noise_level),
       exactNoiseLevelDb: numberOrNull(encounter.exact_noise_level_db),
@@ -218,7 +220,7 @@ export function buildProfileConnectionLines(
       : extractLegacyContext(c);
   const place =
     strictOriginEncounter != null
-      ? strictOriginEncounter.locationName?.trim() || undefined
+      ? strictOriginEncounter.locationName?.trim() || strictOriginEncounter.displayLocation?.trim() || undefined
       : (typeof c.semantic_location === 'string' && c.semantic_location.trim()) || formatFullLocation(c.full_location ?? undefined) || undefined;
   const detail =
     strictOriginEncounter != null

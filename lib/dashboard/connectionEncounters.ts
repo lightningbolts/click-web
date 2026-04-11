@@ -7,6 +7,8 @@ export type ConnectionEncounterRow = {
   encounteredAt: string;
   /** Present when `location_name` was captured for this crossing. */
   locationName?: string;
+  /** Broad city-level label safe for public surfaces. */
+  displayLocation?: string;
   gpsLat?: number;
   gpsLon?: number;
   weatherSnapshot: unknown;
@@ -50,6 +52,8 @@ export function parseConnectionEncounters(conn: Record<string, unknown>): Connec
       encounteredAt,
       locationName:
         typeof r.location_name === 'string' && r.location_name.trim() ? r.location_name.trim() : undefined,
+      displayLocation:
+        typeof r.display_location === 'string' && r.display_location.trim() ? r.display_location.trim() : undefined,
       gpsLat: numOrUndef(r.gps_lat),
       gpsLon: numOrUndef(r.gps_lon),
       weatherSnapshot: r.weather_snapshot,

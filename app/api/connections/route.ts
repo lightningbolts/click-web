@@ -55,9 +55,25 @@ function extractDisplayLocation(semanticLocation: Record<string, unknown>): stri
   return state ? `${city}, ${state}` : city;
 }
 
+function extractSpecificLocationName(semanticLocation: Record<string, unknown>): string | null {
+  const topLevelName = firstNonEmptyString([semanticLocation.name]);
+  if (topLevelName) return topLevelName;
+
+  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
+  if (!address) return null;
+
+  return firstNonEmptyString([
+    address.amenity,
+    address.building,
+    address.residential,
+    address.road,
+  ]);
+}
+
 async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
   semanticLocation: Record<string, unknown> | null;
   displayLocation: string;
+  specificLocationName: string | null;
 }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
@@ -72,18 +88,31 @@ async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
       },
     });
     if (!response.ok) {
-      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+      return {
+        semanticLocation: null,
+        displayLocation: DISPLAY_LOCATION_FALLBACK,
+        specificLocationName: null,
+      };
     }
     const payload = (await response.json()) as unknown;
     if (!isRecord(payload)) {
-      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+      return {
+        semanticLocation: null,
+        displayLocation: DISPLAY_LOCATION_FALLBACK,
+        specificLocationName: null,
+      };
     }
     return {
       semanticLocation: payload,
       displayLocation: extractDisplayLocation(payload),
+      specificLocationName: extractSpecificLocationName(payload),
     };
   } catch {
-    return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    return {
+      semanticLocation: null,
+      displayLocation: DISPLAY_LOCATION_FALLBACK,
+      specificLocationName: null,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -714,6 +743,7 @@ export async function POST(request: NextRequest) {
       responderId,
       initiator_id,
       responder_id,
+      location_name,
       noiseLevelCategory,
       exactNoiseLevelDb,
       exactBarometricElevationMeters,
@@ -868,6 +898,7 @@ export async function POST(request: NextRequest) {
     };
 
     let connection: { id: string };
+    const reusingExistingPair = !!existing;
 
     if (existing) {
       const pairIds = (existing.user_ids ?? []).filter((x): x is string => typeof x === 'string' && x.length > 0);
@@ -916,18 +947,20 @@ export async function POST(request: NextRequest) {
       connection = inserted;
     }
 
-    // Also create a chat row for this connection (so it shows in the chat list)
-    const { error: chatError } = await adminClient
-      .from('chats')
-      .insert({
-        connection_id: connection.id,
-        created_at: now,
-        updated_at: now,
-      });
+    // Existing 1:1 pairs already have a chat row; avoid duplicate chat threads on repeat QR scans.
+    if (!reusingExistingPair) {
+      const { error: chatError } = await adminClient
+        .from('chats')
+        .insert({
+          connection_id: connection.id,
+          created_at: now,
+          updated_at: now,
+        });
 
-    if (chatError) {
-      console.error('Chat creation error (non-fatal):', chatError);
-      // Non-fatal — connection was created
+      if (chatError) {
+        console.error('Chat creation error (non-fatal):', chatError);
+        // Non-fatal — connection was created
+      }
     }
 
     const memoryCapsule: MemoryCapsulePayload = {
@@ -935,8 +968,14 @@ export async function POST(request: NextRequest) {
       ...memoryCapsuleBase,
     };
 
+    const manualLocationName =
+      typeof location_name === 'string' && location_name.trim().length > 0
+        ? location_name.trim()
+        : null;
+
     let semanticLocation: Record<string, unknown> | null = null;
     let displayLocation = DISPLAY_LOCATION_FALLBACK;
+    let specificLocationName: string | null = null;
     if (
       Number.isFinite(geoLocation.lat) &&
       Number.isFinite(geoLocation.lon) &&
@@ -945,17 +984,21 @@ export async function POST(request: NextRequest) {
       const geocoded = await fetchNominatimReverseGeocode(geoLocation.lat, geoLocation.lon);
       semanticLocation = geocoded.semanticLocation;
       displayLocation = geocoded.displayLocation;
+      specificLocationName = geocoded.specificLocationName;
     }
 
     const encounterInsert: Record<string, unknown> = {
       connection_id: connection.id,
       encountered_at: new Date(now).toISOString(),
-      location_name: memoryCapsule.locationName,
       display_location: displayLocation,
       context_tags: resolvedContextTagId ? [resolvedContextTagId] : [],
       noise_level: resolvedNoiseLevel,
       weather_snapshot: memoryCapsule.weatherSnapshot,
     };
+    const resolvedLocationName = manualLocationName ?? specificLocationName ?? memoryCapsule.locationName;
+    if (resolvedLocationName) {
+      encounterInsert.location_name = resolvedLocationName;
+    }
     if (
       Number.isFinite(geoLocation.lat) &&
       Number.isFinite(geoLocation.lon) &&

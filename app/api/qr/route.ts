@@ -77,9 +77,25 @@ function extractDisplayLocation(semanticLocation: Record<string, unknown>): stri
   return state ? `${city}, ${state}` : city;
 }
 
+function extractSpecificLocationName(semanticLocation: Record<string, unknown>): string | null {
+  const topLevelName = firstNonEmptyString([semanticLocation.name]);
+  if (topLevelName) return topLevelName;
+
+  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
+  if (!address) return null;
+
+  return firstNonEmptyString([
+    address.amenity,
+    address.building,
+    address.residential,
+    address.road,
+  ]);
+}
+
 async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
   semanticLocation: Record<string, unknown> | null;
   displayLocation: string;
+  specificLocationName: string | null;
 }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
@@ -94,18 +110,31 @@ async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
       },
     });
     if (!response.ok) {
-      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+      return {
+        semanticLocation: null,
+        displayLocation: DISPLAY_LOCATION_FALLBACK,
+        specificLocationName: null,
+      };
     }
     const payload = (await response.json()) as unknown;
     if (!isRecord(payload)) {
-      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+      return {
+        semanticLocation: null,
+        displayLocation: DISPLAY_LOCATION_FALLBACK,
+        specificLocationName: null,
+      };
     }
     return {
       semanticLocation: payload,
       displayLocation: extractDisplayLocation(payload),
+      specificLocationName: extractSpecificLocationName(payload),
     };
   } catch {
-    return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    return {
+      semanticLocation: null,
+      displayLocation: DISPLAY_LOCATION_FALLBACK,
+      specificLocationName: null,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -284,6 +313,10 @@ export async function POST(request: NextRequest) {
         scannerLat: scannerLocation?.lat,
         scannerLon: scannerLocation?.lon,
       });
+      const manualLocationName =
+        typeof body.location_name === 'string' && body.location_name.trim().length > 0
+          ? body.location_name.trim()
+          : null;
 
       const luxLevel = finiteNumber(body.lux_level);
       const motionVariance = finiteNumber(body.motion_variance);
@@ -374,10 +407,12 @@ export async function POST(request: NextRequest) {
       if (existingConnection?.id) {
         let semanticLocation: Record<string, unknown> | null = null;
         let displayLocation = DISPLAY_LOCATION_FALLBACK;
+        let specificLocationName: string | null = null;
         if (gpsPair.lat != null && gpsPair.lon != null) {
           const geocoded = await fetchNominatimReverseGeocode(gpsPair.lat, gpsPair.lon);
           semanticLocation = geocoded.semanticLocation;
           displayLocation = geocoded.displayLocation;
+          specificLocationName = geocoded.specificLocationName;
         }
 
         const encounterInsert: Record<string, unknown> = {
@@ -385,6 +420,10 @@ export async function POST(request: NextRequest) {
           encountered_at: new Date().toISOString(),
           display_location: displayLocation,
         };
+        const resolvedLocationName = manualLocationName ?? specificLocationName;
+        if (resolvedLocationName) {
+          encounterInsert.location_name = resolvedLocationName;
+        }
         if (gpsPair.lat != null && gpsPair.lon != null) {
           encounterInsert.gps_lat = gpsPair.lat;
           encounterInsert.gps_lon = gpsPair.lon;

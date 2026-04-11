@@ -430,7 +430,7 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                               const isOrigin = enc.id === encounterTimeline.originId;
                               const pills = encounterMetricPills(enc);
                               const place =
-                                enc.locationName?.trim() || 'Unknown place';
+                                enc.locationName?.trim() || enc.displayLocation?.trim() || 'A new location';
                               return (
                                 <li key={enc.id} className="relative pb-9 last:pb-1">
                                   <div

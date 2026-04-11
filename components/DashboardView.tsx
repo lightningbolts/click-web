@@ -1707,7 +1707,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
         const latestEnc = encs[0];
         const originEnc = encs.length > 0 ? encs[encs.length - 1] : undefined;
 
-        const semanticFromEncounter = latestEnc?.locationName?.trim();
+        const semanticFromEncounter =
+          latestEnc?.locationName?.trim() || latestEnc?.displayLocation?.trim();
         const hasExistingSemantic =
           typeof conn.semantic_location === 'string' && conn.semantic_location.trim().length > 0;
         const connForExtras: Record<string, unknown> =
@@ -1772,10 +1773,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
           dateMet: new Date(typeof dateMetValue === 'number' ? dateMetValue : String(dateMetValue ?? 0)),
           location:
             latestEnc?.locationName ??
+            latestEnc?.displayLocation ??
             originEnc?.locationName ??
+            originEnc?.displayLocation ??
             ((typeof connForExtras.semantic_location === 'string' && connForExtras.semantic_location.trim())
               ? connForExtras.semantic_location.trim()
-              : 'Unknown location'),
+              : 'A new location'),
           context: extractEventContext(connForExtras),
           weatherSummary: extractWeatherSummary(connForExtras),
           noiseSummary: extractNoiseSummary(connForExtras),
@@ -1794,7 +1797,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
               ? encs.map((e) => ({
                   id: e.id,
                   encounteredAt: new Date(e.encounteredAt),
-                  locationName: e.locationName?.trim() || 'Unknown location',
+                  locationName: e.locationName?.trim() || undefined,
+                  displayLocation: e.displayLocation?.trim() || undefined,
                   contextTags: e.contextTags,
                   ...(typeof e.exactNoiseLevelDb === 'number' && Number.isFinite(e.exactNoiseLevelDb)
                     ? { exactNoiseLevelDb: e.exactNoiseLevelDb }

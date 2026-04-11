@@ -23,7 +23,8 @@ import { useAuth } from '@/lib/AuthContext';
 export interface ConnectionEncounterBrief {
   id: string;
   encounteredAt: Date;
-  locationName: string;
+  locationName?: string;
+  displayLocation?: string;
   contextTags: string[];
   /** Present only when the crossing stored a calibrated SPL reading */
   exactNoiseLevelDb?: number;

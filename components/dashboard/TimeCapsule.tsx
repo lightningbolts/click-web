@@ -458,7 +458,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                               year: 'numeric',
                                             })}
                                           </span>
-                                          <span className="truncate">{enc.locationName}</span>
+                                          <span className="truncate">{enc.locationName || enc.displayLocation || 'A new location'}</span>
                                           {enc.contextTags.length > 0 ? (
                                             <span className="truncate text-[#C4B5FD]">
                                               {enc.contextTags.join(' · ')}

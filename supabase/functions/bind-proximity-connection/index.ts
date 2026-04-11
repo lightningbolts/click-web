@@ -120,9 +120,25 @@ function extractDisplayLocation(semanticLocation: Record<string, unknown>): stri
   return state ? `${city}, ${state}` : city;
 }
 
+function extractSpecificLocationName(semanticLocation: Record<string, unknown>): string | null {
+  const topLevelName = firstNonEmptyString([semanticLocation.name]);
+  if (topLevelName) return topLevelName;
+
+  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
+  if (!address) return null;
+
+  return firstNonEmptyString([
+    address.amenity,
+    address.building,
+    address.residential,
+    address.road,
+  ]);
+}
+
 async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
   semanticLocation: Record<string, unknown> | null;
   displayLocation: string;
+  specificLocationName: string | null;
 }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
@@ -136,18 +152,31 @@ async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
       },
     });
     if (!response.ok) {
-      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+      return {
+        semanticLocation: null,
+        displayLocation: DISPLAY_LOCATION_FALLBACK,
+        specificLocationName: null,
+      };
     }
     const payload = (await response.json()) as unknown;
     if (!isRecord(payload)) {
-      return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+      return {
+        semanticLocation: null,
+        displayLocation: DISPLAY_LOCATION_FALLBACK,
+        specificLocationName: null,
+      };
     }
     return {
       semanticLocation: payload,
       displayLocation: extractDisplayLocation(payload),
+      specificLocationName: extractSpecificLocationName(payload),
     };
   } catch {
-    return { semanticLocation: null, displayLocation: DISPLAY_LOCATION_FALLBACK };
+    return {
+      semanticLocation: null,
+      displayLocation: DISPLAY_LOCATION_FALLBACK,
+      specificLocationName: null,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -263,6 +292,7 @@ Deno.serve(async (req) => {
     motion_variance?: unknown;
     compass_azimuth?: unknown;
     battery_level?: unknown;
+    location_name?: unknown;
   };
   try {
     body = await req.json();
@@ -296,6 +326,10 @@ Deno.serve(async (req) => {
   const selfMotion = finiteNumber(body.motion_variance);
   const selfAz = finiteNumber(body.compass_azimuth);
   const selfBattery = finiteBatteryPct(body.battery_level);
+  const manualLocationName =
+    typeof body.location_name === 'string' && body.location_name.trim().length > 0
+      ? body.location_name.trim()
+      : null;
 
   const cutoffIso = new Date(Date.now() - CLEANUP_GRACE_MS).toISOString();
   await admin.from('proximity_handshake_events').delete().lt('created_at', cutoffIso);
@@ -413,11 +447,14 @@ Deno.serve(async (req) => {
 
   let semanticLocation: Record<string, unknown> | null = null;
   let displayLocation = DISPLAY_LOCATION_FALLBACK;
+  let specificLocationName: string | null = null;
   if (encLat != null && encLon != null) {
     const geocoded = await fetchNominatimReverseGeocode(encLat, encLon);
     semanticLocation = geocoded.semanticLocation;
     displayLocation = geocoded.displayLocation;
+    specificLocationName = geocoded.specificLocationName;
   }
+  const resolvedLocationName = manualLocationName ?? specificLocationName;
 
   async function connectionIdForPair(peerId: string): Promise<string | null> {
     const { data, error } = await admin
@@ -547,6 +584,9 @@ Deno.serve(async (req) => {
       context_tags: vibeTags,
       display_location: displayLocation,
     };
+    if (resolvedLocationName) {
+      insertRow.location_name = resolvedLocationName;
+    }
     if (encLat != null && encLon != null) {
       insertRow.gps_lat = encLat;
       insertRow.gps_lon = encLon;
