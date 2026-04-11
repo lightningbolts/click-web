@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo: `${request.nextUrl.origin}/api/auth/callback`,
           data: {
             ...(fn ? { first_name: fn } : {}),
             ...(ln ? { last_name: ln } : {}),

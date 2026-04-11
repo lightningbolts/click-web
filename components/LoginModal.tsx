@@ -59,16 +59,8 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
         return;
       }
 
-      // Redirect directly to /reset-password.  With implicit flow the
-      // recovery token lands in the URL hash fragment (#access_token=...),
-      // which is never sent to the server.  This is important because:
-      //  1. It avoids the PKCE code_verifier mismatch when the link is
-      //     opened in a different browser/tab than the one that requested it.
-      //  2. URL-defense proxies (Proofpoint, etc.) pre-fetch links to scan
-      //     for malware, which consumes one-time PKCE tokens before the
-      //     user clicks.  Hash fragments are invisible to these scanners.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/reset-password')}`,
       });
 
       if (error) {
@@ -130,8 +122,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
               full_name: display,
               name: display,
             },
-            // Direct the confirmation email to the server-side callback
-            // so it can exchange the code/token and set cookies properly.
+            // Send email auth redirects through the secure server callback route.
             emailRedirectTo: `${window.location.origin}/api/auth/callback`,
           },
         });

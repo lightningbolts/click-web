@@ -10,9 +10,8 @@ type RouteAuthResult = {
 };
 
 /**
- * Supabase auth for Route Handlers: prefers `Authorization: Bearer` from the
- * browser client (implicit flow stores the session in localStorage, not cookies).
- * Falls back to SSR cookie jar when no bearer token is sent.
+ * Supabase auth for Route Handlers: prefers explicit `Authorization: Bearer`
+ * when clients send it and otherwise falls back to the SSR cookie session.
  */
 export async function getSupabaseFromRouteRequest(
   request: NextRequest,

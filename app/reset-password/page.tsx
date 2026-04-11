@@ -6,24 +6,6 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ARCHITECTURE NOTE — why this is structured this way
-// ─────────────────────────────────────────────────────────────────────────────
-// Corporate email security scanners (Proofpoint / urldefense, Mimecast, etc.)
-// pre-fetch every link inside every email via HTTP GET to scan for malware.
-// Because Supabase tokens are one-time-use, the scanner burns the token before
-// the real user ever clicks.
-//
-// The ONLY scanner-proof approach:
-//   1. The email template links to YOUR domain, not supabase.co/auth/v1/verify.
-//      Template: {{ .SiteURL }}/reset-password?token_hash={{ .TokenHash }}&type=recovery
-//   2. The page receives token_hash as a URL param and shows a password form.
-//   3. verifyOtp() is called ONLY when the user submits the form (client-side JS).
-//      Scanners do not execute JavaScript — they cannot trigger form submission.
-//   4. After verifyOtp() succeeds, updateUser() is called immediately in the
-//      same interaction, before the session can expire.
-// ─────────────────────────────────────────────────────────────────────────────
-
 type PageState = 'form' | 'loading' | 'success' | 'error';
 
 export default function ResetPassword() {
@@ -33,51 +15,64 @@ export default function ResetPassword() {
   const [pageState, setPageState] = useState<PageState>('form');
   const [error, setError] = useState('');
 
-  // The token_hash and type come from the Supabase email template:
-  //   {{ .SiteURL }}/reset-password?token_hash={{ .TokenHash }}&type=recovery
   const [tokenHash, setTokenHash] = useState<string | null>(null);
   const [tokenType, setTokenType] = useState<string>('recovery');
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const searchParams = new URLSearchParams(window.location.search);
+    const initializeRecoveryContext = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
 
-    // ── Error params: Supabase redirects here with ?error= on failure ──
-    const qError = searchParams.get('error');
-    const qErrCode = searchParams.get('error_code');
-    const qErrDesc = searchParams.get('error_description');
+      const qError = searchParams.get('error');
+      const qErrCode = searchParams.get('error_code');
+      const qErrDesc = searchParams.get('error_description');
 
-    // Also check hash (Supabase puts errors in hash with implicit flow)
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    const hError = hashParams.get('error');
-    const hErrCode = hashParams.get('error_code');
-    const hErrDesc = hashParams.get('error_description');
+      const anyError = qError || qErrCode;
 
-    const anyError = qError || qErrCode || hError || hErrCode;
-    const errDesc = qErrDesc || hErrDesc;
+      if (anyError) {
+        const msg = qErrDesc
+          ? decodeURIComponent(qErrDesc.replace(/\+/g, ' '))
+          : 'This reset link is invalid or has expired.';
+        setError(msg);
+        setPageState('error');
+        return;
+      }
 
-    if (anyError) {
-      const msg = errDesc
-        ? decodeURIComponent(errDesc.replace(/\+/g, ' '))
-        : 'This reset link is invalid or has expired.';
-      setError(msg);
-      setPageState('error');
-      return;
-    }
+      // Legacy and compatibility path where recovery links include token_hash.
+      const hash = searchParams.get('token_hash');
+      const type = searchParams.get('type') ?? 'recovery';
 
-    // ── Happy path: extract token_hash and type ──
-    const hash = searchParams.get('token_hash');
-    const type = searchParams.get('type') ?? 'recovery';
+      if (hash) {
+        setTokenHash(hash);
+        setTokenType(type);
+        setHasRecoverySession(false);
+        return;
+      }
 
-    if (hash) {
-      setTokenHash(hash);
-      setTokenType(type);
-    } else {
-      // No token_hash — the user landed here without a valid link
+      // PKCE path: /api/auth/callback has already exchanged the code and set session cookies.
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setError('Authentication is not available. Please request a new password reset link.');
+        setPageState('error');
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        setHasRecoverySession(true);
+        return;
+      }
+
       setError('No reset token found. Please request a new password reset link.');
       setPageState('error');
-    }
+    };
+
+    void initializeRecoveryContext();
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -102,35 +97,30 @@ export default function ResetPassword() {
       return;
     }
 
-    if (!tokenHash) {
-      setError('Reset token is missing. Please request a new link.');
+    if (tokenHash) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: tokenType as 'recovery',
+      });
+
+      if (verifyError) {
+        const expired =
+          verifyError.message.toLowerCase().includes('expired') ||
+          verifyError.message.toLowerCase().includes('invalid');
+        setError(
+          expired
+            ? 'This reset link has expired. Please request a new one from the login page.'
+            : verifyError.message
+        );
+        setPageState('error');
+        return;
+      }
+    } else if (!hasRecoverySession) {
+      setError('Reset session is missing. Please request a new link.');
       setPageState('error');
       return;
     }
 
-    // ── Step 1: Exchange the token_hash for a session ──
-    // This is the ONLY place verifyOtp is called — inside a form submit handler.
-    // It runs in the user's browser via JavaScript. Email scanners making HTTP
-    // GET requests to the page URL never reach this code path.
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: tokenType as 'recovery',
-    });
-
-    if (verifyError) {
-      const expired =
-        verifyError.message.toLowerCase().includes('expired') ||
-        verifyError.message.toLowerCase().includes('invalid');
-      setError(
-        expired
-          ? 'This reset link has expired. Please request a new one from the login page.'
-          : verifyError.message
-      );
-      setPageState('error');
-      return;
-    }
-
-    // ── Step 2: Update the password using the freshly established session ──
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
     if (updateError) {
@@ -141,7 +131,7 @@ export default function ResetPassword() {
 
     setPageState('success');
     setTimeout(() => router.push('/dashboard'), 2000);
-  }, [password, confirmPassword, tokenHash, tokenType, router]);
+  }, [password, confirmPassword, tokenHash, tokenType, hasRecoverySession, router]);
 
   // ── Error / expired state ──
   if (pageState === 'error') {

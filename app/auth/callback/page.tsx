@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Loader2 } from 'lucide-react';
-import { getSupabaseClient } from '@/lib/supabase';
 
 type VerificationStatus = 'loading' | 'success' | 'error';
 
@@ -15,8 +14,7 @@ type VerificationStatus = 'loading' | 'success' | 'error';
  *  1. Error in query params  (?error=...&error_code=...)        → show error
  *  2. PKCE flow             (?code=...)                        → server route
  *  3. Token-hash flow       (?token_hash=...&type=...)         → server route
- *  4. Legacy implicit flow  (#access_token=...&type=recovery)  → setSession
- *  5. Post-signup success   (?verified=signup)                 → success UI (session set by API)
+ *  4. Post-signup success   (?verified=signup)                 → success UI (session set by API)
  *
  * Note: `otp_expired` errors originate at Supabase's server before reaching
  * this page; they indicate the email link token expired/was already used.
@@ -35,13 +33,6 @@ export default function AuthCallbackPage() {
       // --- 0. Server already verified signup (redirect from /api/auth/callback) ---
       if (params.get('verified') === 'signup') {
         setStatus('success');
-        return;
-      }
-
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        setErrorMessage('Authentication is not available.');
-        setStatus('error');
         return;
       }
 
@@ -75,66 +66,8 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // --- 4. Legacy implicit flow: hash fragment tokens ---
-      const hash = window.location.hash;
-      if (!hash || hash.length < 2) {
-        // No tokens at all: user navigated here directly
-        setErrorMessage('No authentication data found. Please request a new link.');
-        setStatus('error');
-        return;
-      }
-
-      const hashParams = new URLSearchParams(hash.substring(1));
-
-      // Check for errors in the hash fragment
-      const hashError = hashParams.get('error');
-      const errorDescription = hashParams.get('error_description');
-      if (hashError) {
-        const desc = errorDescription
-          ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
-          : 'Authentication failed. The link may have expired. Please request a new one.';
-        setErrorMessage(desc);
-        setStatus('error');
-        return;
-      }
-
-      // Extract legacy implicit-flow tokens
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      const type = hashParams.get('type');
-
-      if (accessToken && refreshToken) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (sessionError) {
-          console.error('Error setting session:', sessionError);
-          setErrorMessage(sessionError.message);
-          setStatus('error');
-          return;
-        }
-
-        if (type === 'recovery') {
-          router.replace('/reset-password');
-          return;
-        }
-
-        // Email signup confirmation: stay on a clear success screen (not a jarring redirect).
-        if (type === 'signup') {
-          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-          setStatus('success');
-          return;
-        }
-
-        // Magic link and other flows: send user to app as before.
-        const next = params.get('next') || '/dashboard';
-        router.replace(next);
-      } else {
-        setErrorMessage('Invalid authentication link. Please request a new one.');
-        setStatus('error');
-      }
+      setErrorMessage('No authentication data found. Please request a new link.');
+      setStatus('error');
     };
 
     handleCallback();

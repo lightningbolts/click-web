@@ -23,7 +23,7 @@ function createSupabaseWithAccessToken(accessToken: string) {
 
 /**
  * Creates a venue in `inactive` state and adds the current user as owner (RLS).
- * Pass the browser session `access_token` so the server can authorize the user (implicit flow uses localStorage, not cookies).
+ * Pass the browser session `access_token` so the server can authorize the user.
  */
 export async function createVenueForCheckout(
   accessToken: string,

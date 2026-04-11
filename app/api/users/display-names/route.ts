@@ -25,8 +25,8 @@ const isGenericName = (value: string | null | undefined): boolean => {
 };
 
 /**
- * Browser client (implicit flow) keeps the JWT in localStorage — callers must send
- * `Authorization: Bearer <access_token>`. Cookie-based / SSR sessions use
+ * Browser callers can send `Authorization: Bearer <access_token>`.
+ * Cookie-based / SSR sessions use
  * `sb-<project-ref>-auth-token` with a JSON body containing access_token.
  */
 function accessTokenFromRequest(req: NextRequest): string | null {

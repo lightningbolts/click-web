@@ -44,7 +44,7 @@ function connectionsRateLimitExceeded(ip: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
+  let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -71,24 +71,23 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      auth: {
-        flowType: 'implicit',
-      },
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
+            request.cookies.set({ name, value, ...options });
           });
-          response = NextResponse.next({
+
+          supabaseResponse = NextResponse.next({
             request: {
               headers: request.headers,
             },
           });
+
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+            supabaseResponse.cookies.set(name, value, options);
           });
         },
       },
@@ -103,24 +102,21 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/insights' || pathname.startsWith('/insights/')) {
     const signupUrl = new URL('/business/signup', request.url);
 
-    // Browser auth uses implicit flow + localStorage (see lib/supabase.ts). Middleware only
-    // sees cookie-based sessions, so getUser() is often null even when the user is signed in.
-    // Defer to client-side InsightsAccessGate + /api/user/insights-access (Bearer from client).
     if (!user) {
-      return response;
+      return supabaseResponse;
     }
 
     const allowed = await userMayAccessBusinessInsights(supabase, user);
     if (!allowed) {
       const redirect = NextResponse.redirect(signupUrl);
-      response.cookies.getAll().forEach((c) => {
+      supabaseResponse.cookies.getAll().forEach((c) => {
         redirect.cookies.set(c.name, c.value);
       });
       return redirect;
     }
   }
 
-  return response;
+  return supabaseResponse;
 }
 
 export const config = {
