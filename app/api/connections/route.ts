@@ -895,9 +895,13 @@ export async function POST(request: NextRequest) {
     if (encElev != null) encounterInsert.exact_barometric_elevation_m = encElev;
 
     const { error: encounterErr } = await adminClient.from('connection_encounters').insert(encounterInsert);
+    let encounter_logged = true;
+    let encounter_reason: string | undefined;
     if (encounterErr) {
       const msg = encounterErr.message ?? '';
       if (msg.includes('encounter_rate_limit_3h')) {
+        encounter_logged = false;
+        encounter_reason = 'rate_limit_active';
         await adminClient.from('chats').update({ updated_at: now }).eq('connection_id', connection.id);
       } else {
         console.error('connection_encounters insert error:', encounterErr);
@@ -914,6 +918,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      encounter_logged,
+      ...(encounter_reason ? { reason: encounter_reason } : {}),
+      connection_id: connection.id,
       connection,
       proximityConfidence,
     });

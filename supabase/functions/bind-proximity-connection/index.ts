@@ -33,7 +33,17 @@ type UserProfile = {
   email: string | null;
   image: string | null;
   created_at: number;
+  connection_id: string | null;
+  encounter_logged: boolean;
+  reason?: string;
 };
+
+type EncounterMutationOutcome =
+  | 'inserted'
+  | 'debounced'
+  | 'rate_limited'
+  | 'insert_error'
+  | 'debounce_update_error';
 
 function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6_371_000;
@@ -215,9 +225,14 @@ Deno.serve(async (req) => {
   }
 
   if (matchedIds.size === 0) {
-    return new Response(JSON.stringify({ matches: [] as UserProfile[] }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        encounter_logged: true,
+        matches: [] as UserProfile[],
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   }
 
   // Only remove this device's handshake row so other participants can still bind within the TTL
@@ -244,7 +259,7 @@ Deno.serve(async (req) => {
     insertRow: Record<string, unknown>,
     encLat: number | null,
     encLon: number | null,
-  ): Promise<void> {
+  ): Promise<EncounterMutationOutcome> {
     const encounteredAtIso = String(insertRow.encountered_at ?? '');
     const newBlock = twelveHourUtcBlockId(encounteredAtIso);
     if (encLat == null || encLon == null || newBlock == null) {
@@ -254,11 +269,12 @@ Deno.serve(async (req) => {
         if (msg.includes('encounter_rate_limit_3h')) {
           const nowMs = Date.now();
           await admin.from('chats').update({ updated_at: nowMs }).eq('connection_id', connectionId);
-        } else {
-          console.warn('bind-proximity-connection encounter:', encErr.message);
+          return 'rate_limited';
         }
+        console.warn('bind-proximity-connection encounter:', encErr.message);
+        return 'insert_error';
       }
-      return;
+      return 'inserted';
     }
 
     const { data: lastRow, error: lastErr } = await admin
@@ -303,8 +319,9 @@ Deno.serve(async (req) => {
         .eq('id', last.id);
       if (upErr) {
         console.warn('bind-proximity-connection encounter debounce update:', upErr.message);
+        return 'debounce_update_error';
       }
-      return;
+      return 'debounced';
     }
 
     const { error: encErr } = await admin.from('connection_encounters').insert(insertRow);
@@ -313,15 +330,28 @@ Deno.serve(async (req) => {
       if (msg.includes('encounter_rate_limit_3h')) {
         const nowMs = Date.now();
         await admin.from('chats').update({ updated_at: nowMs }).eq('connection_id', connectionId);
-      } else {
-        console.warn('bind-proximity-connection encounter:', encErr.message);
+        return 'rate_limited';
       }
+      console.warn('bind-proximity-connection encounter:', encErr.message);
+      return 'insert_error';
     }
+    return 'inserted';
   }
+
+  /** Per-peer: should the client offer the post-crossing context-tagging flow for this peer? */
+  const peerEncounterLogged: { peerId: string; connectionId: string | null; encounterLogged: boolean; reason?: string }[] =
+    [];
 
   for (const peerId of ids) {
     const connectionId = await connectionIdForPair(peerId);
-    if (!connectionId) continue;
+    if (!connectionId) {
+      peerEncounterLogged.push({
+        peerId,
+        connectionId: null,
+        encounterLogged: true,
+      });
+      continue;
+    }
     const insertRow: Record<string, unknown> = {
       connection_id: connectionId,
       encountered_at: new Date().toISOString(),
@@ -335,8 +365,27 @@ Deno.serve(async (req) => {
       encLat = lat;
       encLon = lon;
     }
-    await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
+    const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
+    if (outcome === 'rate_limited') {
+      peerEncounterLogged.push({
+        peerId,
+        connectionId,
+        encounterLogged: false,
+        reason: 'rate_limit_active',
+      });
+    } else {
+      peerEncounterLogged.push({
+        peerId,
+        connectionId,
+        encounterLogged: true,
+        ...(outcome === 'insert_error' || outcome === 'debounce_update_error'
+          ? { reason: 'encounter_mutation_failed' as const }
+          : {}),
+      });
+    }
   }
+
+  const aggregateEncounterLogged = peerEncounterLogged.some((p) => p.encounterLogged);
 
   const { data: users, error: uErr } = await admin
     .from('users')
@@ -351,20 +400,36 @@ Deno.serve(async (req) => {
     });
   }
 
-  const matches: UserProfile[] = (users ?? []).map((u: Record<string, unknown>) => ({
-    id: String(u.id),
-    name: (u.name as string | null | undefined) ?? null,
-    email: (u.email as string | null | undefined) ?? null,
-    image: (u.image as string | null | undefined) ?? null,
-    created_at:
-      typeof u.created_at === 'string'
-        ? Date.parse(u.created_at)
-        : typeof u.created_at === 'number'
-          ? u.created_at
-          : 0,
-  }));
+  const metaByPeer = new Map(peerEncounterLogged.map((p) => [p.peerId, p]));
 
-  return new Response(JSON.stringify({ matches }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  const matches: UserProfile[] = (users ?? []).map((u: Record<string, unknown>) => {
+    const id = String(u.id);
+    const meta = metaByPeer.get(id);
+    const encounter_logged = meta?.encounterLogged ?? true;
+    const base: UserProfile = {
+      id,
+      name: (u.name as string | null | undefined) ?? null,
+      email: (u.email as string | null | undefined) ?? null,
+      image: (u.image as string | null | undefined) ?? null,
+      created_at:
+        typeof u.created_at === 'string'
+          ? Date.parse(u.created_at)
+          : typeof u.created_at === 'number'
+            ? u.created_at
+            : 0,
+      connection_id: meta?.connectionId ?? null,
+      encounter_logged,
+      ...(meta?.reason ? { reason: meta.reason } : {}),
+    };
+    return base;
   });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      encounter_logged: aggregateEncounterLogged,
+      matches,
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  );
 });
