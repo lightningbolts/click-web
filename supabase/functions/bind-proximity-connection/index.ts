@@ -189,7 +189,6 @@ Deno.serve(async (req) => {
 
   const rows = recent ?? [];
   const matchedIds = new Set<string>();
-  const matchedPeerEventIds = new Set<string>();
 
   for (const o of rows) {
     if (!o || o.user_id === uid) continue;
@@ -213,7 +212,6 @@ Deno.serve(async (req) => {
     }
 
     matchedIds.add(String(o.user_id));
-    matchedPeerEventIds.add(String(o.id));
   }
 
   if (matchedIds.size === 0) {
@@ -222,8 +220,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  const idsToDelete = [String(inserted.id), ...matchedPeerEventIds];
-  await admin.from('proximity_handshake_events').delete().in('id', idsToDelete);
+  // Only remove this device's handshake row so other participants can still bind within the TTL
+  // window and receive the same peer set (multi-person tap).
+  await admin.from('proximity_handshake_events').delete().eq('id', String(inserted.id));
 
   const ids = [...matchedIds];
 
