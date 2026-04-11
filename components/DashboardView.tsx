@@ -53,7 +53,6 @@ import {
 } from '@/components/dashboard';
 import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import CallOverlay, {
   type WebActiveCallState,
   type WebCallInvite,
@@ -153,7 +152,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
   const [mapConnectionRecords, setMapConnectionRecords] = useState<ConnectionRecord[]>([]);
-  const [chapters, setChapters] = useState<TimelineChapter[]>([]);
+  const chapters = useMemo(
+    () => generateChaptersFromConnections(connectionRecords),
+    [connectionRecords],
+  );
   /** The connection whose chat is currently open, or null */
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
   const [chatListTab, setChatListTab] = useState<'active' | 'archived'>('active');
@@ -1524,7 +1526,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
     if (!user?.id) {
       setConnectionRecords([]);
       setMapConnectionRecords([]);
-      setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
       markInitialLoadComplete();
       return;
@@ -1535,7 +1536,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
     const setEmptyConnections = () => {
       setConnectionRecords([]);
       setMapConnectionRecords([]);
-      setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
     };
 
@@ -1819,7 +1819,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       setConnectionRecords(records);
       setMapConnectionRecords(mapRes.ok ? mapRecords : records);
-      setChapters(generateChaptersFromConnections(records));
     } catch (err) {
       console.error('Unexpected error fetching connections:', err);
       setEmptyConnections();
@@ -1836,7 +1835,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
       setConnectionsInitialLoadComplete(false);
       setConnectionRecords([]);
       setMapConnectionRecords([]);
-      setChapters(generateChaptersFromConnections([]));
       setArchivedConnectionIds(new Set());
     }
     void loadConnections();
@@ -1941,6 +1939,35 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const handleExport = useCallback(() => {
     downloadCSV(connectionRecords, `click-connections-${user.email?.split('@')[0] || 'user'}`);
   }, [connectionRecords, user]);
+
+  const handleRenameEncounterLocation = useCallback(
+    async (
+      connectionId: string,
+      encounterId: string,
+      newName: string,
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { ok: false, error: 'Not signed in' };
+      const { error } = await supabase.rpc('rename_encounter_location', {
+        encounter_id: encounterId,
+        new_name: newName,
+      });
+      if (error) return { ok: false, error: error.message };
+      const patchEncounters = (c: ConnectionRecord) => {
+        if (c.id !== connectionId || !c.encounters?.length) return c;
+        return {
+          ...c,
+          encounters: c.encounters.map((e) =>
+            e.id === encounterId ? { ...e, locationName: newName } : e,
+          ),
+        };
+      };
+      setConnectionRecords((prev) => prev.map(patchEncounters));
+      setMapConnectionRecords((prev) => prev.map(patchEncounters));
+      return { ok: true };
+    },
+    [],
+  );
 
   // Shared handler: open chat for a specific connection
   const handleOpenChat = useCallback((conn: ConnectionRecord) => {
@@ -2523,7 +2550,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
                 {/* Time Capsule Section */}
                 <section className="glass p-6 rounded-3xl border border-zinc-800">
-                  <TimeCapsule chapters={chapters} onConnectionClick={handleOpenChat} />
+                  <TimeCapsule
+                    chapters={chapters}
+                    onConnectionClick={handleOpenChat}
+                    onRenameEncounterLocation={handleRenameEncounterLocation}
+                  />
                 </section>
 
                 {/* Connection Table Section */}
