@@ -82,6 +82,50 @@ function finiteNumber(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+function finiteBatteryPct(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const r = Math.round(v);
+  if (r < 0 || r > 100) return null;
+  return r;
+}
+
+/** Variance of |a| over ~500ms; same units from Android + normalized iOS clients. */
+const MOTION_VARIANCE_ACTIVE_THRESHOLD = 1.25;
+
+function buildVibeContextTags(input: {
+  lux: number | null;
+  selfMotion: number | null;
+  peerMotion: number | null;
+  selfAz: number | null;
+  peerAz: number | null;
+  battery: number | null;
+}): string[] {
+  const tags: string[] = [];
+  const add = (t: string) => {
+    if (!tags.includes(t)) tags.push(t);
+  };
+  const { lux, selfMotion, peerMotion, selfAz, peerAz, battery } = input;
+  if (lux != null) {
+    if (lux < 15) add('Dimly Lit');
+    if (lux > 10_000) add('Bright Outdoors');
+  }
+  if (selfAz != null && peerAz != null) {
+    const raw = Math.abs(selfAz - peerAz);
+    const diff = Math.min(raw, 360 - raw);
+    if (diff >= 160 && diff <= 200) add('Met Face-to-Face');
+  }
+  if (battery != null && battery <= 5) add('Living on the Edge (Low Battery)');
+  if (
+    selfMotion != null &&
+    peerMotion != null &&
+    selfMotion > MOTION_VARIANCE_ACTIVE_THRESHOLD &&
+    peerMotion > MOTION_VARIANCE_ACTIVE_THRESHOLD
+  ) {
+    add('Active/Moving');
+  }
+  return tags;
+}
+
 /**
  * Terrain elevation (m above sea level) at a point from Open-Elevation (SRTM-backed DEM).
  */
@@ -151,6 +195,10 @@ Deno.serve(async (req) => {
     exact_barometric_elevation_m?: unknown;
     noise_level?: unknown;
     exact_noise_level_db?: unknown;
+    lux_level?: unknown;
+    motion_variance?: unknown;
+    compass_azimuth?: unknown;
+    battery_level?: unknown;
   };
   try {
     body = await req.json();
@@ -180,6 +228,11 @@ Deno.serve(async (req) => {
   const noiseLevel =
     typeof body.noise_level === 'string' && body.noise_level.trim().length > 0 ? body.noise_level.trim() : null;
 
+  const selfLux = finiteNumber(body.lux_level);
+  const selfMotion = finiteNumber(body.motion_variance);
+  const selfAz = finiteNumber(body.compass_azimuth);
+  const selfBattery = finiteBatteryPct(body.battery_level);
+
   const cutoffIso = new Date(Date.now() - CLEANUP_GRACE_MS).toISOString();
   await admin.from('proximity_handshake_events').delete().lt('created_at', cutoffIso);
 
@@ -197,6 +250,10 @@ Deno.serve(async (req) => {
       heard_tokens: heardTokens,
       lat,
       lon,
+      lux_level: selfLux,
+      motion_variance: selfMotion,
+      compass_azimuth: selfAz,
+      battery_level: selfBattery,
     })
     .select('id, created_at')
     .single();
@@ -220,7 +277,9 @@ Deno.serve(async (req) => {
   const windowStart = new Date(t0 - MATCH_TIME_WINDOW_MS).toISOString();
   const { data: recent, error: qErr } = await admin
     .from('proximity_handshake_events')
-    .select('id, user_id, my_token, heard_tokens, lat, lon, created_at')
+    .select(
+      'id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, created_at',
+    )
     .gte('created_at', windowStart);
 
   if (qErr) {
@@ -399,10 +458,21 @@ Deno.serve(async (req) => {
       });
       continue;
     }
+    const peerRow = rows.find((r) => r && String(r.user_id) === peerId) as Record<string, unknown> | undefined;
+    const peerMotion = peerRow ? finiteNumber(peerRow.motion_variance) : null;
+    const peerAz = peerRow ? finiteNumber(peerRow.compass_azimuth) : null;
+    const vibeTags = buildVibeContextTags({
+      lux: selfLux,
+      selfMotion,
+      peerMotion,
+      selfAz,
+      peerAz,
+      battery: selfBattery,
+    });
     const insertRow: Record<string, unknown> = {
       connection_id: connectionId,
       encountered_at: new Date().toISOString(),
-      context_tags: [],
+      context_tags: vibeTags,
     };
     if (encLat != null && encLon != null) {
       insertRow.gps_lat = encLat;
@@ -414,6 +484,10 @@ Deno.serve(async (req) => {
       insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
     }
     if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
+    if (selfLux != null) insertRow.lux_level = selfLux;
+    if (selfMotion != null) insertRow.motion_variance = selfMotion;
+    if (selfAz != null) insertRow.compass_azimuth = selfAz;
+    if (selfBattery != null) insertRow.battery_level = selfBattery;
     const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
     if (outcome === 'rate_limited') {
       peerEncounterLogged.push({

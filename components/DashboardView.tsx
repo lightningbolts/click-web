@@ -1803,6 +1803,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   Number.isFinite(e.exactBarometricElevationM)
                     ? { exactBarometricElevationM: e.exactBarometricElevationM }
                     : {}),
+                  ...(typeof e.luxLevel === 'number' && Number.isFinite(e.luxLevel) ? { luxLevel: e.luxLevel } : {}),
+                  ...(typeof e.motionVariance === 'number' && Number.isFinite(e.motionVariance)
+                    ? { motionVariance: e.motionVariance }
+                    : {}),
+                  ...(typeof e.compassAzimuth === 'number' && Number.isFinite(e.compassAzimuth)
+                    ? { compassAzimuth: e.compassAzimuth }
+                    : {}),
+                  ...(typeof e.batteryLevel === 'number' &&
+                  Number.isFinite(e.batteryLevel) &&
+                  e.batteryLevel >= 0 &&
+                  e.batteryLevel <= 100
+                    ? { batteryLevel: e.batteryLevel }
+                    : {}),
                 }))
               : undefined,
           intentOverlapLabel: overlapLabel,

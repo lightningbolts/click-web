@@ -11,6 +11,11 @@ import {
   Volume2,
   Mountain,
   Thermometer,
+  Sun,
+  Moon,
+  Battery,
+  Compass,
+  Activity,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -101,6 +106,24 @@ function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon:
       const f = Math.round((temp * 9) / 5 + 32);
       out.push({ key: 'temp', Icon: Thermometer, label: `${f}°F` });
     }
+  }
+  const luxRaw = enc.luxLevel;
+  if (luxRaw !== null && luxRaw !== undefined && typeof luxRaw === 'number' && Number.isFinite(luxRaw) && luxRaw >= 0) {
+    const I = luxRaw < 15 ? Moon : Sun;
+    out.push({ key: 'lux', Icon: I, label: `${Math.round(luxRaw)} lx` });
+  }
+  const bat = enc.batteryLevel;
+  if (bat !== null && bat !== undefined && typeof bat === 'number' && Number.isFinite(bat) && bat >= 0 && bat <= 100) {
+    out.push({ key: 'bat', Icon: Battery, label: `${Math.round(bat)}%` });
+  }
+  const az = enc.compassAzimuth;
+  if (az !== null && az !== undefined && typeof az === 'number' && Number.isFinite(az)) {
+    const d = Math.round(((az % 360) + 360) % 360);
+    out.push({ key: 'az', Icon: Compass, label: `${d}°` });
+  }
+  const mv = enc.motionVariance;
+  if (mv !== null && mv !== undefined && typeof mv === 'number' && Number.isFinite(mv) && mv >= 0) {
+    out.push({ key: 'mv', Icon: Activity, label: mv.toFixed(2) });
   }
   return out;
 }

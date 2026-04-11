@@ -15,6 +15,10 @@ export type ConnectionEncounterRow = {
   exactNoiseLevelDb?: number;
   exactBarometricElevationM?: number;
   relativeAltitudeM?: number;
+  luxLevel?: number;
+  motionVariance?: number;
+  compassAzimuth?: number;
+  batteryLevel?: number;
   contextTags: string[];
 };
 
@@ -57,6 +61,18 @@ export function parseConnectionEncounters(conn: Record<string, unknown>): Connec
       exactNoiseLevelDb: numOrUndef(r.exact_noise_level_db),
       exactBarometricElevationM: numOrUndef(r.exact_barometric_elevation_m),
       relativeAltitudeM: numOrUndef(r.relative_altitude_m),
+      luxLevel: numOrUndef(r.lux_level),
+      motionVariance: numOrUndef(r.motion_variance),
+      compassAzimuth: numOrUndef(r.compass_azimuth),
+      batteryLevel:
+        typeof r.battery_level === 'number' && Number.isFinite(r.battery_level)
+          ? Math.round(r.battery_level)
+          : typeof r.battery_level === 'string' && r.battery_level.trim()
+            ? (() => {
+                const n = Number(r.battery_level);
+                return Number.isFinite(n) ? Math.round(n) : undefined;
+              })()
+            : undefined,
       contextTags,
     });
   }

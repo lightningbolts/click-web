@@ -29,6 +29,10 @@ export interface ConnectionEncounterBrief {
   exactNoiseLevelDb?: number;
   /** Present only when barometric altitude was captured */
   exactBarometricElevationM?: number;
+  luxLevel?: number;
+  motionVariance?: number;
+  compassAzimuth?: number;
+  batteryLevel?: number;
 }
 
 export interface ConnectionRecord {

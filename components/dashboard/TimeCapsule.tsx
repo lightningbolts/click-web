@@ -14,6 +14,11 @@ import {
   TrendingUp,
   Volume2,
   Mountain,
+  Sun,
+  Moon,
+  Battery,
+  Compass,
+  Activity,
 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
@@ -411,7 +416,41 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                           Number.isFinite(enc.exactBarometricElevationM)
                                             ? enc.exactBarometricElevationM
                                             : null;
-                                        if (db === null && el === null) return null;
+                                        const lux =
+                                          enc.luxLevel !== null &&
+                                          enc.luxLevel !== undefined &&
+                                          typeof enc.luxLevel === 'number' &&
+                                          Number.isFinite(enc.luxLevel) &&
+                                          enc.luxLevel >= 0
+                                            ? enc.luxLevel
+                                            : null;
+                                        const mv =
+                                          enc.motionVariance !== null &&
+                                          enc.motionVariance !== undefined &&
+                                          typeof enc.motionVariance === 'number' &&
+                                          Number.isFinite(enc.motionVariance) &&
+                                          enc.motionVariance >= 0
+                                            ? enc.motionVariance
+                                            : null;
+                                        const az =
+                                          enc.compassAzimuth !== null &&
+                                          enc.compassAzimuth !== undefined &&
+                                          typeof enc.compassAzimuth === 'number' &&
+                                          Number.isFinite(enc.compassAzimuth)
+                                            ? enc.compassAzimuth
+                                            : null;
+                                        const bat =
+                                          enc.batteryLevel !== null &&
+                                          enc.batteryLevel !== undefined &&
+                                          typeof enc.batteryLevel === 'number' &&
+                                          Number.isFinite(enc.batteryLevel) &&
+                                          enc.batteryLevel >= 0 &&
+                                          enc.batteryLevel <= 100
+                                            ? enc.batteryLevel
+                                            : null;
+                                        if (db === null && el === null && lux === null && mv === null && az === null && bat === null) {
+                                          return null;
+                                        }
                                         return (
                                           <div className="mt-1 flex flex-wrap gap-1">
                                             {db !== null ? (
@@ -424,6 +463,34 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                               <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
                                                 <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-300" aria-hidden />
                                                 {Math.round(el)} m
+                                              </span>
+                                            ) : null}
+                                            {lux !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                {lux < 15 ? (
+                                                  <Moon className="h-2.5 w-2.5 shrink-0 text-sky-200" aria-hidden />
+                                                ) : (
+                                                  <Sun className="h-2.5 w-2.5 shrink-0 text-amber-200" aria-hidden />
+                                                )}
+                                                {Math.round(lux)} lx
+                                              </span>
+                                            ) : null}
+                                            {bat !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Battery className="h-2.5 w-2.5 shrink-0 text-emerald-300" aria-hidden />
+                                                {Math.round(bat)}%
+                                              </span>
+                                            ) : null}
+                                            {az !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Compass className="h-2.5 w-2.5 shrink-0 text-violet-200" aria-hidden />
+                                                {Math.round(((az % 360) + 360) % 360)}°
+                                              </span>
+                                            ) : null}
+                                            {mv !== null ? (
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200">
+                                                <Activity className="h-2.5 w-2.5 shrink-0 text-orange-200" aria-hidden />
+                                                {mv.toFixed(2)}
                                               </span>
                                             ) : null}
                                           </div>
