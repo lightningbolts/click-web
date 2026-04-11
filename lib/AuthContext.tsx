@@ -10,6 +10,9 @@ interface AuthContextType {
   loading: boolean;
   /** User IDs with an active session on Realtime channel `room:presence` (see Supabase Presence). */
   onlineUserIds: ReadonlySet<string>;
+  /** Public profile image URL from `public.users.image`, kept in sync for instant avatar updates. */
+  profileImageUrl: string | null;
+  setProfileImageUrl: (url: string | null) => void;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -18,6 +21,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   onlineUserIds: new Set(),
+  profileImageUrl: null,
+  setProfileImageUrl: () => { },
   signOut: async () => { },
   refreshUser: async () => { },
 });
@@ -30,6 +35,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [onlineUserIds, setOnlineUserIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  const loadProfileImageFromUsersTable = useCallback(async (userId: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.from('users').select('image').eq('id', userId).maybeSingle();
+      if (!error) {
+        const url = data?.image;
+        setProfileImageUrl(typeof url === 'string' && url.length > 0 ? url : null);
+      }
+    } catch (e) {
+      console.error('Error loading profile image:', e);
+    }
+  }, []);
 
   // Function to refresh user data from Supabase
   const refreshUser = useCallback(async () => {
@@ -40,11 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { user: freshUser }, error } = await supabase.auth.getUser();
       if (!error && freshUser) {
         setUser(freshUser);
+        await loadProfileImageFromUsersTable(freshUser.id);
       }
     } catch (err) {
       console.error('Error refreshing user:', err);
     }
-  }, []);
+  }, [loadProfileImageFromUsersTable]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -55,14 +76,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
       setLoading(false);
+      if (u?.id) {
+        void loadProfileImageFromUsersTable(u.id);
+      } else {
+        setProfileImageUrl(null);
+      }
     });
 
     // Listen for changes on auth state (including USER_UPDATED and PASSWORD_RECOVERY events)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+      const next = session?.user ?? null;
+      setUser(next);
       setLoading(false);
+      if (next?.id) {
+        void loadProfileImageFromUsersTable(next.id);
+      } else {
+        setProfileImageUrl(null);
+      }
 
       // Log auth events for debugging
       if (event === 'USER_UPDATED') {
@@ -80,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfileImageFromUsersTable]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -144,14 +177,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         // Always clear local state
         setUser(null);
+        setProfileImageUrl(null);
       }
     } else {
       setUser(null);
+      setProfileImageUrl(null);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, onlineUserIds, signOut, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        onlineUserIds,
+        profileImageUrl,
+        setProfileImageUrl,
+        signOut,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import * as Switch from '@radix-ui/react-switch';
-import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone, MapPin, Map, Shield } from 'lucide-react';
+import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone, MapPin, Map, Shield, Camera, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
@@ -20,7 +20,7 @@ export default function SettingsView({
   notificationPreferences,
   onSaveNotificationPreferences,
 }: SettingsViewProps) {
-  const { user, signOut, refreshUser } = useAuth();
+  const { user, signOut, refreshUser, profileImageUrl, setProfileImageUrl } = useAuth();
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -56,7 +56,12 @@ export default function SettingsView({
   const [locationPrefsLoading, setLocationPrefsLoading] = useState(false);
   const [locationPrefsMessage, setLocationPrefsMessage] = useState({ type: '', text: '' });
 
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   const browserNotificationsSupported = typeof window !== 'undefined' && 'Notification' in window;
+
+  const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
   const accountDisplayName = useMemo(
     () => (displayNameFromUserMetadata(user?.user_metadata) || '').trim(),
@@ -226,6 +231,69 @@ export default function SettingsView({
       setTagsMessage({ type: 'error', text: err.message || 'Failed to save' });
     } finally {
       setTagsLoading(false);
+    }
+  };
+
+  const handleAvatarFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !user?.id) return;
+
+    if (!file.type.startsWith('image/')) {
+      setProfileMessage({ type: 'error', text: 'Please choose an image file.' });
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setProfileMessage({ type: 'error', text: 'Image must be under 2 MB.' });
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setProfileMessage({ type: 'error', text: 'Supabase client not initialized' });
+      return;
+    }
+
+    const previousImage = profileImageUrl;
+    const objectPath = `${user.id}/${Date.now()}.png`;
+
+    setAvatarUploading(true);
+    setProfileMessage({ type: '', text: '' });
+
+    try {
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(objectPath, file, {
+        upsert: true,
+        contentType: file.type || 'image/png',
+      });
+      if (uploadError) {
+        setProfileMessage({ type: 'error', text: uploadError.message });
+        return;
+      }
+
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(objectPath);
+      const publicUrl = pub?.publicUrl;
+      if (!publicUrl) {
+        setProfileMessage({ type: 'error', text: 'Could not resolve public URL for avatar.' });
+        return;
+      }
+
+      setProfileImageUrl(publicUrl);
+
+      const { error: dbError } = await supabase.from('users').update({ image: publicUrl }).eq('id', user.id);
+      if (dbError) {
+        setProfileImageUrl(previousImage ?? null);
+        setProfileMessage({ type: 'error', text: dbError.message });
+        return;
+      }
+
+      await refreshUser();
+      setProfileMessage({ type: 'success', text: 'Profile photo updated.' });
+    } catch (err: unknown) {
+      setProfileImageUrl(previousImage ?? null);
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      setProfileMessage({ type: 'error', text: message });
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -425,6 +493,50 @@ export default function SettingsView({
         </div>
 
         <form onSubmit={handleUpdateProfile} className="space-y-4">
+          <input
+            ref={avatarFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={handleAvatarFileSelected}
+          />
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                disabled={avatarUploading}
+                onClick={() => avatarFileInputRef.current?.click()}
+                className="relative h-20 w-20 rounded-2xl border border-zinc-700 bg-zinc-900/50 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC] disabled:opacity-50"
+                aria-label="Change profile photo"
+              >
+                {profileImageUrl ? (
+                  <img src={profileImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#8338EC] to-purple-600 text-lg font-bold text-white">
+                    {(accountDisplayName || user?.email || 'U').trim().slice(0, 2).toUpperCase() || 'U'}
+                  </div>
+                )}
+                <span
+                  className={`absolute inset-0 flex items-center justify-center bg-black/45 transition-opacity ${
+                    avatarUploading ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+                  }`}
+                >
+                  {avatarUploading ? (
+                    <Loader2 className="h-7 w-7 text-white animate-spin" aria-hidden />
+                  ) : (
+                    <Camera className="h-7 w-7 text-white" aria-hidden />
+                  )}
+                </span>
+              </button>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Profile photo</p>
+              <p className="text-xs text-zinc-500 mt-1">JPG or PNG, max 2 MB. Opens your photo library.</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="settings-first-name" className="block text-sm font-medium mb-2">
