@@ -23,7 +23,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function finiteNumber(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v.trim());
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
 function normalizeClientNoiseLevelString(value: unknown): string | null {
@@ -86,8 +91,7 @@ export async function PATCH(
     const resolvedContextTag = normalizeContextTag(contextTagObject ?? contextTag);
     const resolvedContextTagId = resolveContextTagId(resolvedContextTag);
     const enumNoiseLevel = normalizeNoiseLevelCategory(noiseLevelCategory);
-    const resolvedNoiseForEncounter =
-      enumNoiseLevel ?? clientNoiseLevelString ?? normalizeNoiseLevelCategory(heightCategoryRaw);
+    const resolvedNoiseForEncounter = enumNoiseLevel ?? clientNoiseLevelString;
     const resolvedElevationCategory =
       normalizeElevationCategoryString(elevationCategoryRaw) ??
       normalizeElevationCategoryString(heightCategoryRaw);
@@ -147,7 +151,7 @@ export async function PATCH(
     const updatePayload: Record<string, unknown> = {};
 
     const prevTags = (latestEnc as { context_tags?: string[] | null }).context_tags;
-    let mergedTags = Array.isArray(prevTags) ? [...prevTags] : [];
+    let mergedTags: string[] = Array.isArray(prevTags) ? [...prevTags] : [];
     for (const id of incomingTagIds) {
       mergedTags = mergeContextTags(mergedTags, id);
     }
@@ -155,7 +159,7 @@ export async function PATCH(
       mergedTags = mergeContextTags(mergedTags, resolvedContextTagId);
     }
     if (incomingTagIds.length > 0 || resolvedContextTagId != null) {
-      updatePayload.context_tags = mergedTags;
+      updatePayload.context_tags = mergedTags.length > 0 ? mergedTags : [];
     }
 
     if (resolvedNoiseForEncounter != null) {
@@ -213,22 +217,26 @@ export async function PATCH(
       !(lat === 0 && lon === 0) &&
       updated?.id
     ) {
-      void (async () => {
-        try {
-          const terrainM = await fetchTerrainElevationMeters(lat, lon);
-          if (terrainM == null) return;
-          const relativeAltitudeM = encElev - terrainM;
-          const { error: relErr } = await adminClient
-            .from('connection_encounters')
-            .update({ relative_altitude_m: relativeAltitudeM })
-            .eq('id', updated.id);
-          if (relErr) {
-            console.error('connection_encounters relative_altitude async update:', relErr);
+      try {
+        void (async () => {
+          try {
+            const terrainM = await fetchTerrainElevationMeters(lat, lon);
+            if (terrainM == null) return;
+            const relativeAltitudeM = encElev - terrainM;
+            const { error: relErr } = await adminClient
+              .from('connection_encounters')
+              .update({ relative_altitude_m: relativeAltitudeM })
+              .eq('id', updated.id);
+            if (relErr) {
+              console.error('connection_encounters relative_altitude async update:', relErr);
+            }
+          } catch (openElevErr) {
+            console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
           }
-        } catch (openElevErr) {
-          console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
-        }
-      })();
+        })();
+      } catch (relScheduleErr) {
+        console.error('relative_altitude follow-up failed (non-fatal):', relScheduleErr);
+      }
     }
 
     return NextResponse.json({ success: true, encounter: updated });

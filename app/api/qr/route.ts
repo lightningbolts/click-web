@@ -4,6 +4,11 @@ import crypto from 'crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
+import {
+  normalizeContextTag,
+  normalizeContextTagsArray,
+  resolveContextTagId,
+} from '@/lib/server/connectionEncounterContextTag';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -432,11 +437,25 @@ export async function POST(request: NextRequest) {
         body.noise_level ?? body.noiseLevel,
       );
       const enumNoiseLevel = normalizeNoiseLevelCategory(noiseLevelCategory);
-      const resolvedNoiseForEncounter =
-        enumNoiseLevel ?? clientNoiseLevelString ?? normalizeNoiseLevelCategory(heightCategoryRaw);
+      const resolvedNoiseForEncounter = enumNoiseLevel ?? clientNoiseLevelString;
       const resolvedElevationCategory =
         normalizeElevationCategoryString(elevationCategoryRaw) ??
         normalizeElevationCategoryString(heightCategoryRaw);
+
+      const resolvedSingleContextTagId = resolveContextTagId(
+        normalizeContextTag(
+          body.contextTagObject ?? body.context_tag_object ?? body.contextTag ?? body.context_tag,
+        ),
+      );
+      const contextTagsFromArray = normalizeContextTagsArray(body.context_tags ?? body.contextTags);
+      const mergedEncounterContextTags = [
+        ...new Set([
+          ...contextTagsFromArray,
+          ...(resolvedSingleContextTagId != null && resolvedSingleContextTagId.trim().length > 0
+            ? [resolvedSingleContextTagId.trim()]
+            : []),
+        ]),
+      ];
 
       // Build RPC params — include scanner GPS for proximity gate
       const rpcParams: Record<string, unknown> = { p_token: token };
@@ -594,6 +613,8 @@ export async function POST(request: NextRequest) {
         if (relativeAltitudeM != null) {
           encounterInsert.relative_altitude_m = relativeAltitudeM;
         }
+
+        encounterInsert.context_tags = mergedEncounterContextTags;
 
         const { error: encounterErr } = await adminClient
           .from('connection_encounters')
