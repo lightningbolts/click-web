@@ -16,11 +16,16 @@ import {
   Battery,
   Compass,
   Activity,
+  Wind,
+  Gauge,
   type LucideIcon,
 } from 'lucide-react';
 import {
   buildProfileConnectionLines,
   originEncounter as strictProfileOriginEncounter,
+  normalizeWeatherSnapshot,
+  prettyElevationCategoryKey,
+  prettyNoiseCategoryKey,
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
@@ -92,21 +97,62 @@ function formatEncounterWhen(iso: string): string {
 
 function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon: LucideIcon; label: string }[] {
   const out: { key: string; Icon: LucideIcon; label: string }[] = [];
+  const ws = normalizeWeatherSnapshot(enc.weatherSnapshot);
+  if (ws) {
+    const cond =
+      typeof ws.condition === 'string' && ws.condition.trim()
+        ? ws.condition.trim()
+        : typeof ws.iconCode === 'string' && ws.iconCode.trim()
+          ? ws.iconCode.trim().replace(/^./, (c) => c.toUpperCase())
+          : null;
+    if (cond) out.push({ key: 'wx-cond', Icon: Cloud, label: cond });
+
+    const temp = typeof ws.temperatureCelsius === 'number' && Number.isFinite(ws.temperatureCelsius)
+      ? ws.temperatureCelsius
+      : null;
+    if (temp != null) {
+      const f = Math.round((temp * 9) / 5 + 32);
+      out.push({ key: 'temp', Icon: Thermometer, label: `${f}°F (${Math.round(temp)}°C)` });
+    }
+    const windKph =
+      typeof ws.windSpeedKph === 'number' && Number.isFinite(ws.windSpeedKph) ? ws.windSpeedKph : null;
+    if (windKph != null) {
+      const degRaw = ws.windDirectionDegrees;
+      const deg =
+        typeof degRaw === 'number' && Number.isFinite(degRaw)
+          ? degRaw
+          : typeof degRaw === 'string' && degRaw.trim()
+            ? Number(degRaw.trim())
+            : NaN;
+      let suffix = '';
+      if (Number.isFinite(deg) && deg >= 0 && deg <= 359) {
+        const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        const x = ((deg % 360) + 360) % 360;
+        const idx = (Math.floor((x + 22.5) / 45) % 8 + 8) % 8;
+        suffix = ` ${dirs[idx]}`;
+      }
+      out.push({ key: 'wind', Icon: Wind, label: `${Math.round(windKph)} km/h${suffix}` });
+    }
+    const p = typeof ws.pressureMslHpa === 'number' && Number.isFinite(ws.pressureMslHpa) ? ws.pressureMslHpa : null;
+    if (p != null) {
+      out.push({ key: 'hpa', Icon: Gauge, label: `${Math.round(p)} hPa` });
+    }
+  }
+  const noiseCat = enc.noiseLevel?.trim();
+  if (noiseCat) {
+    out.push({ key: 'noise-cat', Icon: Volume2, label: prettyNoiseCategoryKey(noiseCat) });
+  }
   const dbRaw = enc.exactNoiseLevelDb;
   if (dbRaw !== null && dbRaw !== undefined && typeof dbRaw === 'number' && Number.isFinite(dbRaw)) {
     out.push({ key: 'db', Icon: Volume2, label: `${Math.round(dbRaw)} dB` });
   }
+  const elCat = enc.elevationCategory?.trim();
+  if (elCat) {
+    out.push({ key: 'el-cat', Icon: Mountain, label: prettyElevationCategoryKey(elCat) });
+  }
   const elRaw = enc.exactBarometricElevationM;
   if (elRaw !== null && elRaw !== undefined && typeof elRaw === 'number' && Number.isFinite(elRaw)) {
     out.push({ key: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
-  }
-  const ws = enc.weatherSnapshot;
-  if (ws && typeof ws === 'object' && ws !== null) {
-    const temp = (ws as { temperatureCelsius?: unknown }).temperatureCelsius;
-    if (typeof temp === 'number' && Number.isFinite(temp)) {
-      const f = Math.round((temp * 9) / 5 + 32);
-      out.push({ key: 'temp', Icon: Thermometer, label: `${f}°F` });
-    }
   }
   const luxRaw = enc.luxLevel;
   if (luxRaw !== null && luxRaw !== undefined && typeof luxRaw === 'number' && Number.isFinite(luxRaw) && luxRaw >= 0) {
@@ -354,6 +400,15 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                             </div>
                           </div>
                         )}
+                        {momentLines.elevation && (
+                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                            <Mountain className="h-4 w-4 shrink-0 text-sky-300/90 mt-0.5" aria-hidden />
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Elevation</p>
+                              <p className="mt-0.5 leading-snug">{momentLines.elevation}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </section>
                   )}
@@ -429,8 +484,10 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                             {encounterTimeline.rows.map((enc) => {
                               const isOrigin = enc.id === encounterTimeline.originId;
                               const pills = encounterMetricPills(enc);
+                              const dn = enc.displayLocation?.trim();
+                              const ln = enc.locationName?.trim();
                               const place =
-                                enc.locationName?.trim() || enc.displayLocation?.trim() || 'A new location';
+                                ln && dn && ln !== dn ? `${ln} · ${dn}` : dn || ln || 'A new location';
                               return (
                                 <li key={enc.id} className="relative pb-9 last:pb-1">
                                   <div

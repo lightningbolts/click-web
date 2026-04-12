@@ -30,6 +30,8 @@ export type ProfileConnectionLines = {
   when?: string;
   weather?: string;
   noise?: string;
+  /** Barometric floor / height context from the origin encounter. */
+  elevation?: string;
 };
 
 export type ProfileOriginEncounter = {
@@ -40,6 +42,8 @@ export type ProfileOriginEncounter = {
   weatherSnapshot?: unknown;
   noiseLevel?: string | null;
   exactNoiseLevelDb?: number | null;
+  elevationCategory?: string | null;
+  exactBarometricElevationM?: number | null;
   contextTags: string[];
 };
 
@@ -66,6 +70,101 @@ function numberOrNull(v: unknown): number | null | undefined {
 
 function celsiusToFahrenheit(c: number): number {
   return (c * 9) / 5 + 32;
+}
+
+const WEATHER_STRINGIFY_MAX_DEPTH = 8;
+
+/**
+ * Unwraps `weather_snapshot` values that may be jsonb objects, stringified JSON,
+ * or legacy double-encoded JSON strings (matches mobile WeatherSnapshot parsing).
+ */
+export function normalizeWeatherSnapshot(raw: unknown): Record<string, unknown> | null {
+  let cur: unknown = raw;
+  for (let d = 0; d < WEATHER_STRINGIFY_MAX_DEPTH; d++) {
+    if (cur == null) return null;
+    if (typeof cur === 'string') {
+      const t = cur.trim();
+      if (!t) return null;
+      try {
+        cur = JSON.parse(t) as unknown;
+      } catch {
+        return null;
+      }
+      continue;
+    }
+    if (typeof cur === 'object' && cur !== null && !Array.isArray(cur)) {
+      return cur as Record<string, unknown>;
+    }
+    return null;
+  }
+  return null;
+}
+
+function windCompassAbbrev(deg: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const x = ((deg % 360) + 360) % 360;
+  const idx = (Math.floor((x + 22.5) / 45) % 8 + 8) % 8;
+  return dirs[idx];
+}
+
+function titleCaseWords(s: string): string {
+  return s
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+export function prettyNoiseCategoryKey(raw: string): string {
+  const k = raw.trim().toUpperCase().replace(/\s+/g, '_');
+  const map: Record<string, string> = {
+    VERY_QUIET: 'Very quiet',
+    QUIET: 'Quiet',
+    MODERATE: 'Moderate',
+    LOUD: 'Loud',
+    VERY_LOUD: 'Very loud',
+  };
+  return map[k] ?? titleCaseWords(raw.replace(/_/g, ' '));
+}
+
+export function prettyElevationCategoryKey(raw: string): string {
+  const k = raw.trim().toUpperCase().replace(/\s+/g, '_');
+  const map: Record<string, string> = {
+    BELOW_GROUND: 'Below ground',
+    GROUND_LEVEL: 'Ground level',
+    ELEVATED: 'Elevated',
+    HIGH_RISE: 'High rise',
+  };
+  return map[k] ?? titleCaseWords(raw.replace(/_/g, ' '));
+}
+
+function formatWeatherRecord(ws: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  const condition =
+    typeof ws.condition === 'string' && ws.condition.trim() ? ws.condition.trim() : undefined;
+  const iconCode =
+    typeof ws.iconCode === 'string' && ws.iconCode.trim() ? ws.iconCode.trim() : undefined;
+  if (condition) parts.push(condition);
+  else if (iconCode) parts.push(iconCode.charAt(0).toUpperCase() + iconCode.slice(1));
+
+  const temp = numberOrNull(ws.temperatureCelsius);
+  if (typeof temp === 'number') {
+    const f = Math.round(celsiusToFahrenheit(temp));
+    parts.push(`${f}°F (${Math.round(temp)}°C)`);
+  }
+  const windKph = numberOrNull(ws.windSpeedKph);
+  if (typeof windKph === 'number') {
+    const deg = numberOrNull(ws.windDirectionDegrees);
+    let suffix = '';
+    if (typeof deg === 'number' && Number.isFinite(deg) && deg >= 0 && deg <= 359) {
+      suffix = ` ${windCompassAbbrev(deg)}`;
+    }
+    parts.push(`${Math.round(windKph)} km/h${suffix}`);
+  }
+  const p = numberOrNull(ws.pressureMslHpa);
+  if (typeof p === 'number') parts.push(`${Math.round(p)} hPa`);
+
+  return parts.length > 0 ? parts.join(' · ') : undefined;
 }
 
 function formatFullLocation(full: Record<string, unknown> | null | undefined): string {
@@ -102,6 +201,8 @@ export function originEncounter(c: SharedConnectionPayload): ProfileOriginEncoun
       weatherSnapshot: encounter.weather_snapshot,
       noiseLevel: stringOrNull(encounter.noise_level),
       exactNoiseLevelDb: numberOrNull(encounter.exact_noise_level_db),
+      elevationCategory: stringOrNull(encounter.elevation_category),
+      exactBarometricElevationM: numberOrNull(encounter.exact_barometric_elevation_m),
       contextTags: Array.isArray(tagsRaw)
         ? tagsRaw
             .filter((tag): tag is string => typeof tag === 'string')
@@ -171,20 +272,19 @@ function extractLegacyWeather(c: SharedConnectionPayload): string | undefined {
     capsule && typeof capsule === 'object' && capsule !== null && 'weatherSnapshot' in capsule
       ? (capsule as { weatherSnapshot?: unknown }).weatherSnapshot
       : null;
-  const source = snapshot && typeof snapshot === 'object' ? snapshot : null;
-  if (source) {
-    const condition = stringOrNull((source as { condition?: unknown }).condition);
-    const temp = numberOrNull((source as { temperatureCelsius?: unknown }).temperatureCelsius);
-    const parts = [condition ?? undefined, typeof temp === 'number' ? `${Math.round(celsiusToFahrenheit(temp))}°F` : undefined]
-      .filter((part): part is string => typeof part === 'string' && part.length > 0);
-    if (parts.length > 0) return parts.join(' · ');
+  const normalized = normalizeWeatherSnapshot(snapshot);
+  if (normalized) {
+    const line = formatWeatherRecord(normalized);
+    if (line) return line;
   }
   return typeof c.weather_condition === 'string' && c.weather_condition.trim() ? c.weather_condition.trim() : undefined;
 }
 
 function extractLegacyNoise(c: SharedConnectionPayload): string | undefined {
   const parts: string[] = [];
-  if (typeof c.noise_level === 'string' && c.noise_level.trim()) parts.push(c.noise_level.trim());
+  if (typeof c.noise_level === 'string' && c.noise_level.trim()) {
+    parts.push(prettyNoiseCategoryKey(c.noise_level.trim()));
+  }
   if (typeof c.exact_noise_level_db === 'number' && Number.isFinite(c.exact_noise_level_db)) {
     parts.push(`${Math.round(c.exact_noise_level_db)} dB`);
   }
@@ -192,21 +292,29 @@ function extractLegacyNoise(c: SharedConnectionPayload): string | undefined {
 }
 
 function extractStrictOriginWeather(origin: ProfileOriginEncounter): string | undefined {
-  const snapshot = origin.weatherSnapshot;
-  if (!snapshot || typeof snapshot !== 'object') return undefined;
-  const condition = stringOrNull((snapshot as { condition?: unknown }).condition);
-  const temp = numberOrNull((snapshot as { temperatureCelsius?: unknown }).temperatureCelsius);
-  const parts = [condition ?? undefined, typeof temp === 'number' ? `${Math.round(celsiusToFahrenheit(temp))}°F` : undefined]
-    .filter((part): part is string => typeof part === 'string' && part.length > 0);
-  return parts.length > 0 ? parts.join(' · ') : undefined;
+  const ws = normalizeWeatherSnapshot(origin.weatherSnapshot);
+  if (!ws) return undefined;
+  return formatWeatherRecord(ws);
 }
 
 function extractStrictOriginNoise(origin: ProfileOriginEncounter): string | undefined {
   const parts: string[] = [];
-  if (typeof origin.noiseLevel === 'string' && origin.noiseLevel.trim()) parts.push(origin.noiseLevel.trim());
+  if (typeof origin.noiseLevel === 'string' && origin.noiseLevel.trim()) {
+    parts.push(prettyNoiseCategoryKey(origin.noiseLevel.trim()));
+  }
   if (typeof origin.exactNoiseLevelDb === 'number' && Number.isFinite(origin.exactNoiseLevelDb)) {
     parts.push(`${Math.round(origin.exactNoiseLevelDb)} dB`);
   }
+  return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+function extractStrictOriginElevation(origin: ProfileOriginEncounter): string | undefined {
+  const parts: string[] = [];
+  if (typeof origin.elevationCategory === 'string' && origin.elevationCategory.trim()) {
+    parts.push(prettyElevationCategoryKey(origin.elevationCategory.trim()));
+  }
+  const m = origin.exactBarometricElevationM;
+  if (typeof m === 'number' && Number.isFinite(m)) parts.push(`${Math.round(m)} m`);
   return parts.length > 0 ? parts.join(' · ') : undefined;
 }
 
@@ -220,7 +328,12 @@ export function buildProfileConnectionLines(
       : extractLegacyContext(c);
   const place =
     strictOriginEncounter != null
-      ? strictOriginEncounter.locationName?.trim() || strictOriginEncounter.displayLocation?.trim() || undefined
+      ? (() => {
+          const dn = strictOriginEncounter.displayLocation?.trim();
+          const ln = strictOriginEncounter.locationName?.trim();
+          if (ln && dn && ln !== dn) return `${ln} · ${dn}`;
+          return dn || ln || undefined;
+        })()
       : (typeof c.semantic_location === 'string' && c.semantic_location.trim()) || formatFullLocation(c.full_location ?? undefined) || undefined;
   const detail =
     strictOriginEncounter != null
@@ -235,6 +348,8 @@ export function buildProfileConnectionLines(
     strictOriginEncounter != null ? extractStrictOriginWeather(strictOriginEncounter) : extractLegacyWeather(c);
   const noise =
     strictOriginEncounter != null ? extractStrictOriginNoise(strictOriginEncounter) : extractLegacyNoise(c);
+  const elevation =
+    strictOriginEncounter != null ? extractStrictOriginElevation(strictOriginEncounter) : undefined;
 
   const lines: ProfileConnectionLines = {};
   if (context) lines.context = context;
@@ -243,5 +358,6 @@ export function buildProfileConnectionLines(
   if (when) lines.when = when;
   if (weather) lines.weather = weather;
   if (noise) lines.noise = noise;
+  if (elevation) lines.elevation = elevation;
   return lines;
 }
