@@ -488,6 +488,13 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                               const ln = enc.locationName?.trim();
                               const place =
                                 ln && dn && ln !== dn ? `${ln} · ${dn}` : dn || ln || 'A new location';
+                              const momentTags = Array.from(
+                                new Set(
+                                  (enc.contextTags ?? [])
+                                    .map((t) => (typeof t === 'string' ? t.trim() : ''))
+                                    .filter(Boolean),
+                                ),
+                              );
                               return (
                                 <li key={enc.id} className="relative pb-9 last:pb-1">
                                   <div
@@ -506,6 +513,19 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                                     <p className="text-sm font-semibold text-white mt-1 leading-snug">
                                       {place}
                                     </p>
+                                    {momentTags.length > 0 && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {momentTags.map((tag) => (
+                                          <span
+                                            key={`${enc.id}-${tag}`}
+                                            className="inline-flex items-center gap-1 rounded-full border border-[#8338EC]/35 bg-[#8338EC]/12 px-2.5 py-0.5 text-[11px] text-[#c4b5fd]"
+                                          >
+                                            <Sparkles className="h-3 w-3 shrink-0 text-[#8338EC]/90" aria-hidden />
+                                            {tag}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                     {pills.length > 0 && (
                                       <div className="mt-2 flex flex-wrap gap-1.5">
                                         {pills.map(({ key, Icon, label }) => (
