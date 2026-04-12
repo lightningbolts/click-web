@@ -3,6 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ConnectionLifecycleStatus } from '@/types/connection';
 import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatus';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
+import {
+  normalizeContextTag,
+  normalizeNoiseLevelCategory,
+  resolveContextTagId,
+  type ContextTagPayload,
+} from '@/lib/server/connectionEncounterContextTag';
 
 /**
  * Connections API
@@ -30,6 +37,20 @@ const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function finiteNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function normalizeClientNoiseLevelString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeElevationCategoryString(value: unknown): string | null {
+  return normalizeClientNoiseLevelString(value);
 }
 
 function firstNonEmptyString(values: unknown[]): string | null {
@@ -200,12 +221,6 @@ function computeProximityScore(params: {
   return { score, signals };
 }
 
-type ContextTagPayload = {
-  id: string;
-  label: string;
-  emoji: string;
-};
-
 type MemoryCapsulePayload = {
   connectionId: string;
   locationName: string | null;
@@ -223,49 +238,6 @@ type MemoryCapsulePayload = {
 
 function buildUtcTimeOfDayLabel(isoTimestamp: string): string {
   return `${isoTimestamp.slice(11, 19)} UTC`;
-}
-
-function normalizeContextTag(input: unknown): ContextTagPayload | null {
-  if (typeof input === 'string') {
-    const label = input.trim();
-    return label ? { id: 'custom', label, emoji: '✏️' } : null;
-  }
-
-  if (
-    input &&
-    typeof input === 'object' &&
-    'id' in input &&
-    'label' in input &&
-    typeof input.id === 'string' &&
-    typeof input.label === 'string'
-  ) {
-    const candidate = input as { id: string; label: string; emoji?: unknown };
-    return {
-      id: candidate.id,
-      label: candidate.label,
-      emoji: typeof candidate.emoji === 'string' ? candidate.emoji : '✏️',
-    };
-  }
-
-  return null;
-}
-
-function resolveContextTagId(contextTag: ContextTagPayload | null): string | null {
-  if (!contextTag) {
-    return null;
-  }
-
-  return contextTag.id === 'custom' ? contextTag.label : contextTag.id;
-}
-
-function normalizeNoiseLevel(value: unknown): MemoryCapsulePayload['noiseLevelCategory'] {
-  return value === 'VERY_QUIET' ||
-    value === 'QUIET' ||
-    value === 'MODERATE' ||
-    value === 'LOUD' ||
-    value === 'VERY_LOUD'
-    ? value
-    : null;
 }
 
 function toConditionLabel(weatherCode: number): string {
@@ -726,28 +698,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const body = isRecord(rawBody) ? rawBody : {};
 
-    const {
-      userId1,
-      userId2,
-      location1,        // { lat, lon } — initiator's GPS
-      location2,        // { lat, lon } — scanner's GPS (if available)
-      connectionMethod = 'qr',
-      tokenAgeMs,       // milliseconds since token was created (null for NFC/legacy)
-      wifiBssid1,       // initiator's WiFi BSSID (optional)
-      wifiBssid2,       // scanner's WiFi BSSID (optional)
-      contextTag,       // user-defined tag (optional)
-      contextTagObject,
-      initiatorId,
-      responderId,
-      initiator_id,
-      responder_id,
-      location_name,
-      noiseLevelCategory,
-      exactNoiseLevelDb,
-      exactBarometricElevationMeters,
-    } = body;
+    const userId1 = typeof body.userId1 === 'string' ? body.userId1 : null;
+    const userId2 = typeof body.userId2 === 'string' ? body.userId2 : null;
+    const location1 = isRecord(body.location1) ? body.location1 : null;
+    const location2 = isRecord(body.location2) ? body.location2 : null;
+    const connectionMethod =
+      typeof body.connectionMethod === 'string' && body.connectionMethod.trim().length > 0
+        ? body.connectionMethod.trim()
+        : 'qr';
+    const tokenAgeMs = finiteNumber(body.tokenAgeMs);
+    const wifiBssid1 = typeof body.wifiBssid1 === 'string' ? body.wifiBssid1 : undefined;
+    const wifiBssid2 = typeof body.wifiBssid2 === 'string' ? body.wifiBssid2 : undefined;
+    const contextTag = body.contextTag;
+    const contextTagObject = body.contextTagObject;
+    const initiatorId = body.initiatorId;
+    const responderId = body.responderId;
+    const initiator_id = body.initiator_id;
+    const responder_id = body.responder_id;
+    const location_name = body.location_name;
+    const noiseLevelCategory = body.noiseLevelCategory ?? body.noise_level_category;
+    const heightCategoryRaw = body.height_category ?? body.heightCategory;
+    const elevationCategoryRaw = body.elevation_category ?? body.elevationCategory;
+    const exactNoiseLevelDb =
+      body.exactNoiseLevelDb ??
+      body.exact_noise_level_db;
+    const exactBarometricElevationMeters =
+      body.exactBarometricElevationMeters ??
+      body.exact_barometric_elevation_m;
+    const clientNoiseLevelString = normalizeClientNoiseLevelString(
+      body.noise_level ?? body.noiseLevel,
+    );
 
     // Validate required fields
     if (!userId1 || !userId2) {
@@ -763,19 +746,21 @@ export async function POST(request: NextRequest) {
 
     // ── Layer 2: GPS proximity validation ──
 
-    const loc1Valid = location1 && isFinite(location1.lat) && isFinite(location1.lon) &&
-      !(location1.lat === 0 && location1.lon === 0);
-    const loc2Valid = location2 && isFinite(location2.lat) && isFinite(location2.lon) &&
-      !(location2.lat === 0 && location2.lon === 0);
+    const loc1Lat = location1 ? finiteNumber(location1.lat) : null;
+    const loc1Lon = location1 ? finiteNumber(location1.lon) : null;
+    const loc2Lat = location2 ? finiteNumber(location2.lat) : null;
+    const loc2Lon = location2 ? finiteNumber(location2.lon) : null;
+
+    const loc1Valid =
+      loc1Lat != null && loc1Lon != null && !(loc1Lat === 0 && loc1Lon === 0);
+    const loc2Valid =
+      loc2Lat != null && loc2Lon != null && !(loc2Lat === 0 && loc2Lon === 0);
 
     let gpsDistanceMeters: number | null = null;
     const gpsAvailable = loc1Valid || loc2Valid;
 
     if (loc1Valid && loc2Valid) {
-      gpsDistanceMeters = haversineMeters(
-        location1.lat, location1.lon,
-        location2.lat, location2.lon
-      );
+      gpsDistanceMeters = haversineMeters(loc1Lat, loc1Lon, loc2Lat, loc2Lon);
 
       // Hard reject if distance > 150m
       if (gpsDistanceMeters > 150) {
@@ -828,11 +813,11 @@ export async function POST(request: NextRequest) {
     // If both are available, prefer initiator location1.
     let geoLocation: { lat: number; lon: number };
     if (loc1Valid && loc2Valid) {
-      geoLocation = { lat: location1.lat, lon: location1.lon };
+      geoLocation = { lat: loc1Lat, lon: loc1Lon };
     } else if (loc1Valid) {
-      geoLocation = { lat: location1.lat, lon: location1.lon };
-    } else if (loc2Valid) {
-      geoLocation = { lat: location2.lat, lon: location2.lon };
+      geoLocation = { lat: loc1Lat, lon: loc1Lon };
+    } else if (loc2Valid && loc2Lat != null && loc2Lon != null) {
+      geoLocation = { lat: loc2Lat, lon: loc2Lon };
     } else {
       // No GPS available — use a null-island sentinel that the frontend filters out
       geoLocation = { lat: 0, lon: 0 };
@@ -844,7 +829,12 @@ export async function POST(request: NextRequest) {
     const expiry = now + 30 * 24 * 60 * 60 * 1000; // 30 days
     const resolvedContextTag = normalizeContextTag(contextTagObject ?? contextTag);
     const resolvedContextTagId = resolveContextTagId(resolvedContextTag);
-    const resolvedNoiseLevel = normalizeNoiseLevel(noiseLevelCategory);
+    const enumNoiseLevel = normalizeNoiseLevelCategory(noiseLevelCategory);
+    const resolvedNoiseForEncounter =
+      enumNoiseLevel ?? clientNoiseLevelString ?? normalizeNoiseLevelCategory(heightCategoryRaw);
+    const resolvedElevationCategory =
+      normalizeElevationCategoryString(elevationCategoryRaw) ??
+      normalizeElevationCategoryString(heightCategoryRaw);
     const resolvedInitiatorId = initiator_id ?? initiatorId ?? (connectionMethod === 'qr' ? userId2 : userId1);
     const resolvedResponderId = responder_id ?? responderId ?? (connectionMethod === 'qr' ? userId1 : userId2);
 
@@ -855,7 +845,7 @@ export async function POST(request: NextRequest) {
       weatherSnapshot: null,
       contextTag: resolvedContextTag,
       photoUri: null,
-      noiseLevelCategory: resolvedNoiseLevel,
+      noiseLevelCategory: enumNoiseLevel,
     };
 
     const userIdsForRow = existing?.user_ids ?? [userId1, userId2];
@@ -992,9 +982,14 @@ export async function POST(request: NextRequest) {
       encountered_at: new Date(now).toISOString(),
       display_location: displayLocation,
       context_tags: resolvedContextTagId ? [resolvedContextTagId] : [],
-      noise_level: resolvedNoiseLevel,
       weather_snapshot: memoryCapsule.weatherSnapshot,
     };
+    if (resolvedNoiseForEncounter != null) {
+      encounterInsert.noise_level = resolvedNoiseForEncounter;
+    }
+    if (resolvedElevationCategory != null) {
+      encounterInsert.elevation_category = resolvedElevationCategory;
+    }
     const resolvedLocationName = manualLocationName ?? specificLocationName ?? memoryCapsule.locationName;
     if (resolvedLocationName) {
       encounterInsert.location_name = resolvedLocationName;
@@ -1009,16 +1004,34 @@ export async function POST(request: NextRequest) {
     }
     if (semanticLocation != null) encounterInsert.semantic_location = semanticLocation;
 
-    const encDb =
-      typeof exactNoiseLevelDb === 'number' && Number.isFinite(exactNoiseLevelDb)
-        ? exactNoiseLevelDb
-        : null;
-    const encElev =
-      typeof exactBarometricElevationMeters === 'number' && Number.isFinite(exactBarometricElevationMeters)
-        ? exactBarometricElevationMeters
-        : null;
-    if (encDb != null) encounterInsert.exact_noise_level_db = encDb;
-    if (encElev != null) encounterInsert.exact_barometric_elevation_m = encElev;
+    const encDb = finiteNumber(exactNoiseLevelDb);
+    const encElev = finiteNumber(exactBarometricElevationMeters);
+    if (encDb != null) {
+      encounterInsert.exact_noise_level_db = encDb;
+    }
+    if (encElev != null) {
+      encounterInsert.exact_barometric_elevation_m = encElev;
+    }
+
+    let relativeAltitudeM: number | null = null;
+    if (
+      encElev != null &&
+      Number.isFinite(geoLocation.lat) &&
+      Number.isFinite(geoLocation.lon) &&
+      !(geoLocation.lat === 0 && geoLocation.lon === 0)
+    ) {
+      try {
+        const terrainM = await fetchTerrainElevationMeters(geoLocation.lat, geoLocation.lon);
+        if (terrainM != null) {
+          relativeAltitudeM = encElev - terrainM;
+        }
+      } catch (openElevErr) {
+        console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
+      }
+    }
+    if (relativeAltitudeM != null) {
+      encounterInsert.relative_altitude_m = relativeAltitudeM;
+    }
 
     const { error: encounterErr } = await adminClient.from('connection_encounters').insert(encounterInsert);
     let encounter_logged = true;
