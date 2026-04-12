@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -43,6 +44,28 @@ const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
 function finiteNumber(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function normalizeClientNoiseLevelString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeNoiseLevelCategory(
+  value: unknown,
+): 'VERY_QUIET' | 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD' | null {
+  return value === 'VERY_QUIET' ||
+    value === 'QUIET' ||
+    value === 'MODERATE' ||
+    value === 'LOUD' ||
+    value === 'VERY_LOUD'
+    ? value
+    : null;
+}
+
+function normalizeElevationCategoryString(value: unknown): string | null {
+  return normalizeClientNoiseLevelString(value);
 }
 
 function finiteBatteryPct(v: unknown): number | null {
@@ -399,6 +422,22 @@ export async function POST(request: NextRequest) {
           ? body.weather_snapshot.trim()
           : null;
 
+      const noiseLevelCategory = body.noiseLevelCategory ?? body.noise_level_category;
+      const heightCategoryRaw = body.height_category ?? body.heightCategory;
+      const elevationCategoryRaw = body.elevation_category ?? body.elevationCategory;
+      const exactNoiseLevelDb = body.exactNoiseLevelDb ?? body.exact_noise_level_db;
+      const exactBarometricElevationMeters =
+        body.exactBarometricElevationMeters ?? body.exact_barometric_elevation_m;
+      const clientNoiseLevelString = normalizeClientNoiseLevelString(
+        body.noise_level ?? body.noiseLevel,
+      );
+      const enumNoiseLevel = normalizeNoiseLevelCategory(noiseLevelCategory);
+      const resolvedNoiseForEncounter =
+        enumNoiseLevel ?? clientNoiseLevelString ?? normalizeNoiseLevelCategory(heightCategoryRaw);
+      const resolvedElevationCategory =
+        normalizeElevationCategoryString(elevationCategoryRaw) ??
+        normalizeElevationCategoryString(heightCategoryRaw);
+
       // Build RPC params — include scanner GPS for proximity gate
       const rpcParams: Record<string, unknown> = { p_token: token };
       if (gpsPair.lat != null && gpsPair.lon != null) {
@@ -518,6 +557,42 @@ export async function POST(request: NextRequest) {
         }
         if (resolvedWeather != null) {
           encounterInsert.weather_snapshot = resolvedWeather;
+        }
+
+        if (resolvedNoiseForEncounter != null) {
+          encounterInsert.noise_level = resolvedNoiseForEncounter;
+        }
+        if (resolvedElevationCategory != null) {
+          encounterInsert.elevation_category = resolvedElevationCategory;
+        }
+
+        const encDb = finiteNumber(exactNoiseLevelDb);
+        const encElev = finiteNumber(exactBarometricElevationMeters);
+        if (encDb != null) {
+          encounterInsert.exact_noise_level_db = encDb;
+        }
+        if (encElev != null) {
+          encounterInsert.exact_barometric_elevation_m = encElev;
+        }
+
+        let relativeAltitudeM: number | null = null;
+        if (
+          encElev != null &&
+          gpsPair.lat != null &&
+          gpsPair.lon != null &&
+          !(gpsPair.lat === 0 && gpsPair.lon === 0)
+        ) {
+          try {
+            const terrainM = await fetchTerrainElevationMeters(gpsPair.lat, gpsPair.lon);
+            if (terrainM != null) {
+              relativeAltitudeM = encElev - terrainM;
+            }
+          } catch (openElevErr) {
+            console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
+          }
+        }
+        if (relativeAltitudeM != null) {
+          encounterInsert.relative_altitude_m = relativeAltitudeM;
         }
 
         const { error: encounterErr } = await adminClient
