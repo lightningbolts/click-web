@@ -1,6 +1,6 @@
 /**
  * Terrain elevation (m above sea level) at a point from Open-Elevation (SRTM-backed DEM).
- * Mirrors `fetchTerrainElevationM` in `supabase/functions/bind-proximity-connection`.
+ * Mirrors `fetchTerrainElevationM` in `supabase/functions/bind-proximity-connection` (bind uses a shorter timeout).
  */
 export const OPEN_ELEVATION_LOOKUP_TIMEOUT_MS = 8_000;
 

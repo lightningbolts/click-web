@@ -2,7 +2,7 @@
  * Edge Function: bind-proximity-connection
  *
  * POST JSON { my_token, heard_tokens[], latitude?, longitude?, gps_lat?, gps_lon?,
- *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db?,
+ *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db?, context_tags?, height_category?,
  *   lux_level?, motion_variance?, compass_azimuth?, battery_level? }
  * Authorization: Bearer <user JWT>
  *
@@ -30,6 +30,8 @@ const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 const EXTENDED_HANGOUT_TAG = 'Extended Hangout';
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
 const OPEN_METEO_TIMEOUT_MS = 3_500;
+/** Open-Elevation lookup budget during bind; keep small so tri-factor resolution stays snappy. */
+const OPEN_ELEVATION_BIND_TIMEOUT_MS = 2_500;
 const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
@@ -92,6 +94,29 @@ function finiteBatteryPct(v: unknown): number | null {
   const r = Math.round(v);
   if (r < 0 || r > 100) return null;
   return r;
+}
+
+/** Client `context_tags`: trimmed non-empty strings, order preserved, deduped. */
+function normalizeContextTagsArray(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const x of raw) {
+    if (typeof x !== 'string') continue;
+    const t = x.trim();
+    if (t.length === 0) continue;
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+function mergeContextTagLists(client: string[], derived: string[]): string[] {
+  const out: string[] = [];
+  const add = (t: string) => {
+    if (!out.includes(t)) out.push(t);
+  };
+  for (const t of client) add(t);
+  for (const t of derived) add(t);
+  return out;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -297,7 +322,7 @@ function buildVibeContextTags(input: {
 async function fetchTerrainElevationM(lat: number, lon: number): Promise<number | null> {
   const url = `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8_000);
+  const timer = setTimeout(() => controller.abort(), OPEN_ELEVATION_BIND_TIMEOUT_MS);
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return null;
@@ -360,6 +385,8 @@ Deno.serve(async (req) => {
     exact_barometric_elevation_m?: unknown;
     noise_level?: unknown;
     exact_noise_level_db?: unknown;
+    context_tags?: unknown;
+    height_category?: unknown;
     lux_level?: unknown;
     motion_variance?: unknown;
     compass_azimuth?: unknown;
@@ -395,6 +422,11 @@ Deno.serve(async (req) => {
   const exactNoiseLevelDb = finiteNumber(body.exact_noise_level_db);
   const noiseLevel =
     typeof body.noise_level === 'string' && body.noise_level.trim().length > 0 ? body.noise_level.trim() : null;
+  const clientContextTags = normalizeContextTagsArray(body.context_tags);
+  const clientHeightCategory =
+    typeof body.height_category === 'string' && body.height_category.trim().length > 0
+      ? body.height_category.trim()
+      : null;
 
   const selfLux = finiteNumber(body.lux_level);
   const selfMotion = finiteNumber(body.motion_variance);
@@ -524,9 +556,13 @@ Deno.serve(async (req) => {
 
   if (!clientContextFirst) {
     if (exactBarometricElevationM != null && encLat != null && encLon != null) {
-      const terrainM = await fetchTerrainElevationM(encLat, encLon);
-      if (terrainM != null) {
-        relativeAltitudeM = exactBarometricElevationM - terrainM;
+      try {
+        const terrainM = await fetchTerrainElevationM(encLat, encLon);
+        if (terrainM != null) {
+          relativeAltitudeM = exactBarometricElevationM - terrainM;
+        }
+      } catch {
+        relativeAltitudeM = null;
       }
     }
     if (encLat != null && encLon != null) {
@@ -670,10 +706,11 @@ Deno.serve(async (req) => {
         peerAz,
         battery: selfBattery,
       });
+      const mergedContextTags = mergeContextTagLists(clientContextTags, vibeTags);
       const insertRow: Record<string, unknown> = {
         connection_id: connectionId,
         encountered_at: new Date().toISOString(),
-        context_tags: vibeTags,
+        context_tags: mergedContextTags,
         display_location: displayLocation,
       };
       if (resolvedLocationName) {
@@ -688,6 +725,9 @@ Deno.serve(async (req) => {
       if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
       if (exactBarometricElevationM != null) {
         insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
+      }
+      if (clientHeightCategory != null) {
+        insertRow.elevation_category = clientHeightCategory;
       }
       if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
       if (selfLux != null) insertRow.lux_level = selfLux;
