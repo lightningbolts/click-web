@@ -37,6 +37,7 @@ function createAdminClient() {
 }
 
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
+const OPEN_METEO_TIMEOUT_MS = 3_500;
 const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
@@ -78,18 +79,54 @@ function extractDisplayLocation(semanticLocation: Record<string, unknown>): stri
 }
 
 function extractSpecificLocationName(semanticLocation: Record<string, unknown>): string | null {
-  const topLevelName = firstNonEmptyString([semanticLocation.name]);
-  if (topLevelName) return topLevelName;
-
   const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
-  if (!address) return null;
+  if (address) {
+    const hn = firstNonEmptyString([address.house_number]);
+    const rd = firstNonEmptyString([address.road]);
+    if (hn != null && rd != null) return `${hn} ${rd}`;
+  }
 
   return firstNonEmptyString([
-    address.amenity,
-    address.building,
-    address.residential,
-    address.road,
+    semanticLocation.name,
+    address?.amenity,
+    address?.building,
+    address?.residential,
+    address?.road,
   ]);
+}
+
+function openMeteoCodeToLabel(code: number): string {
+  if (code === 0) return 'Clear';
+  if ([1, 2, 3].includes(code)) return 'Cloudy';
+  if ([45, 48].includes(code)) return 'Foggy';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'Rain';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'Snow';
+  if ([95, 96, 99].includes(code)) return 'Storm';
+  return 'Clear';
+}
+
+async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const raw = (await res.json()) as {
+      current_weather?: { temperature?: unknown; weathercode?: unknown };
+    };
+    const cw = raw.current_weather;
+    const temp = typeof cw?.temperature === 'number' && Number.isFinite(cw.temperature) ? cw.temperature : null;
+    const codeRaw = cw?.weathercode;
+    const code = typeof codeRaw === 'number' && Number.isFinite(codeRaw) ? codeRaw : 0;
+    if (temp == null) return null;
+    return `${Math.round(temp)}°C, ${openMeteoCodeToLabel(code)}`;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
@@ -322,6 +359,10 @@ export async function POST(request: NextRequest) {
       const motionVariance = finiteNumber(body.motion_variance);
       const compassAzimuth = finiteNumber(body.compass_azimuth);
       const batteryLevel = finiteBatteryPct(body.battery_level);
+      const clientWeatherSnapshot =
+        typeof body.weather_snapshot === 'string' && body.weather_snapshot.trim().length > 0
+          ? body.weather_snapshot.trim()
+          : null;
 
       // Build RPC params — include scanner GPS for proximity gate
       const rpcParams: Record<string, unknown> = { p_token: token };
@@ -435,6 +476,14 @@ export async function POST(request: NextRequest) {
         if (motionVariance != null) encounterInsert.motion_variance = motionVariance;
         if (compassAzimuth != null) encounterInsert.compass_azimuth = compassAzimuth;
         if (batteryLevel != null) encounterInsert.battery_level = batteryLevel;
+
+        let resolvedWeather = clientWeatherSnapshot;
+        if (resolvedWeather == null && gpsPair.lat != null && gpsPair.lon != null) {
+          resolvedWeather = await fetchOpenMeteoWeatherSnapshot(gpsPair.lat, gpsPair.lon);
+        }
+        if (resolvedWeather != null) {
+          encounterInsert.weather_snapshot = resolvedWeather;
+        }
 
         const { error: encounterErr } = await adminClient
           .from('connection_encounters')
