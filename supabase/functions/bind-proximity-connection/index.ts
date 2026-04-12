@@ -3,7 +3,7 @@
  *
  * POST JSON { my_token, heard_tokens[], latitude?, longitude?, gps_lat?, gps_lon?,
  *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db?, context_tags?, height_category?,
- *   lux_level?, motion_variance?, compass_azimuth?, battery_level? }
+ *   lux_level?, motion_variance?, compass_azimuth?, battery_level?, client_context_first? (ignored) }
  * Authorization: Bearer <user JWT>
  *
  * Inserts this device's handshake, then returns other users whose pings overlap in time,
@@ -12,6 +12,10 @@
  * Ghost taps: unmatched handshake rows are kept up to ~5 minutes so a delayed peer ping can match.
  * Encounter debouncing: new crossings within 50m and the same 12-hour UTC block append "Extended Hangout"
  * to the latest encounter instead of inserting a duplicate row.
+ *
+ * On each successful match: ensures a `connections` row exists (creates one + `chats` when missing), inserts
+ * or debounces `connection_encounters` with sensor payload, and returns per-peer `is_new_connection` plus
+ * optional top-level `connection_id` / `is_new_connection` when exactly one peer matched.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -43,6 +47,10 @@ type UserProfile = {
   created_at: number;
   connection_id: string | null;
   encounter_logged: boolean;
+  /** False when this bind attached to an existing `connections` row (reconnection / same pair). */
+  is_new_connection: boolean;
+  /** True when a new `connection_encounters` row was inserted or debounced on the server during this bind. */
+  encounter_persisted_on_bind: boolean;
   reason?: string;
 };
 
@@ -94,6 +102,18 @@ function finiteBatteryPct(v: unknown): number | null {
   const r = Math.round(v);
   if (r < 0 || r > 100) return null;
   return r;
+}
+
+function utcTimeOfDayLabelFromMs(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+}
+
+function isDuplicateKeyError(err: { message?: string; code?: string } | null): boolean {
+  const code = err?.code ?? '';
+  const msg = (err?.message ?? '').toLowerCase();
+  return code === '23505' || msg.includes('duplicate key') || msg.includes('unique constraint');
 }
 
 /** Client `context_tags`: trimmed non-empty strings, order preserved, deduped. */
@@ -392,7 +412,6 @@ Deno.serve(async (req) => {
     compass_azimuth?: unknown;
     battery_level?: unknown;
     location_name?: unknown;
-    client_context_first?: unknown;
     weather_snapshot?: unknown;
   };
   try {
@@ -437,7 +456,6 @@ Deno.serve(async (req) => {
       ? body.location_name.trim()
       : null;
 
-  const clientContextFirst = body.client_context_first === true;
   const clientWeatherSnapshot =
     typeof body.weather_snapshot === 'string' && body.weather_snapshot.trim().length > 0
       ? body.weather_snapshot.trim()
@@ -554,27 +572,25 @@ Deno.serve(async (req) => {
   let displayLocation = DISPLAY_LOCATION_FALLBACK;
   let specificLocationName: string | null = null;
 
-  if (!clientContextFirst) {
-    if (exactBarometricElevationM != null && encLat != null && encLon != null) {
-      try {
-        const terrainM = await fetchTerrainElevationM(encLat, encLon);
-        if (terrainM != null) {
-          relativeAltitudeM = exactBarometricElevationM - terrainM;
-        }
-      } catch {
-        relativeAltitudeM = null;
+  if (exactBarometricElevationM != null && encLat != null && encLon != null) {
+    try {
+      const terrainM = await fetchTerrainElevationM(encLat, encLon);
+      if (terrainM != null) {
+        relativeAltitudeM = exactBarometricElevationM - terrainM;
       }
+    } catch {
+      relativeAltitudeM = null;
     }
-    if (encLat != null && encLon != null) {
-      const geocoded = await fetchNominatimReverseGeocode(encLat, encLon);
-      semanticLocation = geocoded.semanticLocation;
-      displayLocation = geocoded.displayLocation;
-      specificLocationName = geocoded.specificLocationName;
-    }
+  }
+  if (encLat != null && encLon != null) {
+    const geocoded = await fetchNominatimReverseGeocode(encLat, encLon);
+    semanticLocation = geocoded.semanticLocation;
+    displayLocation = geocoded.displayLocation;
+    specificLocationName = geocoded.specificLocationName;
   }
   const resolvedLocationName = manualLocationName ?? specificLocationName;
 
-  async function connectionIdForPair(peerId: string): Promise<string | null> {
+  async function lookupConnectionIdForPair(peerId: string): Promise<string | null> {
     const { data, error } = await admin
       .from('connections')
       .select('id, user_ids')
@@ -585,6 +601,62 @@ Deno.serve(async (req) => {
       return u.includes(uid) && u.includes(peerId);
     });
     return row?.id ?? null;
+  }
+
+  /**
+   * Returns an existing pairwise connection or creates one (+ chat row) using the same shape as mobile `proximity` create.
+   */
+  async function ensureConnectionForPair(peerId: string): Promise<{ connectionId: string; isNewConnection: boolean } | null> {
+    const existingId = await lookupConnectionIdForPair(peerId);
+    if (existingId) {
+      return { connectionId: existingId, isNewConnection: false };
+    }
+    const nowMs = Date.now();
+    const expiryMs = nowMs + 30 * 24 * 60 * 60 * 1000;
+    const hasGps = encLat != null && encLon != null;
+    const proximityConfidence = hasGps ? 65 : 50;
+    const proximitySignals = {
+      connection_method: 'proximity',
+      gps_available: hasGps,
+      bind_source: 'bind-proximity-connection',
+    };
+    const insertRow: Record<string, unknown> = {
+      user_ids: [uid, peerId],
+      created: nowMs,
+      expiry: expiryMs,
+      should_continue: [false, false],
+      has_begun: false,
+      expiry_state: 'pending',
+      status: 'pending',
+      include_in_business_insights: true,
+      initiator_id: peerId,
+      responder_id: uid,
+      connection_method: 'proximity',
+      proximity_confidence: proximityConfidence,
+      flagged: proximityConfidence < 20,
+      proximity_signals: proximitySignals,
+      created_utc: new Date(nowMs).toISOString(),
+      time_of_day_utc: utcTimeOfDayLabelFromMs(nowMs),
+    };
+    const { data: ins, error: insErr } = await admin.from('connections').insert(insertRow).select('id').single();
+    if (insErr || !ins?.id) {
+      if (isDuplicateKeyError(insErr)) {
+        const retry = await lookupConnectionIdForPair(peerId);
+        if (retry) return { connectionId: retry, isNewConnection: false };
+      }
+      console.error('bind-proximity-connection ensureConnection insert:', insErr);
+      return null;
+    }
+    const connectionId = String(ins.id);
+    const { error: chatErr } = await admin.from('chats').insert({
+      connection_id: connectionId,
+      created_at: nowMs,
+      updated_at: nowMs,
+    });
+    if (chatErr && !isDuplicateKeyError(chatErr)) {
+      console.warn('bind-proximity-connection ensureConnection chat:', chatErr.message);
+    }
+    return { connectionId, isNewConnection: true };
   }
 
   async function insertOrDebounceEncounter(
@@ -671,96 +743,101 @@ Deno.serve(async (req) => {
     return 'inserted';
   }
 
-  /** Per-peer: should the client offer the post-crossing context-tagging flow for this peer? */
-  const peerEncounterLogged: { peerId: string; connectionId: string | null; encounterLogged: boolean; reason?: string }[] =
-    [];
+  type PeerBindMeta = {
+    peerId: string;
+    connectionId: string | null;
+    encounterLogged: boolean;
+    isNewConnection: boolean;
+    encounterPersistedOnBind: boolean;
+    reason?: string;
+  };
+  const peerEncounterLogged: PeerBindMeta[] = [];
 
-  if (clientContextFirst) {
-    for (const peerId of ids) {
-      const connectionId = await connectionIdForPair(peerId);
+  for (const peerId of ids) {
+    const ensured = await ensureConnectionForPair(peerId);
+    if (!ensured) {
+      peerEncounterLogged.push({
+        peerId,
+        connectionId: null,
+        encounterLogged: false,
+        isNewConnection: true,
+        encounterPersistedOnBind: false,
+        reason: 'connection_unavailable',
+      });
+      continue;
+    }
+    const { connectionId, isNewConnection } = ensured;
+
+    const peerRow = rows.find((r) => r && String(r.user_id) === peerId) as Record<string, unknown> | undefined;
+    const peerMotion = peerRow ? finiteNumber(peerRow.motion_variance) : null;
+    const peerAz = peerRow ? finiteNumber(peerRow.compass_azimuth) : null;
+    const vibeTags = buildVibeContextTags({
+      lux: selfLux,
+      selfMotion,
+      peerMotion,
+      selfAz,
+      peerAz,
+      battery: selfBattery,
+    });
+    const mergedContextTags = mergeContextTagLists(clientContextTags, vibeTags);
+    const insertRow: Record<string, unknown> = {
+      connection_id: connectionId,
+      encountered_at: new Date().toISOString(),
+      context_tags: mergedContextTags,
+      display_location: displayLocation,
+    };
+    if (resolvedLocationName) {
+      insertRow.location_name = resolvedLocationName;
+    }
+    if (encLat != null && encLon != null) {
+      insertRow.gps_lat = encLat;
+      insertRow.gps_lon = encLon;
+    }
+    if (semanticLocation != null) insertRow.semantic_location = semanticLocation;
+    if (noiseLevel != null) insertRow.noise_level = noiseLevel;
+    if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
+    if (exactBarometricElevationM != null) {
+      insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
+    }
+    if (clientHeightCategory != null) {
+      insertRow.elevation_category = clientHeightCategory;
+    }
+    if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
+    if (selfLux != null) insertRow.lux_level = selfLux;
+    if (selfMotion != null) insertRow.motion_variance = selfMotion;
+    if (selfAz != null) insertRow.compass_azimuth = selfAz;
+    if (selfBattery != null) insertRow.battery_level = selfBattery;
+
+    let resolvedWeather = clientWeatherSnapshot;
+    if (resolvedWeather == null && encLat != null && encLon != null) {
+      resolvedWeather = await fetchOpenMeteoWeatherSnapshot(encLat, encLon);
+    }
+    if (resolvedWeather != null) {
+      insertRow.weather_snapshot = resolvedWeather;
+    }
+
+    const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
+    const persisted = outcome === 'inserted' || outcome === 'debounced';
+    if (outcome === 'rate_limited') {
+      peerEncounterLogged.push({
+        peerId,
+        connectionId,
+        encounterLogged: false,
+        isNewConnection,
+        encounterPersistedOnBind: false,
+        reason: 'rate_limit_active',
+      });
+    } else {
       peerEncounterLogged.push({
         peerId,
         connectionId,
         encounterLogged: true,
+        isNewConnection,
+        encounterPersistedOnBind: persisted,
+        ...(outcome === 'insert_error' || outcome === 'debounce_update_error'
+          ? { reason: 'encounter_mutation_failed' as const }
+          : {}),
       });
-    }
-  } else {
-    for (const peerId of ids) {
-      const connectionId = await connectionIdForPair(peerId);
-      if (!connectionId) {
-        peerEncounterLogged.push({
-          peerId,
-          connectionId: null,
-          encounterLogged: true,
-        });
-        continue;
-      }
-      const peerRow = rows.find((r) => r && String(r.user_id) === peerId) as Record<string, unknown> | undefined;
-      const peerMotion = peerRow ? finiteNumber(peerRow.motion_variance) : null;
-      const peerAz = peerRow ? finiteNumber(peerRow.compass_azimuth) : null;
-      const vibeTags = buildVibeContextTags({
-        lux: selfLux,
-        selfMotion,
-        peerMotion,
-        selfAz,
-        peerAz,
-        battery: selfBattery,
-      });
-      const mergedContextTags = mergeContextTagLists(clientContextTags, vibeTags);
-      const insertRow: Record<string, unknown> = {
-        connection_id: connectionId,
-        encountered_at: new Date().toISOString(),
-        context_tags: mergedContextTags,
-        display_location: displayLocation,
-      };
-      if (resolvedLocationName) {
-        insertRow.location_name = resolvedLocationName;
-      }
-      if (encLat != null && encLon != null) {
-        insertRow.gps_lat = encLat;
-        insertRow.gps_lon = encLon;
-      }
-      if (semanticLocation != null) insertRow.semantic_location = semanticLocation;
-      if (noiseLevel != null) insertRow.noise_level = noiseLevel;
-      if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
-      if (exactBarometricElevationM != null) {
-        insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
-      }
-      if (clientHeightCategory != null) {
-        insertRow.elevation_category = clientHeightCategory;
-      }
-      if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
-      if (selfLux != null) insertRow.lux_level = selfLux;
-      if (selfMotion != null) insertRow.motion_variance = selfMotion;
-      if (selfAz != null) insertRow.compass_azimuth = selfAz;
-      if (selfBattery != null) insertRow.battery_level = selfBattery;
-
-      let resolvedWeather = clientWeatherSnapshot;
-      if (resolvedWeather == null && encLat != null && encLon != null) {
-        resolvedWeather = await fetchOpenMeteoWeatherSnapshot(encLat, encLon);
-      }
-      if (resolvedWeather != null) {
-        insertRow.weather_snapshot = resolvedWeather;
-      }
-
-      const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
-      if (outcome === 'rate_limited') {
-        peerEncounterLogged.push({
-          peerId,
-          connectionId,
-          encounterLogged: false,
-          reason: 'rate_limit_active',
-        });
-      } else {
-        peerEncounterLogged.push({
-          peerId,
-          connectionId,
-          encounterLogged: true,
-          ...(outcome === 'insert_error' || outcome === 'debounce_update_error'
-            ? { reason: 'encounter_mutation_failed' as const }
-            : {}),
-        });
-      }
     }
   }
 
@@ -798,17 +875,27 @@ Deno.serve(async (req) => {
             : 0,
       connection_id: meta?.connectionId ?? null,
       encounter_logged,
+      is_new_connection: meta?.isNewConnection ?? true,
+      encounter_persisted_on_bind: meta?.encounterPersistedOnBind ?? false,
       ...(meta?.reason ? { reason: meta.reason } : {}),
     };
     return base;
   });
 
-  return new Response(
-    JSON.stringify({
-      success: true,
-      encounter_logged: aggregateEncounterLogged,
-      matches,
-    }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-  );
+  const responseBody: Record<string, unknown> = {
+    success: true,
+    encounter_logged: aggregateEncounterLogged,
+    matches,
+  };
+  if (matches.length === 1) {
+    const only = matches[0];
+    if (only?.connection_id != null) {
+      responseBody.connection_id = only.connection_id;
+      responseBody.is_new_connection = only.is_new_connection;
+    }
+  }
+
+  return new Response(JSON.stringify(responseBody), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 });
