@@ -581,12 +581,12 @@ export async function POST(request: NextRequest) {
         if (resolvedNoiseForEncounter != null) {
           encounterInsert.noise_level = resolvedNoiseForEncounter;
         }
-        if (resolvedElevationCategory != null) {
-          encounterInsert.elevation_category = resolvedElevationCategory;
-        }
 
         const encDb = finiteNumber(exactNoiseLevelDb);
         const encElev = finiteNumber(exactBarometricElevationMeters);
+        if (encElev != null && resolvedElevationCategory != null) {
+          encounterInsert.elevation_category = resolvedElevationCategory;
+        }
         if (encDb != null) {
           encounterInsert.exact_noise_level_db = encDb;
         }
