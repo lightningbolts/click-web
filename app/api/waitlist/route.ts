@@ -17,7 +17,6 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      console.log('Supabase not configured. Email captured:', email);
       return NextResponse.json({ success: true, message: 'Successfully joined the waitlist!' });
     }
 

@@ -149,22 +149,57 @@ function openMeteoCodeToLabel(code: number): string {
   return 'Clear';
 }
 
+function openMeteoCodeToIcon(code: number): string {
+  if (code === 0) return 'clear';
+  if ([1, 2, 3].includes(code)) return 'cloudy';
+  if ([45, 48].includes(code)) return 'fog';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow';
+  if ([95, 96, 99].includes(code)) return 'thunder';
+  return 'clear';
+}
+
 async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl';
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return null;
     const raw = (await res.json()) as {
-      current_weather?: { temperature?: unknown; weathercode?: unknown };
+      current?: {
+        temperature_2m?: number;
+        weather_code?: number;
+        wind_speed_10m?: number;
+        wind_direction_10m?: number;
+        pressure_msl?: number;
+      };
     };
-    const cw = raw.current_weather;
-    const temp = typeof cw?.temperature === 'number' && Number.isFinite(cw.temperature) ? cw.temperature : null;
-    const codeRaw = cw?.weathercode;
-    const code = typeof codeRaw === 'number' && Number.isFinite(codeRaw) ? codeRaw : 0;
-    if (temp == null) return null;
-    return `${Math.round(temp)}°C, ${openMeteoCodeToLabel(code)}`;
+    const cur = raw.current;
+    if (cur == null || typeof cur.temperature_2m !== 'number' || !Number.isFinite(cur.temperature_2m)) {
+      return null;
+    }
+    const code =
+      typeof cur.weather_code === 'number' && Number.isFinite(cur.weather_code) ? cur.weather_code : 0;
+    const payload = {
+      iconCode: openMeteoCodeToIcon(code),
+      condition: openMeteoCodeToLabel(code),
+      windSpeedKph:
+        typeof cur.wind_speed_10m === 'number' && Number.isFinite(cur.wind_speed_10m)
+          ? cur.wind_speed_10m
+          : null,
+      pressureMslHpa:
+        typeof cur.pressure_msl === 'number' && Number.isFinite(cur.pressure_msl) ? cur.pressure_msl : null,
+      temperatureCelsius: cur.temperature_2m,
+      windDirectionDegrees:
+        typeof cur.wind_direction_10m === 'number' && Number.isFinite(cur.wind_direction_10m)
+          ? Math.round(cur.wind_direction_10m)
+          : null,
+    };
+    return JSON.stringify(payload);
   } catch {
     return null;
   } finally {
