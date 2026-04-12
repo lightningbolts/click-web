@@ -6,6 +6,7 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
 import {
   normalizeContextTag,
+  normalizeContextTagsArray,
   normalizeNoiseLevelCategory,
   resolveContextTagId,
   type ContextTagPayload,
@@ -328,6 +329,56 @@ async function enrichEncounterWeather(
     }
   } catch (error) {
     console.error('Memory capsule weather fetch error:', error);
+  }
+}
+
+/**
+ * Computes terrain-relative altitude after insert so Open-Elevation latency never delays the POST response.
+ */
+async function enrichEncounterRelativeAltitude(
+  adminClient: ReturnType<typeof createAdminClient>,
+  connectionId: string,
+  barometricElevationM: number,
+  lat: number,
+  lon: number,
+) {
+  if (
+    !Number.isFinite(barometricElevationM) ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lon) ||
+    (lat === 0 && lon === 0)
+  ) {
+    return;
+  }
+
+  try {
+    const terrainM = await fetchTerrainElevationMeters(lat, lon);
+    if (terrainM == null) return;
+
+    const { data: latestEnc, error: encLookupErr } = await adminClient
+      .from('connection_encounters')
+      .select('id')
+      .eq('connection_id', connectionId)
+      .order('encountered_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (encLookupErr || !latestEnc?.id) {
+      if (encLookupErr) console.error('Encounter lookup for relative altitude:', encLookupErr);
+      return;
+    }
+
+    const relativeAltitudeM = barometricElevationM - terrainM;
+    const { error } = await adminClient
+      .from('connection_encounters')
+      .update({ relative_altitude_m: relativeAltitudeM })
+      .eq('id', latestEnc.id);
+
+    if (error) {
+      console.error('Encounter relative altitude update error:', error);
+    }
+  } catch (error) {
+    console.error('Relative altitude enrichment error:', error);
   }
 }
 
@@ -829,6 +880,7 @@ export async function POST(request: NextRequest) {
     const expiry = now + 30 * 24 * 60 * 60 * 1000; // 30 days
     const resolvedContextTag = normalizeContextTag(contextTagObject ?? contextTag);
     const resolvedContextTagId = resolveContextTagId(resolvedContextTag);
+    const contextTagIdsFromBody = normalizeContextTagsArray(body.context_tags ?? body.contextTags);
     const enumNoiseLevel = normalizeNoiseLevelCategory(noiseLevelCategory);
     const resolvedNoiseForEncounter =
       enumNoiseLevel ?? clientNoiseLevelString ?? normalizeNoiseLevelCategory(heightCategoryRaw);
@@ -977,11 +1029,18 @@ export async function POST(request: NextRequest) {
       specificLocationName = geocoded.specificLocationName;
     }
 
+    const encounterContextTags = [
+      ...new Set([
+        ...contextTagIdsFromBody,
+        ...(resolvedContextTagId ? [resolvedContextTagId] : []),
+      ]),
+    ];
+
     const encounterInsert: Record<string, unknown> = {
       connection_id: connection.id,
       encountered_at: new Date(now).toISOString(),
       display_location: displayLocation,
-      context_tags: resolvedContextTagId ? [resolvedContextTagId] : [],
+      context_tags: encounterContextTags,
       weather_snapshot: memoryCapsule.weatherSnapshot,
     };
     if (resolvedNoiseForEncounter != null) {
@@ -1013,26 +1072,6 @@ export async function POST(request: NextRequest) {
       encounterInsert.exact_barometric_elevation_m = encElev;
     }
 
-    let relativeAltitudeM: number | null = null;
-    if (
-      encElev != null &&
-      Number.isFinite(geoLocation.lat) &&
-      Number.isFinite(geoLocation.lon) &&
-      !(geoLocation.lat === 0 && geoLocation.lon === 0)
-    ) {
-      try {
-        const terrainM = await fetchTerrainElevationMeters(geoLocation.lat, geoLocation.lon);
-        if (terrainM != null) {
-          relativeAltitudeM = encElev - terrainM;
-        }
-      } catch (openElevErr) {
-        console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
-      }
-    }
-    if (relativeAltitudeM != null) {
-      encounterInsert.relative_altitude_m = relativeAltitudeM;
-    }
-
     const { error: encounterErr } = await adminClient.from('connection_encounters').insert(encounterInsert);
     let encounter_logged = true;
     let encounter_reason: string | undefined;
@@ -1054,6 +1093,21 @@ export async function POST(request: NextRequest) {
       geoLocation.lon,
       memoryCapsule
     );
+
+    if (
+      encElev != null &&
+      Number.isFinite(geoLocation.lat) &&
+      Number.isFinite(geoLocation.lon) &&
+      !(geoLocation.lat === 0 && geoLocation.lon === 0)
+    ) {
+      void enrichEncounterRelativeAltitude(
+        adminClient,
+        connection.id,
+        encElev,
+        geoLocation.lat,
+        geoLocation.lon,
+      );
+    }
 
     return NextResponse.json({
       success: true,

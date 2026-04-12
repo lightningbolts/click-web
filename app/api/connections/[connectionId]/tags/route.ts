@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   normalizeContextTag,
+  normalizeContextTagsArray,
   normalizeNoiseLevelCategory,
   resolveContextTagId,
 } from '@/lib/server/connectionEncounterContextTag';
@@ -71,6 +72,7 @@ export async function PATCH(
 
     const contextTag = body.contextTag ?? body.context_tag;
     const contextTagObject = body.contextTagObject ?? body.context_tag_object;
+    const incomingTagIds = normalizeContextTagsArray(body.context_tags ?? body.contextTags);
     const noiseLevelCategory = body.noiseLevelCategory ?? body.noise_level_category;
     const heightCategoryRaw = body.height_category ?? body.heightCategory;
     const elevationCategoryRaw = body.elevation_category ?? body.elevationCategory;
@@ -92,6 +94,7 @@ export async function PATCH(
 
     if (
       resolvedContextTagId == null &&
+      incomingTagIds.length === 0 &&
       resolvedNoiseForEncounter == null &&
       resolvedElevationCategory == null &&
       finiteNumber(exactNoiseLevelDb) == null &&
@@ -144,8 +147,15 @@ export async function PATCH(
     const updatePayload: Record<string, unknown> = {};
 
     const prevTags = (latestEnc as { context_tags?: string[] | null }).context_tags;
+    let mergedTags = Array.isArray(prevTags) ? [...prevTags] : [];
+    for (const id of incomingTagIds) {
+      mergedTags = mergeContextTags(mergedTags, id);
+    }
     if (resolvedContextTagId != null) {
-      updatePayload.context_tags = mergeContextTags(prevTags, resolvedContextTagId);
+      mergedTags = mergeContextTags(mergedTags, resolvedContextTagId);
+    }
+    if (incomingTagIds.length > 0 || resolvedContextTagId != null) {
+      updatePayload.context_tags = mergedTags;
     }
 
     if (resolvedNoiseForEncounter != null) {
@@ -180,17 +190,6 @@ export async function PATCH(
       updatePayload.gps_lon = lon;
     }
 
-    if (encElev != null && lat != null && lon != null && !(lat === 0 && lon === 0)) {
-      try {
-        const terrainM = await fetchTerrainElevationMeters(lat, lon);
-        if (terrainM != null) {
-          updatePayload.relative_altitude_m = encElev - terrainM;
-        }
-      } catch (openElevErr) {
-        console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
-      }
-    }
-
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ success: true, encounter: latestEnc });
     }
@@ -205,6 +204,31 @@ export async function PATCH(
     if (upErr) {
       console.error('connection_encounters tags update:', upErr);
       return NextResponse.json({ error: upErr.message }, { status: 400 });
+    }
+
+    if (
+      encElev != null &&
+      lat != null &&
+      lon != null &&
+      !(lat === 0 && lon === 0) &&
+      updated?.id
+    ) {
+      void (async () => {
+        try {
+          const terrainM = await fetchTerrainElevationMeters(lat, lon);
+          if (terrainM == null) return;
+          const relativeAltitudeM = encElev - terrainM;
+          const { error: relErr } = await adminClient
+            .from('connection_encounters')
+            .update({ relative_altitude_m: relativeAltitudeM })
+            .eq('id', updated.id);
+          if (relErr) {
+            console.error('connection_encounters relative_altitude async update:', relErr);
+          }
+        } catch (openElevErr) {
+          console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
+        }
+      })();
     }
 
     return NextResponse.json({ success: true, encounter: updated });

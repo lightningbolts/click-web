@@ -48,3 +48,16 @@ export function normalizeNoiseLevelCategory(
     ? value
     : null;
 }
+
+/** Client `context_tags` / `contextTags` payloads: non-empty trimmed strings only, deduped. */
+export function normalizeContextTagsArray(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  for (const item of input) {
+    if (typeof item === 'string') {
+      const t = item.trim();
+      if (t.length > 0) out.push(t);
+    }
+  }
+  return [...new Set(out)];
+}
