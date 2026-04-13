@@ -43,7 +43,7 @@ function connectionsRateLimitExceeded(ip: string): boolean {
   return false;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -99,6 +99,19 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
+
+  if (adminRoute) {
+    const role = user?.user_metadata?.role;
+    if (!user || role !== 'admin') {
+      const redirect = NextResponse.redirect(new URL('/', request.url));
+      supabaseResponse.cookies.getAll().forEach((c) => {
+        redirect.cookies.set(c.name, c.value);
+      });
+      return redirect;
+    }
+  }
+
   if (pathname === '/insights' || pathname.startsWith('/insights/')) {
     const signupUrl = new URL('/business/signup', request.url);
 
