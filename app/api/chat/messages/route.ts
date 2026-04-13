@@ -19,6 +19,12 @@ import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { buildMessageInsertRow, normalizeDbMessage } from '@/lib/chat/messages';
 import type { MessageType } from '@/lib/chat/types';
+import {
+  assertChatWritable,
+  createChatGatekeeperAdmin,
+  requireBearerUser,
+} from '@/lib/server/chatGatekeeper';
+import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 
 const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
@@ -49,8 +55,8 @@ async function notifyChatMessagePush(token: string | null, chatId: string, messa
   }
 }
 
-async function getOrCreateChat(supabase: SupabaseClient, connectionId: string) {
-  const { data: existing, error: findErr } = await supabase
+async function getOrCreateChatAdmin(admin: SupabaseClient, connectionId: string) {
+  const { data: existing, error: findErr } = await admin
     .from('chats')
     .select('*')
     .eq('connection_id', connectionId)
@@ -61,7 +67,7 @@ async function getOrCreateChat(supabase: SupabaseClient, connectionId: string) {
   if (existing) return existing;
 
   const now = Date.now();
-  const { data: created, error: createErr } = await supabase
+  const { data: created, error: createErr } = await admin
     .from('chats')
     .insert({ connection_id: connectionId, created_at: now, updated_at: now })
     .select()
@@ -69,27 +75,6 @@ async function getOrCreateChat(supabase: SupabaseClient, connectionId: string) {
 
   if (createErr) throw createErr;
   return created;
-}
-
-async function resolveChatId(
-  supabase: SupabaseClient,
-  chatId?: string | null,
-  connectionId?: string | null
-) {
-  if (chatId) {
-    const { data: existing, error } = await supabase
-      .from('chats')
-      .select('id')
-      .eq('id', chatId)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (existing?.id) return existing.id as string;
-  }
-
-  if (!connectionId) return null;
-  const chat = await getOrCreateChat(supabase, connectionId);
-  return chat.id as string;
 }
 
 const DEFAULT_LIMIT = 40;
@@ -176,7 +161,14 @@ function parsePostMessageType(raw: unknown): MessageType {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { chatId, connectionId, content, message_type: rawMessageType, metadata } = body;
+  const chatId =
+    typeof body.chatId === 'string'
+      ? body.chatId
+      : typeof body.chat_id === 'string'
+        ? body.chat_id
+        : '';
+  const connectionId = typeof body.connectionId === 'string' ? body.connectionId : '';
+  const { content, message_type: rawMessageType, metadata } = body;
   const messageType = parsePostMessageType(rawMessageType);
   const isCallLog = messageType === 'call_log';
   const isMedia = messageType === 'image' || messageType === 'audio';
@@ -207,11 +199,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { user, supabase, token } = await getAuthenticatedSupabase(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const jwt = await requireBearerUser(req);
+  if (!jwt.ok) return jwt.response;
+  const { user, bearer: token } = jwt;
+  const admin = createChatGatekeeperAdmin();
 
   try {
-    const resolvedChatId = await resolveChatId(supabase, chatId, connectionId);
+    let resolvedChatId: string | null = null;
+
+    if (chatId.trim()) {
+      const denied = await assertChatWritable(admin, user.id, chatId.trim());
+      if (denied) return denied;
+      resolvedChatId = chatId.trim();
+    } else if (connectionId.trim()) {
+      const { data: conn, error: connErr } = await admin
+        .from('connections')
+        .select('id, user_ids, status, expiry_state')
+        .eq('id', connectionId.trim())
+        .maybeSingle();
+
+      if (connErr) throw connErr;
+      const ids =
+        (conn?.user_ids as string[] | null)?.map((id) => id.trim()).filter((id) => id.length > 0) ?? [];
+      if (!conn || !ids.includes(user.id)) {
+        return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
+      }
+      const st = normalizeConnectionStatus(conn as Record<string, unknown>);
+      if (!isActiveChatListStatus(st)) {
+        return NextResponse.json({ error: 'Connection not active for chat' }, { status: 403 });
+      }
+
+      const chat = await getOrCreateChatAdmin(admin, connectionId.trim());
+      resolvedChatId = chat.id as string;
+    }
+
     if (!resolvedChatId) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
@@ -235,21 +256,7 @@ export async function POST(req: NextRequest) {
       metadata,
     });
 
-    let { data: message, error: insertErr } = await supabase.from('messages').insert(insertRow).select().single();
-
-    if (insertErr && connectionId) {
-      const ensuredChat = await getOrCreateChat(supabase, connectionId);
-      if (ensuredChat.id !== resolvedChatId) {
-        const retried = await supabase
-          .from('messages')
-          .insert({ ...insertRow, chat_id: ensuredChat.id as string })
-          .select()
-          .single();
-
-        message = retried.data;
-        insertErr = retried.error;
-      }
-    }
+    const { data: message, error: insertErr } = await admin.from('messages').insert(insertRow).select().single();
 
     if (insertErr) {
       console.error('Message insert failed', {
@@ -261,12 +268,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
 
-    await supabase
-      .from('chats')
-      .update({ updated_at: now })
-      .eq('id', message.chat_id);
+    await admin.from('chats').update({ updated_at: now }).eq('id', message.chat_id);
 
-    if (messageType !== 'call_log') {
+    const skipPushForEncryptedMedia =
+      isMedia && (meta.is_encrypted_media === true || meta.is_encrypted_media === 'true');
+
+    if (messageType !== 'call_log' && !skipPushForEncryptedMedia) {
       try {
         await notifyChatMessagePush(token, message.chat_id, message.id, user.id);
       } catch (pushError) {
@@ -281,7 +288,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       { message: normalizeDbMessage({ ...(message as Record<string, unknown>), reactions: {} }) },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (err: any) {
     return NextResponse.json({ error: err.message ?? 'Failed to send message' }, { status: 500 });
@@ -290,20 +297,48 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { messageId, content } = body;
+  const messageId = typeof body.messageId === 'string' ? body.messageId : '';
+  const chatIdBody = typeof body.chatId === 'string' ? body.chatId : typeof body.chat_id === 'string' ? body.chat_id : '';
+  const { content } = body;
 
   if (!messageId || !content?.trim()) {
     return NextResponse.json({ error: 'messageId and content are required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthenticatedSupabase(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const jwt = await requireBearerUser(req);
+  if (!jwt.ok) return jwt.response;
+  const { user } = jwt;
+  const admin = createChatGatekeeperAdmin();
+
+  const { data: row, error: fetchErr } = await admin
+    .from('messages')
+    .select('id, chat_id, user_id')
+    .eq('id', messageId.trim())
+    .maybeSingle();
+
+  if (fetchErr) {
+    return NextResponse.json({ error: fetchErr.message }, { status: 400 });
+  }
+  if (!row) {
+    return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+  }
+  if (row.user_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const effectiveChatId = (chatIdBody || row.chat_id) as string;
+  const denied = await assertChatWritable(admin, user.id, effectiveChatId);
+  if (denied) return denied;
+
+  if (String(row.chat_id) !== String(effectiveChatId)) {
+    return NextResponse.json({ error: 'chatId does not match message' }, { status: 400 });
+  }
 
   const wireContent = typeof content === 'string' && content.startsWith('e2e:') ? content : content.trim();
-  const { data: message, error } = await supabase
+  const { data: message, error } = await admin
     .from('messages')
     .update({ content: wireContent, time_edited: Date.now() })
-    .eq('id', messageId)
+    .eq('id', messageId.trim())
     .eq('user_id', user.id)
     .select()
     .single();
