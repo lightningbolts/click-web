@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
       : typeof body.chat_id === 'string'
         ? body.chat_id
         : '';
-  const connectionId = typeof body.connectionId === 'string' ? body.connectionId : '';
+  const connectionId = typeof body.connectionId === 'string' ? body.connectionId : typeof body.connection_id === 'string' ? body.connection_id : '';
   const { content, message_type: rawMessageType, metadata } = body;
   const messageType = parsePostMessageType(rawMessageType);
   const isCallLog = messageType === 'call_log';
