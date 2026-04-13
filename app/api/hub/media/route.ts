@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
   const file = form.get('file');
   const latRaw = form.get('user_lat') ?? form.get('userLat');
   const lonRaw = form.get('user_long') ?? form.get('userLong');
-  const userLat = typeof latRaw === 'string' ? Number.parseFloat(latRaw) : Number(latRaw);
-  const userLong = typeof lonRaw === 'string' ? Number.parseFloat(lonRaw) : Number(lonRaw);
+  const userLat = typeof latRaw === 'string' && latRaw.trim() !== '' ? Number.parseFloat(latRaw) : NaN;
+  const userLong = typeof lonRaw === 'string' && lonRaw.trim() !== '' ? Number.parseFloat(lonRaw) : NaN;
 
   if (!hubId) {
     return NextResponse.json({ error: 'hub_id is required' }, { status: 400 });
