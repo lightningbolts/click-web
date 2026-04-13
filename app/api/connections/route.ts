@@ -711,14 +711,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     const hiddenAt = new Date().toISOString();
-    const hiddenRows = ids.map((participantId) => ({
-      user_id: participantId,
-      connection_id: trimmedId,
-      hidden_at: hiddenAt,
-    }));
     const { error: insertError } = await adminClient
       .from('connection_hidden')
-      .upsert(hiddenRows, { onConflict: 'user_id,connection_id' });
+      .upsert(
+        {
+          user_id: user.id,
+          connection_id: trimmedId,
+          hidden_at: hiddenAt,
+        },
+        { onConflict: 'user_id,connection_id' },
+      );
 
     if (!insertError) {
       return NextResponse.json({ success: true, connectionId: trimmedId });
