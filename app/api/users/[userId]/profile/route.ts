@@ -192,12 +192,20 @@ export async function PATCH(
 
   if (Object.prototype.hasOwnProperty.call(body, 'first_name') && typeof body.first_name === 'string') {
     const f = (updates.first_name as string) ?? body.first_name.trim();
-    const l =
-      typeof updates.last_name === 'string'
-        ? (updates.last_name as string)
-        : typeof body.last_name === 'string'
-          ? body.last_name.trim()
-          : '';
+    let l: string;
+    if (typeof updates.last_name === 'string') {
+      l = updates.last_name;
+    } else if (typeof body.last_name === 'string') {
+      l = body.last_name.trim();
+    } else {
+      // Fetch the existing last_name so auto-derived display name doesn't drop it
+      const { data: currentRow } = await supabase
+        .from('users')
+        .select('last_name')
+        .eq('id', userId)
+        .maybeSingle();
+      l = (currentRow as { last_name?: string } | null)?.last_name ?? '';
+    }
     const display = [f, l].filter((s) => s.length > 0).join(' ');
     if (!Object.prototype.hasOwnProperty.call(body, 'full_name')) {
       updates.full_name = display;
