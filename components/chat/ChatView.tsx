@@ -148,7 +148,7 @@ function buildTimelineEntries(messages: Message[]): ChatTimelineEntry[] {
  *  3. Subscribe to Supabase Realtime on `messages` and `message_reactions`
  *     filtered by chat_id for live updates.
  *  4. Send, edit, delete via POST/PATCH/DELETE to /api/chat/messages.
- *  5. React via POST /api/chat/reactions (toggle).
+ *  5. React via POST /api/chat/reactions (add) or DELETE (remove own).
  */
 export default function ChatView({
   connection,
@@ -1213,9 +1213,13 @@ export default function ChatView({
     }));
 
     const headers = await getAuthHeaders();
+    const method = alreadyMine ? 'DELETE' : 'POST';
     const res = await fetch('/api/chat/reactions', {
-      method: 'POST',
-      headers,
+      method,
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ messageId, reactionType: emoji }),
     });
 

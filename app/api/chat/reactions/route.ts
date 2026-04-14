@@ -1,59 +1,80 @@
 /**
- * POST /api/chat/reactions
- * Body: { messageId: string; reactionType: string }
- * Toggle a reaction – adds if absent, removes if present.
+ * POST   /api/chat/reactions — add a reaction (idempotent on unique constraint)
+ * DELETE /api/chat/reactions — remove the caller's reaction for messageId + reactionType
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import {
+  assertMessageInWritableChat,
+  createChatGatekeeperAdmin,
+  requireBearerUser,
+} from '@/lib/server/chatGatekeeper';
 
 export async function POST(req: NextRequest) {
+  const jwt = await requireBearerUser(req);
+  if (!jwt.ok) return jwt.response;
+
   const body = await req.json().catch(() => ({}));
-  const { messageId, reactionType } = body;
+  const messageId = String(body.messageId ?? '').trim();
+  const reactionType = String(body.reactionType ?? '').trim();
 
   if (!messageId || !reactionType) {
     return NextResponse.json({ error: 'messageId and reactionType are required' }, { status: 400 });
   }
 
-  const { user, supabase } = await getAuthenticatedSupabase(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const admin = createChatGatekeeperAdmin();
+  const gate = await assertMessageInWritableChat(admin, jwt.user.id, messageId);
+  if (!gate.ok) return gate.response;
 
-  // Check if reactions already exist for this user/message/emoji
-  const { data: existing, error: existingError } = await supabase
-    .from('message_reactions')
-    .select('id')
-    .eq('message_id', messageId)
-    .eq('user_id', user.id)
-    .eq('reaction_type', reactionType)
-    .limit(50);
-
-  if (existingError) {
-    return NextResponse.json({ error: existingError.message }, { status: 500 });
-  }
-
-  if ((existing ?? []).length > 0) {
-    // Toggle off – delete
-    const { error } = await supabase
-      .from('message_reactions')
-      .delete()
-      .in('id', (existing ?? []).map((row: { id: string }) => row.id));
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ action: 'removed' });
-  }
-
-  // Toggle on – insert
-  const { data: reaction, error: insertErr } = await supabase
+  const now = Date.now();
+  const { data: reaction, error: insertErr } = await admin
     .from('message_reactions')
     .insert({
       message_id: messageId,
-      user_id: user.id,
+      user_id: jwt.user.id,
       reaction_type: reactionType,
-      created_at: Date.now(),
+      created_at: now,
     })
     .select()
     .single();
 
-  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  if (insertErr) {
+    const msg = insertErr.message?.toLowerCase() ?? '';
+    if (msg.includes('duplicate') || msg.includes('unique') || (insertErr as { code?: string }).code === '23505') {
+      return NextResponse.json({ action: 'exists', reaction: null }, { status: 200 });
+    }
+    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  }
+
   return NextResponse.json({ action: 'added', reaction }, { status: 201 });
+}
+
+export async function DELETE(req: NextRequest) {
+  const jwt = await requireBearerUser(req);
+  if (!jwt.ok) return jwt.response;
+
+  const body = await req.json().catch(() => ({}));
+  const messageId = String(body.messageId ?? '').trim();
+  const reactionType = String(body.reactionType ?? '').trim();
+
+  if (!messageId || !reactionType) {
+    return NextResponse.json({ error: 'messageId and reactionType are required' }, { status: 400 });
+  }
+
+  const admin = createChatGatekeeperAdmin();
+  const gate = await assertMessageInWritableChat(admin, jwt.user.id, messageId);
+  if (!gate.ok) return gate.response;
+
+  const { error } = await admin
+    .from('message_reactions')
+    .delete()
+    .eq('message_id', messageId)
+    .eq('user_id', jwt.user.id)
+    .eq('reaction_type', reactionType);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

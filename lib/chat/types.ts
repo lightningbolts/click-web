@@ -30,6 +30,10 @@ export type MessageType = 'text' | 'image' | 'audio' | 'call_log';
 /** Structured fields stored in `messages.metadata` for media (matches mobile `MessageMediaMetadata`). */
 export interface MessageMediaMetadata {
   media_url?: string;
+  /** True when [media_url] points at ciphertext bytes (KMP gatekeeper upload). */
+  is_encrypted_media?: boolean;
+  /** Original MIME before encryption (e.g. image/jpeg) — not sent to storage. */
+  original_mime_type?: string;
   /** Voice note length in seconds (optional). */
   duration_seconds?: number;
   /** Reply threading (existing). */
