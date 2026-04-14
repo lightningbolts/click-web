@@ -91,6 +91,11 @@ export async function GET(req: NextRequest) {
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Gatekeeper check ensures this endpoint is safe even when read-marking uses admin updates.
+  const admin = createChatGatekeeperAdmin();
+  const denied = await assertChatWritable(admin, user.id, chatId);
+  if (denied) return denied;
+
   // Build message query with optional cursor-based pagination
   let query = supabase
     .from('messages')
@@ -142,10 +147,13 @@ export async function GET(req: NextRequest) {
     .map((m: any) => m.id);
 
   if (unreadIds.length > 0) {
-    await supabase
+    const { error: markErr } = await admin
       .from('messages')
       .update({ is_read: true })
       .in('id', unreadIds);
+    if (markErr) {
+      console.error('mark read failed in /api/chat/messages GET:', markErr.message);
+    }
   }
 
   return NextResponse.json({ messages: enriched });

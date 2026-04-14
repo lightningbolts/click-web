@@ -1247,6 +1247,48 @@ export default function ChatView({
   });
   const timelineEntries = useMemo(() => buildTimelineEntries(messages), [messages]);
 
+  const unreadIncomingMessageIds = useMemo(
+    () =>
+      messages
+        .filter((m) => m.user_id !== currentUserId && !m.is_read)
+        .map((m) => m.id),
+    [messages, currentUserId],
+  );
+
+  useEffect(() => {
+    if (!chatId || unreadIncomingMessageIds.length === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/chat/messages/read', {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ chat_id: chatId }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          console.error('read receipt mark failed:', res.status, text);
+          return;
+        }
+        if (cancelled) return;
+        const unreadSet = new Set(unreadIncomingMessageIds);
+        setMessages((prev) =>
+          prev.map((m) => (unreadSet.has(m.id) ? { ...m, is_read: true } : m)),
+        );
+      } catch (err) {
+        if (!cancelled) {
+          console.error('read receipt mark failed:', err);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, getAuthHeaders, unreadIncomingMessageIds]);
+
   return (
     <div className="flex flex-col h-full min-h-0 overflow-visible">
       {/* ── Header ── */}
