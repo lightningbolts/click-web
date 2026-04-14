@@ -30,6 +30,12 @@ const keyCache = new Map<string, DerivedKeys>();
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
+function toBytes(data: ArrayBuffer | Uint8Array): Bytes {
+  return data instanceof Uint8Array
+    ? (data as Bytes)
+    : (new Uint8Array(data) as Bytes);
+}
+
 async function sha256(data: Bytes): Promise<ArrayBuffer> {
   return crypto.subtle.digest('SHA-256', data);
 }
@@ -192,6 +198,49 @@ async function decryptWithPrefix(content: string, keys: DerivedKeys, prefix: str
     console.warn('MessageCrypto: decryption failed', err);
     return content;
   }
+}
+
+async function decryptMediaBytesWithKeys(blob: Bytes, keys: DerivedKeys): Promise<Bytes> {
+  if (blob.length < IV_LENGTH + HMAC_LENGTH + 1) {
+    throw new Error('Encrypted media blob too short');
+  }
+
+  const iv = blob.slice(0, IV_LENGTH) as Bytes;
+  const storedHmac = blob.slice(IV_LENGTH, IV_LENGTH + HMAC_LENGTH) as Bytes;
+  const ciphertext = blob.slice(IV_LENGTH + HMAC_LENGTH) as Bytes;
+
+  const isValid = await crypto.subtle.verify(
+    'HMAC',
+    keys.macKey,
+    storedHmac,
+    concatBuffers(iv, ciphertext),
+  );
+  if (!isValid) {
+    throw new Error('Encrypted media HMAC verification failed');
+  }
+
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, keys.encKey, ciphertext);
+  return new Uint8Array(decrypted) as Bytes;
+}
+
+/**
+ * Decrypts E2EE media bytes using connection-derived keys.
+ * Wire format is raw bytes: IV[16] || HMAC[32] || ciphertext.
+ */
+export async function decryptMediaBytes(
+  blob: ArrayBuffer | Uint8Array,
+  keys: DerivedKeys,
+): Promise<Uint8Array> {
+  return decryptMediaBytesWithKeys(toBytes(blob), keys);
+}
+
+/** Decrypts E2EE media bytes using the 32-byte verified clique group master key. */
+export async function decryptGroupMediaBytes(
+  blob: ArrayBuffer | Uint8Array,
+  groupMasterKey32: ArrayBuffer,
+): Promise<Uint8Array> {
+  const keys = await deriveKeysFromGroupMaster(groupMasterKey32);
+  return decryptMediaBytesWithKeys(toBytes(blob), keys);
 }
 
 export async function decryptContent(content: string, keys: DerivedKeys): Promise<string> {

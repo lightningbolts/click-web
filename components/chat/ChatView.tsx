@@ -1789,6 +1789,7 @@ export default function ChatView({
                   message={entry.message}
                   isMine={entry.message.user_id === currentUserId}
                   currentUserId={currentUserId}
+                  mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
                   senderInitial={otherInitial}
                   senderLabel={
                     isGroupClique && entry.message.user_id !== currentUserId

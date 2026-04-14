@@ -17,8 +17,14 @@ import type { Message, MessageReaction } from '@/lib/chat/types';
 import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
 import { LinkifiedText } from '@/lib/chat/linkify';
-import { durationSecondsFromMetadata, mediaUrlFromMetadata } from '@/lib/chat/mediaMetadata';
-import { isAnyE2eeWireContent } from '@/lib/chat/crypto';
+import {
+  durationSecondsFromMetadata,
+  isEncryptedMediaFromMetadata,
+  mediaUrlFromMetadata,
+  originalMimeTypeFromMetadata,
+} from '@/lib/chat/mediaMetadata';
+import { isAnyE2eeWireContent, type DerivedKeys } from '@/lib/chat/crypto';
+import { useSecureMedia } from '@/lib/chat/useSecureMedia';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
@@ -45,6 +51,8 @@ interface MessageBubbleProps {
   onDelete: (messageId: string) => void;
   /** Messages glass panel — keeps portaled toolbars inside the chat card. */
   portalsBoundsRef?: RefObject<HTMLElement | null>;
+  /** Active chat crypto key for decrypting encrypted media payloads. */
+  mediaChatKey?: DerivedKeys | ArrayBuffer | null;
 }
 
 function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
@@ -73,10 +81,10 @@ function formatMessageTimeLabel(ms: number) {
   return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function isSafeHttpUrl(url: string): boolean {
+function isSafeRenderableMediaUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    return u.protocol === 'https:' || u.protocol === 'http:';
+    return u.protocol === 'https:' || u.protocol === 'http:' || u.protocol === 'blob:';
   } catch {
     return false;
   }
@@ -99,6 +107,7 @@ export default function MessageBubble({
   onEdit,
   onDelete,
   portalsBoundsRef,
+  mediaChatKey,
 }: MessageBubbleProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
@@ -147,6 +156,16 @@ export default function MessageBubble({
   useEffect(() => {
     if (showPicker) cancelHide();
   }, [showPicker, cancelHide]);
+
+  const mediaUrl = mediaUrlFromMetadata(message.metadata);
+  const isEncryptedMedia = isEncryptedMediaFromMetadata(message.metadata);
+  const originalMimeType = originalMimeTypeFromMetadata(message.metadata);
+  const secureMedia = useSecureMedia({
+    storageUrl: mediaUrl,
+    chatKey: mediaChatKey,
+    mimeType: originalMimeType,
+    isEncryptedMedia,
+  });
 
   if (message.message_type === 'call_log') {
     const { text, missed } = callLogLabel(message.metadata);
@@ -281,7 +300,7 @@ export default function MessageBubble({
 
   const timeLabel = formatMessageTimeLabel(message.time_created);
   const replyMeta = getReplyFromMetadata(message.metadata);
-  const mediaUrl = mediaUrlFromMetadata(message.metadata);
+  const resolvedMediaUrl = secureMedia.src;
   const audioDuration = durationSecondsFromMetadata(message.metadata);
   const linkVariant = isMine ? 'mine' : 'theirs';
   const captionText = message.content.trim();
@@ -377,7 +396,13 @@ export default function MessageBubble({
 
             {isImage && (
               <>
-                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
+                {secureMedia.isLoading ? (
+                  <div
+                    className="h-56 w-[min(100%,20rem)] animate-pulse rounded-2xl border border-zinc-700/60 bg-zinc-900/60"
+                    aria-busy
+                    aria-label="Decrypting photo"
+                  />
+                ) : resolvedMediaUrl && isSafeRenderableMediaUrl(resolvedMediaUrl) ? (
                   <div
                     className={`max-w-full overflow-hidden rounded-2xl ${
                       isMine
@@ -387,29 +412,41 @@ export default function MessageBubble({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs are dynamic per project */}
                     <img
-                      src={mediaUrl}
+                      src={resolvedMediaUrl}
                       alt=""
                       className="block max-h-72 w-full object-cover"
                       loading="lazy"
                     />
                   </div>
                 ) : (
-                  <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>Photo unavailable</p>
+                  <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                    {isEncryptedMedia || secureMedia.error ? 'Encrypted photo unavailable' : 'Photo unavailable'}
+                  </p>
                 )}
               </>
             )}
 
             {isAudio && (
               <>
-                {mediaUrl && isSafeHttpUrl(mediaUrl) ? (
+                {secureMedia.isLoading ? (
+                  <div
+                    className={`h-[60px] min-w-[220px] max-w-[min(100%,300px)] animate-pulse rounded-2xl border ${
+                      isMine ? 'border-white/20 bg-white/10' : 'border-zinc-700/60 bg-zinc-900/60'
+                    }`}
+                    aria-busy
+                    aria-label="Decrypting voice message"
+                  />
+                ) : resolvedMediaUrl && isSafeRenderableMediaUrl(resolvedMediaUrl) ? (
                   <ChatThemeAudioPlayer
-                    src={mediaUrl}
+                    src={resolvedMediaUrl}
                     variant={linkVariant}
                     durationHint={audioDuration}
                   />
                 ) : (
                   <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>
-                    Voice message unavailable
+                    {isEncryptedMedia || secureMedia.error
+                      ? 'Encrypted voice message unavailable'
+                      : 'Voice message unavailable'}
                   </p>
                 )}
               </>
