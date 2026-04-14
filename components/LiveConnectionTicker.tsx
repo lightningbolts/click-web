@@ -100,6 +100,17 @@ function isRecord(x: unknown): x is Record<string, unknown> {
   return x !== null && typeof x === 'object' && !Array.isArray(x);
 }
 
+function coerceTickerId(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const t = value.trim();
+    return t.length > 0 ? t : null;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
 function readDisplayLocation(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -168,7 +179,7 @@ function parseTickerWeatherFields(x: Record<string, unknown>): {
 
 function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
   if (!isRecord(x)) return null;
-  const id = x.id;
+  const id = coerceTickerId(x.id);
   // Privacy guard: this public component only reads sanitized `display_location`.
   const display_location = readDisplayLocation(x.display_location);
   const connection_method =
@@ -182,7 +193,7 @@ function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
       : typeof createdRaw === 'string' && createdRaw.trim()
         ? Number(createdRaw.trim())
         : NaN;
-  if (typeof id !== 'string' || display_location === null) return null;
+  if (id == null || display_location === null) return null;
   if (!Number.isFinite(created)) return null;
   const { condition, tempC, windKph } = parseTickerWeatherFields(x);
   const created_utc =
@@ -216,8 +227,16 @@ function unwrapTickerRpcPayload(data: unknown): unknown[] {
       return [];
     }
   }
-  if (isRecord(data) && typeof data.id === 'string' && 'display_location' in data) {
-    return [data];
+  if (isRecord(data)) {
+    const keys = Object.keys(data);
+    if (keys.length > 0 && keys.every((k) => /^\d+$/.test(k))) {
+      return [...keys]
+        .sort((a, b) => Number(a) - Number(b))
+        .map((k) => (data as Record<string, unknown>)[k]);
+    }
+    if (coerceTickerId(data.id) != null && 'display_location' in data) {
+      return [data];
+    }
   }
   return [];
 }
@@ -261,7 +280,8 @@ export default function LiveConnectionTicker() {
   const [rows, setRows] = useState<SanitizedTickerConnection[]>([]);
   const [pageLoading, setPageLoading] = useState(false);
   const [live, setLive] = useState(false);
-  const [rpcOk, setRpcOk] = useState(true);
+  /** Only reflects `get_recent_sanitized_connections` (not the total-count RPC). */
+  const [recentFeedOk, setRecentFeedOk] = useState(true);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const listScrollRef = useRef<HTMLDivElement>(null);
   const pageIndexRef = useRef(0);
@@ -272,7 +292,11 @@ export default function LiveConnectionTicker() {
 
   const fetchPage = useCallback(async (page: number) => {
     const supabase = getSupabaseClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setRecentFeedOk(false);
+      setRows([]);
+      return;
+    }
     setPageLoading(true);
     try {
       const { data: recentData, error: recentError } = await supabase.rpc('get_recent_sanitized_connections', {
@@ -281,9 +305,10 @@ export default function LiveConnectionTicker() {
       });
       if (recentError) throw recentError;
       setRows(parseRecentRpc(recentData));
-      setRpcOk(true);
-    } catch {
-      setRpcOk(false);
+      setRecentFeedOk(true);
+    } catch (err) {
+      console.error('[LiveConnectionTicker] get_recent_sanitized_connections failed:', err);
+      setRecentFeedOk(false);
       setRows([]);
     } finally {
       setPageLoading(false);
@@ -293,7 +318,7 @@ export default function LiveConnectionTicker() {
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setRpcOk(false);
+      setRecentFeedOk(false);
       setTotalCount(null);
       return;
     }
@@ -306,10 +331,10 @@ export default function LiveConnectionTicker() {
         if (countError) throw countError;
         const n = normalizeCount(countData);
         if (!cancelled && n !== null) setTotalCount(n);
-      } catch {
+      } catch (err) {
         if (!cancelled) {
-          setRpcOk(false);
-          setTotalCount(0);
+          console.error('[LiveConnectionTicker] get_total_connections_count failed:', err);
+          setTotalCount(null);
         }
       }
     })();
@@ -422,9 +447,12 @@ export default function LiveConnectionTicker() {
           </div>
         </div>
 
-        {!rpcOk && rows.length === 0 && !pageLoading ? (
+        {!recentFeedOk && rows.length === 0 && !pageLoading ? (
           <p className="text-sm leading-relaxed text-zinc-500">
-            Stats unavailable. When the database scripts are deployed, recent activity will show here.
+            Recent activity could not be loaded. The list RPC failed or returned rows we could not parse; the
+            click total above may still be correct. Open the browser console for the error, and ensure
+            `get_recent_sanitized_connections` plus a non-throwing `build_sanitized_connection_payload` are deployed
+            (corrupt `weather_snapshot` values must not abort the whole batch).
           </p>
         ) : totalCount === 0 && rows.length === 0 && !pageLoading ? (
           <p className="text-sm text-zinc-500">Waiting for the next connection…</p>
