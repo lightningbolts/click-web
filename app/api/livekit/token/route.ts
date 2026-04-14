@@ -27,19 +27,21 @@ async function isPairBlocked(
   userId: string,
   peerId: string,
 ): Promise<boolean> {
-  const { data: a } = await admin
+  const { data: a, error: errA } = await admin
     .from('user_blocks')
     .select('id')
     .eq('blocker_id', userId)
     .eq('blocked_id', peerId)
     .maybeSingle();
+  if (errA) return true;
   if (a) return true;
-  const { data: b } = await admin
+  const { data: b, error: errB } = await admin
     .from('user_blocks')
     .select('id')
     .eq('blocker_id', peerId)
     .eq('blocked_id', userId)
     .maybeSingle();
+  if (errB) return true;
   return Boolean(b);
 }
 
