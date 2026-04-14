@@ -16,6 +16,11 @@
  * On each successful match: ensures a `connections` row exists (creates one + `chats` when missing), inserts
  * or debounces `connection_encounters` with sensor payload, and returns per-peer `is_new_connection` plus
  * optional top-level `connection_id` / `is_new_connection` when exactly one peer matched.
+ *
+ * Multi-tap: builds a token/GPS/time graph across all handshake rows in the window so a third participant
+ * can match transitively. When three or more users are in the same component, `group_clique_candidate` is set
+ * for clients to start a verified group flow. Pairwise `connections` inserts are skipped when a row
+ * already exists (unique-safe); encounters are still logged for reunions.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -85,6 +90,119 @@ function tokenSetsIntersect(a: string[], b: string[]): boolean {
     if (sa.has(x)) return true;
   }
   return false;
+}
+
+type HandshakeRowLite = {
+  id: string;
+  user_id: string;
+  my_token: unknown;
+  heard_tokens: unknown;
+  lat: unknown;
+  lon: unknown;
+  created_at: string;
+};
+
+function parseHeardTokensField(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeToken).filter((t): t is string => t != null);
+}
+
+function rowMyTokenNorm(row: HandshakeRowLite): string | null {
+  return normalizeToken(row.my_token);
+}
+
+function rowTimeMs(row: HandshakeRowLite): number {
+  const t = Date.parse(String(row.created_at));
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Same distance rule as legacy pairwise match: skip check if either side lacks usable GPS. */
+function gpsPairWithinProximityMax(
+  la: number | null,
+  lo: number | null,
+  lb: number | null,
+  mb: number | null,
+): boolean {
+  if (la == null || lo == null || lb == null || mb == null) return true;
+  if (la === 0 && lo === 0) return true;
+  if (lb === 0 && mb === 0) return true;
+  return haversineMeters(la, lo, lb, mb) <= PROXIMITY_MATCH_MAX_M;
+}
+
+function tokenEvidenceBetweenRows(a: HandshakeRowLite, b: HandshakeRowLite): boolean {
+  const ta = rowMyTokenNorm(a);
+  const tb = rowMyTokenNorm(b);
+  if (!ta || !tb) return false;
+  const heardA = parseHeardTokensField(a.heard_tokens);
+  const heardB = parseHeardTokensField(b.heard_tokens);
+  const mutual = heardA.includes(tb) && heardB.includes(ta);
+  if (mutual) return true;
+  return tokenSetsIntersect(heardA, heardB);
+}
+
+function handshakeRowsLinked(a: HandshakeRowLite, b: HandshakeRowLite): boolean {
+  const dt = Math.abs(rowTimeMs(a) - rowTimeMs(b));
+  if (dt > MATCH_TIME_WINDOW_MS) return false;
+  if (!tokenEvidenceBetweenRows(a, b)) return false;
+  const la = finiteNumber(a.lat);
+  const lo = finiteNumber(a.lon);
+  const lb = finiteNumber(b.lat);
+  const mb = finiteNumber(b.lon);
+  return gpsPairWithinProximityMax(la, lo, lb, mb);
+}
+
+/** Latest row per user_id (most recent `created_at`) for stable graph nodes. */
+function latestHandshakeRowPerUser(rows: HandshakeRowLite[]): Map<string, HandshakeRowLite> {
+  const m = new Map<string, HandshakeRowLite>();
+  for (const r of rows) {
+    if (!r?.user_id) continue;
+    const uid = String(r.user_id);
+    const prev = m.get(uid);
+    if (!prev || rowTimeMs(r) >= rowTimeMs(prev)) {
+      m.set(uid, r);
+    }
+  }
+  return m;
+}
+
+function buildUserAdjacency(nodes: HandshakeRowLite[]): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+  const addEdge = (u: string, v: string) => {
+    if (u === v) return;
+    if (!adj.has(u)) adj.set(u, new Set());
+    if (!adj.has(v)) adj.set(v, new Set());
+    adj.get(u)!.add(v);
+    adj.get(v)!.add(u);
+  };
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i];
+      const b = nodes[j];
+      if (!a || !b) continue;
+      if (handshakeRowsLinked(a, b)) {
+        addEdge(String(a.user_id), String(b.user_id));
+      }
+    }
+  }
+  return adj;
+}
+
+function bfsComponent(startUserId: string, adj: Map<string, Set<string>>): Set<string> {
+  const out = new Set<string>();
+  const q: string[] = [];
+  if (!adj.has(startUserId)) return out;
+  out.add(startUserId);
+  q.push(startUserId);
+  while (q.length) {
+    const u = q.pop()!;
+    for (const v of adj.get(u) ?? []) {
+      if (!out.has(v)) {
+        out.add(v);
+        q.push(v);
+      }
+    }
+  }
+  return out;
 }
 
 function twelveHourUtcBlockId(iso: string): number | null {
@@ -518,32 +636,12 @@ Deno.serve(async (req) => {
     });
   }
 
-  const rows = recent ?? [];
-  const matchedIds = new Set<string>();
-
-  for (const o of rows) {
-    if (!o || o.user_id === uid) continue;
-    const ot = Date.parse(String(o.created_at));
-    if (!Number.isFinite(ot) || Math.abs(ot - t0) > MATCH_TIME_WINDOW_MS) continue;
-
-    const otherHeard: string[] = Array.isArray(o.heard_tokens)
-      ? o.heard_tokens.map((x: unknown) => normalizeToken(x)).filter((t): t is string => t != null)
-      : [];
-    const otherToken = normalizeToken(o.my_token);
-    if (!otherToken) continue;
-
-    const mutual = heardTokens.includes(otherToken) && otherHeard.includes(myToken);
-    const intersect = tokenSetsIntersect(heardTokens, otherHeard);
-
-    if (!mutual && !intersect) continue;
-
-    if (lat != null && lon != null && o.lat != null && o.lon != null) {
-      const d = haversineMeters(lat, lon, Number(o.lat), Number(o.lon));
-      if (d > PROXIMITY_MATCH_MAX_M) continue;
-    }
-
-    matchedIds.add(String(o.user_id));
-  }
+  const rows = (recent ?? []) as HandshakeRowLite[];
+  const latestByUser = latestHandshakeRowPerUser(rows);
+  const nodeRows = [...latestByUser.values()];
+  const adj = buildUserAdjacency(nodeRows);
+  const component = bfsComponent(uid, adj);
+  const matchedIds = new Set<string>([...component].filter((id) => id !== uid));
 
   if (matchedIds.size === 0) {
     return new Response(
@@ -556,9 +654,12 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Only remove this device's handshake row so other participants can still bind within the TTL
-  // window and receive the same peer set (multi-person tap).
-  await admin.from('proximity_handshake_events').delete().eq('id', String(inserted.id));
+  // For a single peer, remove this device's handshake row (legacy behavior). For 2+ peers (3+ people
+  // in the tap cluster), keep this row for the TTL window so a slower device can still bind and
+  // resolve the same graph without seeing an empty match list.
+  if (matchedIds.size < 2) {
+    await admin.from('proximity_handshake_events').delete().eq('id', String(inserted.id));
+  }
 
   const ids = [...matchedIds];
 
@@ -605,6 +706,8 @@ Deno.serve(async (req) => {
 
   /**
    * Returns an existing pairwise connection or creates one (+ chat row) using the same shape as mobile `proximity` create.
+   * Never inserts when a row already exists (avoids unique constraint failures on N-way / concurrent binds);
+   * callers still log `connection_encounters` for reunions.
    */
   async function ensureConnectionForPair(peerId: string): Promise<{ connectionId: string; isNewConnection: boolean } | null> {
     const existingId = await lookupConnectionIdForPair(peerId);
@@ -887,6 +990,11 @@ Deno.serve(async (req) => {
     encounter_logged: aggregateEncounterLogged,
     matches,
   };
+  if (matchedIds.size >= 2) {
+    responseBody.group_clique_candidate = {
+      member_user_ids: [...component].sort(),
+    };
+  }
   if (matches.length === 1) {
     const only = matches[0];
     if (only?.connection_id != null) {
