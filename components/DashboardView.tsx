@@ -105,6 +105,7 @@ import {
   normalizeNoiseCategory,
 } from '@/lib/dashboard/connectionExtras';
 import { parseConnectionEncounters } from '@/lib/dashboard/connectionEncounters';
+import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import { computeIntentOverlapLabel } from '@/lib/dashboard/intentOverlap';
 import {
   normalizeAvailabilityIntentRows,
@@ -1724,14 +1725,29 @@ export default function DashboardView({ user }: DashboardViewProps) {
         const latestEnc = encs[0];
         const originEnc = encs.length > 0 ? encs[encs.length - 1] : undefined;
 
-        const semanticFromEncounter =
-          latestEnc?.locationName?.trim() || latestEnc?.displayLocation?.trim();
-        const hasExistingSemantic =
-          typeof conn.semantic_location === 'string' && conn.semantic_location.trim().length > 0;
+        const encounterPlaceLine =
+          latestEnc != null
+            ? formatDetailedEncounterLocation({
+                locationName: latestEnc.locationName,
+                displayLocation: latestEnc.displayLocation,
+                semanticLocation: latestEnc.semanticLocation,
+              })
+            : undefined;
+        const encounterFallbackLabel = (() => {
+          if (!latestEnc) return undefined;
+          const a = latestEnc.locationName?.trim();
+          const b = latestEnc.displayLocation?.trim();
+          if (a && b && a !== b) return `${a} · ${b}`;
+          return a || b || undefined;
+        })();
+        const syntheticSemantic = encounterPlaceLine ?? encounterFallbackLabel;
+        /** When crossings exist, never prefer stale `connections.semantic_location` over encounter-derived labels. */
         const connForExtras: Record<string, unknown> =
-          hasExistingSemantic || !semanticFromEncounter
-            ? conn
-            : { ...conn, semantic_location: semanticFromEncounter };
+          encs.length > 0 && syntheticSemantic
+            ? { ...conn, semantic_location: syntheticSemantic }
+            : encs.length > 0
+              ? { ...conn }
+              : conn;
 
         let geoLoc: { latitude: number; longitude: number } | undefined;
         if (
@@ -1793,13 +1809,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
           avatarUrl: peerAvatarUrl,
           dateMet: new Date(typeof dateMetValue === 'number' ? dateMetValue : String(dateMetValue ?? 0)),
           location:
-            latestEnc?.locationName ??
-            latestEnc?.displayLocation ??
-            originEnc?.locationName ??
-            originEnc?.displayLocation ??
-            ((typeof connForExtras.semantic_location === 'string' && connForExtras.semantic_location.trim())
-              ? connForExtras.semantic_location.trim()
-              : 'A new location'),
+            syntheticSemantic ??
+            (encs.length > 0
+              ? 'A new location'
+              : typeof conn.semantic_location === 'string' && conn.semantic_location.trim()
+                ? conn.semantic_location.trim()
+                : 'A new location'),
           context: extractEventContext(connForExtras),
           weatherSummary: extractWeatherSummary(connForExtras),
           noiseSummary: extractNoiseSummary(connForExtras),
@@ -1820,6 +1835,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   encounteredAt: new Date(e.encounteredAt),
                   locationName: e.locationName?.trim() || undefined,
                   displayLocation: e.displayLocation?.trim() || undefined,
+                  semanticLocation: e.semanticLocation,
                   contextTags: e.contextTags,
                   ...(typeof e.exactNoiseLevelDb === 'number' && Number.isFinite(e.exactNoiseLevelDb)
                     ? { exactNoiseLevelDb: e.exactNoiseLevelDb }

@@ -22,12 +22,12 @@ import {
 } from 'lucide-react';
 import {
   buildProfileConnectionLines,
-  originEncounter as strictProfileOriginEncounter,
   normalizeWeatherSnapshot,
   prettyElevationCategoryKey,
   prettyNoiseCategoryKey,
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
+import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
 import {
   originEncounter,
@@ -259,8 +259,7 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
     const sc = data?.sharedConnection;
     const payload = coerceSharedConnection(sc);
     if (!payload) return null;
-    const origin = strictProfileOriginEncounter(payload);
-    return buildProfileConnectionLines(payload, origin);
+    return buildProfileConnectionLines(payload);
   }, [data?.sharedConnection]);
 
   const hasMoment =
@@ -484,10 +483,12 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                             {encounterTimeline.rows.map((enc) => {
                               const isOrigin = enc.id === encounterTimeline.originId;
                               const pills = encounterMetricPills(enc);
-                              const dn = enc.displayLocation?.trim();
-                              const ln = enc.locationName?.trim();
                               const place =
-                                ln && dn && ln !== dn ? `${ln} · ${dn}` : dn || ln || 'A new location';
+                                formatDetailedEncounterLocation({
+                                  locationName: enc.locationName,
+                                  displayLocation: enc.displayLocation,
+                                  semanticLocation: enc.semanticLocation,
+                                }) ?? 'A new location';
                               const momentTags = Array.from(
                                 new Set(
                                   (enc.contextTags ?? [])

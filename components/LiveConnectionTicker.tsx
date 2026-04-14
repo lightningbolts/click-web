@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { normalizeWeatherSnapshot } from '@/lib/userProfile/formatSharedConnection';
 
 /** Must match server max in `get_recent_sanitized_connections` (50). */
 const PAGE_SIZE = 20;
@@ -14,7 +15,11 @@ export type SanitizedTickerConnection = {
   id: string;
   display_location: string;
   connection_method: string;
+  /** Human-readable condition (never a raw JSON blob). */
   weather_condition: string | null;
+  /** Parsed from `weather_snapshot` when the payload includes numeric fields. */
+  weather_temperature_celsius?: number | null;
+  weather_wind_speed_kph?: number | null;
   created: number;
   created_utc: string | null;
 };
@@ -73,8 +78,20 @@ export function formatTickerLine(c: SanitizedTickerConnection): string {
   const timePart = formatConnectionLocalTime(c);
   const when = timePart ? ` at ${timePart}` : '';
   const w = c.weather_condition?.trim();
+  const temp = c.weather_temperature_celsius;
+  const wind = c.weather_wind_speed_kph;
+  const wxParts: string[] = [];
   if (w) {
-    return `New Click in ${place}${when} • ${emojiForWeather(w)} ${w}`;
+    wxParts.push(`${emojiForWeather(w)} ${w}`);
+  }
+  if (typeof temp === 'number' && Number.isFinite(temp)) {
+    wxParts.push(`${Math.round(temp)}°C`);
+  }
+  if (typeof wind === 'number' && Number.isFinite(wind)) {
+    wxParts.push(`${Math.round(wind)} km/h`);
+  }
+  if (wxParts.length > 0) {
+    return `New Click in ${place}${when} • ${wxParts.join(' · ')}`;
   }
   return `New Click in ${place}${when}`;
 }
@@ -89,6 +106,53 @@ function readDisplayLocation(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : TICKER_LOCATION_FALLBACK;
 }
 
+function parseTickerWeatherFields(x: Record<string, unknown>): {
+  condition: string | null;
+  tempC: number | null;
+  windKph: number | null;
+} {
+  let ws = normalizeWeatherSnapshot(x.weather_snapshot);
+  if (!ws) {
+    const wcRaw = x.weather_condition;
+    if (typeof wcRaw === 'string' && wcRaw.trim().startsWith('{')) {
+      ws = normalizeWeatherSnapshot(wcRaw.trim());
+    }
+  }
+  if (ws) {
+    const condRaw = ws['condition'];
+    const cond =
+      typeof condRaw === 'string' && condRaw.trim()
+        ? condRaw.trim()
+        : typeof ws['iconCode'] === 'string' && ws['iconCode'].trim()
+          ? ws['iconCode'].trim().replace(/^./, (c) => c.toUpperCase())
+          : null;
+    const tempRaw = ws['temperatureCelsius'];
+    const temp =
+      typeof tempRaw === 'number' && Number.isFinite(tempRaw)
+        ? tempRaw
+        : typeof tempRaw === 'string' && tempRaw.trim()
+          ? Number(tempRaw.trim())
+          : NaN;
+    const windRaw = ws['windSpeedKph'];
+    const wind =
+      typeof windRaw === 'number' && Number.isFinite(windRaw)
+        ? windRaw
+        : typeof windRaw === 'string' && windRaw.trim()
+          ? Number(windRaw.trim())
+          : NaN;
+    return {
+      condition: cond,
+      tempC: Number.isFinite(temp) ? temp : null,
+      windKph: Number.isFinite(wind) ? wind : null,
+    };
+  }
+  const wc = x.weather_condition;
+  if (typeof wc === 'string' && wc.trim() && !wc.trim().startsWith('{')) {
+    return { condition: wc.trim(), tempC: null, windKph: null };
+  }
+  return { condition: null, tempC: null, windKph: null };
+}
+
 function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
   if (!isRecord(x)) return null;
   const id = x.id;
@@ -99,12 +163,7 @@ function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
   if (typeof id !== 'string' || display_location === null) return null;
   if (typeof connection_method !== 'string') return null;
   if (typeof created !== 'number' || !Number.isFinite(created)) return null;
-  const weather =
-    x.weather_condition === null || x.weather_condition === undefined
-      ? null
-      : typeof x.weather_condition === 'string'
-        ? x.weather_condition
-        : null;
+  const { condition, tempC, windKph } = parseTickerWeatherFields(x);
   const created_utc =
     x.created_utc === null || x.created_utc === undefined
       ? null
@@ -115,7 +174,9 @@ function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
     id,
     display_location,
     connection_method,
-    weather_condition: weather,
+    weather_condition: condition,
+    weather_temperature_celsius: tempC,
+    weather_wind_speed_kph: windKph,
     created,
     created_utc,
   };

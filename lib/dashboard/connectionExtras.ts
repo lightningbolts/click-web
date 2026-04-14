@@ -4,6 +4,7 @@
  */
 
 import { latestEncounter } from '@/lib/dashboard/connectionEncounters';
+import { normalizeWeatherSnapshot } from '@/lib/userProfile/formatSharedConnection';
 
 /** Escape text embedded in map popup HTML */
 export function escapeHtml(s: string): string {
@@ -116,10 +117,10 @@ export function extractEventContext(conn: Record<string, unknown>): string | und
 
 export function extractWeatherSummary(conn: Record<string, unknown>): string | undefined {
   const enc = latestEncounter(conn);
-  const wsEnc = enc?.weatherSnapshot;
-  if (wsEnc && typeof wsEnc === 'object' && wsEnc !== null) {
-    const condition = (wsEnc as { condition?: unknown }).condition;
-    const temp = (wsEnc as { temperatureCelsius?: unknown }).temperatureCelsius;
+  const wsEnc = normalizeWeatherSnapshot(enc?.weatherSnapshot);
+  if (wsEnc) {
+    const condition = wsEnc['condition'];
+    const temp = wsEnc['temperatureCelsius'];
     const parts: string[] = [];
     if (typeof condition === 'string' && condition.trim()) {
       parts.push(condition.trim());
@@ -127,6 +128,10 @@ export function extractWeatherSummary(conn: Record<string, unknown>): string | u
     if (typeof temp === 'number' && Number.isFinite(temp)) {
       const f = celsiusToFahrenheit(temp);
       parts.push(`${Math.round(f)}°F`);
+    }
+    const windKph = wsEnc['windSpeedKph'];
+    if (typeof windKph === 'number' && Number.isFinite(windKph)) {
+      parts.push(`${Math.round(windKph)} km/h wind`);
     }
     if (parts.length > 0) {
       return parts.join(' · ');
@@ -139,9 +144,10 @@ export function extractWeatherSummary(conn: Record<string, unknown>): string | u
       ? (capsule as { weatherSnapshot?: unknown }).weatherSnapshot
       : null;
 
-  if (ws && typeof ws === 'object' && ws !== null) {
-    const condition = (ws as { condition?: unknown }).condition;
-    const temp = (ws as { temperatureCelsius?: unknown }).temperatureCelsius;
+  const normalizedCapsule = normalizeWeatherSnapshot(ws);
+  if (normalizedCapsule) {
+    const condition = normalizedCapsule['condition'];
+    const temp = normalizedCapsule['temperatureCelsius'];
     const parts: string[] = [];
     if (typeof condition === 'string' && condition.trim()) {
       parts.push(condition.trim());
@@ -149,6 +155,10 @@ export function extractWeatherSummary(conn: Record<string, unknown>): string | u
     if (typeof temp === 'number' && Number.isFinite(temp)) {
       const f = celsiusToFahrenheit(temp);
       parts.push(`${Math.round(f)}°F`);
+    }
+    const windKph = normalizedCapsule['windSpeedKph'];
+    if (typeof windKph === 'number' && Number.isFinite(windKph)) {
+      parts.push(`${Math.round(windKph)} km/h wind`);
     }
     if (parts.length > 0) {
       return parts.join(' · ');

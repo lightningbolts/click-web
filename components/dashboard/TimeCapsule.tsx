@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
+import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 
 export interface TimelineChapter {
   id: string;
@@ -458,7 +459,13 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                               year: 'numeric',
                                             })}
                                           </span>
-                                          <span className="truncate">{enc.locationName || enc.displayLocation || 'A new location'}</span>
+                                          <span className="truncate">
+                                            {formatDetailedEncounterLocation({
+                                              locationName: enc.locationName,
+                                              displayLocation: enc.displayLocation,
+                                              semanticLocation: enc.semanticLocation,
+                                            }) ?? enc.locationName ?? enc.displayLocation ?? 'A new location'}
+                                          </span>
                                           {enc.contextTags.length > 0 ? (
                                             <span className="truncate text-[#C4B5FD]">
                                               {enc.contextTags.join(' · ')}

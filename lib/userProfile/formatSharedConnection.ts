@@ -1,7 +1,10 @@
 /**
- * Formats `public.connections` rows for the profile “how we met” section.
- * When encounter rows exist, the profile moment is sourced strictly from the origin encounter only.
+ * Formats `public.connections` rows for the profile “when you connected” section.
+ * When encounter rows exist, the profile moment aligns with the **most recent** crossing
+ * (same ordering as the first entry in “Our timeline”).
  */
+
+import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 
 export type SharedConnectionPayload = {
   id: string;
@@ -39,6 +42,8 @@ export type ProfileOriginEncounter = {
   encounteredAt: string;
   locationName?: string | null;
   displayLocation?: string | null;
+  /** Raw `semantic_location` from `connection_encounters` (jsonb or string). */
+  semanticLocation?: unknown;
   weatherSnapshot?: unknown;
   noiseLevel?: string | null;
   exactNoiseLevelDb?: number | null;
@@ -180,9 +185,8 @@ function formatFullLocation(full: Record<string, unknown> | null | undefined): s
   return parts.length ? parts.join(', ') : '';
 }
 
-export function originEncounter(c: SharedConnectionPayload): ProfileOriginEncounter | undefined {
-  const raw = c.connection_encounters;
-  if (!Array.isArray(raw)) return undefined;
+function parseEncounterPayloads(raw: unknown): ProfileOriginEncounter[] {
+  if (!Array.isArray(raw)) return [];
 
   const parsed: ProfileOriginEncounter[] = [];
   for (const item of raw) {
@@ -198,6 +202,7 @@ export function originEncounter(c: SharedConnectionPayload): ProfileOriginEncoun
       encounteredAt,
       locationName: stringOrNull(encounter.location_name),
       displayLocation: stringOrNull(encounter.display_location),
+      semanticLocation: encounter.semantic_location,
       weatherSnapshot: encounter.weather_snapshot,
       noiseLevel: stringOrNull(encounter.noise_level),
       exactNoiseLevelDb: numberOrNull(encounter.exact_noise_level_db),
@@ -212,7 +217,19 @@ export function originEncounter(c: SharedConnectionPayload): ProfileOriginEncoun
     });
   }
 
-  return parsed.sort((a, b) => new Date(a.encounteredAt).getTime() - new Date(b.encounteredAt).getTime())[0];
+  return parsed.sort((a, b) => new Date(a.encounteredAt).getTime() - new Date(b.encounteredAt).getTime());
+}
+
+/** Chronologically first crossing (for “where it started” badges). */
+export function originEncounter(c: SharedConnectionPayload): ProfileOriginEncounter | undefined {
+  const asc = parseEncounterPayloads(c.connection_encounters);
+  return asc.length > 0 ? asc[0] : undefined;
+}
+
+/** Most recent crossing — matches the first row in newest-first encounter timelines. */
+export function latestEncounterFromPayload(c: SharedConnectionPayload): ProfileOriginEncounter | undefined {
+  const asc = parseEncounterPayloads(c.connection_encounters);
+  return asc.length > 0 ? asc[asc.length - 1] : undefined;
 }
 
 /** Local calendar date + clock time only (no raw UTC bucket / GPS). */
@@ -320,7 +337,8 @@ function extractStrictOriginElevation(origin: ProfileOriginEncounter): string | 
 
 export function buildProfileConnectionLines(
   c: SharedConnectionPayload,
-  strictOriginEncounter: ProfileOriginEncounter | undefined = originEncounter(c),
+  /** Defaults to the latest encounter so the summary matches the top of the encounter timeline. */
+  strictOriginEncounter: ProfileOriginEncounter | undefined = latestEncounterFromPayload(c),
 ): ProfileConnectionLines {
   const context =
     strictOriginEncounter != null
@@ -328,12 +346,11 @@ export function buildProfileConnectionLines(
       : extractLegacyContext(c);
   const place =
     strictOriginEncounter != null
-      ? (() => {
-          const dn = strictOriginEncounter.displayLocation?.trim();
-          const ln = strictOriginEncounter.locationName?.trim();
-          if (ln && dn && ln !== dn) return `${ln} · ${dn}`;
-          return dn || ln || undefined;
-        })()
+      ? formatDetailedEncounterLocation({
+          locationName: strictOriginEncounter.locationName,
+          displayLocation: strictOriginEncounter.displayLocation,
+          semanticLocation: strictOriginEncounter.semanticLocation,
+        })
       : (typeof c.semantic_location === 'string' && c.semantic_location.trim()) || formatFullLocation(c.full_location ?? undefined) || undefined;
   const detail =
     strictOriginEncounter != null

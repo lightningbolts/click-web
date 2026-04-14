@@ -26,6 +26,8 @@ export interface ConnectionEncounterBrief {
   encounteredAt: Date;
   locationName?: string;
   displayLocation?: string;
+  /** `connection_encounters.semantic_location` for neighbourhood-aware labels */
+  semanticLocation?: unknown;
   contextTags: string[];
   /** Present only when the crossing stored a calibrated SPL reading */
   exactNoiseLevelDb?: number;

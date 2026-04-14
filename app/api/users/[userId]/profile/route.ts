@@ -167,9 +167,11 @@ export async function GET(
 
     let sharedConnection: Record<string, unknown> | null = null;
     if (user.id !== userId) {
+      // Full edge row + all `connection_encounters` (newest first). The web profile uses the latest
+      // crossing for the summary card and the full list for the timeline — same source of truth as the app.
       const { data: mutualRows, error: mutualErr } = await supabase
         .from('connections')
-        .select('id, created, created_utc, time_of_day_utc, last_message_at, connection_encounters(*)')
+        .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id, userId])
         .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
       if (mutualErr) {

@@ -9,6 +9,8 @@ export type ConnectionEncounterRow = {
   locationName?: string;
   /** Broad city-level label safe for public surfaces. */
   displayLocation?: string;
+  /** Full reverse-geocode payload (jsonb or string); internal formatting only. */
+  semanticLocation?: unknown;
   gpsLat?: number;
   gpsLon?: number;
   weatherSnapshot: unknown;
@@ -54,6 +56,7 @@ export function parseConnectionEncounters(conn: Record<string, unknown>): Connec
         typeof r.location_name === 'string' && r.location_name.trim() ? r.location_name.trim() : undefined,
       displayLocation:
         typeof r.display_location === 'string' && r.display_location.trim() ? r.display_location.trim() : undefined,
+      semanticLocation: r.semantic_location,
       gpsLat: numOrUndef(r.gps_lat),
       gpsLon: numOrUndef(r.gps_lon),
       weatherSnapshot: r.weather_snapshot,
