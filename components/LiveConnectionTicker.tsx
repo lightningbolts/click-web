@@ -106,51 +106,64 @@ function readDisplayLocation(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : TICKER_LOCATION_FALLBACK;
 }
 
+function readNumericField(o: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = o[k];
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim()) {
+      const n = Number(v.trim());
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * RPC / broadcast rows never include raw `weather_snapshot`; the DB may send
+ * `weather_condition` as a plain label, a JSON object, or a **double-encoded** JSON string
+ * (often starting with `"` after one decode). Top-level `weather_temperature_celsius` /
+ * `weather_wind_speed_kph` are added by `build_sanitized_connection_payload` after migration.
+ */
 function parseTickerWeatherFields(x: Record<string, unknown>): {
   condition: string | null;
   tempC: number | null;
   windKph: number | null;
 } {
-  let ws = normalizeWeatherSnapshot(x.weather_snapshot);
-  if (!ws) {
-    const wcRaw = x.weather_condition;
-    if (typeof wcRaw === 'string' && wcRaw.trim().startsWith('{')) {
-      ws = normalizeWeatherSnapshot(wcRaw.trim());
-    }
-  }
+  const topTemp = readNumericField(
+    x,
+    'weather_temperature_celsius',
+    'weatherTemperatureCelsius',
+  );
+  const topWind = readNumericField(x, 'weather_wind_speed_kph', 'weatherWindSpeedKph');
+
+  const ws =
+    normalizeWeatherSnapshot(x.weather_snapshot) ??
+    normalizeWeatherSnapshot(x['weatherSnapshot']) ??
+    normalizeWeatherSnapshot(x.weather_condition);
+
   if (ws) {
-    const condRaw = ws['condition'];
+    const condRaw = ws['condition'] ?? ws['Condition'];
     const cond =
       typeof condRaw === 'string' && condRaw.trim()
         ? condRaw.trim()
         : typeof ws['iconCode'] === 'string' && ws['iconCode'].trim()
-          ? ws['iconCode'].trim().replace(/^./, (c) => c.toUpperCase())
+          ? ws['iconCode'].trim().replace(/^./, (c) => String(c).toUpperCase())
           : null;
-    const tempRaw = ws['temperatureCelsius'];
     const temp =
-      typeof tempRaw === 'number' && Number.isFinite(tempRaw)
-        ? tempRaw
-        : typeof tempRaw === 'string' && tempRaw.trim()
-          ? Number(tempRaw.trim())
-          : NaN;
-    const windRaw = ws['windSpeedKph'];
-    const wind =
-      typeof windRaw === 'number' && Number.isFinite(windRaw)
-        ? windRaw
-        : typeof windRaw === 'string' && windRaw.trim()
-          ? Number(windRaw.trim())
-          : NaN;
-    return {
-      condition: cond,
-      tempC: Number.isFinite(temp) ? temp : null,
-      windKph: Number.isFinite(wind) ? wind : null,
-    };
+      readNumericField(ws, 'temperatureCelsius', 'temperature_celsius') ?? topTemp;
+    const wind = readNumericField(ws, 'windSpeedKph', 'wind_speed_kph') ?? topWind;
+    return { condition: cond, tempC: temp, windKph: wind };
   }
+
   const wc = x.weather_condition;
-  if (typeof wc === 'string' && wc.trim() && !wc.trim().startsWith('{')) {
-    return { condition: wc.trim(), tempC: null, windKph: null };
+  if (typeof wc === 'string' && wc.trim()) {
+    const t = wc.trim();
+    if (!t.startsWith('{') && !t.startsWith('[') && !t.startsWith('"')) {
+      return { condition: t, tempC: topTemp, windKph: topWind };
+    }
   }
-  return { condition: null, tempC: null, windKph: null };
+
+  return { condition: null, tempC: topTemp, windKph: topWind };
 }
 
 function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
@@ -158,11 +171,19 @@ function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
   const id = x.id;
   // Privacy guard: this public component only reads sanitized `display_location`.
   const display_location = readDisplayLocation(x.display_location);
-  const connection_method = x.connection_method;
-  const created = x.created;
+  const connection_method =
+    typeof x.connection_method === 'string' && x.connection_method.trim()
+      ? x.connection_method.trim()
+      : 'qr';
+  const createdRaw = x.created;
+  const created =
+    typeof createdRaw === 'number' && Number.isFinite(createdRaw)
+      ? createdRaw
+      : typeof createdRaw === 'string' && createdRaw.trim()
+        ? Number(createdRaw.trim())
+        : NaN;
   if (typeof id !== 'string' || display_location === null) return null;
-  if (typeof connection_method !== 'string') return null;
-  if (typeof created !== 'number' || !Number.isFinite(created)) return null;
+  if (!Number.isFinite(created)) return null;
   const { condition, tempC, windKph } = parseTickerWeatherFields(x);
   const created_utc =
     x.created_utc === null || x.created_utc === undefined
@@ -182,10 +203,29 @@ function parseSanitizedRow(x: unknown): SanitizedTickerConnection | null {
   };
 }
 
+/** `get_recent_sanitized_connections` returns `jsonb_agg(...)` — usually an array; tolerate a single object or stringified JSON. */
+function unwrapTickerRpcPayload(data: unknown): unknown[] {
+  if (data == null) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'string') {
+    const t = data.trim();
+    if (!t) return [];
+    try {
+      return unwrapTickerRpcPayload(JSON.parse(t) as unknown);
+    } catch {
+      return [];
+    }
+  }
+  if (isRecord(data) && typeof data.id === 'string' && 'display_location' in data) {
+    return [data];
+  }
+  return [];
+}
+
 function parseRecentRpc(data: unknown): SanitizedTickerConnection[] {
-  if (!Array.isArray(data)) return [];
+  const rows = unwrapTickerRpcPayload(data);
   const out: SanitizedTickerConnection[] = [];
-  for (const row of data) {
+  for (const row of rows) {
     const parsed = parseSanitizedRow(row);
     if (parsed) out.push(parsed);
   }
@@ -240,15 +280,7 @@ export default function LiveConnectionTicker() {
         p_offset: page * PAGE_SIZE,
       });
       if (recentError) throw recentError;
-      let raw: unknown = recentData;
-      if (typeof raw === 'string') {
-        try {
-          raw = JSON.parse(raw) as unknown;
-        } catch {
-          raw = [];
-        }
-      }
-      setRows(parseRecentRpc(raw));
+      setRows(parseRecentRpc(recentData));
       setRpcOk(true);
     } catch {
       setRpcOk(false);
