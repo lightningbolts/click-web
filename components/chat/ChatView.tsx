@@ -36,6 +36,7 @@ import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
 import {
   deriveKeysForConnection,
   encryptContent,
@@ -1282,16 +1283,16 @@ export default function ChatView({
             }
             aria-label={isGroupClique ? 'View members' : 'View profile'}
           >
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
-              text-sm font-bold glow-violet"
-            >
-              {isGroupClique ? <Users className="h-5 w-5 text-white" aria-hidden /> : otherInitial}
-            </div>
-            {!isGroupClique && peerIsOnline && (
-              <span
-                className="absolute bottom-0.5 right-0.5 block h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950/90"
-                aria-hidden
+            {isGroupClique ? (
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold glow-violet">
+                <Users className="h-5 w-5 text-white" aria-hidden />
+              </div>
+            ) : (
+              <ConnectionPeerAvatar
+                label={otherUserName}
+                imageUrl={connection.avatarUrl}
+                size="lg"
+                showOnline={peerIsOnline}
               />
             )}
           </button>

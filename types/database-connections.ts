@@ -27,6 +27,15 @@ export type ConnectionHiddenRow = {
   hidden_at: string;
 };
 
+/**
+ * JSON from `POST /api/users/display-names`: display strings plus optional `users.image` per id
+ * (hydrated for connection / chat sidebars; not stored on `connections`).
+ */
+export type DisplayNamesBatchResponse = {
+  names: Record<string, string>;
+  images?: Record<string, string | null>;
+};
+
 /** Row shape returned by `/api/connections` (subset used on the client). */
 export type ConnectionsApiRow = {
   id: string;

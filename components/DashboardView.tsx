@@ -110,6 +110,8 @@ import {
   normalizeAvailabilityIntentRows,
   type AvailabilityIntentRow,
 } from '@/lib/userProfile/availability';
+import type { DisplayNamesBatchResponse } from '@/types/database-connections';
+import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
 import {
   connectionRecordToArchiveRow,
   formatArchiveCountdownLabel,
@@ -147,7 +149,7 @@ const IDLE_ACTIVE_CALL: WebActiveCallState = {
  * Combines connections, timeline, map, QR identity, and settings
  */
 export default function DashboardView({ user }: DashboardViewProps) {
-  const { signOut } = useAuth();
+  const { signOut, onlineUserIds } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
@@ -1613,6 +1615,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         .filter((id, i, arr) => arr.indexOf(id) === i);
 
       let userNameMap: Record<string, string> = {};
+      let userImageMap: Record<string, string | null> = {};
       if (otherUserIds.length > 0) {
         try {
           const nameRes = await fetch('/api/users/display-names', {
@@ -1621,8 +1624,16 @@ export default function DashboardView({ user }: DashboardViewProps) {
             body: JSON.stringify({ userIds: otherUserIds }),
           });
           if (nameRes.ok) {
-            const payload = await nameRes.json();
-            userNameMap = payload?.names ?? {};
+            const payload = (await nameRes.json()) as DisplayNamesBatchResponse;
+            userNameMap = payload.names ?? {};
+            const batchImages = payload.images;
+            if (batchImages && typeof batchImages === 'object') {
+              for (const [uid, raw] of Object.entries(batchImages)) {
+                if (typeof uid !== 'string' || !uid.trim()) continue;
+                userImageMap[uid] =
+                  typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
+              }
+            }
           }
         } catch {
           // Fall through to direct DB lookup below.
@@ -1632,14 +1643,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
           let usersData: any[] | null = null;
           const { data: d1, error: e1 } = await supabase
             .from('users')
-            .select('id, name, full_name, first_name, last_name, email')
+            .select('id, name, full_name, first_name, last_name, email, image')
             .in('id', otherUserIds);
           if (!e1 && d1) {
             usersData = d1;
           } else {
             const { data: d2 } = await supabase
               .from('users')
-              .select('id, name, email')
+              .select('id, name, email, image')
               .in('id', otherUserIds);
             usersData = d2;
           }
@@ -1659,6 +1670,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   '';
                 return [u.id, resolvedName];
               })
+            );
+            userImageMap = Object.fromEntries(
+              usersData.map((u: any) => {
+                const img = typeof u.image === 'string' && u.image.trim() ? u.image.trim() : null;
+                return [u.id, img] as [string, string | null];
+              }),
             );
           }
         }
@@ -1765,11 +1782,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
             ? computeIntentOverlapLabel(selfIntentRows, peerIntentByUserId.get(otherUserId) ?? [])
             : null;
 
+        const peerAvatarUrl =
+          otherUserId != null && otherUserId.length > 0 ? userImageMap[otherUserId] ?? null : null;
+
         return {
           id: String(conn.id),
           otherUserId,
           userIds,
           name: displayName,
+          avatarUrl: peerAvatarUrl,
           dateMet: new Date(typeof dateMetValue === 'number' ? dateMetValue : String(dateMetValue ?? 0)),
           location:
             latestEnc?.locationName ??
@@ -2753,6 +2774,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                               const listPeerId =
                                 conn.otherUserId ??
                                 (user?.id ? conn.userIds?.find((id) => id !== user.id) : undefined);
+                              const listPeerOnline = !!(listPeerId && onlineUserIds.has(listPeerId));
                               return (
                                 <div key={conn.id} className="relative">
                                   <motion.div
@@ -2805,14 +2827,24 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                           e.stopPropagation();
                                           setProfileUserId(listPeerId);
                                         }}
-                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
+                                        className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
                                         aria-label={`View ${conn.name}'s profile`}
                                       >
-                                        {conn.name.charAt(0).toUpperCase()}
+                                        <ConnectionPeerAvatar
+                                          label={conn.name}
+                                          imageUrl={conn.avatarUrl}
+                                          size="md"
+                                          showOnline={listPeerOnline}
+                                        />
                                       </button>
                                     ) : (
-                                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold">
-                                        {conn.name.charAt(0).toUpperCase()}
+                                      <div className="shrink-0">
+                                        <ConnectionPeerAvatar
+                                          label={conn.name}
+                                          imageUrl={conn.avatarUrl}
+                                          size="md"
+                                          showOnline={false}
+                                        />
                                       </div>
                                     )}
                                     <div className="min-w-0 flex-1">

@@ -8,6 +8,7 @@ type UserRow = {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  image?: string | null;
 };
 
 const GENERIC_NAMES = new Set(['user', 'connection', 'unknown']);
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
 
   const userIds: string[] = Array.from(new Set<string>(requestedIds)).slice(0, 100);
   if (userIds.length === 0) {
-    return NextResponse.json({ names: {} });
+    return NextResponse.json({ names: {}, images: {} });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -113,16 +114,20 @@ export async function POST(req: NextRequest) {
 
   const usersWithFullName = await admin
     .from('users')
-    .select('id, name, full_name, first_name, last_name, email')
+    .select('id, name, full_name, first_name, last_name, email, image')
     .in('id', userIds);
 
   const userRows: UserRow[] = usersWithFullName.error
-    ? ((await admin.from('users').select('id, name, full_name, email').in('id', userIds)).data as UserRow[] ?? [])
+    ? ((await admin.from('users').select('id, name, full_name, email, image').in('id', userIds)).data as UserRow[] ?? [])
     : (usersWithFullName.data as UserRow[] ?? []);
 
   const names: Record<string, string> = {};
+  const images: Record<string, string | null> = {};
 
   userRows.forEach((row) => {
+    const img = sanitize(row.image);
+    images[row.id] = img;
+
     const fromParts = [row.first_name, row.last_name]
       .map((x) => sanitize(x))
       .filter(Boolean)
@@ -168,5 +173,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ names });
+  return NextResponse.json({ names, images });
 }

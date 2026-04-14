@@ -18,6 +18,7 @@ import {
 import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
 import type { ConnectionDisplayStatus } from '@/lib/dashboard/connectionStatus';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
+import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
 import { useAuth } from '@/lib/AuthContext';
 
 export interface ConnectionEncounterBrief {
@@ -65,7 +66,8 @@ export interface ConnectionRecord {
   connectionCreatedMs?: number;
   hasBegun?: boolean;
   expiryState?: string | null;
-  avatarUrl?: string;
+  /** Other participant's `public.users.image` when known (nullable). */
+  avatarUrl?: string | null;
   geo_location?: {
     latitude: number;
     longitude: number;
@@ -90,22 +92,6 @@ interface ConnectionTableProps {
 
 type SortField = 'name' | 'dateMet' | 'location' | 'status';
 type SortOrder = 'asc' | 'desc';
-
-function RowAvatar({ initial, showOnline }: { initial: string; showOnline: boolean }) {
-  return (
-    <div className="relative h-8 w-8 shrink-0">
-      <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-xs font-bold">
-        {initial}
-      </div>
-      {showOnline && (
-        <span
-          className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
-          aria-hidden
-        />
-      )}
-    </div>
-  );
-}
 
 /**
  * ConnectionTable - A searchable, sortable data table of "People I've Met"
@@ -393,14 +379,18 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                             className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
                             aria-label={`View ${connection.name}'s profile`}
                           >
-                            <RowAvatar
-                              initial={connection.name.charAt(0).toUpperCase()}
+                            <ConnectionPeerAvatar
+                              label={connection.name}
+                              imageUrl={connection.avatarUrl}
+                              size="sm"
                               showOnline={peerOnline}
                             />
                           </button>
                         ) : (
-                          <RowAvatar
-                            initial={connection.name.charAt(0).toUpperCase()}
+                          <ConnectionPeerAvatar
+                            label={connection.name}
+                            imageUrl={connection.avatarUrl}
+                            size="sm"
                             showOnline={peerOnline}
                           />
                         )}
