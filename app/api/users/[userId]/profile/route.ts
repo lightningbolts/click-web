@@ -3,7 +3,7 @@
  * Returns joined profile for a user (respects RLS — typically connections only).
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
@@ -21,6 +21,83 @@ function createAdminClient() {
     serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } },
   );
+}
+
+/** Trimmed display strings (legacy / dual-write) and deduped lowercase names for `interests.name`. */
+function parseProfileTagsInput(raw: unknown[]): { legacy: string[]; normalizedUnique: string[] } {
+  const legacy: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const t = item.trim();
+    if (t.length === 0) continue;
+    legacy.push(t);
+  }
+  const seen = new Set<string>();
+  const normalizedUnique: string[] = [];
+  for (const t of legacy) {
+    const n = t.toLowerCase();
+    if (seen.has(n)) continue;
+    seen.add(n);
+    normalizedUnique.push(n);
+  }
+  return { legacy, normalizedUnique };
+}
+
+/**
+ * Upsert master interests, replace `user_interest_links` for this user.
+ * Order: upsert `interests` → delete links → insert links.
+ */
+async function syncUserInterestNormalization(
+  supabase: SupabaseClient,
+  userId: string,
+  normalizedUniqueNames: string[],
+): Promise<{ error: string | null }> {
+  try {
+    let idByName: Map<string, string> | null = null;
+
+    if (normalizedUniqueNames.length > 0) {
+      const { data: interestRows, error: upErr } = await supabase
+        .from('interests')
+        .upsert(
+          normalizedUniqueNames.map((name) => ({ name })),
+          { onConflict: 'name' },
+        )
+        .select('id, name');
+
+      if (upErr) return { error: upErr.message };
+      if (!interestRows?.length) {
+        return { error: 'interest upsert returned no rows' };
+      }
+
+      idByName = new Map(
+        (interestRows as { id: string; name: string }[]).map((r) => [r.name, r.id]),
+      );
+      for (const n of normalizedUniqueNames) {
+        if (!idByName.has(n)) {
+          return { error: `missing interest row for "${n}"` };
+        }
+      }
+    }
+
+    const { error: delErr } = await supabase
+      .from('user_interest_links')
+      .delete()
+      .eq('user_id', userId);
+    if (delErr) return { error: delErr.message };
+
+    if (normalizedUniqueNames.length > 0 && idByName) {
+      const rows = normalizedUniqueNames.map((name) => ({
+        user_id: userId,
+        interest_id: idByName.get(name)!,
+      }));
+      const { error: insErr } = await supabase.from('user_interest_links').insert(rows);
+      if (insErr) return { error: insErr.message };
+    }
+
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export type AvailabilityIntentPayload = AvailabilityIntentRow;
@@ -130,6 +207,7 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
 /**
  * PATCH /api/users/[userId]/profile
  * Updates `public.users` (and optionally `user_interests.tags`) for the signed-in user only.
+ * When `tags` is sent, also normalizes into `interests` + `user_interest_links` and dual-writes `users.tags`.
  */
 export async function PATCH(
   req: NextRequest,
@@ -216,11 +294,15 @@ export async function PATCH(
   }
 
   let tags: string[] | null = null;
+  let tagsNormalizedUnique: string[] | null = null;
   if (Object.prototype.hasOwnProperty.call(body, 'tags')) {
     if (!Array.isArray(body.tags)) {
       return NextResponse.json({ error: 'tags must be an array of strings' }, { status: 400 });
     }
-    tags = body.tags.filter((t): t is string => typeof t === 'string').map((t) => t.trim());
+    const { legacy, normalizedUnique } = parseProfileTagsInput(body.tags);
+    tags = legacy;
+    tagsNormalizedUnique = normalizedUnique;
+    updates.tags = legacy;
   }
 
   if (Object.keys(updates).length === 0 && tags == null) {
@@ -234,26 +316,41 @@ export async function PATCH(
   }
 
   try {
-    if (Object.keys(updates).length > 0) {
-      const { error: upErr } = await supabase.from('users').update(updates).eq('id', userId);
-      if (upErr) {
-        console.error('users profile PATCH:', upErr.message);
-        return NextResponse.json({ error: upErr.message }, { status: 500 });
+    if (tags != null && tagsNormalizedUnique != null) {
+      const { error: normErr } = await syncUserInterestNormalization(
+        supabase,
+        userId,
+        tagsNormalizedUnique,
+      );
+      if (normErr) {
+        console.error('users profile PATCH interest normalization:', normErr);
+        return NextResponse.json({ error: 'Interest normalization failed' }, { status: 500 });
       }
     }
 
+    const persistTasks = [];
+    if (Object.keys(updates).length > 0) {
+      persistTasks.push(supabase.from('users').update(updates).eq('id', userId));
+    }
     if (tags != null) {
-      const { error: tagErr } = await supabase.from('user_interests').upsert(
-        {
-          user_id: userId,
-          tags,
-          updated_at: Date.now(),
-        },
-        { onConflict: 'user_id' },
+      persistTasks.push(
+        supabase.from('user_interests').upsert(
+          {
+            user_id: userId,
+            tags,
+            updated_at: Date.now(),
+          },
+          { onConflict: 'user_id' },
+        ),
       );
-      if (tagErr) {
-        console.error('user_interests PATCH:', tagErr.message);
-        return NextResponse.json({ error: tagErr.message }, { status: 500 });
+    }
+    if (persistTasks.length > 0) {
+      const results = await Promise.all(persistTasks);
+      for (const r of results) {
+        if (r.error) {
+          console.error('users profile PATCH:', r.error.message);
+          return NextResponse.json({ error: r.error.message }, { status: 500 });
+        }
       }
     }
 
