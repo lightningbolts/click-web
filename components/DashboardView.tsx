@@ -643,10 +643,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          roomName: invite.roomName,
-          participantName:
+          connection_id: invite.connectionId,
+          room_name: invite.roomName,
+          participant_name:
             displayNameFromUserMetadata(user.user_metadata) || user.email?.split('@')[0] || 'Click User',
-          userId: user.id,
         }),
       });
 
@@ -709,7 +709,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         endWithReason(invite, 'Call ended');
       });
 
-      await room.connect(payload.wsUrl, payload.token);
+      await room.connect(payload.ws_url, payload.token);
       await room.localParticipant.setMicrophoneEnabled(true);
       if (invite.videoEnabled) {
         await room.localParticipant.setCameraEnabled(true);
