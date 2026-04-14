@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  experimental: {
+    // Larger multipart bodies for chat/hub media when a proxy/middleware path buffers the request (see Next docs).
+    proxyClientMaxBodySize: '32mb',
+  },
 };
 
 export default nextConfig;
