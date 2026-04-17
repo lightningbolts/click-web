@@ -46,13 +46,20 @@ import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 import useSWR from 'swr';
 import { coerceMessageType } from '@/lib/chat/messages';
 import {
+  decodeFileMasterKeyBase64,
+  decryptFileBytes,
+  sha256Base64,
+  tryDecodeEnvelope,
+  type AttachmentEnvelope,
+} from '@/lib/chat/attachmentCrypto';
+import {
   decryptContent,
   deriveKeysForConnection,
   isEncrypted,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
 import { createSecureMediaObjectUrl } from '@/lib/chat/useSecureMedia';
-import { signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
+import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 
 export type { AvailabilityIntentRow };
 
@@ -281,6 +288,7 @@ type FileItem = {
   timestamp: string;
   downloadUrl: string | null;
   storagePath: string | null;
+  envelope: AttachmentEnvelope | null;
 };
 type LinkItem = { id: string; url: string; timestamp: string };
 
@@ -372,21 +380,30 @@ function mapFilesFromRow(row: {
   message_type: string;
   metadata: Record<string, unknown> | null;
 }): FileItem {
+  const envelope = tryDecodeEnvelope(row.content);
   const fileName =
-    pickString(row.metadata, ['file_name', 'filename', 'name']) ??
+    pickString(row.metadata, ['attachment_name', 'file_name', 'filename', 'name']) ??
+    envelope?.name ??
     (row.content && !row.content.startsWith('e2e:') && !row.content.startsWith('ccx:v1:')
       ? maskEncryptedSnippet(row.content)
       : 'Attachment');
-  const sizeBytes = pickNumber(row.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
-  const mimeType = pickString(row.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
+  const sizeBytes = pickNumber(row.metadata, ['attachment_size', 'file_size', 'size_bytes', 'size']) ?? envelope?.size ?? 0;
+  const mimeType =
+    pickString(row.metadata, ['attachment_mime', 'original_mime_type', 'mime_type', 'content_type']) ??
+    envelope?.mime ??
+    'application/octet-stream';
   const downloadUrl = pickString(row.metadata, [
     'signed_url',
     'public_url',
     'url',
     'storage_url',
     'media_url',
+    'attachment_url',
   ]);
-  const storagePath = pickString(row.metadata, ['path', 'storage_path', 'object_path', 'media_path']);
+  const storagePath =
+    pickString(row.metadata, ['attachment_path', 'path', 'storage_path', 'object_path', 'media_path']) ??
+    envelope?.path ??
+    null;
   return {
     id: row.id,
     fileName,
@@ -395,6 +412,7 @@ function mapFilesFromRow(row: {
     timestamp: formatTimestamp(row.time_created, ''),
     downloadUrl,
     storagePath,
+    envelope,
   };
 }
 
@@ -447,6 +465,7 @@ function mergeFileItems(localItems: FileItem[], bffItems: FileItem[]): FileItem[
       mimeType: item.mimeType !== 'application/octet-stream' ? item.mimeType : prev.mimeType,
       downloadUrl: item.downloadUrl ?? prev.downloadUrl,
       storagePath: item.storagePath ?? prev.storagePath,
+      envelope: item.envelope ?? prev.envelope,
       timestamp: item.timestamp || prev.timestamp,
     });
   }
@@ -506,6 +525,24 @@ function extensionFromMime(mimeType: string | null | undefined): string {
   if (mt.includes('ogg')) return 'ogg';
   if (mt.includes('mpeg') || mt.includes('m4a') || mt.includes('mp4')) return 'm4a';
   return 'bin';
+}
+
+function triggerBlobDownload(bytes: Uint8Array, fileName: string, mimeType: string): void {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const blob = new Blob([buffer], { type: mimeType || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = sanitizeDownloadName(fileName);
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
 }
 
 function ProfileLoadingSkeleton() {
@@ -688,6 +725,8 @@ export default function UserProfileModal({
         (m.metadata != null &&
           (typeof m.metadata['attachment_v'] === 'number' ||
             typeof m.metadata['attachment_v'] === 'string' ||
+            typeof m.metadata['attachment_path'] === 'string' ||
+            typeof m.metadata['attachment_name'] === 'string' ||
             typeof m.metadata['file_name'] === 'string' ||
             typeof m.metadata['filename'] === 'string')),
     );
@@ -892,6 +931,21 @@ export default function UserProfileModal({
     async (item: FileItem) => {
       const url = await resolveFileUrl(item);
       if (!url) return;
+      if (item.envelope) {
+        try {
+          const ciphertext = await downloadAttachmentCiphertext(url);
+          const fileKey = decodeFileMasterKeyBase64(item.envelope.key);
+          const plaintext = await decryptFileBytes(ciphertext, fileKey);
+          const digest = await sha256Base64(plaintext);
+          if (digest !== item.envelope.sha256) {
+            throw new Error('Attachment integrity check failed (SHA-256 mismatch)');
+          }
+          triggerBlobDownload(plaintext, item.fileName, item.mimeType);
+          return;
+        } catch {
+          // If decryption fails, fall back to raw download path for legacy/non-envelope rows.
+        }
+      }
       await downloadUrl(url, item.fileName);
     },
     [downloadUrl, resolveFileUrl],
