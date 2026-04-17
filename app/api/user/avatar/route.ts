@@ -31,14 +31,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const form = await request.formData().catch(() => null);
+  // KMP/Ktor must send `MultiPartFormDataContent` with part name `file` (see click ApiClient.uploadAvatar).
+  const form = await request.formData().catch((err) => {
+    console.error('[user/avatar] formData() failed:', err);
+    return null;
+  });
   if (!form) {
-    return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error:
+          'Could not parse multipart body. Send multipart/form-data with a binary part named "file".',
+      },
+      { status: 400 },
+    );
   }
 
   const file = form.get('file');
   if (!(file instanceof Blob)) {
-    return NextResponse.json({ error: 'file is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Multipart part "file" (image) is required' }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
