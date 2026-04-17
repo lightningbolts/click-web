@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { startOAuth, type OAuthProvider } from '@/lib/auth/oauth';
 import { useRouter } from 'next/navigation';
 
 function isAtLeastYearsOld(isoDate: string, years: number): boolean {
@@ -44,6 +45,33 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
       setSuccess('');
     }
   }, [isOpen, initialIsSignup]);
+
+  const handleOAuth = async (provider: OAuthProvider) => {
+    setError('');
+    setSuccess('');
+    setIsLoading(true);
+    try {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setError('Authentication is not available');
+        setIsLoading(false);
+        return;
+      }
+      const { error: oauthError } = await startOAuth(supabase, {
+        provider,
+        origin: window.location.origin,
+        next: '/dashboard',
+      });
+      if (oauthError) {
+        setError(oauthError);
+        setIsLoading(false);
+      }
+      // On success the browser is redirected to the provider; nothing more to do here.
+    } catch (_err) {
+      setError('Network error. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,6 +236,60 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     ? 'Join Click and start building real connections'
                     : 'Sign in to your Click account'}
               </p>
+
+              {/* OAuth sign-in buttons — hidden on the forgot-password pane. */}
+              {!isForgotPassword && (
+                <div className="space-y-3 mb-5">
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    type="button"
+                    onClick={() => handleOAuth('google')}
+                    disabled={isLoading}
+                    aria-label={isSignup ? 'Continue with Google' : 'Sign in with Google'}
+                    className="w-full flex items-center justify-center gap-3 py-3 bg-white text-zinc-900 hover:bg-zinc-100 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
+                      <path
+                        fill="#4285F4"
+                        d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.209 1.125-.8427 2.0782-1.7963 2.7166v2.2581h2.9087c1.7018-1.5668 2.6836-3.874 2.6836-6.6152z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M9 18c2.43 0 4.4673-.8059 5.9564-2.1804l-2.9087-2.2581c-.8059.54-1.8368.8591-3.0477.8591-2.344 0-4.3282-1.5832-5.0359-3.7104H.957v2.3318C2.4382 15.9832 5.4818 18 9 18z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M3.9641 10.71c-.18-.54-.2822-1.1168-.2822-1.71s.1023-1.17.2822-1.71V4.9582H.957C.3477 6.1732 0 7.5468 0 9s.3477 2.8268.957 4.0418L3.9641 10.71z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5814C13.4632.8918 11.4259 0 9 0 5.4818 0 2.4382 2.0168.957 4.9582L3.9641 7.29C4.6718 5.1627 6.656 3.5795 9 3.5795z"
+                      />
+                    </svg>
+                    Continue with Google
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    type="button"
+                    onClick={() => handleOAuth('apple')}
+                    disabled={isLoading}
+                    aria-label={isSignup ? 'Continue with Apple' : 'Sign in with Apple'}
+                    className="w-full flex items-center justify-center gap-3 py-3 bg-black text-white border border-zinc-700 hover:bg-zinc-900 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg aria-hidden="true" width="16" height="18" viewBox="0 0 16 18" fill="currentColor">
+                      <path d="M13.35 9.58c-.02-2.02 1.65-2.99 1.73-3.04-.95-1.38-2.42-1.57-2.94-1.59-1.25-.13-2.44.74-3.07.74-.64 0-1.61-.72-2.65-.7-1.36.02-2.63.8-3.33 2.02-1.42 2.46-.36 6.1 1.02 8.09.67.97 1.47 2.06 2.52 2.02 1.02-.04 1.4-.66 2.63-.66s1.57.66 2.65.64c1.1-.02 1.79-.99 2.46-1.97.78-1.12 1.09-2.22 1.11-2.28-.02-.01-2.13-.82-2.15-3.27zM11.4 3.64c.56-.68.94-1.62.83-2.56-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.56-.85 2.48.9.07 1.83-.46 2.39-1.14z" />
+                    </svg>
+                    Continue with Apple
+                  </motion.button>
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="h-px bg-zinc-800 flex-1" />
+                    <span className="text-xs uppercase tracking-wider text-zinc-500">or</span>
+                    <div className="h-px bg-zinc-800 flex-1" />
+                  </div>
+                </div>
+              )}
 
               {/* Form */}
               <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4">
