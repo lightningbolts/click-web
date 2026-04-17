@@ -4,8 +4,9 @@
  * Returns profile-sheet tab payloads for a conversation, backed by the
  * `public.messages` table for the chat associated with [connectionId].
  *
- *   - `media`  → rows where `message_type IN ('image','audio')`
- *   - `files`  → rows where `message_type = 'file'`
+ *   - `attachments` → rows where `message_type IN ('image','audio','file')`
+ *   - `media`       → attachments filtered to `image` / `audio`
+ *   - `files`       → attachments filtered to `file`
  *   - `links`  → intentionally omitted server-side; [content] is E2EE,
  *                so clients filter their locally-decrypted message state for
  *                `http://` / `https://` substrings.
@@ -82,39 +83,28 @@ export async function GET(
     return Math.min(Math.max(raw, 1), 500);
   })();
 
-  const [mediaRes, filesRes] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .in('message_type', ['image', 'audio'])
-      .order('time_created', { ascending: false })
-      .limit(limit),
-    supabase
-      .from('messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .eq('message_type', 'file')
-      .order('time_created', { ascending: false })
-      .limit(limit),
-  ]);
+  const attachmentsRes = await supabase
+    .schema('public')
+    .from('messages')
+    .select('*')
+    .eq('chat_id', chatId)
+    .in('message_type', ['image', 'audio', 'file'])
+    .order('time_created', { ascending: false })
+    .limit(limit);
 
-  if (mediaRes.error) {
-    return NextResponse.json({ error: mediaRes.error.message }, { status: 500 });
-  }
-  if (filesRes.error) {
-    return NextResponse.json({ error: filesRes.error.message }, { status: 500 });
+  if (attachmentsRes.error) {
+    return NextResponse.json({ error: attachmentsRes.error.message }, { status: 500 });
   }
 
-  const media: TabMessage[] = (mediaRes.data ?? []).map((row: Record<string, unknown>) =>
+  const attachments: TabMessage[] = (attachmentsRes.data ?? []).map((row: Record<string, unknown>) =>
     normalizeDbMessage(row),
   );
-  const files: TabMessage[] = (filesRes.data ?? []).map((row: Record<string, unknown>) =>
-    normalizeDbMessage(row),
-  );
+  const media = attachments.filter((item) => item.message_type === 'image' || item.message_type === 'audio');
+  const files = attachments.filter((item) => item.message_type === 'file');
 
   return NextResponse.json({
     chatId,
+    attachments,
     // NB: `links` is intentionally omitted — see the route-level doc comment.
     media,
     files,
