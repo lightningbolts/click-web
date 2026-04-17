@@ -374,7 +374,9 @@ function mapFilesFromRow(row: {
 }): FileItem {
   const fileName =
     pickString(row.metadata, ['file_name', 'filename', 'name']) ??
-    (row.content ? maskEncryptedSnippet(row.content) : 'Attachment');
+    (row.content && !row.content.startsWith('e2e:') && !row.content.startsWith('ccx:v1:')
+      ? maskEncryptedSnippet(row.content)
+      : 'Attachment');
   const sizeBytes = pickNumber(row.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
   const mimeType = pickString(row.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
   const downloadUrl = pickString(row.metadata, [
@@ -384,7 +386,7 @@ function mapFilesFromRow(row: {
     'storage_url',
     'media_url',
   ]);
-  const storagePath = pickString(row.metadata, ['path', 'storage_path', 'object_path']);
+  const storagePath = pickString(row.metadata, ['path', 'storage_path', 'object_path', 'media_path']);
   return {
     id: row.id,
     fileName,
@@ -541,12 +543,13 @@ export default function UserProfileModal({
   connectionId = null,
   decryptedMessages = [],
 }: UserProfileModalProps) {
+  const requestedUserId = userId?.trim() || null;
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
   const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
-  const profilePath = userId ? `/api/users/${encodeURIComponent(userId)}/profile` : null;
-  const { data, error, isLoading } = useSWR<UserProfilePayload>(
+  const profilePath = requestedUserId ? `/api/users/${encodeURIComponent(requestedUserId)}/profile` : null;
+  const { data, error } = useSWR<UserProfilePayload>(
     profilePath,
     async (path: string) => {
       const headers = await getAuthHeaders();
@@ -564,16 +567,21 @@ export default function UserProfileModal({
     {
       revalidateOnFocus: false,
       dedupingInterval: 60_000,
-      keepPreviousData: true,
+      keepPreviousData: false,
     },
   );
+
+  const profileData = useMemo(() => {
+    if (!requestedUserId || !data?.user?.id) return null;
+    return data.user.id === requestedUserId ? data : null;
+  }, [data, requestedUserId]);
 
   const effectiveConnectionId = useMemo(() => {
     const fromProp = connectionId?.trim();
     if (fromProp) return fromProp;
-    const fromProfile = (data?.sharedConnection as Record<string, unknown> | null)?.id;
+    const fromProfile = (profileData?.sharedConnection as Record<string, unknown> | null)?.id;
     return typeof fromProfile === 'string' && fromProfile.trim() ? fromProfile.trim() : null;
-  }, [connectionId, data?.sharedConnection]);
+  }, [connectionId, profileData?.sharedConnection]);
 
   const tabsPath = effectiveConnectionId
     ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/tabs?limit=200`
@@ -596,7 +604,7 @@ export default function UserProfileModal({
     {
       revalidateOnFocus: false,
       dedupingInterval: 60_000,
-      keepPreviousData: true,
+      keepPreviousData: false,
     },
   );
 
@@ -621,17 +629,17 @@ export default function UserProfileModal({
     {
       revalidateOnFocus: false,
       dedupingInterval: 60_000,
-      keepPreviousData: true,
+      keepPreviousData: false,
     },
   );
 
   const connectionUserIds = useMemo(() => {
-    const raw = (data?.sharedConnection as Record<string, unknown> | null)?.user_ids;
+    const raw = (profileData?.sharedConnection as Record<string, unknown> | null)?.user_ids;
     if (!Array.isArray(raw)) return [];
     return raw
       .map((v) => (typeof v === 'string' ? v.trim() : ''))
       .filter((v) => v.length > 0);
-  }, [data?.sharedConnection]);
+  }, [profileData?.sharedConnection]);
   const connectionUserIdsKey = connectionUserIds.join(':');
 
   useEffect(() => {
@@ -675,7 +683,13 @@ export default function UserProfileModal({
 
   const localFileItems = useMemo(() => {
     const fileMessages = decryptedMessages.filter(
-      (m) => coerceMessageType(m.messageType) === 'file' || m.content.startsWith('ccx:v1:'),
+      (m) =>
+        coerceMessageType(m.messageType) === 'file' ||
+        (m.metadata != null &&
+          (typeof m.metadata['attachment_v'] === 'number' ||
+            typeof m.metadata['attachment_v'] === 'string' ||
+            typeof m.metadata['file_name'] === 'string' ||
+            typeof m.metadata['filename'] === 'string')),
     );
     return fileMessages.map((m): FileItem =>
       mapFilesFromRow({
@@ -793,14 +807,32 @@ export default function UserProfileModal({
     [localLinkItems, fallbackLinkItems],
   );
 
-  const downloadUrl = useCallback((url: string, filename: string) => {
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = sanitizeDownloadName(filename);
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+  const downloadUrl = useCallback(async (url: string, filename: string) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`download failed (${res.status})`);
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objUrl;
+      anchor.download = sanitizeDownloadName(filename);
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objUrl);
+      return;
+    } catch {
+      // Fallback: trigger a direct navigation/download via anchor (popup-safe).
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = sanitizeDownloadName(filename);
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
   }, []);
 
   const openMediaItem = useCallback(
@@ -813,11 +845,11 @@ export default function UserProfileModal({
   );
 
   const downloadMediaItem = useCallback(
-    (item: MediaItem) => {
+    async (item: MediaItem) => {
       const url = resolvedMediaUrls[item.id];
       if (!url) return;
       const ext = extensionFromMime(item.mimeType);
-      downloadUrl(url, `${item.mediaType}-${item.id}.${ext}`);
+      await downloadUrl(url, `${item.mediaType}-${item.id}.${ext}`);
     },
     [downloadUrl, resolvedMediaUrls],
   );
@@ -860,44 +892,49 @@ export default function UserProfileModal({
     async (item: FileItem) => {
       const url = await resolveFileUrl(item);
       if (!url) return;
-      downloadUrl(url, item.fileName);
+      await downloadUrl(url, item.fileName);
     },
     [downloadUrl, resolveFileUrl],
   );
 
   useEffect(() => {
-    // Reset to the Timeline tab whenever the sheet opens for a new user.
-    if (userId) setActiveTab('timeline');
-  }, [userId]);
+    // Reset derived state whenever the sheet opens for a new user.
+    if (!requestedUserId) return;
+    setActiveTab('timeline');
+    setResolvedMediaUrls({});
+    setSignedFileUrls({});
+    setFallbackLinkItems([]);
+  }, [requestedUserId]);
 
-  const open = !!userId;
-  const loading = Boolean(userId) && isLoading && !data;
+  const open = !!requestedUserId;
   const errorMessage = error instanceof Error ? error.message : error ? 'Failed to load' : null;
+  const loading = Boolean(requestedUserId) && !profileData && !errorMessage;
 
   const momentLines = useMemo(() => {
-    const sc = data?.sharedConnection;
+    const sc = profileData?.sharedConnection;
     const payload = coerceSharedConnection(sc);
     if (!payload) return null;
     return buildProfileConnectionLines(payload);
-  }, [data?.sharedConnection]);
+  }, [profileData?.sharedConnection]);
 
   const hasMoment =
     !!momentLines &&
     Object.values(momentLines).some((v) => typeof v === 'string' && v.trim().length > 0);
 
   const encounterTimeline = useMemo(() => {
-    const raw = data?.sharedConnection;
+    const raw = profileData?.sharedConnection;
     if (!raw || typeof raw !== 'object') return null;
     const conn = raw as Record<string, unknown>;
     const rows = parseConnectionEncounters(conn);
     const origin = originEncounter(conn);
     return { rows, originId: origin?.id ?? null };
-  }, [data?.sharedConnection]);
+  }, [profileData?.sharedConnection]);
 
   return (
     <AnimatePresence>
       {open && (
         <motion.div
+          key={requestedUserId}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -930,7 +967,7 @@ export default function UserProfileModal({
               {errorMessage && !loading && (
                 <p className="text-sm text-red-400 text-center py-6">{errorMessage}</p>
               )}
-              {data && !loading && (
+              {profileData && !loading && (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -938,10 +975,10 @@ export default function UserProfileModal({
                   className="space-y-5"
                 >
                   <div className="flex flex-col items-center gap-3">
-                    {data.user.image ? (
+                    {profileData.user.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={data.user.image}
+                        src={profileData.user.image}
                         alt=""
                         className="h-24 w-24 rounded-full object-cover ring-2 ring-[#8338EC]/40"
                       />
@@ -949,18 +986,18 @@ export default function UserProfileModal({
                       <div
                         className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-3xl font-bold text-white"
                       >
-                        {displayName(data.user).charAt(0).toUpperCase()}
+                        {displayName(profileData.user).charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="text-center">
                       <p className="text-xl font-semibold text-white">
-                        {displayName(data.user)}
-                        {ageFromBirthday(data.user.birthday) != null && (
-                          <span className="text-zinc-400 font-normal">, {ageFromBirthday(data.user.birthday)}</span>
+                        {displayName(profileData.user)}
+                        {ageFromBirthday(profileData.user.birthday) != null && (
+                          <span className="text-zinc-400 font-normal">, {ageFromBirthday(profileData.user.birthday)}</span>
                         )}
                       </p>
-                      {data.user.email && (
-                        <p className="text-xs text-zinc-500 mt-1">{data.user.email}</p>
+                      {profileData.user.email && (
+                        <p className="text-xs text-zinc-500 mt-1">{profileData.user.email}</p>
                       )}
                     </div>
                   </div>
@@ -1282,11 +1319,11 @@ export default function UserProfileModal({
 
                   <section>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Interests</h3>
-                    {data.tags.length === 0 ? (
+                    {profileData.tags.length === 0 ? (
                       <p className="text-sm text-zinc-500">No interests shared yet</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {data.tags.map((t) => (
+                        {profileData.tags.map((t) => (
                           <span
                             key={t}
                             className="rounded-full border border-[#8338EC]/35 bg-[#8338EC]/10 px-3 py-1 text-xs text-[#c4b5fd]"
@@ -1298,7 +1335,7 @@ export default function UserProfileModal({
                     )}
                   </section>
 
-                  {!!data.sharedInterestTags?.length && (
+                  {!!profileData.sharedInterestTags?.length && (
                     <section>
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
                         Shared interests
@@ -1307,7 +1344,7 @@ export default function UserProfileModal({
                         Conversation starters you both listed
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {data.sharedInterestTags.map((t) => (
+                        {profileData.sharedInterestTags.map((t) => (
                           <span
                             key={t}
                             className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200"
@@ -1324,8 +1361,8 @@ export default function UserProfileModal({
                       Availability
                     </h3>
                     <CurrentAvailabilitySection
-                      availability={data.availability}
-                      availabilityIntents={data.availabilityIntents}
+                      availability={profileData.availability}
+                      availabilityIntents={profileData.availabilityIntents}
                     />
                   </section>
 
