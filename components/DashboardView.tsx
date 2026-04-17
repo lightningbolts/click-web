@@ -3329,6 +3329,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         userId={profileUserId}
         getAuthHeaders={getAuthHeaders}
         onClose={() => setProfileUserId(null)}
+        connectionId={selectedConnection?.id ?? null}
       />
 
       {vibePromptConnection ? (

@@ -18,6 +18,11 @@ import {
   Activity,
   Wind,
   Gauge,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Paperclip,
+  History,
+  FileText,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -186,11 +191,134 @@ function ageFromBirthday(birthday?: string | null): number | null {
   return age >= 0 && age < 130 ? age : null;
 }
 
+/**
+ * Locally-decrypted text messages used to populate the Links subtab. Message
+ * content is E2EE on the wire, so the BFF (`/api/connections/{id}/tabs`) does
+ * not attempt to parse URLs — clients scan their already-decrypted state.
+ */
+export type DecryptedProfileMessage = {
+  id: string;
+  content: string;
+  /** Human-readable timestamp already formatted by the caller. */
+  timestamp: string;
+};
+
 type UserProfileModalProps = {
   userId: string | null;
   getAuthHeaders: () => Promise<HeadersInit>;
   onClose: () => void;
+  /**
+   * When supplied, the Media and Files subtabs hydrate from
+   * `GET /api/connections/{connectionId}/tabs` on click-web. Omit to render the
+   * sheet in profile-only mode (Media / Files will show empty states).
+   */
+  connectionId?: string | null;
+  /**
+   * Locally-decrypted chat messages scanned client-side for `http(s)://` URLs.
+   * Required for the Links subtab — the server cannot parse links because
+   * message content is end-to-end encrypted.
+   */
+  decryptedMessages?: DecryptedProfileMessage[];
 };
+
+type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files';
+
+type ConnectionTabsPayload = {
+  media: Array<{
+    id: string;
+    content: string;
+    time_created: number | string;
+    message_type: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+  files: Array<{
+    id: string;
+    content: string;
+    time_created: number | string;
+    message_type: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+};
+
+type MediaItem = { id: string; url: string; caption: string | null };
+type FileItem = {
+  id: string;
+  fileName: string;
+  sizeBytes: number;
+  mimeType: string;
+  timestamp: string;
+};
+type LinkItem = { id: string; url: string; timestamp: string };
+
+function pickString(meta: Record<string, unknown> | null | undefined, keys: string[]): string | null {
+  if (!meta) return null;
+  for (const k of keys) {
+    const v = meta[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+function pickNumber(meta: Record<string, unknown> | null | undefined, keys: string[]): number | null {
+  if (!meta) return null;
+  for (const k of keys) {
+    const v = meta[k];
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim()) {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+function mapMedia(rows: ConnectionTabsPayload['media']): MediaItem[] {
+  const out: MediaItem[] = [];
+  for (const r of rows) {
+    const url = pickString(r.metadata, ['url', 'storage_url', 'image_url', 'audio_url', 'media_url']);
+    if (!url) continue;
+    const caption = r.content && !r.content.startsWith('ccx:v1:') ? r.content : null;
+    out.push({ id: r.id, url, caption });
+  }
+  return out;
+}
+
+function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
+  return rows.map((r) => {
+    const fileName =
+      pickString(r.metadata, ['file_name', 'filename', 'name']) ??
+      (r.content && !r.content.startsWith('ccx:v1:') ? r.content : 'Attachment');
+    const sizeBytes = pickNumber(r.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
+    const mimeType =
+      pickString(r.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
+    const raw = r.time_created;
+    const ts = typeof raw === 'number' ? new Date(raw).toLocaleString() : String(raw ?? '');
+    return { id: r.id, fileName, sizeBytes, mimeType, timestamp: ts };
+  });
+}
+
+const URL_REGEX = /https?:\/\/\S+/gi;
+
+function extractLinks(messages: DecryptedProfileMessage[]): LinkItem[] {
+  if (!messages.length) return [];
+  const seen = new Set<string>();
+  const out: LinkItem[] = [];
+  for (const m of messages) {
+    const matches = m.content.matchAll(URL_REGEX);
+    for (const match of matches) {
+      const url = match[0].replace(/[.,)\]};:]+$/g, '');
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      out.push({ id: `${m.id}:${url}`, url, timestamp: m.timestamp });
+    }
+  }
+  return out;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${((bytes / (1024 * 1024)) * 10 >> 0) / 10} MB`;
+}
 
 function ProfileLoadingSkeleton() {
   return (
@@ -220,10 +348,61 @@ function ProfileLoadingSkeleton() {
   );
 }
 
-export default function UserProfileModal({ userId, getAuthHeaders, onClose }: UserProfileModalProps) {
+export default function UserProfileModal({
+  userId,
+  getAuthHeaders,
+  onClose,
+  connectionId = null,
+  decryptedMessages = [],
+}: UserProfileModalProps) {
   const [data, setData] = useState<UserProfilePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
+  const [tabsPayload, setTabsPayload] = useState<ConnectionTabsPayload | null>(null);
+
+  useEffect(() => {
+    if (!connectionId) {
+      setTabsPayload(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(
+          `/api/connections/${encodeURIComponent(connectionId)}/tabs`,
+          { headers },
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        if (!cancelled) setTabsPayload(json as ConnectionTabsPayload);
+      } catch {
+        // Soft-fail: tabs stay empty; Timeline subtab still renders full profile.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionId, getAuthHeaders]);
+
+  const mediaItems = useMemo(
+    () => mapMedia(tabsPayload?.media ?? []),
+    [tabsPayload],
+  );
+  const fileItems = useMemo(
+    () => mapFiles(tabsPayload?.files ?? []),
+    [tabsPayload],
+  );
+  const linkItems = useMemo(
+    () => extractLinks(decryptedMessages),
+    [decryptedMessages],
+  );
+
+  useEffect(() => {
+    // Reset to the Timeline tab whenever the sheet opens for a new user.
+    if (userId) setActiveTab('timeline');
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -345,6 +524,135 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                       )}
                     </div>
                   </div>
+
+                  {/*
+                    Four-tab secondary nav mirroring the KMP [ProfileBottomSheet]
+                    subtabs: Timeline · Media · Links · Files. Media/Files are
+                    hydrated from `/api/connections/{connectionId}/tabs`; Links are
+                    derived client-side from the locally-decrypted chat messages
+                    (server content is E2EE, so the BFF never sees URLs).
+                  */}
+                  <nav
+                    role="tablist"
+                    aria-label="Profile sections"
+                    className="grid grid-cols-4 gap-1 rounded-xl border border-zinc-800/90 bg-zinc-900/50 p-1"
+                  >
+                    {(
+                      [
+                        { key: 'timeline', label: 'Timeline', Icon: History },
+                        { key: 'media', label: 'Media', Icon: ImageIcon },
+                        { key: 'links', label: 'Links', Icon: LinkIcon },
+                        { key: 'files', label: 'Files', Icon: Paperclip },
+                      ] as const
+                    ).map(({ key, label, Icon }) => {
+                      const selected = activeTab === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          role="tab"
+                          aria-selected={selected}
+                          onClick={() => setActiveTab(key)}
+                          className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors ${
+                            selected
+                              ? 'bg-[#8338EC]/20 text-[#c4b5fd] ring-1 ring-[#8338EC]/40'
+                              : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" aria-hidden />
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+
+                  {activeTab === 'media' && (
+                    <section role="tabpanel" aria-label="Media">
+                      {mediaItems.length === 0 ? (
+                        <EmptyTabState
+                          Icon={ImageIcon}
+                          title="No shared photos"
+                          body="Photos you exchange in chat will appear here."
+                        />
+                      ) : (
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {mediaItems.map((m) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={m.id}
+                              src={m.url}
+                              alt={m.caption ?? ''}
+                              className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  )}
+
+                  {activeTab === 'links' && (
+                    <section role="tabpanel" aria-label="Links">
+                      {linkItems.length === 0 ? (
+                        <EmptyTabState
+                          Icon={LinkIcon}
+                          title="No shared links"
+                          body="URLs shared in chat show up here."
+                        />
+                      ) : (
+                        <ul className="space-y-2">
+                          {linkItems.map((l) => (
+                            <li key={l.id}>
+                              <a
+                                href={l.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-200 hover:border-[#8338EC]/50 hover:bg-zinc-900/80"
+                              >
+                                <LinkIcon className="h-4 w-4 shrink-0 text-[#8338EC]/80 mt-0.5" aria-hidden />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-[#c4b5fd]">{l.url}</p>
+                                  <p className="text-[11px] text-zinc-500 mt-0.5">{l.timestamp}</p>
+                                </div>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+                  )}
+
+                  {activeTab === 'files' && (
+                    <section role="tabpanel" aria-label="Files">
+                      {fileItems.length === 0 ? (
+                        <EmptyTabState
+                          Icon={Paperclip}
+                          title="No shared files"
+                          body="Attachments sent in chat will appear here."
+                        />
+                      ) : (
+                        <ul className="space-y-2">
+                          {fileItems.map((f) => (
+                            <li
+                              key={f.id}
+                              className="flex items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5"
+                            >
+                              <FileText className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-white">{f.fileName}</p>
+                                <p className="text-[11px] text-zinc-500 mt-0.5">
+                                  {formatFileSize(f.sizeBytes)} · {f.mimeType}
+                                </p>
+                                <p className="text-[11px] text-zinc-500">{f.timestamp}</p>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+                  )}
+
+                  {activeTab === 'timeline' && (
+                  <>
 
                   {hasMoment && momentLines && (
                     <section>
@@ -552,6 +860,8 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
                       )}
                     </section>
                   )}
+                  </>
+                  )}
                 </motion.div>
               )}
             </div>
@@ -559,5 +869,23 @@ export default function UserProfileModal({ userId, getAuthHeaders, onClose }: Us
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function EmptyTabState({
+  Icon,
+  title,
+  body,
+}: {
+  Icon: LucideIcon;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-800/90 bg-zinc-900/30 px-6 py-12 text-center">
+      <Icon className="h-10 w-10 text-zinc-600" aria-hidden />
+      <p className="mt-3 text-sm font-semibold text-zinc-200">{title}</p>
+      <p className="mt-1 text-xs text-zinc-500">{body}</p>
+    </div>
   );
 }
