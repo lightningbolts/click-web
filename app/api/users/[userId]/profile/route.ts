@@ -102,6 +102,53 @@ async function syncUserInterestNormalization(
 
 export type AvailabilityIntentPayload = AvailabilityIntentRow;
 
+function extractAvailabilityIntentsFromClaims(
+  authUser: { app_metadata?: unknown; user_metadata?: unknown } | null | undefined,
+  targetUserId: string,
+): AvailabilityIntentRow[] {
+  if (!authUser) return [];
+
+  const candidates: unknown[] = [];
+  const appMeta = isJsonObject(authUser.app_metadata) ? authUser.app_metadata : null;
+  const userMeta = isJsonObject(authUser.user_metadata) ? authUser.user_metadata : null;
+
+  if (appMeta) {
+    candidates.push(appMeta);
+    if (isJsonObject(appMeta.claims)) candidates.push(appMeta.claims);
+    if (isJsonObject(appMeta.custom_claims)) candidates.push(appMeta.custom_claims);
+  }
+  if (userMeta) {
+    candidates.push(userMeta);
+    if (isJsonObject(userMeta.claims)) candidates.push(userMeta.claims);
+    if (isJsonObject(userMeta.custom_claims)) candidates.push(userMeta.custom_claims);
+  }
+
+  const tryNormalize = (value: unknown): AvailabilityIntentRow[] => {
+    if (Array.isArray(value)) return normalizeAvailabilityIntentRows(value);
+    if (!isJsonObject(value)) return [];
+
+    const direct = value.availability_intents ?? value.availabilityIntents;
+    if (Array.isArray(direct)) return normalizeAvailabilityIntentRows(direct);
+
+    const byUser = value.by_user ?? value.users ?? value.user_ids;
+    if (isJsonObject(byUser)) {
+      const scoped = byUser[targetUserId];
+      if (Array.isArray(scoped)) return normalizeAvailabilityIntentRows(scoped);
+    }
+
+    const keyed = value[targetUserId];
+    if (Array.isArray(keyed)) return normalizeAvailabilityIntentRows(keyed);
+    return [];
+  };
+
+  for (const c of candidates) {
+    const rows = tryNormalize(c);
+    if (rows.length > 0) return rows;
+  }
+
+  return [];
+}
+
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ userId: string }> },
@@ -127,23 +174,25 @@ export async function GET(
 
     const profileTags = (interestsRes.data as { tags?: string[] } | null)?.tags ?? [];
 
-    let availabilityIntents: AvailabilityIntentRow[] = [];
-    try {
-      const admin = createAdminClient();
-      const { data: intentRows, error: intentErr } = await admin
-        .from('availability_intents')
-        .select('id, timeframe, intent_tag, expires_at')
-        .eq('user_id', userId)
-        .gt('expires_at', new Date().toISOString())
-        .order('expires_at', { ascending: true });
+    let availabilityIntents = extractAvailabilityIntentsFromClaims(user, userId);
+    if (availabilityIntents.length === 0) {
+      try {
+        const admin = createAdminClient();
+        const { data: intentRows, error: intentErr } = await admin
+          .from('availability_intents')
+          .select('id, timeframe, intent_tag, expires_at')
+          .eq('user_id', userId)
+          .gt('expires_at', new Date().toISOString())
+          .order('expires_at', { ascending: true });
 
-      if (!intentErr && intentRows) {
-        availabilityIntents = normalizeAvailabilityIntentRows(intentRows);
-      } else if (intentErr) {
-        console.warn('profile availability_intents:', intentErr.message);
+        if (!intentErr && intentRows) {
+          availabilityIntents = normalizeAvailabilityIntentRows(intentRows);
+        } else if (intentErr) {
+          console.warn('profile availability_intents:', intentErr.message);
+        }
+      } catch (e) {
+        console.warn('profile availability_intents fetch failed:', e);
       }
-    } catch (e) {
-      console.warn('profile availability_intents fetch failed:', e);
     }
 
     let viewerInterestTags: string[] = [];

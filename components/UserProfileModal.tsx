@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -42,6 +42,14 @@ import {
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 import useSWR from 'swr';
 import { coerceMessageType } from '@/lib/chat/messages';
+import {
+  decryptContent,
+  deriveKeysForConnection,
+  isEncrypted,
+  type DerivedKeys,
+} from '@/lib/chat/crypto';
+import { createSecureMediaObjectUrl } from '@/lib/chat/useSecureMedia';
+import { signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 
 export type { AvailabilityIntentRow };
 
@@ -226,6 +234,7 @@ type UserProfileModalProps = {
 type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files';
 
 type ConnectionTabsPayload = {
+  chatId: string | null;
   media: Array<{
     id: string;
     content: string;
@@ -242,13 +251,32 @@ type ConnectionTabsPayload = {
   }>;
 };
 
-type MediaItem = { id: string; url: string; caption: string | null };
+type ChatMessagesPayload = {
+  messages: Array<{
+    id: string;
+    content: string;
+    time_created: number;
+    message_type: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+};
+
+type MediaItem = {
+  id: string;
+  sourceUrl: string | null;
+  storagePath: string | null;
+  caption: string | null;
+  mimeType: string | null;
+  isEncrypted: boolean;
+};
 type FileItem = {
   id: string;
   fileName: string;
   sizeBytes: number;
   mimeType: string;
   timestamp: string;
+  downloadUrl: string | null;
+  storagePath: string | null;
 };
 type LinkItem = { id: string; url: string; timestamp: string };
 
@@ -261,38 +289,6 @@ function pickString(meta: Record<string, unknown> | null | undefined, keys: stri
   return null;
 }
 
-function mapMedia(rows: ConnectionTabsPayload['media']): MediaItem[] {
-  const out: MediaItem[] = [];
-  for (const r of rows) {
-    const url = pickString(r.metadata, [
-      'url',
-      'storage_url',
-      'image_url',
-      'audio_url',
-      'media_url',
-      'signed_url',
-      'public_url',
-    ]);
-    if (!url) continue;
-    const caption = r.content && !r.content.startsWith('ccx:v1:') ? r.content : null;
-    out.push({ id: r.id, url, caption });
-  }
-  return out;
-}
-
-function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
-  return rows.map((r) => {
-    const fileName =
-      pickString(r.metadata, ['file_name', 'filename', 'name']) ??
-      (r.content && !r.content.startsWith('ccx:v1:') ? r.content : 'Attachment');
-    const sizeBytes = pickNumber(r.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
-    const mimeType =
-      pickString(r.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
-    const raw = r.time_created;
-    const ts = typeof raw === 'number' ? new Date(raw).toLocaleString() : String(raw ?? '');
-    return { id: r.id, fileName, sizeBytes, mimeType, timestamp: ts };
-  });
-}
 function pickNumber(meta: Record<string, unknown> | null | undefined, keys: string[]): number | null {
   if (!meta) return null;
   for (const k of keys) {
@@ -306,7 +302,106 @@ function pickNumber(meta: Record<string, unknown> | null | undefined, keys: stri
   return null;
 }
 
+function pickBoolean(meta: Record<string, unknown> | null | undefined, keys: string[]): boolean | null {
+  if (!meta) return null;
+  for (const k of keys) {
+    const v = meta[k];
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'string') {
+      const lowered = v.trim().toLowerCase();
+      if (lowered === 'true') return true;
+      if (lowered === 'false') return false;
+    }
+    if (typeof v === 'number') {
+      if (v === 1) return true;
+      if (v === 0) return false;
+    }
+  }
+  return null;
+}
+
+function formatTimestamp(raw: number | string | undefined, fallback: string): string {
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return new Date(raw).toISOString();
+  }
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  return fallback;
+}
+
+function mapMediaFromRow(row: {
+  id: string;
+  content: string;
+  message_type: string;
+  metadata: Record<string, unknown> | null;
+}): MediaItem | null {
+  if (coerceMessageType(row.message_type) !== 'image') return null;
+  const sourceUrl = pickString(row.metadata, [
+    'signed_url',
+    'public_url',
+    'url',
+    'storage_url',
+    'image_url',
+    'media_url',
+  ]);
+  const storagePath = pickString(row.metadata, ['path', 'storage_path', 'object_path', 'media_path']);
+  const mimeType = pickString(row.metadata, ['original_mime_type', 'mime_type', 'content_type']);
+  const isEncrypted =
+    pickBoolean(row.metadata, ['is_encrypted_media', 'encrypted_media']) ??
+    false;
+  const caption = row.content && !row.content.startsWith('ccx:v1:') ? row.content : null;
+  return {
+    id: row.id,
+    sourceUrl,
+    storagePath,
+    caption,
+    mimeType,
+    isEncrypted,
+  };
+}
+
+function mapFilesFromRow(row: {
+  id: string;
+  content: string;
+  time_created?: number | string;
+  message_type: string;
+  metadata: Record<string, unknown> | null;
+}): FileItem {
+  const fileName =
+    pickString(row.metadata, ['file_name', 'filename', 'name']) ??
+    (row.content ? maskEncryptedSnippet(row.content) : 'Attachment');
+  const sizeBytes = pickNumber(row.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
+  const mimeType = pickString(row.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
+  const downloadUrl = pickString(row.metadata, [
+    'signed_url',
+    'public_url',
+    'url',
+    'storage_url',
+    'media_url',
+  ]);
+  const storagePath = pickString(row.metadata, ['path', 'storage_path', 'object_path']);
+  return {
+    id: row.id,
+    fileName,
+    sizeBytes,
+    mimeType,
+    timestamp: formatTimestamp(row.time_created, ''),
+    downloadUrl,
+    storagePath,
+  };
+}
+
+function mapMedia(rows: ConnectionTabsPayload['media']): MediaItem[] {
+  return rows
+    .map((row) => mapMediaFromRow(row))
+    .filter((row): row is MediaItem => row != null);
+}
+
+function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
+  return rows.map((row) => mapFilesFromRow(row));
+}
+
 const URL_REGEX = /https?:\/\/\S+/gi;
+const ENCRYPTED_ATTACHMENT_SNIPPET = /ccx:v1:[^\s]+/gi;
 
 function extractLinks(messages: DecryptedProfileMessage[]): LinkItem[] {
   if (!messages.length) return [];
@@ -328,6 +423,15 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${((bytes / (1024 * 1024)) * 10 >> 0) / 10} MB`;
+}
+
+function maskEncryptedSnippet(value: string): string {
+  return value.replace(ENCRYPTED_ATTACHMENT_SNIPPET, '[encrypted attachment]');
+}
+
+function sanitizeDownloadName(name: string): string {
+  const cleaned = name.trim().replace(/[\\/:*?"<>|]+/g, '_');
+  return cleaned || 'Attachment';
 }
 
 function ProfileLoadingSkeleton() {
@@ -366,6 +470,9 @@ export default function UserProfileModal({
   decryptedMessages = [],
 }: UserProfileModalProps) {
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
+  const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
+  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
+  const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
   const profilePath = userId ? `/api/users/${encodeURIComponent(userId)}/profile` : null;
   const { data, error, isLoading } = useSWR<UserProfilePayload>(
     profilePath,
@@ -397,9 +504,9 @@ export default function UserProfileModal({
   }, [connectionId, data?.sharedConnection]);
 
   const tabsPath = effectiveConnectionId
-    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/tabs`
+    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/tabs?limit=200`
     : null;
-  const { data: tabsPayload } = useSWR<ConnectionTabsPayload>(
+  const { data: tabsPayload, isLoading: tabsLoading } = useSWR<ConnectionTabsPayload>(
     tabsPath,
     async (path: string) => {
       const headers = await getAuthHeaders();
@@ -421,57 +528,135 @@ export default function UserProfileModal({
     },
   );
 
+  const chatMessagesPath = tabsPayload?.chatId
+    ? `/api/chat/messages?chatId=${encodeURIComponent(tabsPayload.chatId)}&limit=200`
+    : null;
+  const { data: chatMessagesPayload, isLoading: chatMessagesLoading } = useSWR<ChatMessagesPayload>(
+    chatMessagesPath,
+    async (path: string) => {
+      const headers = await getAuthHeaders();
+      const res = await fetch(path, { headers });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof json?.error === 'string' && json.error.trim()
+            ? json.error
+            : res.statusText || 'Failed to load chat messages',
+        );
+      }
+      return json as ChatMessagesPayload;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
+      keepPreviousData: true,
+    },
+  );
+
+  const connectionUserIds = useMemo(() => {
+    const raw = (data?.sharedConnection as Record<string, unknown> | null)?.user_ids;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter((v) => v.length > 0);
+  }, [data?.sharedConnection]);
+  const connectionUserIdsKey = connectionUserIds.join(':');
+
+  useEffect(() => {
+    let cancelled = false;
+    setDerivedKeys(null);
+    if (!effectiveConnectionId || connectionUserIds.length < 2) return;
+
+    void deriveKeysForConnection(effectiveConnectionId, connectionUserIds)
+      .then((keys) => {
+        if (!cancelled) setDerivedKeys(keys);
+      })
+      .catch(() => {
+        if (!cancelled) setDerivedKeys(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveConnectionId, connectionUserIdsKey]);
+
   const localMediaItems = useMemo(() => {
-    const mediaMessages = decryptedMessages.filter(
-      (m) => {
-        const type = coerceMessageType(m.messageType);
-        return type === 'image' || type === 'audio';
-      },
-    );
-    const out: MediaItem[] = [];
-    for (const m of mediaMessages) {
-      const url = pickString(m.metadata, [
-        'url',
-        'storage_url',
-        'image_url',
-        'audio_url',
-        'media_url',
-        'signed_url',
-        'public_url',
-      ]);
-      if (!url) continue;
-      const caption = m.content && !m.content.startsWith('ccx:v1:') ? m.content : null;
-      out.push({ id: m.id, url, caption });
-    }
-    return out;
+    return decryptedMessages
+      .map((m) =>
+        mapMediaFromRow({
+          id: m.id,
+          content: m.content,
+          message_type: coerceMessageType(m.messageType),
+          metadata: m.metadata ?? null,
+        }),
+      )
+      .filter((row): row is MediaItem => row != null);
   }, [decryptedMessages]);
+
+  const bffMediaItems = useMemo(() => mapMedia(tabsPayload?.media ?? []), [tabsPayload]);
+  const mediaItems = localMediaItems.length > 0 ? localMediaItems : bffMediaItems;
 
   const localFileItems = useMemo(() => {
     const fileMessages = decryptedMessages.filter(
       (m) => coerceMessageType(m.messageType) === 'file' || m.content.startsWith('ccx:v1:'),
     );
-    return fileMessages.map((m): FileItem => {
-      const fileName =
-        pickString(m.metadata, ['file_name', 'filename', 'name']) ??
-        (m.content && !m.content.startsWith('ccx:v1:') ? m.content : 'Attachment');
-      const sizeBytes = pickNumber(m.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
-      const mimeType = pickString(m.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
-      return { id: m.id, fileName, sizeBytes, mimeType, timestamp: m.timestamp };
-    });
+    return fileMessages.map((m): FileItem =>
+      mapFilesFromRow({
+        id: m.id,
+        content: m.content,
+        message_type: coerceMessageType(m.messageType),
+        metadata: m.metadata ?? null,
+        time_created: m.timestamp,
+      }),
+    );
   }, [decryptedMessages]);
-
-  const bffMediaItems = useMemo(
-    () => mapMedia(tabsPayload?.media ?? []),
-    [tabsPayload],
-  );
-  const bffFileItems = useMemo(
-    () => mapFiles(tabsPayload?.files ?? []),
-    [tabsPayload],
-  );
-
-  const mediaItems = localMediaItems.length > 0 ? localMediaItems : bffMediaItems;
+  const bffFileItems = useMemo(() => mapFiles(tabsPayload?.files ?? []), [tabsPayload]);
   const fileItems = localFileItems.length > 0 ? localFileItems : bffFileItems;
-  const linkItems = useMemo(
+
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls: string[] = [];
+    setResolvedMediaUrls({});
+
+    const resolveAll = async () => {
+      const next: Record<string, string> = {};
+      for (const item of mediaItems) {
+        try {
+          let sourceUrl = item.sourceUrl;
+          if (!sourceUrl && item.storagePath) {
+            sourceUrl = await signChatAttachmentUrl(item.storagePath, getAuthHeaders);
+          }
+          if (!sourceUrl) continue;
+
+          if (item.isEncrypted) {
+            if (!derivedKeys) continue;
+            const objectUrl = await createSecureMediaObjectUrl({
+              storageUrl: sourceUrl,
+              chatKey: derivedKeys,
+              mimeType: item.mimeType ?? undefined,
+            });
+            objectUrls.push(objectUrl);
+            next[item.id] = objectUrl;
+          } else {
+            next[item.id] = sourceUrl;
+          }
+        } catch {
+          // Keep this media tile hidden when we cannot resolve/decrypt its source.
+        }
+      }
+      if (!cancelled) setResolvedMediaUrls(next);
+    };
+
+    void resolveAll();
+    return () => {
+      cancelled = true;
+      for (const url of objectUrls) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [derivedKeys, getAuthHeaders, mediaItems]);
+
+  const localLinkItems = useMemo(
     () =>
       extractLinks(
         decryptedMessages.filter(
@@ -481,6 +666,77 @@ export default function UserProfileModal({
         ),
       ),
     [decryptedMessages],
+  );
+  const [fallbackLinkItems, setFallbackLinkItems] = useState<LinkItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (localLinkItems.length > 0) {
+      setFallbackLinkItems([]);
+      return;
+    }
+
+    const sourceRows = chatMessagesPayload?.messages ?? [];
+    if (sourceRows.length === 0) {
+      setFallbackLinkItems([]);
+      return;
+    }
+
+    const hydrate = async () => {
+      const decryptedRows: DecryptedProfileMessage[] = [];
+      for (const row of sourceRows) {
+        if (coerceMessageType(row.message_type) !== 'text') continue;
+
+        let content = row.content;
+        if (isEncrypted(content) && derivedKeys) {
+          content = await decryptContent(content, derivedKeys);
+        }
+
+        decryptedRows.push({
+          id: row.id,
+          content,
+          timestamp: new Date(row.time_created).toISOString(),
+          messageType: row.message_type,
+          metadata: row.metadata,
+        });
+      }
+
+      if (!cancelled) {
+        setFallbackLinkItems(extractLinks(decryptedRows));
+      }
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [chatMessagesPayload?.messages, derivedKeys, localLinkItems.length]);
+
+  const linkItems = localLinkItems.length > 0 ? localLinkItems : fallbackLinkItems;
+
+  const openFileItem = useCallback(
+    async (item: FileItem) => {
+      if (item.downloadUrl) {
+        window.open(item.downloadUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      const cached = signedFileUrls[item.id];
+      if (cached) {
+        window.open(cached, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      if (!item.storagePath) return;
+      try {
+        const signed = await signChatAttachmentUrl(item.storagePath, getAuthHeaders);
+        setSignedFileUrls((prev) => ({ ...prev, [item.id]: signed }));
+        window.open(signed, '_blank', 'noopener,noreferrer');
+      } catch {
+        // Fail silently in the profile sheet; chat row still has canonical download action.
+      }
+    },
+    [getAuthHeaders, signedFileUrls],
   );
 
   useEffect(() => {
@@ -585,10 +841,8 @@ export default function UserProfileModal({
 
                   {/*
                     Four-tab secondary nav mirroring the KMP [ProfileBottomSheet]
-                    subtabs: Timeline · Media · Links · Files. Local decrypted
-                    messages are the primary source; Media/Files fall back to the
-                    connection tabs metadata route when opening from map/list without
-                    an active chat snapshot.
+                    subtabs: Timeline · Media · Links · Files. Tab content is derived
+                    from local decrypted message state to preserve E2EE integrity.
                   */}
                   <nav
                     role="tablist"
@@ -626,7 +880,13 @@ export default function UserProfileModal({
 
                   {activeTab === 'media' && (
                     <section role="tabpanel" aria-label="Media">
-                      {mediaItems.length === 0 ? (
+                      {mediaItems.length === 0 && tabsLoading ? (
+                        <EmptyTabState
+                          Icon={ImageIcon}
+                          title="Loading shared photos"
+                          body="Pulling image history for this conversation."
+                        />
+                      ) : mediaItems.length === 0 ? (
                         <EmptyTabState
                           Icon={ImageIcon}
                           title="No shared photos"
@@ -635,13 +895,20 @@ export default function UserProfileModal({
                       ) : (
                         <div className="grid grid-cols-3 gap-2">
                           {mediaItems.map((m) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              key={m.id}
-                              src={m.url}
-                              alt={m.caption ?? ''}
-                              className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
-                            />
+                            <div key={m.id}>
+                              {resolvedMediaUrls[m.id] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={resolvedMediaUrls[m.id]}
+                                  alt={m.caption ?? ''}
+                                  className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
+                                />
+                              ) : (
+                                <div className="flex h-28 w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 text-[11px] text-zinc-400">
+                                  Secured image
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
@@ -650,7 +917,13 @@ export default function UserProfileModal({
 
                   {activeTab === 'links' && (
                     <section role="tabpanel" aria-label="Links">
-                      {linkItems.length === 0 ? (
+                      {linkItems.length === 0 && chatMessagesLoading ? (
+                        <EmptyTabState
+                          Icon={LinkIcon}
+                          title="Loading shared links"
+                          body="Scanning chat history for URLs."
+                        />
+                      ) : linkItems.length === 0 ? (
                         <EmptyTabState
                           Icon={LinkIcon}
                           title="No shared links"
@@ -681,7 +954,13 @@ export default function UserProfileModal({
 
                   {activeTab === 'files' && (
                     <section role="tabpanel" aria-label="Files">
-                      {fileItems.length === 0 ? (
+                      {fileItems.length === 0 && tabsLoading ? (
+                        <EmptyTabState
+                          Icon={Paperclip}
+                          title="Loading shared files"
+                          body="Fetching attachment metadata for this chat."
+                        />
+                      ) : fileItems.length === 0 ? (
                         <EmptyTabState
                           Icon={Paperclip}
                           title="No shared files"
@@ -690,18 +969,23 @@ export default function UserProfileModal({
                       ) : (
                         <ul className="flex flex-col gap-2">
                           {fileItems.map((f) => (
-                            <li
-                              key={f.id}
-                              className="flex items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5"
-                            >
-                              <FileText className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-white">{f.fileName}</p>
-                                <p className="text-[11px] text-zinc-500 mt-0.5">
-                                  {formatFileSize(f.sizeBytes)} · {f.mimeType}
-                                </p>
-                                <p className="text-[11px] text-zinc-500">{f.timestamp}</p>
-                              </div>
+                            <li key={f.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void openFileItem(f);
+                                }}
+                                className="flex w-full items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-left hover:border-sky-400/50 hover:bg-zinc-900/80"
+                              >
+                                <FileText className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium text-white">{f.fileName}</p>
+                                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                                    {formatFileSize(f.sizeBytes)} · {f.mimeType}
+                                  </p>
+                                  <p className="text-[11px] text-zinc-500">{f.timestamp}</p>
+                                </div>
+                              </button>
                             </li>
                           ))}
                         </ul>
