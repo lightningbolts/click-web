@@ -1,3 +1,4 @@
+import { ENVELOPE_PREFIX } from '@/lib/chat/attachmentCrypto';
 import type { Message, MessageMediaMetadata, MessageType } from '@/lib/chat/types';
 
 /** Public URL for image/audio from `metadata.media_url` (camelCase fallback for older rows). */
@@ -43,5 +44,9 @@ export function previewLabelForMessage(message: Pick<Message, 'message_type' | '
   if (t === 'image') return cap || 'Photo';
   if (t === 'audio') return cap || 'Voice message';
   if (t === 'call_log') return 'Call';
+  // C6 regression fix: attachment envelopes (`ccx:v1:{...}`) must never bleed into
+  // the chat list / reply banner as raw JSON. Render a neutral "📎 Attachment"
+  // placeholder — the full preview is only materialised after client-side decryption.
+  if (cap.startsWith(ENVELOPE_PREFIX)) return '📎 Attachment';
   return message.content;
 }
