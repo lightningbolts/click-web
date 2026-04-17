@@ -40,6 +40,7 @@ import {
   type ConnectionEncounterRow,
 } from '@/lib/dashboard/connectionEncounters';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
+import useSWR from 'swr';
 
 export type { AvailabilityIntentRow };
 
@@ -211,11 +212,7 @@ type UserProfileModalProps = {
   userId: string | null;
   getAuthHeaders: () => Promise<HeadersInit>;
   onClose: () => void;
-  /**
-   * When supplied, the Media and Files subtabs hydrate from
-   * `GET /api/connections/{connectionId}/tabs` on click-web. Omit to render the
-   * sheet in profile-only mode (Media / Files will show empty states).
-   */
+  /** Optional parent context for call sites opening from a specific chat row. */
   connectionId?: string | null;
   /**
    * Locally-decrypted chat messages scanned client-side for `http(s)://` URLs.
@@ -226,23 +223,6 @@ type UserProfileModalProps = {
 };
 
 type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files';
-
-type ConnectionTabsPayload = {
-  media: Array<{
-    id: string;
-    content: string;
-    time_created: number | string;
-    message_type: string;
-    metadata: Record<string, unknown> | null;
-  }>;
-  files: Array<{
-    id: string;
-    content: string;
-    time_created: number | string;
-    message_type: string;
-    metadata: Record<string, unknown> | null;
-  }>;
-};
 
 type MediaItem = { id: string; url: string; caption: string | null };
 type FileItem = {
@@ -273,31 +253,6 @@ function pickNumber(meta: Record<string, unknown> | null | undefined, keys: stri
     }
   }
   return null;
-}
-
-function mapMedia(rows: ConnectionTabsPayload['media']): MediaItem[] {
-  const out: MediaItem[] = [];
-  for (const r of rows) {
-    const url = pickString(r.metadata, ['url', 'storage_url', 'image_url', 'audio_url', 'media_url']);
-    if (!url) continue;
-    const caption = r.content && !r.content.startsWith('ccx:v1:') ? r.content : null;
-    out.push({ id: r.id, url, caption });
-  }
-  return out;
-}
-
-function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
-  return rows.map((r) => {
-    const fileName =
-      pickString(r.metadata, ['file_name', 'filename', 'name']) ??
-      (r.content && !r.content.startsWith('ccx:v1:') ? r.content : 'Attachment');
-    const sizeBytes = pickNumber(r.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
-    const mimeType =
-      pickString(r.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
-    const raw = r.time_created;
-    const ts = typeof raw === 'number' ? new Date(raw).toLocaleString() : String(raw ?? '');
-    return { id: r.id, fileName, sizeBytes, mimeType, timestamp: ts };
-  });
 }
 
 const URL_REGEX = /https?:\/\/\S+/gi;
@@ -356,39 +311,31 @@ export default function UserProfileModal({
   userId,
   getAuthHeaders,
   onClose,
-  connectionId = null,
   decryptedMessages = [],
 }: UserProfileModalProps) {
-  const [data, setData] = useState<UserProfilePayload | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
-  const [tabsPayload, setTabsPayload] = useState<ConnectionTabsPayload | null>(null);
-
-  useEffect(() => {
-    if (!connectionId) {
-      setTabsPayload(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const headers = await getAuthHeaders();
-        const res = await fetch(
-          `/api/connections/${encodeURIComponent(connectionId)}/tabs`,
-          { headers },
+  const profilePath = userId ? `/api/users/${encodeURIComponent(userId)}/profile` : null;
+  const { data, error, isLoading } = useSWR<UserProfilePayload>(
+    profilePath,
+    async (path: string) => {
+      const headers = await getAuthHeaders();
+      const res = await fetch(path, { headers });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof json?.error === 'string' && json.error.trim()
+            ? json.error
+            : res.statusText || 'Failed to load profile',
         );
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) return;
-        if (!cancelled) setTabsPayload(json as ConnectionTabsPayload);
-      } catch {
-        // Soft-fail: tabs stay empty; Timeline subtab still renders full profile.
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [connectionId, getAuthHeaders]);
+      return json as UserProfilePayload;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
+      keepPreviousData: true,
+    },
+  );
 
   const localMediaItems = useMemo(() => {
     const mediaMessages = decryptedMessages.filter(
@@ -418,19 +365,17 @@ export default function UserProfileModal({
     });
   }, [decryptedMessages]);
 
-  const bffMediaItems = useMemo(
-    () => mapMedia(tabsPayload?.media ?? []),
-    [tabsPayload],
-  );
-  const bffFileItems = useMemo(
-    () => mapFiles(tabsPayload?.files ?? []),
-    [tabsPayload],
-  );
-
-  const mediaItems = localMediaItems.length > 0 ? localMediaItems : bffMediaItems;
-  const fileItems = localFileItems.length > 0 ? localFileItems : bffFileItems;
+  const mediaItems = localMediaItems;
+  const fileItems = localFileItems;
   const linkItems = useMemo(
-    () => extractLinks(decryptedMessages.filter((m) => (m.messageType ?? 'text') === 'text' && m.content.includes('http'))),
+    () =>
+      extractLinks(
+        decryptedMessages.filter(
+          (m) =>
+            m.messageType === 'text' &&
+            (m.content.includes('http://') || m.content.includes('https://')),
+        ),
+      ),
     [decryptedMessages],
   );
 
@@ -439,35 +384,9 @@ export default function UserProfileModal({
     if (userId) setActiveTab('timeline');
   }, [userId]);
 
-  useEffect(() => {
-    if (!userId) {
-      setData(null);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      setData(null);
-      try {
-        const headers = await getAuthHeaders();
-        const res = await fetch(`/api/users/${encodeURIComponent(userId)}/profile`, { headers });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json.error || res.statusText);
-        if (!cancelled) setData(json as UserProfilePayload);
-      } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, getAuthHeaders]);
-
   const open = !!userId;
+  const loading = Boolean(userId) && isLoading && !data;
+  const errorMessage = error instanceof Error ? error.message : error ? 'Failed to load' : null;
 
   const momentLines = useMemo(() => {
     const sc = data?.sharedConnection;
@@ -522,8 +441,8 @@ export default function UserProfileModal({
 
             <div className="p-5">
               {loading && <ProfileLoadingSkeleton />}
-              {error && !loading && (
-                <p className="text-sm text-red-400 text-center py-6">{error}</p>
+              {errorMessage && !loading && (
+                <p className="text-sm text-red-400 text-center py-6">{errorMessage}</p>
               )}
               {data && !loading && (
                 <motion.div
@@ -562,10 +481,9 @@ export default function UserProfileModal({
 
                   {/*
                     Four-tab secondary nav mirroring the KMP [ProfileBottomSheet]
-                    subtabs: Timeline · Media · Links · Files. Media/Files are
-                    hydrated from `/api/connections/{connectionId}/tabs`; Links are
-                    derived client-side from the locally-decrypted chat messages
-                    (server content is E2EE, so the BFF never sees URLs).
+                    subtabs: Timeline · Media · Links · Files. All tab payloads are
+                    derived client-side from locally-decrypted chat messages because
+                    server-side filtering cannot inspect E2EE message content.
                   */}
                   <nav
                     role="tablist"
@@ -610,7 +528,7 @@ export default function UserProfileModal({
                           body="Photos you exchange in chat will appear here."
                         />
                       ) : (
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-3 gap-2">
                           {mediaItems.map((m) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -634,7 +552,7 @@ export default function UserProfileModal({
                           body="URLs shared in chat show up here."
                         />
                       ) : (
-                        <ul className="space-y-2">
+                        <ul className="flex flex-col gap-2">
                           {linkItems.map((l) => (
                             <li key={l.id}>
                               <a
@@ -665,7 +583,7 @@ export default function UserProfileModal({
                           body="Attachments sent in chat will appear here."
                         />
                       ) : (
-                        <ul className="space-y-2">
+                        <ul className="flex flex-col gap-2">
                           {fileItems.map((f) => (
                             <li
                               key={f.id}
