@@ -58,7 +58,8 @@ import CallOverlay, {
   type WebCallInvite,
   type WebCallOverlayState,
 } from '@/components/chat/CallOverlay';
-import UserProfileModal from '@/components/UserProfileModal';
+import UserProfileModal, { type DecryptedProfileMessage } from '@/components/UserProfileModal';
+import type { Message } from '@/lib/chat/types';
 import PostConnectionVibePrompt from '@/components/dashboard/PostConnectionVibePrompt';
 
 /** Matches `CallPushNotifier.kt` → `send-push-notification` for `incoming_call` / VoIP wake-up. */
@@ -202,6 +203,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [chatMessagesSnapshot, setChatMessagesSnapshot] = useState<Message[]>([]);
+  const profileDecryptedMessages = useMemo<DecryptedProfileMessage[]>(
+    () =>
+      chatMessagesSnapshot.map((m) => ({
+        id: m.id,
+        content: m.content,
+        timestamp: new Date(m.time_created).toISOString(),
+        messageType: m.message_type,
+        metadata: m.metadata as Record<string, unknown> | null,
+      })),
+    [chatMessagesSnapshot],
+  );
   const [groupMemberPickerRows, setGroupMemberPickerRows] = useState<{ userId: string; label: string }[]>([]);
   const [showGroupMemberPicker, setShowGroupMemberPicker] = useState(false);
   const [groupMemberPickerBusy, setGroupMemberPickerBusy] = useState(false);
@@ -2670,6 +2683,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         onGroupChatChanged={() => {
                           setGroupClicksReloadNonce((n) => n + 1);
                         }}
+                        onMessagesSnapshot={setChatMessagesSnapshot}
                       />
                     </motion.div>
                   ) : (
@@ -3330,6 +3344,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         getAuthHeaders={getAuthHeaders}
         onClose={() => setProfileUserId(null)}
         connectionId={selectedConnection?.id ?? null}
+        decryptedMessages={profileDecryptedMessages}
       />
 
       {vibePromptConnection ? (

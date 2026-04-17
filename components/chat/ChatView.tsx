@@ -92,6 +92,9 @@ interface ChatViewProps {
   onOpenProfile?: (userId: string) => void;
   /** After leave/delete verified click; parent should refresh group list. */
   onGroupChatChanged?: () => void;
+  /** Reports the current locally-decrypted messages so the parent can feed them
+   *  into the profile sheet's Media / Links / Files tabs (E2EE content). */
+  onMessagesSnapshot?: (messages: Message[]) => void;
 }
 
 type ChatTimelineEntry =
@@ -183,6 +186,7 @@ export default function ChatView({
   onClose,
   onOpenProfile,
   onGroupChatChanged,
+  onMessagesSnapshot,
 }: ChatViewProps) {
   const { onlineUserIds } = useAuth();
   const isGroupClique = connection.chatKind === 'group_clique';
@@ -198,6 +202,7 @@ export default function ChatView({
 
   const [chatId, setChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  useEffect(() => { onMessagesSnapshot?.(messages); }, [messages, onMessagesSnapshot]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);

@@ -192,15 +192,19 @@ function ageFromBirthday(birthday?: string | null): number | null {
 }
 
 /**
- * Locally-decrypted text messages used to populate the Links subtab. Message
- * content is E2EE on the wire, so the BFF (`/api/connections/{id}/tabs`) does
- * not attempt to parse URLs — clients scan their already-decrypted state.
+ * Locally-decrypted chat messages used to populate the Media / Files / Links
+ * subtabs. Message content is E2EE on the wire, so the BFF cannot parse it —
+ * clients scan their already-decrypted state.
  */
 export type DecryptedProfileMessage = {
   id: string;
   content: string;
   /** Human-readable timestamp already formatted by the caller. */
   timestamp: string;
+  /** Message type (e.g. 'text', 'image', 'audio', 'file'). Defaults to 'text'. */
+  messageType?: string;
+  /** Parsed metadata JSON for media/file messages. */
+  metadata?: Record<string, unknown> | null;
 };
 
 type UserProfileModalProps = {
@@ -386,16 +390,47 @@ export default function UserProfileModal({
     };
   }, [connectionId, getAuthHeaders]);
 
-  const mediaItems = useMemo(
+  const localMediaItems = useMemo(() => {
+    const mediaMessages = decryptedMessages.filter(
+      (m) => m.messageType === 'image' || m.messageType === 'audio',
+    );
+    const out: MediaItem[] = [];
+    for (const m of mediaMessages) {
+      const url = pickString(m.metadata, ['url', 'storage_url', 'image_url', 'audio_url', 'media_url']);
+      if (!url) continue;
+      const caption = m.content && !m.content.startsWith('ccx:v1:') ? m.content : null;
+      out.push({ id: m.id, url, caption });
+    }
+    return out;
+  }, [decryptedMessages]);
+
+  const localFileItems = useMemo(() => {
+    const fileMessages = decryptedMessages.filter(
+      (m) => m.messageType === 'file' || m.content.startsWith('ccx:v1:'),
+    );
+    return fileMessages.map((m): FileItem => {
+      const fileName =
+        pickString(m.metadata, ['file_name', 'filename', 'name']) ??
+        (m.content && !m.content.startsWith('ccx:v1:') ? m.content : 'Attachment');
+      const sizeBytes = pickNumber(m.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
+      const mimeType = pickString(m.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
+      return { id: m.id, fileName, sizeBytes, mimeType, timestamp: m.timestamp };
+    });
+  }, [decryptedMessages]);
+
+  const bffMediaItems = useMemo(
     () => mapMedia(tabsPayload?.media ?? []),
     [tabsPayload],
   );
-  const fileItems = useMemo(
+  const bffFileItems = useMemo(
     () => mapFiles(tabsPayload?.files ?? []),
     [tabsPayload],
   );
+
+  const mediaItems = localMediaItems.length > 0 ? localMediaItems : bffMediaItems;
+  const fileItems = localFileItems.length > 0 ? localFileItems : bffFileItems;
   const linkItems = useMemo(
-    () => extractLinks(decryptedMessages),
+    () => extractLinks(decryptedMessages.filter((m) => (m.messageType ?? 'text') === 'text' && m.content.includes('http'))),
     [decryptedMessages],
   );
 
@@ -473,7 +508,7 @@ export default function UserProfileModal({
             className="w-full max-w-md max-h-[min(88vh,640px)] overflow-y-auto rounded-3xl border border-zinc-700/80 bg-zinc-950 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800/90 bg-zinc-950/95 px-4 py-3 backdrop-blur-md">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800/90 bg-zinc-950/95 px-4 pt-6 pb-3 backdrop-blur-md">
               <h2 className="text-lg font-semibold text-white">Profile</h2>
               <button
                 type="button"
