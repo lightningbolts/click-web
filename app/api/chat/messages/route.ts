@@ -164,6 +164,7 @@ function parsePostMessageType(raw: unknown): MessageType {
   if (s === 'call_log') return 'call_log';
   if (s === 'image') return 'image';
   if (s === 'audio') return 'audio';
+  if (s === 'file') return 'file';
   return 'text';
 }
 
