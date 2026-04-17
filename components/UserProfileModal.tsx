@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
+  Download,
+  ExternalLink,
   Sparkles,
   MapPin,
   Clock,
@@ -20,6 +22,7 @@ import {
   Gauge,
   Image as ImageIcon,
   Link as LinkIcon,
+  Maximize2,
   Paperclip,
   History,
   FileText,
@@ -263,6 +266,7 @@ type ChatMessagesPayload = {
 
 type MediaItem = {
   id: string;
+  mediaType: 'image' | 'audio';
   sourceUrl: string | null;
   storagePath: string | null;
   caption: string | null;
@@ -334,7 +338,8 @@ function mapMediaFromRow(row: {
   message_type: string;
   metadata: Record<string, unknown> | null;
 }): MediaItem | null {
-  if (coerceMessageType(row.message_type) !== 'image') return null;
+  const mediaType = coerceMessageType(row.message_type);
+  if (mediaType !== 'image' && mediaType !== 'audio') return null;
   const sourceUrl = pickString(row.metadata, [
     'signed_url',
     'public_url',
@@ -351,6 +356,7 @@ function mapMediaFromRow(row: {
   const caption = row.content && !row.content.startsWith('ccx:v1:') ? row.content : null;
   return {
     id: row.id,
+    mediaType,
     sourceUrl,
     storagePath,
     caption,
@@ -400,6 +406,58 @@ function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
   return rows.map((row) => mapFilesFromRow(row));
 }
 
+function mergeMediaItems(localItems: MediaItem[], bffItems: MediaItem[]): MediaItem[] {
+  const merged = new Map<string, MediaItem>();
+  for (const item of bffItems) merged.set(item.id, item);
+  for (const item of localItems) {
+    const prev = merged.get(item.id);
+    if (!prev) {
+      merged.set(item.id, item);
+      continue;
+    }
+    merged.set(item.id, {
+      ...prev,
+      ...item,
+      sourceUrl: item.sourceUrl ?? prev.sourceUrl,
+      storagePath: item.storagePath ?? prev.storagePath,
+      caption: item.caption ?? prev.caption,
+      mimeType: item.mimeType ?? prev.mimeType,
+      isEncrypted: item.isEncrypted || prev.isEncrypted,
+    });
+  }
+  return Array.from(merged.values());
+}
+
+function mergeFileItems(localItems: FileItem[], bffItems: FileItem[]): FileItem[] {
+  const merged = new Map<string, FileItem>();
+  for (const item of bffItems) merged.set(item.id, item);
+  for (const item of localItems) {
+    const prev = merged.get(item.id);
+    if (!prev) {
+      merged.set(item.id, item);
+      continue;
+    }
+    merged.set(item.id, {
+      ...prev,
+      ...item,
+      fileName: item.fileName !== 'Attachment' ? item.fileName : prev.fileName,
+      sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : prev.sizeBytes,
+      mimeType: item.mimeType !== 'application/octet-stream' ? item.mimeType : prev.mimeType,
+      downloadUrl: item.downloadUrl ?? prev.downloadUrl,
+      storagePath: item.storagePath ?? prev.storagePath,
+      timestamp: item.timestamp || prev.timestamp,
+    });
+  }
+  return Array.from(merged.values());
+}
+
+function mergeLinkItems(primary: LinkItem[], fallback: LinkItem[]): LinkItem[] {
+  const merged = new Map<string, LinkItem>();
+  for (const item of fallback) merged.set(item.url, item);
+  for (const item of primary) merged.set(item.url, item);
+  return Array.from(merged.values());
+}
+
 const URL_REGEX = /https?:\/\/\S+/gi;
 const ENCRYPTED_ATTACHMENT_SNIPPET = /ccx:v1:[^\s]+/gi;
 
@@ -432,6 +490,20 @@ function maskEncryptedSnippet(value: string): string {
 function sanitizeDownloadName(name: string): string {
   const cleaned = name.trim().replace(/[\\/:*?"<>|]+/g, '_');
   return cleaned || 'Attachment';
+}
+
+function extensionFromMime(mimeType: string | null | undefined): string {
+  const mt = (mimeType ?? '').toLowerCase();
+  if (mt.includes('jpeg')) return 'jpg';
+  if (mt.includes('png')) return 'png';
+  if (mt.includes('webp')) return 'webp';
+  if (mt.includes('gif')) return 'gif';
+  if (mt.includes('mp3')) return 'mp3';
+  if (mt.includes('wav')) return 'wav';
+  if (mt.includes('webm')) return 'webm';
+  if (mt.includes('ogg')) return 'ogg';
+  if (mt.includes('mpeg') || mt.includes('m4a') || mt.includes('mp4')) return 'm4a';
+  return 'bin';
 }
 
 function ProfileLoadingSkeleton() {
@@ -594,7 +666,12 @@ export default function UserProfileModal({
   }, [decryptedMessages]);
 
   const bffMediaItems = useMemo(() => mapMedia(tabsPayload?.media ?? []), [tabsPayload]);
-  const mediaItems = localMediaItems.length > 0 ? localMediaItems : bffMediaItems;
+  const mediaItems = useMemo(
+    () => mergeMediaItems(localMediaItems, bffMediaItems),
+    [localMediaItems, bffMediaItems],
+  );
+  const imageItems = useMemo(() => mediaItems.filter((m) => m.mediaType === 'image'), [mediaItems]);
+  const audioItems = useMemo(() => mediaItems.filter((m) => m.mediaType === 'audio'), [mediaItems]);
 
   const localFileItems = useMemo(() => {
     const fileMessages = decryptedMessages.filter(
@@ -611,7 +688,10 @@ export default function UserProfileModal({
     );
   }, [decryptedMessages]);
   const bffFileItems = useMemo(() => mapFiles(tabsPayload?.files ?? []), [tabsPayload]);
-  const fileItems = localFileItems.length > 0 ? localFileItems : bffFileItems;
+  const fileItems = useMemo(
+    () => mergeFileItems(localFileItems, bffFileItems),
+    [localFileItems, bffFileItems],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -671,10 +751,6 @@ export default function UserProfileModal({
 
   useEffect(() => {
     let cancelled = false;
-    if (localLinkItems.length > 0) {
-      setFallbackLinkItems([]);
-      return;
-    }
 
     const sourceRows = chatMessagesPayload?.messages ?? [];
     if (sourceRows.length === 0) {
@@ -712,31 +788,81 @@ export default function UserProfileModal({
     };
   }, [chatMessagesPayload?.messages, derivedKeys, localLinkItems.length]);
 
-  const linkItems = localLinkItems.length > 0 ? localLinkItems : fallbackLinkItems;
+  const linkItems = useMemo(
+    () => mergeLinkItems(localLinkItems, fallbackLinkItems),
+    [localLinkItems, fallbackLinkItems],
+  );
 
-  const openFileItem = useCallback(
-    async (item: FileItem) => {
-      if (item.downloadUrl) {
-        window.open(item.downloadUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
+  const downloadUrl = useCallback((url: string, filename: string) => {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = sanitizeDownloadName(filename);
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }, []);
 
+  const openMediaItem = useCallback(
+    (item: MediaItem) => {
+      const url = resolvedMediaUrls[item.id];
+      if (!url) return;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    },
+    [resolvedMediaUrls],
+  );
+
+  const downloadMediaItem = useCallback(
+    (item: MediaItem) => {
+      const url = resolvedMediaUrls[item.id];
+      if (!url) return;
+      const ext = extensionFromMime(item.mimeType);
+      downloadUrl(url, `${item.mediaType}-${item.id}.${ext}`);
+    },
+    [downloadUrl, resolvedMediaUrls],
+  );
+
+  const resolveFileUrl = useCallback(
+    async (item: FileItem): Promise<string | null> => {
+      if (item.downloadUrl) return item.downloadUrl;
       const cached = signedFileUrls[item.id];
-      if (cached) {
-        window.open(cached, '_blank', 'noopener,noreferrer');
-        return;
-      }
-
-      if (!item.storagePath) return;
+      if (cached) return cached;
+      if (!item.storagePath) return null;
       try {
         const signed = await signChatAttachmentUrl(item.storagePath, getAuthHeaders);
         setSignedFileUrls((prev) => ({ ...prev, [item.id]: signed }));
-        window.open(signed, '_blank', 'noopener,noreferrer');
+        return signed;
       } catch {
-        // Fail silently in the profile sheet; chat row still has canonical download action.
+        return null;
       }
     },
     [getAuthHeaders, signedFileUrls],
+  );
+
+  const openFileItem = useCallback(
+    async (item: FileItem) => {
+      const popup = window.open('', '_blank', 'noopener,noreferrer');
+      const url = await resolveFileUrl(item);
+      if (!url) {
+        popup?.close();
+        return;
+      }
+      if (popup) {
+        popup.location.href = url;
+      } else {
+        window.location.assign(url);
+      }
+    },
+    [resolveFileUrl],
+  );
+
+  const downloadFileItem = useCallback(
+    async (item: FileItem) => {
+      const url = await resolveFileUrl(item);
+      if (!url) return;
+      downloadUrl(url, item.fileName);
+    },
+    [downloadUrl, resolveFileUrl],
   );
 
   useEffect(() => {
@@ -883,33 +1009,109 @@ export default function UserProfileModal({
                       {mediaItems.length === 0 && tabsLoading ? (
                         <EmptyTabState
                           Icon={ImageIcon}
-                          title="Loading shared photos"
-                          body="Pulling image history for this conversation."
+                          title="Loading shared media"
+                          body="Pulling image and audio history for this conversation."
                         />
                       ) : mediaItems.length === 0 ? (
                         <EmptyTabState
                           Icon={ImageIcon}
-                          title="No shared photos"
-                          body="Photos you exchange in chat will appear here."
+                          title="No shared media"
+                          body="Photos and voice notes you exchange in chat will appear here."
                         />
                       ) : (
-                        <div className="grid grid-cols-3 gap-2">
-                          {mediaItems.map((m) => (
-                            <div key={m.id}>
-                              {resolvedMediaUrls[m.id] ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={resolvedMediaUrls[m.id]}
-                                  alt={m.caption ?? ''}
-                                  className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
-                                />
-                              ) : (
-                                <div className="flex h-28 w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 text-[11px] text-zinc-400">
-                                  Secured image
+                        <div className="space-y-4">
+                          {imageItems.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2">
+                              {imageItems.map((m) => (
+                                <div key={m.id} className="group relative">
+                                  {resolvedMediaUrls[m.id] ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => openMediaItem(m)}
+                                        className="block w-full"
+                                        aria-label="Expand image"
+                                      >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                          src={resolvedMediaUrls[m.id]}
+                                          alt={m.caption ?? ''}
+                                          className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
+                                        />
+                                      </button>
+                                      <div className="pointer-events-none absolute inset-0 rounded-lg bg-black/0 transition group-hover:bg-black/30" />
+                                      <div className="absolute bottom-1 right-1 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                                        <button
+                                          type="button"
+                                          onClick={() => openMediaItem(m)}
+                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-zinc-100 hover:bg-black/80"
+                                          aria-label="Open image"
+                                        >
+                                          <Maximize2 className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => downloadMediaItem(m)}
+                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-zinc-100 hover:bg-black/80"
+                                          aria-label="Download image"
+                                        >
+                                          <Download className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex h-28 w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 text-[11px] text-zinc-400">
+                                      Secured image
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              ))}
                             </div>
-                          ))}
+                          )}
+
+                          {audioItems.length > 0 && (
+                            <ul className="flex flex-col gap-2">
+                              {audioItems.map((m) => {
+                                const audioUrl = resolvedMediaUrls[m.id];
+                                return (
+                                  <li key={m.id} className="rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-medium text-zinc-300">Voice note</p>
+                                      <div className="flex items-center gap-1">
+                                        {audioUrl && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => openMediaItem(m)}
+                                              className="rounded-md p-1 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                              aria-label="Open audio"
+                                            >
+                                              <ExternalLink className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => downloadMediaItem(m)}
+                                              className="rounded-md p-1 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                              aria-label="Download audio"
+                                            >
+                                              <Download className="h-3.5 w-3.5" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {audioUrl ? (
+                                      <audio controls preload="metadata" src={audioUrl} className="mt-2 w-full" />
+                                    ) : (
+                                      <div className="mt-2 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs text-zinc-500">
+                                        Secured audio
+                                      </div>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </div>
                       )}
                     </section>
@@ -970,13 +1172,7 @@ export default function UserProfileModal({
                         <ul className="flex flex-col gap-2">
                           {fileItems.map((f) => (
                             <li key={f.id}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void openFileItem(f);
-                                }}
-                                className="flex w-full items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-left hover:border-sky-400/50 hover:bg-zinc-900/80"
-                              >
+                              <div className="flex w-full items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-left hover:border-sky-400/50 hover:bg-zinc-900/80">
                                 <FileText className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-sm font-medium text-white">{f.fileName}</p>
@@ -985,7 +1181,29 @@ export default function UserProfileModal({
                                   </p>
                                   <p className="text-[11px] text-zinc-500">{f.timestamp}</p>
                                 </div>
-                              </button>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void openFileItem(f);
+                                    }}
+                                    className="rounded-md p-1.5 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                    aria-label="Open file"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void downloadFileItem(f);
+                                    }}
+                                    className="rounded-md p-1.5 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                    aria-label="Download file"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
                             </li>
                           ))}
                         </ul>
