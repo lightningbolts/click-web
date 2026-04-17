@@ -41,6 +41,7 @@ import {
 } from '@/lib/dashboard/connectionEncounters';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 import useSWR from 'swr';
+import { coerceMessageType } from '@/lib/chat/messages';
 
 export type { AvailabilityIntentRow };
 
@@ -224,6 +225,23 @@ type UserProfileModalProps = {
 
 type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files';
 
+type ConnectionTabsPayload = {
+  media: Array<{
+    id: string;
+    content: string;
+    time_created: number | string;
+    message_type: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+  files: Array<{
+    id: string;
+    content: string;
+    time_created: number | string;
+    message_type: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+};
+
 type MediaItem = { id: string; url: string; caption: string | null };
 type FileItem = {
   id: string;
@@ -241,6 +259,39 @@ function pickString(meta: Record<string, unknown> | null | undefined, keys: stri
     if (typeof v === 'string' && v.trim()) return v.trim();
   }
   return null;
+}
+
+function mapMedia(rows: ConnectionTabsPayload['media']): MediaItem[] {
+  const out: MediaItem[] = [];
+  for (const r of rows) {
+    const url = pickString(r.metadata, [
+      'url',
+      'storage_url',
+      'image_url',
+      'audio_url',
+      'media_url',
+      'signed_url',
+      'public_url',
+    ]);
+    if (!url) continue;
+    const caption = r.content && !r.content.startsWith('ccx:v1:') ? r.content : null;
+    out.push({ id: r.id, url, caption });
+  }
+  return out;
+}
+
+function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
+  return rows.map((r) => {
+    const fileName =
+      pickString(r.metadata, ['file_name', 'filename', 'name']) ??
+      (r.content && !r.content.startsWith('ccx:v1:') ? r.content : 'Attachment');
+    const sizeBytes = pickNumber(r.metadata, ['file_size', 'size_bytes', 'size']) ?? 0;
+    const mimeType =
+      pickString(r.metadata, ['mime_type', 'content_type']) ?? 'application/octet-stream';
+    const raw = r.time_created;
+    const ts = typeof raw === 'number' ? new Date(raw).toLocaleString() : String(raw ?? '');
+    return { id: r.id, fileName, sizeBytes, mimeType, timestamp: ts };
+  });
 }
 function pickNumber(meta: Record<string, unknown> | null | undefined, keys: string[]): number | null {
   if (!meta) return null;
@@ -311,6 +362,7 @@ export default function UserProfileModal({
   userId,
   getAuthHeaders,
   onClose,
+  connectionId = null,
   decryptedMessages = [],
 }: UserProfileModalProps) {
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
@@ -337,13 +389,56 @@ export default function UserProfileModal({
     },
   );
 
+  const effectiveConnectionId = useMemo(() => {
+    const fromProp = connectionId?.trim();
+    if (fromProp) return fromProp;
+    const fromProfile = (data?.sharedConnection as Record<string, unknown> | null)?.id;
+    return typeof fromProfile === 'string' && fromProfile.trim() ? fromProfile.trim() : null;
+  }, [connectionId, data?.sharedConnection]);
+
+  const tabsPath = effectiveConnectionId
+    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/tabs`
+    : null;
+  const { data: tabsPayload } = useSWR<ConnectionTabsPayload>(
+    tabsPath,
+    async (path: string) => {
+      const headers = await getAuthHeaders();
+      const res = await fetch(path, { headers });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof json?.error === 'string' && json.error.trim()
+            ? json.error
+            : res.statusText || 'Failed to load profile tabs',
+        );
+      }
+      return json as ConnectionTabsPayload;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
+      keepPreviousData: true,
+    },
+  );
+
   const localMediaItems = useMemo(() => {
     const mediaMessages = decryptedMessages.filter(
-      (m) => m.messageType === 'image' || m.messageType === 'audio',
+      (m) => {
+        const type = coerceMessageType(m.messageType);
+        return type === 'image' || type === 'audio';
+      },
     );
     const out: MediaItem[] = [];
     for (const m of mediaMessages) {
-      const url = pickString(m.metadata, ['url', 'storage_url', 'image_url', 'audio_url', 'media_url']);
+      const url = pickString(m.metadata, [
+        'url',
+        'storage_url',
+        'image_url',
+        'audio_url',
+        'media_url',
+        'signed_url',
+        'public_url',
+      ]);
       if (!url) continue;
       const caption = m.content && !m.content.startsWith('ccx:v1:') ? m.content : null;
       out.push({ id: m.id, url, caption });
@@ -353,7 +448,7 @@ export default function UserProfileModal({
 
   const localFileItems = useMemo(() => {
     const fileMessages = decryptedMessages.filter(
-      (m) => m.messageType === 'file' || m.content.startsWith('ccx:v1:'),
+      (m) => coerceMessageType(m.messageType) === 'file' || m.content.startsWith('ccx:v1:'),
     );
     return fileMessages.map((m): FileItem => {
       const fileName =
@@ -365,14 +460,23 @@ export default function UserProfileModal({
     });
   }, [decryptedMessages]);
 
-  const mediaItems = localMediaItems;
-  const fileItems = localFileItems;
+  const bffMediaItems = useMemo(
+    () => mapMedia(tabsPayload?.media ?? []),
+    [tabsPayload],
+  );
+  const bffFileItems = useMemo(
+    () => mapFiles(tabsPayload?.files ?? []),
+    [tabsPayload],
+  );
+
+  const mediaItems = localMediaItems.length > 0 ? localMediaItems : bffMediaItems;
+  const fileItems = localFileItems.length > 0 ? localFileItems : bffFileItems;
   const linkItems = useMemo(
     () =>
       extractLinks(
         decryptedMessages.filter(
           (m) =>
-            m.messageType === 'text' &&
+            coerceMessageType(m.messageType) === 'text' &&
             (m.content.includes('http://') || m.content.includes('https://')),
         ),
       ),
@@ -481,9 +585,10 @@ export default function UserProfileModal({
 
                   {/*
                     Four-tab secondary nav mirroring the KMP [ProfileBottomSheet]
-                    subtabs: Timeline · Media · Links · Files. All tab payloads are
-                    derived client-side from locally-decrypted chat messages because
-                    server-side filtering cannot inspect E2EE message content.
+                    subtabs: Timeline · Media · Links · Files. Local decrypted
+                    messages are the primary source; Media/Files fall back to the
+                    connection tabs metadata route when opening from map/list without
+                    an active chat snapshot.
                   */}
                   <nav
                     role="tablist"
