@@ -24,6 +24,8 @@ import {
   originalMimeTypeFromMetadata,
 } from '@/lib/chat/mediaMetadata';
 import { isAnyE2eeWireContent, type DerivedKeys } from '@/lib/chat/crypto';
+import { tryDecodeEnvelope } from '@/lib/chat/attachmentCrypto';
+import AttachmentBubble from './AttachmentBubble';
 import { useSecureMedia } from '@/lib/chat/useSecureMedia';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
@@ -53,6 +55,8 @@ interface MessageBubbleProps {
   portalsBoundsRef?: RefObject<HTMLElement | null>;
   /** Active chat crypto key for decrypting encrypted media payloads. */
   mediaChatKey?: DerivedKeys | ArrayBuffer | null;
+  /** Factory returning `Authorization: Bearer …` headers; used to sign attachment URLs. */
+  getAuthHeaders?: () => Promise<HeadersInit>;
 }
 
 function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
@@ -108,6 +112,7 @@ export default function MessageBubble({
   onDelete,
   portalsBoundsRef,
   mediaChatKey,
+  getAuthHeaders,
 }: MessageBubbleProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
@@ -309,6 +314,11 @@ export default function MessageBubble({
     message.message_type === 'text' && showCaption && isAnyE2eeWireContent(captionText);
   const isImage = message.message_type === 'image';
   const isAudio = message.message_type === 'audio';
+  const attachmentEnvelope =
+    message.message_type === 'file' || captionText.startsWith('ccx:v1:')
+      ? tryDecodeEnvelope(captionText)
+      : null;
+  const isAttachment = attachmentEnvelope !== null;
   const textBubbleClass = isMine
     ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm shadow-[0_2px_16px_rgba(131,56,236,0.25)]'
     : 'glass-panel text-zinc-100 rounded-bl-sm';
@@ -373,7 +383,36 @@ export default function MessageBubble({
           }}
         />
 
-        {isImage || isAudio ? (
+        {isAttachment && attachmentEnvelope ? (
+          <div
+            ref={bubbleRef}
+            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
+          >
+            {replyMeta && (
+              <div
+                className={`max-w-full rounded-2xl px-3 py-2 text-xs leading-snug border ${
+                  isMine
+                    ? 'border-white/15 bg-white/10 text-white/90 shadow-[0_2px_12px_rgba(0,0,0,0.12)]'
+                    : 'border-zinc-600/50 bg-zinc-950/50 text-zinc-300'
+                }`}
+              >
+                <span className="flex items-center gap-1 font-medium opacity-90">
+                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
+                  Reply
+                </span>
+                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+              </div>
+            )}
+            <AttachmentBubble
+              envelope={attachmentEnvelope}
+              isMine={isMine}
+              getAuthHeaders={
+                getAuthHeaders ??
+                (async () => ({ 'Content-Type': 'application/json' }))
+              }
+            />
+          </div>
+        ) : isImage || isAudio ? (
           <div
             ref={bubbleRef}
             className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}

@@ -22,6 +22,7 @@ import {
   Phone,
   Video,
   ImagePlus,
+  Paperclip,
   Mic,
   Square,
   X,
@@ -33,6 +34,21 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import { normalizeDbMessage } from '@/lib/chat/messages';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
+import {
+  uploadChatAttachmentBlob,
+} from '@/lib/chat/chatAttachmentStorage';
+import {
+  ATTACHMENT_ACCEPT_STRING,
+  validateAttachment,
+} from '@/lib/chat/attachmentValidator';
+import {
+  encodeEnvelope,
+  encodeFileMasterKeyBase64,
+  encryptFileBytes,
+  generateFileMasterKey,
+  sha256Base64,
+  type AttachmentEnvelope,
+} from '@/lib/chat/attachmentCrypto';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
@@ -229,6 +245,8 @@ export default function ChatView({
   const callMenuAnchorRef = useRef<HTMLDivElement>(null);
   const headerMenuAnchorRef = useRef<HTMLDivElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [isDraggingAttachment, setIsDraggingAttachment] = useState(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<BlobPart[]>([]);
@@ -1101,6 +1119,149 @@ export default function ChatView({
     ],
   );
 
+  // ─────────────────────── file attachment (ccx:v1:) ───────────────────────
+
+  const sendAttachmentFile = useCallback(
+    async (file: File) => {
+      if (!chatId || sending || mediaBusy || isRecording) return;
+
+      const validation = validateAttachment({
+        fileName: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+      });
+      if (!validation.ok) {
+        setActionToast({ type: 'error', message: validation.message });
+        return;
+      }
+
+      setMediaBusy(true);
+      try {
+        const plainBytes = new Uint8Array(await file.arrayBuffer());
+        const masterKey = generateFileMasterKey();
+        const ciphertext = await encryptFileBytes(plainBytes, masterKey);
+        const sha = await sha256Base64(plainBytes);
+        const mimeType = (file.type || 'application/octet-stream').toLowerCase();
+
+        const { path } = await uploadChatAttachmentBlob(
+          chatId,
+          ciphertext,
+          mimeType,
+          file.name,
+          getAuthHeaders,
+        );
+
+        const envelope: AttachmentEnvelope = {
+          v: 1,
+          type: 'file',
+          name: file.name,
+          mime: mimeType,
+          size: plainBytes.byteLength,
+          path,
+          key: encodeFileMasterKeyBase64(masterKey),
+          sha256: sha,
+        };
+        const envelopeBody = encodeEnvelope(envelope);
+
+        const wireContent =
+          isGroupClique && groupMasterKey
+            ? await encryptGroupMessageContent(envelopeBody, groupMasterKey)
+            : e2eKeys
+              ? await encryptContent(envelopeBody, e2eKeys)
+              : envelopeBody;
+
+        const headers = await getAuthHeaders();
+        const metadata = await appendReplyToMetadata({
+          attachment_path: path,
+          attachment_name: file.name,
+          attachment_mime: mimeType,
+          attachment_size: plainBytes.byteLength,
+        });
+        const res = await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chatId,
+            ...(!isGroupClique ? { connectionId: connection.id } : {}),
+            content: wireContent,
+            message_type: 'file',
+            metadata,
+          }),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          throw new Error(`Send failed (${res.status}): ${txt.slice(0, 200)}`);
+        }
+        setReplyingTo(null);
+      } catch (err) {
+        console.error('Attachment send error:', err);
+        setActionToast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Could not send attachment',
+        });
+      } finally {
+        setMediaBusy(false);
+      }
+    },
+    [
+      chatId,
+      sending,
+      mediaBusy,
+      isRecording,
+      e2eKeys,
+      groupMasterKey,
+      isGroupClique,
+      connection.id,
+      getAuthHeaders,
+      appendReplyToMetadata,
+    ],
+  );
+
+  const onAttachmentSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      await sendAttachmentFile(file);
+    },
+    [sendAttachmentFile],
+  );
+
+  const onAttachmentDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingAttachment(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (file.type.startsWith('image/')) {
+        // Photos continue to route through the existing media pipeline so previews/compression
+        // stay consistent with the image attach button.
+        if (photoInputRef.current) {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          photoInputRef.current.files = dt.files;
+          photoInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return;
+      }
+      await sendAttachmentFile(file);
+    },
+    [sendAttachmentFile],
+  );
+
+  const onAttachmentDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer?.types?.includes('Files')) {
+      e.preventDefault();
+      setIsDraggingAttachment(true);
+    }
+  }, []);
+
+  const onAttachmentDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingAttachment(false);
+  }, []);
+
   // Broadcast typing indicator
   const broadcastTyping = useCallback(() => {
     const supabase = getSupabaseClient();
@@ -1290,7 +1451,22 @@ export default function ChatView({
   }, [chatId, getAuthHeaders, unreadIncomingMessageIds]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-visible">
+    <div
+      className="flex flex-col h-full min-h-0 overflow-visible relative"
+      onDragOver={onAttachmentDragOver}
+      onDragLeave={onAttachmentDragLeave}
+      onDrop={onAttachmentDrop}
+    >
+      {isDraggingAttachment && (
+        <div
+          className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#8338EC] bg-[#8338EC]/10 text-[#8338EC] backdrop-blur-sm"
+          aria-hidden="true"
+        >
+          <Paperclip className="w-7 h-7 mb-1.5" />
+          <span className="text-sm font-medium">Drop to encrypt and send</span>
+          <span className="text-xs text-[#8338EC]/80">2 MB max · E2EE per-file key</span>
+        </div>
+      )}
       {/* ── Header ── */}
       <div className="glass relative z-50 rounded-2xl mb-4 shrink-0 overflow-visible">
         {isGroupClique && groupKeyError ? (
@@ -1832,6 +2008,7 @@ export default function ChatView({
                   isMine={entry.message.user_id === currentUserId}
                   currentUserId={currentUserId}
                   mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
+                  getAuthHeaders={getAuthHeaders}
                   senderInitial={otherInitial}
                   senderLabel={
                     isGroupClique && entry.message.user_id !== currentUserId
@@ -1939,6 +2116,13 @@ export default function ChatView({
             className="hidden"
             onChange={onPhotoSelected}
           />
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            accept={ATTACHMENT_ACCEPT_STRING}
+            className="hidden"
+            onChange={onAttachmentSelected}
+          />
           <div className="flex shrink-0 flex-row items-center gap-1.5">
             <button
               type="button"
@@ -1948,6 +2132,16 @@ export default function ChatView({
               title="Attach photo"
             >
               {mediaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => attachmentInputRef.current?.click()}
+              disabled={!chatId || sending || mediaBusy || isRecording}
+              className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Attach file (2 MB max)"
+              aria-label="Attach file"
+            >
+              <Paperclip className="w-4 h-4" />
             </button>
             {!isRecording ? (
               <button
