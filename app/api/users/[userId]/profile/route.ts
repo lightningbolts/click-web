@@ -255,6 +255,13 @@ function isJsonObject(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+function normalizeBirthdayInput(raw: string): string {
+  const trimmed = raw.trim();
+  const cutAtT = trimmed.includes('T') ? trimmed.slice(0, trimmed.indexOf('T')) : trimmed;
+  const cutAtSpace = cutAtT.includes(' ') ? cutAtT.slice(0, cutAtT.indexOf(' ')) : cutAtT;
+  return cutAtSpace;
+}
+
 /**
  * PATCH /api/users/[userId]/profile
  * Updates `public.users` (and optionally `user_interests.tags`) for the signed-in user only.
@@ -323,7 +330,7 @@ export async function PATCH(
     if (typeof body.birthday !== 'string') {
       return NextResponse.json({ error: 'birthday must be a string' }, { status: 400 });
     }
-    const b = body.birthday.trim();
+    const b = normalizeBirthdayInput(body.birthday);
     if (b.length === 0) {
       return NextResponse.json({ error: 'birthday cannot be empty' }, { status: 400 });
     }
