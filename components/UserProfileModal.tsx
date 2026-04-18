@@ -43,7 +43,7 @@ import {
   type ConnectionEncounterRow,
 } from '@/lib/dashboard/connectionEncounters';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { coerceMessageType } from '@/lib/chat/messages';
 import {
   decodeFileMasterKeyBase64,
@@ -231,6 +231,11 @@ type UserProfileModalProps = {
   userId: string | null;
   getAuthHeaders: () => Promise<HeadersInit>;
   onClose: () => void;
+  /**
+   * When true (own profile only), the sheet cannot be dismissed until birthday is saved to
+   * `public.users` — backdrop taps and the header close control are disabled.
+   */
+  forceOwnProfileBirthdayCompletion?: boolean;
   /** Optional parent context for call sites opening from a specific chat row. */
   connectionId?: string | null;
   /**
@@ -577,11 +582,16 @@ export default function UserProfileModal({
   userId,
   getAuthHeaders,
   onClose,
+  forceOwnProfileBirthdayCompletion = false,
   connectionId = null,
   decryptedMessages = [],
 }: UserProfileModalProps) {
+  const { mutate } = useSWRConfig();
   const requestedUserId = userId?.trim() || null;
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
+  const [birthdayDraft, setBirthdayDraft] = useState('');
+  const [birthdaySaveError, setBirthdaySaveError] = useState<string | null>(null);
+  const [birthdaySaving, setBirthdaySaving] = useState(false);
   const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
@@ -958,7 +968,21 @@ export default function UserProfileModal({
     setResolvedMediaUrls({});
     setSignedFileUrls({});
     setFallbackLinkItems([]);
+    setBirthdayDraft('');
+    setBirthdaySaveError(null);
+    setBirthdaySaving(false);
   }, [requestedUserId]);
+
+  useEffect(() => {
+    if (!forceOwnProfileBirthdayCompletion || !profileData?.user) return;
+    const u = profileData.user;
+    const existing = u.birthday?.trim();
+    if (existing) {
+      setBirthdayDraft(existing.slice(0, 10));
+    } else {
+      setBirthdayDraft('');
+    }
+  }, [forceOwnProfileBirthdayCompletion, profileData?.user?.birthday, profileData?.user?.id]);
 
   const open = !!requestedUserId;
   const errorMessage = error instanceof Error ? error.message : error ? 'Failed to load' : null;
@@ -984,6 +1008,49 @@ export default function UserProfileModal({
     return { rows, originId: origin?.id ?? null };
   }, [profileData?.sharedConnection]);
 
+  const blockingBirthday =
+    forceOwnProfileBirthdayCompletion &&
+    !!profileData &&
+    (profileData.user.birthday == null || !String(profileData.user.birthday).trim());
+
+  const saveOwnBirthday = async () => {
+    if (!requestedUserId || !profilePath) return;
+    setBirthdaySaveError(null);
+    const raw = birthdayDraft.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      setBirthdaySaveError('Use format YYYY-MM-DD.');
+      return;
+    }
+    const age = ageFromBirthday(raw);
+    if (age == null || age < 13) {
+      setBirthdaySaveError('You must be at least 13 years old.');
+      return;
+    }
+    setBirthdaySaving(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(profilePath, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birthday: raw.slice(0, 10) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof json?.error === 'string' && json.error.trim()
+            ? json.error.trim()
+            : res.statusText || 'Could not save',
+        );
+      }
+      await mutate(profilePath);
+      onClose();
+    } catch (e) {
+      setBirthdaySaveError(e instanceof Error ? e.message : 'Could not save');
+    } finally {
+      setBirthdaySaving(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -994,7 +1061,7 @@ export default function UserProfileModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-sm p-4"
-          onClick={onClose}
+          onClick={blockingBirthday ? () => {} : onClose}
         >
           <motion.div
             initial={{ opacity: 0, y: 28, scale: 0.98 }}
@@ -1005,18 +1072,57 @@ export default function UserProfileModal({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800/90 bg-zinc-950/95 px-4 pt-6 pb-3 backdrop-blur-md">
-              <h2 className="text-lg font-semibold text-white">Profile</h2>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <h2 className="text-lg font-semibold text-white">
+                {blockingBirthday ? 'Add your birthday' : 'Profile'}
+              </h2>
+              {!blockingBirthday ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              ) : (
+                <span className="w-10" aria-hidden />
+              )}
             </div>
 
             <div className="p-5">
+              {blockingBirthday && (
+                <div className="mb-5 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4">
+                  <p className="text-sm text-amber-100/95 mb-3">
+                    To keep Click age-appropriate, please confirm your date of birth. This modal stays open until you save.
+                  </p>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5" htmlFor="profile-gate-birthday">
+                    Birthday (YYYY-MM-DD)
+                  </label>
+                  <input
+                    id="profile-gate-birthday"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="bday"
+                    value={birthdayDraft}
+                    onChange={(e) => setBirthdayDraft(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                    placeholder="2000-04-17"
+                  />
+                  {birthdaySaveError ? (
+                    <p className="mt-2 text-xs text-red-400">{birthdaySaveError}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={birthdaySaving}
+                    onClick={() => {
+                      void saveOwnBirthday();
+                    }}
+                    className="mt-4 w-full rounded-xl bg-[#8338EC] py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {birthdaySaving ? 'Saving…' : 'Save birthday'}
+                  </button>
+                </div>
+              )}
               {loading && <ProfileLoadingSkeleton />}
               {errorMessage && !loading && (
                 <p className="text-sm text-red-400 text-center py-6">{errorMessage}</p>

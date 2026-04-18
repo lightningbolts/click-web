@@ -319,6 +319,20 @@ export async function PATCH(
     if (t.length > 0) updates.image = t;
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, 'birthday')) {
+    if (typeof body.birthday !== 'string') {
+      return NextResponse.json({ error: 'birthday must be a string' }, { status: 400 });
+    }
+    const b = body.birthday.trim();
+    if (b.length === 0) {
+      return NextResponse.json({ error: 'birthday cannot be empty' }, { status: 400 });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(b)) {
+      return NextResponse.json({ error: 'birthday must be YYYY-MM-DD' }, { status: 400 });
+    }
+    updates.birthday = b;
+  }
+
   if (Object.prototype.hasOwnProperty.call(body, 'first_name') && typeof body.first_name === 'string') {
     const f = (updates.first_name as string) ?? body.first_name.trim();
     let l: string;
@@ -360,7 +374,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error:
-          'No supported fields to update. Provide first_name, last_name, full_name, name, image, and/or tags.',
+          'No supported fields to update. Provide first_name, last_name, full_name, name, image, birthday, and/or tags.',
       },
       { status: 400 },
     );

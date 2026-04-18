@@ -226,6 +226,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
   /** Avoid painting stats at 0 before the first `/api/connections` response (hydrates real counts). */
   const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useState(false);
   const connectionsLoadUserIdRef = useRef<string | null>(null);
+  /** OAuth / incomplete `public.users.birthday` — blocks dashboard until saved (see UserProfileModal). */
+  const [birthdayProfileGateResolved, setBirthdayProfileGateResolved] = useState(false);
+  const [birthdayProfileGateOpen, setBirthdayProfileGateOpen] = useState(false);
 
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     const supabase = getSupabaseClient();
@@ -1213,6 +1216,44 @@ export default function DashboardView({ user }: DashboardViewProps) {
       outboundCallChannelsRef.current.clear();
     };
   }, [clearCallTimeout, disconnectRoom, stopRingtone]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setBirthdayProfileGateResolved(true);
+      setBirthdayProfileGateOpen(false);
+      return;
+    }
+    setBirthdayProfileGateResolved(false);
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/users/${encodeURIComponent(user.id)}/profile`, { headers });
+        const json = (await res.json().catch(() => ({}))) as { user?: { birthday?: string | null } };
+        if (cancelled) return;
+        const bd = json?.user?.birthday;
+        const missing =
+          !res.ok ||
+          bd == null ||
+          (typeof bd === 'string' && !bd.trim());
+        if (missing) {
+          setBirthdayProfileGateOpen(true);
+          setProfileUserId(user.id);
+        } else {
+          setBirthdayProfileGateOpen(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setBirthdayProfileGateOpen(false);
+        }
+      } finally {
+        if (!cancelled) setBirthdayProfileGateResolved(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAuthHeaders, user?.id]);
 
   useEffect(() => {
     if (user) {
@@ -2435,7 +2476,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  if (!connectionsInitialLoadComplete) {
+  if (!connectionsInitialLoadComplete || !birthdayProfileGateResolved) {
     return <LoadingScreen />;
   }
 
@@ -3342,7 +3383,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
       <UserProfileModal
         userId={profileUserId}
         getAuthHeaders={getAuthHeaders}
-        onClose={() => setProfileUserId(null)}
+        onClose={() => {
+          setProfileUserId(null);
+          setBirthdayProfileGateOpen(false);
+        }}
+        forceOwnProfileBirthdayCompletion={Boolean(
+          user?.id && profileUserId === user.id && birthdayProfileGateOpen,
+        )}
         connectionId={selectedConnection?.id ?? null}
         decryptedMessages={profileDecryptedMessages}
       />
