@@ -1,6 +1,8 @@
 /**
  * POST /api/user/avatar
- * multipart/form-data: `file` (image), optional `mime_type`.
+ * Accepts either:
+ * - multipart/form-data: `file` (image), optional `mime_type`
+ * - application/json: `file_b64` (base64 image), optional `mime_type`
  * Verifies JWT, uploads to `avatars` storage, updates `public.users.image`.
  */
 
@@ -9,6 +11,11 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 const MAX_BYTES = 2_000_000;
 const AVATARS_BUCKET = 'avatars';
+
+type AvatarUploadJsonBody = {
+  file_b64?: unknown;
+  mime_type?: unknown;
+};
 
 function extensionFromMime(mime: string): string {
   const m = mime.toLowerCase().split(';')[0]?.trim() ?? '';
@@ -24,6 +31,16 @@ function isAllowedImageMime(mime: string): boolean {
   return ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(m);
 }
 
+function stripDataUriPrefix(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const marker = 'base64,';
+  const markerIndex = trimmed.indexOf(marker);
+  if (markerIndex <= 0) return trimmed;
+  if (!trimmed.slice(0, markerIndex).toLowerCase().startsWith('data:')) return trimmed;
+  return trimmed.slice(markerIndex + marker.length).trim();
+}
+
 export async function POST(request: NextRequest) {
   const { user, supabase, authError } = await getSupabaseFromRouteRequest(request);
 
@@ -31,38 +48,66 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // KMP/Ktor must send `MultiPartFormDataContent` with part name `file` (see click ApiClient.uploadAvatar).
-  const form = await request.formData().catch((err) => {
-    console.error('[user/avatar] formData() failed:', err);
-    return null;
-  });
-  if (!form) {
-    return NextResponse.json(
-      {
-        error:
-          'Could not parse multipart body. Send multipart/form-data with a binary part named "file".',
-      },
-      { status: 400 },
-    );
+  const requestContentType = request.headers.get('content-type')?.toLowerCase() ?? '';
+  let buffer: Buffer;
+  let declaredMime = 'image/jpeg';
+
+  if (requestContentType.includes('application/json')) {
+    let parsedBody: AvatarUploadJsonBody | null = null;
+    try {
+      parsedBody = (await request.json()) as AvatarUploadJsonBody;
+    } catch (err) {
+      console.error('[user/avatar] json parse failed:', err);
+      return NextResponse.json(
+        { error: 'Expected application/json body with file_b64 (base64 image)' },
+        { status: 400 },
+      );
+    }
+
+    const fileB64Raw = typeof parsedBody?.file_b64 === 'string' ? parsedBody.file_b64 : '';
+    const fileB64 = stripDataUriPrefix(fileB64Raw);
+    if (!fileB64) {
+      return NextResponse.json({ error: 'file_b64 is required' }, { status: 400 });
+    }
+
+    buffer = Buffer.from(fileB64, 'base64');
+    declaredMime =
+      typeof parsedBody?.mime_type === 'string' && parsedBody.mime_type.trim().length > 0
+        ? parsedBody.mime_type.trim()
+        : 'image/jpeg';
+  } else {
+    const form = await request.formData().catch((err) => {
+      console.error('[user/avatar] formData() failed:', err);
+      return null;
+    });
+    if (!form) {
+      return NextResponse.json(
+        {
+          error:
+            'Could not parse upload body. Send application/json with file_b64 or multipart/form-data with binary part "file".',
+        },
+        { status: 400 },
+      );
+    }
+
+    const file = form.get('file');
+    if (!(file instanceof Blob)) {
+      return NextResponse.json({ error: 'Multipart part "file" (image) is required' }, { status: 400 });
+    }
+
+    buffer = Buffer.from(await file.arrayBuffer());
+    const fromFormMime =
+      typeof form.get('mime_type') === 'string' ? String(form.get('mime_type')).trim() : '';
+    declaredMime =
+      fromFormMime.length > 0 ? fromFormMime : (file.type && file.type.trim()) || 'image/jpeg';
   }
 
-  const file = form.get('file');
-  if (!(file instanceof Blob)) {
-    return NextResponse.json({ error: 'Multipart part "file" (image) is required' }, { status: 400 });
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
   if (buffer.length === 0) {
-    return NextResponse.json({ error: 'Empty file' }, { status: 400 });
+    return NextResponse.json({ error: 'Empty image payload' }, { status: 400 });
   }
   if (buffer.length > MAX_BYTES) {
     return NextResponse.json({ error: 'Image must be under 2 MB' }, { status: 400 });
   }
-
-  const fromFormMime =
-    typeof form.get('mime_type') === 'string' ? String(form.get('mime_type')).trim() : '';
-  const declaredMime =
-    fromFormMime.length > 0 ? fromFormMime : (file.type && file.type.trim()) || 'image/jpeg';
 
   if (!isAllowedImageMime(declaredMime)) {
     return NextResponse.json({ error: 'Unsupported image type' }, { status: 400 });
