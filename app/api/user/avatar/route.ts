@@ -49,17 +49,21 @@ export async function POST(request: NextRequest) {
   }
 
   const requestContentType = request.headers.get('content-type')?.toLowerCase() ?? '';
+  const isMultipart = requestContentType.includes('multipart/form-data');
   let buffer: Buffer;
   let declaredMime = 'image/jpeg';
 
-  if (requestContentType.includes('application/json')) {
+  if (!isMultipart) {
     let parsedBody: AvatarUploadJsonBody | null = null;
     try {
       parsedBody = (await request.json()) as AvatarUploadJsonBody;
     } catch (err) {
       console.error('[user/avatar] json parse failed:', err);
       return NextResponse.json(
-        { error: 'Expected application/json body with file_b64 (base64 image)' },
+        {
+          error: 'Could not parse JSON upload body. Send application/json with file_b64 (base64 image).',
+          received_content_type: requestContentType || null,
+        },
         { status: 400 },
       );
     }
@@ -85,6 +89,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             'Could not parse upload body. Send application/json with file_b64 or multipart/form-data with binary part "file".',
+          received_content_type: requestContentType || null,
         },
         { status: 400 },
       );
