@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
-import { normalizeDbMessage } from '@/lib/chat/messages';
+import { normalizeDbMessage, notifyMessagesDelivered } from '@/lib/chat/messages';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import {
   uploadChatAttachmentBlob,
@@ -328,6 +328,20 @@ export default function ChatView({
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     };
   }, []);
+
+  /** Recipient device receipt for peer-authored rows (true “Delivered” for the sender). */
+  const firePeerDeliveredAck = useCallback(
+    async (messageIds: string[]) => {
+      if (!chatId || messageIds.length === 0) return;
+      const uniq = [...new Set(messageIds)].slice(0, 120);
+      try {
+        await notifyMessagesDelivered(getAuthHeaders, chatId, uniq);
+      } catch (err) {
+        console.error('delivered ack failed:', err);
+      }
+    },
+    [chatId, getAuthHeaders],
+  );
 
   useEffect(() => {
     inputTextRef.current = inputText;
@@ -711,6 +725,10 @@ export default function ChatView({
       try {
         const msgs = await fetchMessages(chatId);
         setMessages(msgs);
+        const ackIds = msgs
+          .filter((m) => m.user_id !== currentUserId && (m.delivered_at == null || m.delivered_at === undefined))
+          .map((m) => m.id);
+        void firePeerDeliveredAck(ackIds);
         setHasMore(msgs.length === PAGE_SIZE);
       } catch (err: any) {
         setError(err.message);
@@ -731,6 +749,7 @@ export default function ChatView({
     groupMasterKey,
     isGroupClique,
     scrollToBottom,
+    firePeerDeliveredAck,
   ]);
 
   // ─────────────────────────── load older messages ─────────────────────────
@@ -803,6 +822,9 @@ export default function ChatView({
               if (isNearBottom()) setTimeout(() => scrollToBottom(), 60);
               return updated;
             });
+            if (msg.user_id !== currentUserId && (msg.delivered_at == null || msg.delivered_at === undefined)) {
+              void firePeerDeliveredAck([msg.id]);
+            }
           } else if (eventType === 'UPDATE') {
             const skipDecrypt = newRow.message_type === 'call_log';
             const plainContent = skipDecrypt
@@ -878,7 +900,7 @@ export default function ChatView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatId, currentUserId, scrollToBottom, e2eKeys, groupMasterKey, isGroupClique]);
+  }, [chatId, currentUserId, scrollToBottom, e2eKeys, groupMasterKey, isGroupClique, firePeerDeliveredAck]);
 
   // ─────────────────────────── scroll event ────────────────────────────────
 

@@ -78,4 +78,19 @@ describe('normalizeDbMessage', () => {
     expect(m.local_sent_at).toBeNull();
     expect(m.read_at).toBeNull();
   });
+
+  it('maps delivered_at when finite', () => {
+    const m = normalizeDbMessage({
+      id: 'm1',
+      chat_id: 'c1',
+      user_id: 'u1',
+      content: '',
+      time_created: 1,
+      is_read: false,
+      delivered_at: 900,
+      message_type: 'text',
+      metadata: {},
+    });
+    expect(m.delivered_at).toBe(900);
+  });
 });

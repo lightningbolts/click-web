@@ -55,6 +55,8 @@ export interface Message {
   local_sent_at?: number | null;
   /** When the recipient marked this row read (ms since epoch). */
   read_at?: number | null;
+  /** When a recipient client ack'd device receipt (ms since epoch); sender sees Delivered. */
+  delivered_at?: number | null;
   message_type: MessageType;
   /** Server jsonb: media uses `media_url`, `duration_seconds`; call_log uses call_state, etc. */
   metadata: MessageMediaMetadata;

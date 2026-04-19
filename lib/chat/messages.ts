@@ -24,6 +24,7 @@ export function coerceMetadata(value: unknown): Message['metadata'] {
 export function normalizeDbMessage(row: Record<string, unknown>): Message {
   const localSentRaw = row.local_sent_at;
   const readAtRaw = row.read_at;
+  const deliveredAtRaw = row.delivered_at;
   return {
     id: String(row.id),
     chat_id: String(row.chat_id),
@@ -35,6 +36,10 @@ export function normalizeDbMessage(row: Record<string, unknown>): Message {
     local_sent_at:
       localSentRaw != null && Number.isFinite(Number(localSentRaw)) ? Number(localSentRaw) : null,
     read_at: readAtRaw != null && Number.isFinite(Number(readAtRaw)) ? Number(readAtRaw) : null,
+    delivered_at:
+      deliveredAtRaw != null && Number.isFinite(Number(deliveredAtRaw))
+        ? Number(deliveredAtRaw)
+        : null,
     message_type: coerceMessageType(row.message_type),
     metadata: coerceMetadata(row.metadata),
     ...(row.reactions !== undefined
@@ -80,6 +85,28 @@ export async function insertCallLogMessage(
 }
 
 /** Parses optional client `local_sent_at` (ms). Returns null if absent or invalid. */
+/** Fire-and-forget: recipient tells server which peer-authored rows reached this device. */
+export async function notifyMessagesDelivered(
+  getAuthHeaders: () => Promise<HeadersInit>,
+  chatId: string,
+  messageIds: string[],
+): Promise<void> {
+  if (!chatId || messageIds.length === 0) return;
+  const headers = await getAuthHeaders();
+  const res = await fetch('/api/chat/messages/delivered', {
+    method: 'PATCH',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ chat_id: chatId, message_ids: messageIds }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`notifyMessagesDelivered failed: ${res.status} ${text}`);
+  }
+}
+
 export function parseLocalSentAtMs(raw: unknown): number | null {
   if (typeof raw !== 'number') return null;
   if (!Number.isFinite(raw)) return null;

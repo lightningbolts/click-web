@@ -50,6 +50,7 @@ export type MessagesTableRow = {
   metadata?: Record<string, unknown> | null;
   local_sent_at?: number | null;
   read_at?: number | null;
+  delivered_at?: number | null;
 };
 
 export type ConnectionsApiRow = {
