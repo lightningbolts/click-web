@@ -22,6 +22,8 @@ export function coerceMetadata(value: unknown): Message['metadata'] {
 
 /** Normalize a row from PostgREST / Realtime into a [Message] (safe defaults for new columns). */
 export function normalizeDbMessage(row: Record<string, unknown>): Message {
+  const localSentRaw = row.local_sent_at;
+  const readAtRaw = row.read_at;
   return {
     id: String(row.id),
     chat_id: String(row.chat_id),
@@ -30,6 +32,9 @@ export function normalizeDbMessage(row: Record<string, unknown>): Message {
     time_created: Number(row.time_created),
     time_edited: row.time_edited != null ? Number(row.time_edited) : null,
     is_read: Boolean(row.is_read),
+    local_sent_at:
+      localSentRaw != null && Number.isFinite(Number(localSentRaw)) ? Number(localSentRaw) : null,
+    read_at: readAtRaw != null && Number.isFinite(Number(readAtRaw)) ? Number(readAtRaw) : null,
     message_type: coerceMessageType(row.message_type),
     metadata: coerceMetadata(row.metadata),
     ...(row.reactions !== undefined
@@ -45,6 +50,7 @@ export type MessageInsertRow = {
   time_created: number;
   message_type: MessageType;
   metadata: Message['metadata'];
+  local_sent_at?: number | null;
 };
 
 export type CallLogStateKey = 'missed' | 'declined' | 'completed';
@@ -73,6 +79,15 @@ export async function insertCallLogMessage(
   }
 }
 
+/** Parses optional client `local_sent_at` (ms). Returns null if absent or invalid. */
+export function parseLocalSentAtMs(raw: unknown): number | null {
+  if (typeof raw !== 'number') return null;
+  if (!Number.isFinite(raw)) return null;
+  if (raw < 0) return null;
+  if (raw > 1e15) return null;
+  return Math.trunc(raw);
+}
+
 export function buildMessageInsertRow(params: {
   chatId: string;
   userId: string;
@@ -80,8 +95,9 @@ export function buildMessageInsertRow(params: {
   now: number;
   messageType?: MessageType;
   metadata?: unknown;
+  localSentAtMs?: number | null;
 }): MessageInsertRow {
-  return {
+  const row: MessageInsertRow = {
     chat_id: params.chatId,
     user_id: params.userId,
     content: params.content,
@@ -89,4 +105,9 @@ export function buildMessageInsertRow(params: {
     message_type: params.messageType ?? 'text',
     metadata: coerceMetadata(params.metadata),
   };
+  const local = params.localSentAtMs;
+  if (local != null) {
+    row.local_sent_at = local;
+  }
+  return row;
 }

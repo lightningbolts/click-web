@@ -33,9 +33,10 @@ export async function PATCH(req: NextRequest) {
   const denied = await assertChatWritable(admin, user.id, chatId);
   if (denied) return denied;
 
+  const readStamp = Date.now();
   const { error } = await admin
     .from('messages')
-    .update({ is_read: true })
+    .update({ is_read: true, read_at: readStamp })
     .eq('chat_id', chatId)
     .neq('user_id', user.id);
 

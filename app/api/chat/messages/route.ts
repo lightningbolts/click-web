@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
-import { buildMessageInsertRow, normalizeDbMessage } from '@/lib/chat/messages';
+import { buildMessageInsertRow, normalizeDbMessage, parseLocalSentAtMs } from '@/lib/chat/messages';
 import type { MessageType } from '@/lib/chat/types';
 import {
   assertChatWritable,
@@ -147,9 +147,10 @@ export async function GET(req: NextRequest) {
     .map((m: any) => m.id);
 
   if (unreadIds.length > 0) {
+    const readStamp = Date.now();
     const { error: markErr } = await admin
       .from('messages')
-      .update({ is_read: true })
+      .update({ is_read: true, read_at: readStamp })
       .in('id', unreadIds);
     if (markErr) {
       console.error('mark read failed in /api/chat/messages GET:', markErr.message);
@@ -247,6 +248,9 @@ export async function POST(req: NextRequest) {
     }
 
     const now = Date.now();
+    const localSentAtMs = parseLocalSentAtMs(
+      (body as Record<string, unknown>).local_sent_at ?? (body as Record<string, unknown>).localSentAt,
+    );
     const rawContent = typeof content === 'string' ? content : '';
     const wireContent = rawContent.startsWith('e2e:')
       ? rawContent
@@ -263,6 +267,7 @@ export async function POST(req: NextRequest) {
       now,
       messageType,
       metadata,
+      localSentAtMs,
     });
 
     const { data: message, error: insertErr } = await admin.from('messages').insert(insertRow).select().single();

@@ -51,6 +51,10 @@ export interface Message {
   time_created: number;
   time_edited: number | null;
   is_read: boolean;
+  /** Client device clock when the row was queued (ms since epoch). */
+  local_sent_at?: number | null;
+  /** When the recipient marked this row read (ms since epoch). */
+  read_at?: number | null;
   message_type: MessageType;
   /** Server jsonb: media uses `media_url`, `duration_seconds`; call_log uses call_state, etc. */
   metadata: MessageMediaMetadata;

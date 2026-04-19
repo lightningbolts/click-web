@@ -37,6 +37,21 @@ export type DisplayNamesBatchResponse = {
 };
 
 /** Row shape returned by `/api/connections` (subset used on the client). */
+/** Subset of `public.messages` columns shared by REST, Realtime, and API consumers. */
+export type MessagesTableRow = {
+  id: string;
+  chat_id: string;
+  user_id: string;
+  content: string;
+  time_created: number;
+  time_edited?: number | null;
+  is_read: boolean;
+  message_type?: string | null;
+  metadata?: Record<string, unknown> | null;
+  local_sent_at?: number | null;
+  read_at?: number | null;
+};
+
 export type ConnectionsApiRow = {
   id: string;
   user_ids: string[];
