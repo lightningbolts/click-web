@@ -3,8 +3,9 @@
  * Returns paginated messages (newest first) with their reactions.
  *
  * POST /api/chat/messages
- * Body: { chatId: string; content: string }
- * Sends a new message.
+ * Body: { chatId?: string; connectionId?: string; content: string; message_type?: string;
+ *         metadata?: object; local_sent_at?: number }
+ * Sends a new message (optional `local_sent_at` ms epoch from the device clock).
  *
  * PATCH /api/chat/messages
  * Body: { messageId: string; content: string }
