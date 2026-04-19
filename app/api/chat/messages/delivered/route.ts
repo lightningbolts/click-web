@@ -50,17 +50,18 @@ export async function PATCH(req: NextRequest) {
   if (denied) return denied;
 
   const stamp = Date.now();
-  const { error } = await admin
+  const { data, error } = await admin
     .from('messages')
     .update({ delivered_at: stamp })
     .eq('chat_id', chatId)
     .in('id', messageIds)
     .neq('user_id', user.id)
-    .is('delivered_at', null);
+    .is('delivered_at', null)
+    .select('id');
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return new NextResponse(null, { status: 200 });
+  return NextResponse.json({ ok: true, updated: data?.length ?? 0 });
 }

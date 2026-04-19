@@ -158,6 +158,30 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Recipient has loaded these rows on this device — mirror PATCH /messages/delivered (covers
+  // pagination and any missed client-side acks).
+  const deliveredIds = messages
+    .filter(
+      (m: any) =>
+        m.user_id !== user.id &&
+        (m.delivered_at == null || m.delivered_at === undefined),
+    )
+    .map((m: any) => String(m.id));
+
+  if (deliveredIds.length > 0) {
+    const deliveredStamp = Date.now();
+    const { error: deliveredErr } = await admin
+      .from('messages')
+      .update({ delivered_at: deliveredStamp })
+      .eq('chat_id', chatId)
+      .in('id', deliveredIds)
+      .neq('user_id', user.id)
+      .is('delivered_at', null);
+    if (deliveredErr) {
+      console.error('mark delivered failed in /api/chat/messages GET:', deliveredErr.message);
+    }
+  }
+
   return NextResponse.json({ messages: enriched });
 }
 

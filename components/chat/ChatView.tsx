@@ -767,6 +767,15 @@ export default function ChatView({
       setMessages((prev) => [...older, ...prev]);
       setHasMore(older.length === PAGE_SIZE);
 
+      const ackIds = older
+        .filter(
+          (m) =>
+            m.user_id !== currentUserId &&
+            (m.delivered_at == null || m.delivered_at === undefined),
+        )
+        .map((m) => m.id);
+      void firePeerDeliveredAck(ackIds);
+
       // Maintain scroll position after prepend
       requestAnimationFrame(() => {
         if (container) {
@@ -778,7 +787,7 @@ export default function ChatView({
     } finally {
       setLoadingMore(false);
     }
-  }, [chatId, fetchMessages, hasMore, loadingMore, messages]);
+  }, [chatId, currentUserId, fetchMessages, firePeerDeliveredAck, hasMore, loadingMore, messages]);
 
   // ─────────────────────────── realtime subscription ───────────────────────
 
