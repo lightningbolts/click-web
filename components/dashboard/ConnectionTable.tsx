@@ -31,6 +31,8 @@ export interface ConnectionEncounterBrief {
   contextTags: string[];
   /** Present only when the crossing stored a calibrated SPL reading */
   exactNoiseLevelDb?: number;
+  /** Raw `weather_snapshot` for ambient mesh (newest crossing is `encounters[0]`). */
+  weatherSnapshot?: unknown;
   /** Present only when barometric altitude was captured */
   exactBarometricElevationM?: number;
   luxLevel?: number;

@@ -1911,6 +1911,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   e.batteryLevel <= 100
                     ? { batteryLevel: e.batteryLevel }
                     : {}),
+                  ...(e.weatherSnapshot != null ? { weatherSnapshot: e.weatherSnapshot } : {}),
                 }))
               : undefined,
           intentOverlapLabel: overlapLabel,

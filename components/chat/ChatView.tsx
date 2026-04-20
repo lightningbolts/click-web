@@ -51,6 +51,7 @@ import {
 } from '@/lib/chat/attachmentCrypto';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import MessageBubble from './MessageBubble';
+import { ChatAmbientMeshBackdrop } from './ChatAmbientMeshBackdrop';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
 import {
@@ -1493,6 +1494,7 @@ export default function ChatView({
       onDragLeave={onAttachmentDragLeave}
       onDrop={onAttachmentDrop}
     >
+      <ChatAmbientMeshBackdrop connection={connection} isGroupClique={isGroupClique} />
       {isDraggingAttachment && (
         <div
           className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#8338EC] bg-[#8338EC]/10 text-[#8338EC] backdrop-blur-sm"
