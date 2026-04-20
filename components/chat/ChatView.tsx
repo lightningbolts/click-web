@@ -209,7 +209,8 @@ export default function ChatView({
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
-  const [sending, setSending] = useState(false);
+  /** Number of POST /api/chat/messages requests still in flight (allows rapid sends without blocking the composer). */
+  const [pendingOutgoingSends, setPendingOutgoingSends] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -246,6 +247,7 @@ export default function ChatView({
   const messagesPanelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputTextRef = useRef('');
+  const programmaticListScrollRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof getSupabaseClient> extends null ? never : any>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callMenuAnchorRef = useRef<HTMLDivElement>(null);
@@ -373,7 +375,13 @@ export default function ChatView({
   // ─────────────────────────── helpers ────────────────────────────────────
 
   const scrollToBottom = useCallback((smooth = true) => {
+    programmaticListScrollRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        programmaticListScrollRef.current = false;
+      });
+    });
   }, []);
 
   const isNearBottom = () => {
@@ -918,6 +926,14 @@ export default function ChatView({
     const el = scrollContainerRef.current;
     if (!el) return;
 
+    if (
+      !programmaticListScrollRef.current &&
+      typeof document !== 'undefined' &&
+      document.activeElement === inputRef.current
+    ) {
+      inputRef.current?.blur();
+    }
+
     setShowScrollBtn(!isNearBottom());
 
     // Load more when scrolled to top
@@ -930,11 +946,11 @@ export default function ChatView({
 
   const sendMessage = useCallback(async () => {
     const content = inputText.trim();
-    if (!content || !chatId || sending || mediaBusy || isRecording) return;
+    if (!content || !chatId || mediaBusy || isRecording) return;
 
-    setSending(true);
     setInputText('');
     inputRef.current?.focus();
+    setPendingOutgoingSends((n) => n + 1);
 
     try {
       const wireContent =
@@ -964,12 +980,11 @@ export default function ChatView({
       console.error('Send error:', err);
       setInputText(content);
     } finally {
-      setSending(false);
+      setPendingOutgoingSends((n) => Math.max(0, n - 1));
     }
   }, [
     inputText,
     chatId,
-    sending,
     mediaBusy,
     isRecording,
     e2eKeys,
@@ -1037,7 +1052,7 @@ export default function ChatView({
   );
 
   const beginVoiceRecording = useCallback(async () => {
-    if (!chatId || sending || mediaBusy || isRecording) return;
+    if (!chatId || mediaBusy || isRecording) return;
     voiceCancelRef.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1078,7 +1093,7 @@ export default function ChatView({
     } catch {
       setActionToast({ type: 'error', message: 'Microphone access denied or unavailable' });
     }
-  }, [chatId, sending, mediaBusy, isRecording, uploadAndSendVoice]);
+  }, [chatId, mediaBusy, isRecording, uploadAndSendVoice]);
 
   const stopVoiceRecording = useCallback(() => {
     const mr = mediaRecorderRef.current;
@@ -1102,7 +1117,7 @@ export default function ChatView({
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       e.target.value = '';
-      if (!file || !chatId || sending || mediaBusy || isRecording) return;
+      if (!file || !chatId || mediaBusy || isRecording) return;
       if (!file.type.startsWith('image/')) {
         setActionToast({ type: 'error', message: 'Please choose an image file' });
         return;
@@ -1143,7 +1158,6 @@ export default function ChatView({
     },
     [
       chatId,
-      sending,
       mediaBusy,
       isRecording,
       currentUserId,
@@ -1160,7 +1174,7 @@ export default function ChatView({
 
   const sendAttachmentFile = useCallback(
     async (file: File) => {
-      if (!chatId || sending || mediaBusy || isRecording) return;
+      if (!chatId || mediaBusy || isRecording) return;
 
       const validation = validateAttachment({
         fileName: file.name,
@@ -1242,7 +1256,6 @@ export default function ChatView({
     },
     [
       chatId,
-      sending,
       mediaBusy,
       isRecording,
       e2eKeys,
@@ -1505,8 +1518,8 @@ export default function ChatView({
           <span className="text-xs text-[#8338EC]/80">2 MB max · E2EE per-file key</span>
         </div>
       )}
-      {/* ── Header ── */}
-      <div className="glass relative z-50 rounded-2xl mb-4 shrink-0 overflow-visible">
+      {/* ── Header (safe-area only; IME resizes the message column in the parent layout) ── */}
+      <div className="glass relative z-50 rounded-2xl mb-4 shrink-0 overflow-visible pt-[env(safe-area-inset-top,0px)]">
         {isGroupClique && groupKeyError ? (
           <div className="mx-4 mt-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
             {groupKeyError}
@@ -2165,7 +2178,7 @@ export default function ChatView({
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              disabled={!chatId || sending || mediaBusy || isRecording}
+              disabled={!chatId || mediaBusy || isRecording}
               className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Attach photo"
             >
@@ -2174,7 +2187,7 @@ export default function ChatView({
             <button
               type="button"
               onClick={() => attachmentInputRef.current?.click()}
-              disabled={!chatId || sending || mediaBusy || isRecording}
+              disabled={!chatId || mediaBusy || isRecording}
               className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Attach file (2 MB max)"
               aria-label="Attach file"
@@ -2185,7 +2198,7 @@ export default function ChatView({
               <button
                 type="button"
                 onClick={() => void beginVoiceRecording()}
-                disabled={!chatId || sending || mediaBusy}
+                disabled={!chatId || mediaBusy}
                 className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Record voice message"
               >
@@ -2245,12 +2258,12 @@ export default function ChatView({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={sendMessage}
-            disabled={!inputText.trim() || sending || mediaBusy || isRecording}
+            disabled={!inputText.trim() || mediaBusy || isRecording}
             className="p-3 rounded-xl bg-gradient-to-br from-[#8338EC] to-[#6520c0] 
               hover:from-[#9b4dff] hover:to-[#7b30e0] disabled:opacity-30 
               disabled:cursor-not-allowed transition-all shrink-0 glow-violet"
           >
-            {sending
+            {pendingOutgoingSends > 0
               ? <Loader2 className="w-4 h-4 animate-spin" />
               : <Send className="w-4 h-4" />
             }
