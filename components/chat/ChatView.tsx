@@ -350,6 +350,21 @@ export default function ChatView({
     inputTextRef.current = inputText;
   }, [inputText]);
 
+  /** Decrypt wire `content` for display — same rules as the Supabase realtime handler. */
+  const decryptWireMessageContent = useCallback(
+    async (content: string, messageType: string): Promise<string> => {
+      if (messageType === 'call_log') return content ?? '';
+      if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(content)) {
+        return decryptGroupMessageContent(content, groupMasterKey);
+      }
+      if (e2eKeys && isEncrypted(content)) {
+        return decryptContent(content, e2eKeys);
+      }
+      return content ?? '';
+    },
+    [isGroupClique, groupMasterKey, e2eKeys],
+  );
+
   const appendReplyToMetadata = useCallback(
     async (meta: Record<string, unknown>): Promise<Record<string, unknown>> => {
       if (!replyingTo || replyingTo.message_type === 'call_log') return meta;
@@ -1018,6 +1033,8 @@ export default function ChatView({
         const metadata = await appendReplyToMetadata({
           media_url: publicUrl,
           duration_seconds: durationSeconds,
+          original_mime_type: blob.type || recordingMimeRef.current || 'audio/webm',
+          is_encrypted_media: false,
         });
         const res = await fetch('/api/chat/messages', {
           method: 'POST',
@@ -1031,6 +1048,23 @@ export default function ChatView({
           }),
         });
         if (!res.ok) throw new Error('Send failed');
+        const payload = (await res.json()) as { message?: Record<string, unknown> };
+        const row = payload.message;
+        if (row) {
+          const mt = typeof row.message_type === 'string' ? row.message_type : 'audio';
+          const plainContent = await decryptWireMessageContent(String(row.content ?? ''), mt);
+          const msg = normalizeDbMessage({
+            ...row,
+            content: plainContent,
+            reactions: {},
+          });
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            const updated = [...prev, msg];
+            if (isNearBottom()) setTimeout(() => scrollToBottom(), 60);
+            return updated;
+          });
+        }
         setReplyingTo(null);
       } catch (err) {
         console.error('Voice send error:', err);
@@ -1048,6 +1082,8 @@ export default function ChatView({
       isGroupClique,
       getAuthHeaders,
       appendReplyToMetadata,
+      decryptWireMessageContent,
+      scrollToBottom,
     ],
   );
 
@@ -1057,12 +1093,17 @@ export default function ChatView({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
+      const candidates = [
+        'audio/mp4',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/aac',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+      ];
       const preferred =
-        typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : '';
+        typeof MediaRecorder !== 'undefined'
+          ? candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
+          : '';
       const mr = preferred
         ? new MediaRecorder(stream, { mimeType: preferred })
         : new MediaRecorder(stream);
