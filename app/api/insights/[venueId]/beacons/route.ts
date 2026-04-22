@@ -129,7 +129,7 @@ export async function POST(
 
     const uri =
       typeof body.spotify_playlist_uri === "string" ? body.spotify_playlist_uri.trim() : "";
-    if (!uri.startsWith(SPOTIFY_PREFIX) || uri.length > 512) {
+    if (!uri.startsWith(SPOTIFY_PREFIX) || uri.length <= SPOTIFY_PREFIX.length || uri.length > 512) {
       return NextResponse.json(
         { error: "spotify_playlist_uri must be a spotify:playlist: URI (max 512 chars)" },
         { status: 400 },
