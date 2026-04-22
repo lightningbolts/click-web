@@ -136,6 +136,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const initialFitDoneRef = useRef(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
@@ -465,6 +466,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       mapContainer.current?.removeEventListener('click', handlePopupClick);
       popupRef.current?.remove();
       popupRef.current = null;
+      initialFitDoneRef.current = false;
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -485,12 +487,13 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', vis);
     });
 
-    if (geoConnections.length > 1) {
+    if (!initialFitDoneRef.current && geoConnections.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
       geoConnections.forEach(conn => {
         if (conn.geo_location) bounds.extend([conn.geo_location.longitude, conn.geo_location.latitude]);
       });
       m.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
+      initialFitDoneRef.current = true;
     }
   }, [mapLoaded, positionedConnections, geoConnections, layers.myNetwork]);
 
