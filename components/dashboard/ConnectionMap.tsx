@@ -138,7 +138,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   const map = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const initialFitDoneRef = useRef(false);
-  const [mapLoaded, setMapLoaded] = useState(false);
+  /** Map instance finished `load` (sources/layers exist) — drives GeoJSON updates. */
+  const [mapInitialized, setMapInitialized] = useState(false);
+  /** First fully idle paint (tiles + layout settled) — drives fade-in to avoid pre-tile flicker. */
+  const [mapPresentationReady, setMapPresentationReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
   const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
@@ -329,6 +332,9 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    /** Timer id — typed as number for browser `setTimeout` (avoids NodeJS.Timeout mismatch). */
+    let fallbackRevealTimer: number | null = null;
+
     try {
       const mapInstance = new maplibregl.Map({
         container: mapContainer.current,
@@ -440,8 +446,21 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         addBeaconStack(SRC_HAZARDS, 'hazard-beacon', '#f97316');
 
         attachMapInteractions(mapInstance);
-        setMapLoaded(true);
+        setMapInitialized(true);
         mapInstance.resize();
+
+        let revealed = false;
+        const reveal = () => {
+          if (revealed) return;
+          revealed = true;
+          if (fallbackRevealTimer != null) {
+            window.clearTimeout(fallbackRevealTimer);
+            fallbackRevealTimer = null;
+          }
+          setMapPresentationReady(true);
+        };
+        fallbackRevealTimer = window.setTimeout(reveal, 2800) as unknown as number;
+        mapInstance.once('idle', reveal);
       });
 
       mapInstance.on('error', (e) => {
@@ -465,6 +484,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     mapContainer.current.addEventListener('click', handlePopupClick);
 
     return () => {
+      if (fallbackRevealTimer != null) {
+        window.clearTimeout(fallbackRevealTimer);
+        fallbackRevealTimer = null;
+      }
       mapContainer.current?.removeEventListener('click', handlePopupClick);
       popupRef.current?.remove();
       popupRef.current = null;
@@ -473,13 +496,14 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         map.current.remove();
         map.current = null;
       }
-      setMapLoaded(false);
+      setMapInitialized(false);
+      setMapPresentationReady(false);
     };
   }, [attachMapInteractions]);
 
   useEffect(() => {
     const m = map.current;
-    if (!m || !mapLoaded) return;
+    if (!m || !mapInitialized) return;
     const fc = { type: 'FeatureCollection' as const, features: buildConnectionFeatures(positionedConnections) };
     const src = m.getSource(SRC_CONNECTIONS) as maplibregl.GeoJSONSource | undefined;
     src?.setData(fc);
@@ -497,11 +521,11 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       m.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
       initialFitDoneRef.current = true;
     }
-  }, [mapLoaded, positionedConnections, geoConnections, layers.myNetwork]);
+  }, [mapInitialized, positionedConnections, geoConnections, layers.myNetwork]);
 
   useEffect(() => {
     const m = map.current;
-    if (!m || !mapLoaded) return;
+    if (!m || !mapInitialized) return;
     const setSrc = (id: string, feats: GeoJSON.Feature[]) => {
       const src = m.getSource(id) as maplibregl.GeoJSONSource | undefined;
       src?.setData({ type: 'FeatureCollection', features: feats });
@@ -520,7 +544,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     ['hazard-beacon-clusters', 'hazard-beacon-cluster-count', 'hazard-beacon-unclustered'].forEach((lid) => {
       if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.hazards));
     });
-  }, [mapLoaded, beacons, layers.officialSoundtracks, layers.communityBeacons, layers.hazards]);
+  }, [mapInitialized, beacons, layers.officialSoundtracks, layers.communityBeacons, layers.hazards]);
 
   useEffect(() => {
     const handleResize = () => { map.current?.resize(); };
@@ -530,7 +554,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       window.removeEventListener('resize', handleResize);
       clearTimeout(resizeTimer);
     };
-  }, [mapLoaded]);
+  }, [mapInitialized]);
 
   const toggle = (key: keyof MapLayerToggles) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -560,18 +584,26 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
 
   return (
     <div className="relative rounded-3xl border border-zinc-800 overflow-hidden bg-zinc-900 h-[600px]">
-      {!mapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin mx-auto mb-2" />
-            <p className="text-sm text-zinc-400">Loading map...</p>
-          </div>
+      <div
+        className={`absolute inset-0 z-10 flex items-center justify-center bg-zinc-900 transition-opacity duration-500 ease-out ${
+          mapPresentationReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        aria-hidden={mapPresentationReady}
+      >
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin mx-auto mb-2" />
+          <p className="text-sm text-zinc-400">Loading map...</p>
         </div>
-      )}
+      </div>
 
-      <div ref={mapContainer} className="absolute inset-0" />
+      <div
+        ref={mapContainer}
+        className={`absolute inset-0 transition-opacity duration-500 ease-out ${
+          mapPresentationReady ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
 
-      {mapLoaded && (
+      {mapPresentationReady && (
         <div className="absolute top-4 left-4 z-[6] max-w-[220px] rounded-2xl border border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-lg shadow-black/40 p-3 text-xs text-zinc-200">
           <div className="flex items-center gap-2 mb-2 font-semibold text-white">
             <Layers className="w-3.5 h-3.5 text-[#8338EC]" />
@@ -596,7 +628,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         </div>
       )}
 
-      {mapLoaded && (
+      {mapPresentationReady && (
         <div className="absolute bottom-4 left-4 bg-zinc-900/90 backdrop-blur-sm px-4 py-2 rounded-xl border border-zinc-700">
           <span className="text-sm text-zinc-400">
             <span className="text-[#8338EC] font-bold">{geoConnections.length}</span> locations mapped

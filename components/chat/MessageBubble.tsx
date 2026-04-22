@@ -14,6 +14,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight } from 'lucide-react';
 import type { Message, MessageReaction } from '@/lib/chat/types';
+import { isClientOptimisticMessageId } from '@/lib/chat/clientOptimistic';
 import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
 import { LinkifiedText } from '@/lib/chat/linkify';
@@ -83,6 +84,53 @@ function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
 
 function formatMessageTimeLabel(ms: number) {
   return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+type MineDeliveryState = 'pending' | 'sent' | 'delivered' | 'read';
+
+function mineDeliveryState(message: Message): MineDeliveryState {
+  const meta =
+    message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata)
+      ? (message.metadata as Record<string, unknown>)
+      : {};
+  const optimistic = isClientOptimisticMessageId(message.id);
+  const postAck = meta._webPostAck === true || !optimistic;
+  const delivered =
+    message.delivered_at != null && Number.isFinite(Number(message.delivered_at));
+  // Use `read_at` only — optimistic rows used `is_read: true` by mistake, which showed double ticks then dropped to one after merge.
+  const read = message.read_at != null && Number.isFinite(Number(message.read_at));
+  if (read) return 'read';
+  if (delivered) return 'delivered';
+  if (postAck) return 'sent';
+  return 'pending';
+}
+
+/** WhatsApp-style ticks for outgoing non–call-log messages (web). */
+function MineDeliveryTicks({ message }: { message: Message }) {
+  const state = mineDeliveryState(message);
+  const pair = (className: string, title: string) => (
+    <span className={`inline-flex items-center -space-x-1.5 ${className}`} title={title}>
+      <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
+      <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
+    </span>
+  );
+
+  if (state === 'read') {
+    return pair('text-[#8338EC]', 'Read');
+  }
+  if (state === 'delivered') {
+    return pair('text-zinc-500', 'Delivered');
+  }
+  if (state === 'sent') {
+    return (
+      <span className="inline-flex text-zinc-500" title="Sent">
+        <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-3 w-3 rounded-full border border-zinc-600/80 opacity-70" title="Sending…" aria-hidden />
+  );
 }
 
 function isSafeRenderableMediaUrl(url: string): boolean {
@@ -631,7 +679,7 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* Timestamp & read receipt */}
+        {/* Timestamp & delivery ticks (outgoing) */}
         <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className="text-[10px] text-zinc-600">
             {timeLabel}
@@ -639,9 +687,7 @@ export default function MessageBubble({
               <span className="ml-1 italic text-zinc-500 opacity-80">· edited</span>
             ) : null}
           </span>
-          {isMine && message.is_read && (
-            <Check className="w-3 h-3 text-[#8338EC]" />
-          )}
+          {isMine && <MineDeliveryTicks message={message} />}
         </div>
       </div>
     </motion.div>

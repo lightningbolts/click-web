@@ -73,6 +73,10 @@ import {
   leaveCliqueRpc,
   renameCliqueRpc,
 } from '@/lib/chat/createVerifiedClick';
+import {
+  CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX,
+  bubbleStableListKey,
+} from '@/lib/chat/clientOptimistic';
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -209,8 +213,6 @@ export default function ChatView({
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
-  /** Number of POST /api/chat/messages requests still in flight (allows rapid sends without blocking the composer). */
-  const [pendingOutgoingSends, setPendingOutgoingSends] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -243,6 +245,8 @@ export default function ChatView({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /** Set in layout when the thread identity changes; cleared after an open snap session completes. */
+  const snapScrollToLatestOnOpenRef = useRef(false);
   /** Glass messages card — clip portaled message menus to this region. */
   const messagesPanelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -673,6 +677,81 @@ export default function ChatView({
     setHasMore(true);
   }, [connection.id, connection.groupChatId, isGroupClique]);
 
+  /** Must run in layout phase so it executes before the snap below on the same paint. */
+  useLayoutEffect(() => {
+    snapScrollToLatestOnOpenRef.current = true;
+  }, [connection.id, connection.groupChatId, isGroupClique]);
+
+  /** Scroll the messages scroller to the true bottom (dimension-safe; avoids document scroll). */
+  const snapThreadViewportToBottom = useCallback(() => {
+    const root = scrollContainerRef.current;
+    if (!root) return;
+    const max = Math.max(0, root.scrollHeight - root.clientHeight);
+    root.scrollTop = max;
+  }, []);
+
+  /**
+   * After opening a thread, keep pinning to the bottom while layout settles (flex, dvh, images,
+   * ResizeObserver). Does not re-run on every new message — only when `loading` becomes ready for this chat.
+   */
+  useEffect(() => {
+    if (loading || !chatId || !snapScrollToLatestOnOpenRef.current) return;
+
+    const root = scrollContainerRef.current;
+    if (!root) return;
+
+    const tick = () => {
+      snapThreadViewportToBottom();
+    };
+
+    tick();
+    const raf0 = requestAnimationFrame(tick);
+    let rafInner = 0;
+    const rafOuter = requestAnimationFrame(() => {
+      rafInner = requestAnimationFrame(tick);
+    });
+    const timeouts = [0, 32, 96, 220, 420].map((ms) => window.setTimeout(tick, ms));
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        tick();
+      });
+      ro.observe(root);
+    }
+
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    vv?.addEventListener('resize', tick);
+    vv?.addEventListener('scroll', tick);
+
+    let doneTimer: number | null = null;
+    const finalize = () => {
+      tick();
+      snapScrollToLatestOnOpenRef.current = false;
+      ro?.disconnect();
+      ro = null;
+      vv?.removeEventListener('resize', tick);
+      vv?.removeEventListener('scroll', tick);
+      timeouts.forEach((id) => window.clearTimeout(id));
+      cancelAnimationFrame(raf0);
+      cancelAnimationFrame(rafOuter);
+      cancelAnimationFrame(rafInner);
+    };
+
+    doneTimer = window.setTimeout(finalize, 720) as unknown as number;
+
+    return () => {
+      if (doneTimer != null) window.clearTimeout(doneTimer);
+      timeouts.forEach((id) => window.clearTimeout(id));
+      cancelAnimationFrame(raf0);
+      cancelAnimationFrame(rafOuter);
+      cancelAnimationFrame(rafInner);
+      ro?.disconnect();
+      vv?.removeEventListener('resize', tick);
+      vv?.removeEventListener('scroll', tick);
+    };
+  }, [loading, chatId, connection.id, connection.groupChatId, isGroupClique, snapThreadViewportToBottom]);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -758,7 +837,6 @@ export default function ChatView({
         setError(err.message);
       } finally {
         setLoading(false);
-        setTimeout(() => scrollToBottom(false), 50);
       }
     };
     load();
@@ -772,7 +850,6 @@ export default function ChatView({
     groupKeyError,
     groupMasterKey,
     isGroupClique,
-    scrollToBottom,
     firePeerDeliveredAck,
   ]);
 
@@ -851,6 +928,43 @@ export default function ChatView({
             });
             setMessages((prev) => {
               if (prev.some((m) => m.id === msg.id)) return prev;
+
+              const lsat = msg.local_sent_at ?? null;
+              if (
+                lsat != null &&
+                msg.user_id === currentUserId &&
+                msg.message_type === 'text'
+              ) {
+                const idx = prev.findIndex(
+                  (m) =>
+                    m.id.startsWith(CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX) &&
+                    m.local_sent_at === lsat,
+                );
+                if (idx >= 0) {
+                  const opt = prev[idx];
+                  const optMeta =
+                    opt.metadata && typeof opt.metadata === 'object' && !Array.isArray(opt.metadata)
+                      ? { ...(opt.metadata as Record<string, unknown>) }
+                      : {};
+                  const bubbleKey =
+                    typeof optMeta._bubbleKey === 'string' ? optMeta._bubbleKey : opt.id;
+                  const postAck = optMeta._webPostAck === true;
+                  const serverMeta =
+                    msg.metadata && typeof msg.metadata === 'object' && !Array.isArray(msg.metadata)
+                      ? { ...(msg.metadata as Record<string, unknown>) }
+                      : {};
+                  const mergedMeta: Message['metadata'] = {
+                    ...serverMeta,
+                    _bubbleKey: bubbleKey,
+                    ...(postAck ? { _webPostAck: true as const } : {}),
+                  };
+                  const merged: Message = { ...msg, metadata: mergedMeta };
+                  const next = [...prev.slice(0, idx), merged, ...prev.slice(idx + 1)];
+                  if (isNearBottom()) setTimeout(() => scrollToBottom(), 60);
+                  return next;
+                }
+              }
+
               const updated = [...prev, msg];
               if (isNearBottom()) setTimeout(() => scrollToBottom(), 60);
               return updated;
@@ -864,16 +978,29 @@ export default function ChatView({
               ? (newRow.content ?? '')
               : await decryptIfNeeded(newRow.content ?? '');
             setMessages((prev) =>
-              prev.map((m) =>
-                m.id === newRow.id
-                  ? normalizeDbMessage({
-                      ...m,
-                      ...newRow,
-                      content: plainContent,
-                      reactions: m.reactions,
-                    })
-                  : m
-              )
+              prev.map((m) => {
+                if (m.id !== newRow.id) return m;
+                const next = normalizeDbMessage({
+                  ...m,
+                  ...newRow,
+                  content: plainContent,
+                  reactions: m.reactions,
+                });
+                const prevMeta =
+                  m.metadata && typeof m.metadata === 'object' && !Array.isArray(m.metadata)
+                    ? (m.metadata as Record<string, unknown>)
+                    : {};
+                const nextMeta =
+                  next.metadata && typeof next.metadata === 'object' && !Array.isArray(next.metadata)
+                    ? { ...(next.metadata as Record<string, unknown>) }
+                    : {};
+                const mergedMeta: Message['metadata'] = {
+                  ...nextMeta,
+                  ...(typeof prevMeta._bubbleKey === 'string' ? { _bubbleKey: prevMeta._bubbleKey } : {}),
+                  ...(prevMeta._webPostAck === true ? { _webPostAck: true as const } : {}),
+                };
+                return { ...next, metadata: mergedMeta };
+              })
             );
           } else if (eventType === 'DELETE') {
             setMessages((prev) => prev.filter((m) => m.id !== oldRow.id));
@@ -963,9 +1090,43 @@ export default function ChatView({
     const content = inputText.trim();
     if (!content || !chatId || mediaBusy || isRecording) return;
 
+    const optimisticId = `${CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX}${crypto.randomUUID()}`;
+    const optimisticMeta: Message['metadata'] = {
+      _bubbleKey: optimisticId,
+    };
+    if (replyingTo && replyingTo.message_type !== 'call_log') {
+      const replyLabel =
+        replyingTo.message_type === 'image' || replyingTo.message_type === 'audio'
+          ? previewLabelForMessage(replyingTo)
+          : replyingTo.content;
+      optimisticMeta.reply_to_id = replyingTo.id;
+      optimisticMeta.reply_to_content = replySnippetForSend(replyLabel, 140);
+    }
+
+    const sentAt = Date.now();
+    const optimisticMsg: Message = {
+      id: optimisticId,
+      chat_id: chatId,
+      user_id: currentUserId,
+      content,
+      time_created: sentAt,
+      time_edited: null,
+      is_read: false,
+      local_sent_at: sentAt,
+      read_at: null,
+      delivered_at: null,
+      message_type: 'text',
+      metadata: optimisticMeta,
+      reactions: {},
+    };
+
     setInputText('');
     inputRef.current?.focus();
-    setPendingOutgoingSends((n) => n + 1);
+    setMessages((prev) => [...prev, optimisticMsg]);
+    requestAnimationFrame(() => {
+      snapThreadViewportToBottom();
+      requestAnimationFrame(() => snapThreadViewportToBottom());
+    });
 
     try {
       const wireContent =
@@ -986,16 +1147,32 @@ export default function ChatView({
           chatId,
           ...(!isGroupClique ? { connectionId: connection.id } : {}),
           content: wireContent,
+          local_sent_at: sentAt,
           ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
         }),
       });
       if (!res.ok) throw new Error('Send failed');
+      await res.json().catch(() => ({}));
+      setMessages((prev) =>
+        prev.map((m) => {
+          const meta =
+            m.metadata && typeof m.metadata === 'object' && !Array.isArray(m.metadata)
+              ? (m.metadata as Record<string, unknown>)
+              : {};
+          const bubbleKey = typeof meta._bubbleKey === 'string' ? meta._bubbleKey : null;
+          const matchesBubble = bubbleKey === optimisticId;
+          const matchesPending = m.id === optimisticId;
+          if (!matchesPending && !matchesBubble) return m;
+          if (meta._webPostAck === true) return m;
+          const prevMeta = { ...meta };
+          return { ...m, metadata: { ...prevMeta, _webPostAck: true } };
+        }),
+      );
       setReplyingTo(null);
     } catch (err) {
       console.error('Send error:', err);
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setInputText(content);
-    } finally {
-      setPendingOutgoingSends((n) => Math.max(0, n - 1));
     }
   }, [
     inputText,
@@ -1007,8 +1184,10 @@ export default function ChatView({
     isGroupClique,
     replyingTo,
     connection.id,
+    currentUserId,
     getAuthHeaders,
     appendReplyToMetadata,
+    snapThreadViewportToBottom,
   ]);
 
   const uploadAndSendVoice = useCallback(
@@ -2095,7 +2274,7 @@ export default function ChatView({
                 </motion.div>
               ) : (
                 <MessageBubble
-                  key={entry.message.id}
+                  key={bubbleStableListKey(entry.message)}
                   message={entry.message}
                   isMine={entry.message.user_id === currentUserId}
                   currentUserId={currentUserId}
@@ -2304,10 +2483,7 @@ export default function ChatView({
               hover:from-[#9b4dff] hover:to-[#7b30e0] disabled:opacity-30 
               disabled:cursor-not-allowed transition-all shrink-0 glow-violet"
           >
-            {pendingOutgoingSends > 0
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <Send className="w-4 h-4" />
-            }
+            <Send className="w-4 h-4" />
           </motion.button>
         </div>
         <p className="text-[10px] text-zinc-600 mt-1 text-left hidden sm:block">
