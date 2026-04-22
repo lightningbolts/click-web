@@ -15,6 +15,11 @@ export type VibeRadarCategoryTotal = {
   count: number;
 };
 
+export type VibeRadarBeaconTrend = {
+  beacon_type: string;
+  count: number;
+};
+
 export type VibeRadarApiResponse = {
   clusters: VibeRadarCluster[];
   categoryTotals: VibeRadarCategoryTotal[];
@@ -23,6 +28,8 @@ export type VibeRadarApiResponse = {
   status: string;
   venueId?: string;
   message?: string;
+  /** Active map_beacons by type within the same radius as intent clusters (managers only). */
+  trendingVibes?: VibeRadarBeaconTrend[];
 };
 
 export type VenuePopUpHubBeacon = {
@@ -59,10 +66,19 @@ function parseCategoryTotal(row: unknown): VibeRadarCategoryTotal | null {
   return { category, count };
 }
 
+function parseTrendingVibe(row: unknown): VibeRadarBeaconTrend | null {
+  if (!row || typeof row !== "object") return null;
+  const o = row as Record<string, unknown>;
+  const beacon_type = typeof o.beacon_type === "string" ? o.beacon_type : null;
+  const count = typeof o.count === "number" && Number.isFinite(o.count) ? o.count : null;
+  if (beacon_type == null || count == null) return null;
+  return { beacon_type, count };
+}
+
 /** Normalize JSON from `insights_vibe_radar_data` RPC. */
 export function parseVibeRadarRpcPayload(
   raw: unknown,
-): Omit<VibeRadarApiResponse, "venueId" | "message"> {
+): Omit<VibeRadarApiResponse, "venueId" | "message" | "trendingVibes"> {
   const empty = {
     clusters: [] as VibeRadarCluster[],
     categoryTotals: [] as VibeRadarCategoryTotal[],
@@ -99,6 +115,14 @@ export function parseVibeRadarRpcPayload(
     radiusMeters,
     status,
   };
+}
+
+/** Normalize JSON from `insights_vibe_radar_beacon_density` RPC. */
+export function parseVibeRadarBeaconDensityRpc(raw: unknown): VibeRadarBeaconTrend[] {
+  if (!raw || typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  const arr = Array.isArray(o.trending) ? o.trending : [];
+  return arr.map(parseTrendingVibe).filter((x): x is VibeRadarBeaconTrend => x != null);
 }
 
 const DEMO_CENTER = { lat: 47.6062, lng: -122.3321 };
@@ -165,5 +189,10 @@ export function demoVibeRadarResponse(): Omit<VibeRadarApiResponse, "venueId"> {
     venueCenter: DEMO_CENTER,
     radiusMeters: 160.934,
     status: "ok",
+    trendingVibes: [
+      { beacon_type: "soundtrack", count: 24 },
+      { beacon_type: "recreation", count: 11 },
+      { beacon_type: "study", count: 9 },
+    ],
   };
 }

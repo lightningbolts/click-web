@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
+import VenueBroadcastingModule from "@/components/insights/VenueBroadcastingModule";
 
 const navItems = [
   { href: "/insights", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -74,6 +75,8 @@ export default function BusinessInsightsShell({
 }: BusinessInsightsShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const insightsVenueId = searchParams.get("venue_id")?.trim() || null;
   const { user, signOut } = useAuth();
   const { demoMode, setDemoMode } = useInsightsDemo();
   const [isLive] = useState(true);
@@ -271,7 +274,12 @@ export default function BusinessInsightsShell({
 
       {/* Page content */}
       <main className="relative p-4 md:p-6 lg:p-8">
-        <div className="max-w-[1800px] mx-auto">{children}</div>
+        <div className="max-w-[1800px] mx-auto space-y-6">
+          {pathname === "/insights/vibe-radar" && insightsVenueId ? (
+            <VenueBroadcastingModule venueId={insightsVenueId} />
+          ) : null}
+          {children}
+        </div>
       </main>
     </div>
   );

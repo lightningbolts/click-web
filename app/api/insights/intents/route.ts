@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
 import { resolveInsightsVenueId } from "@/lib/server/resolveInsightsVenueId";
-import { parseVibeRadarRpcPayload, type VibeRadarApiResponse } from "@/lib/insights/vibeRadar";
+import {
+  parseVibeRadarRpcPayload,
+  parseVibeRadarBeaconDensityRpc,
+  type VibeRadarApiResponse,
+} from "@/lib/insights/vibeRadar";
 
 /**
  * Aggregated availability intent clusters near the venue (no user-level data).
@@ -67,9 +71,22 @@ export async function GET(request: NextRequest) {
     }
 
     const parsed = parseVibeRadarRpcPayload(rpcData);
+
+    let trendingVibes = undefined as VibeRadarApiResponse["trendingVibes"];
+    const { data: densityRaw, error: densityError } = await supabase.rpc(
+      "insights_vibe_radar_beacon_density",
+      { venue_id_param: venueId },
+    );
+    if (densityError) {
+      console.warn("insights_vibe_radar_beacon_density:", densityError.message);
+    } else {
+      trendingVibes = parseVibeRadarBeaconDensityRpc(densityRaw);
+    }
+
     const body: VibeRadarApiResponse = {
       ...parsed,
       venueId,
+      trendingVibes,
     };
 
     return NextResponse.json(body);

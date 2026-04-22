@@ -1,31 +1,55 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, MapPin } from "lucide-react";
+import { Loader2, MapPin, Layers } from "lucide-react";
 import type { VibeRadarCluster } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
+import {
+  DEFAULT_MAP_LAYER_TOGGLES,
+  type MapBeaconRecord,
+  type MapLayerToggles,
+  beaconGeoJsonFeatures,
+} from "@/lib/map/mapBeacons";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
 
-function buildGeoJson(clusters: VibeRadarCluster[]) {
-  return {
-    type: "FeatureCollection" as const,
-    features: clusters.map((c) => ({
-      type: "Feature" as const,
-      geometry: {
-        type: "Point" as const,
-        coordinates: [c.approx_lng, c.approx_lat],
-      },
-      properties: {
-        count: c.count,
-        category: c.category,
-        color: vibeCategoryColor(c.category),
-      },
-    })),
-  };
+const SRC_INTENTS = "vr-intents-geo";
+const SRC_OFFICIAL = "vr-beacons-official";
+const SRC_COMMUNITY = "vr-beacons-community";
+const SRC_HAZARDS = "vr-beacons-hazards";
+
+const CLUSTER_MAX_ZOOM = 13;
+const CLUSTER_RADIUS = 48;
+
+function emptyFc(): GeoJSON.FeatureCollection {
+  return { type: "FeatureCollection", features: [] };
+}
+
+function intentFeatures(clusters: VibeRadarCluster[]): GeoJSON.Feature[] {
+  return clusters.map((c) => ({
+    type: "Feature" as const,
+    geometry: {
+      type: "Point" as const,
+      coordinates: [c.approx_lng, c.approx_lat],
+    },
+    properties: {
+      count: c.count,
+      category: c.category,
+      color: vibeCategoryColor(c.category),
+    },
+  }));
+}
+
+/** Minimal HTML escape for map popups (labels from beacon metadata). */
+function escapeMapHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export interface VibeRadarMapProps {
@@ -33,23 +57,103 @@ export interface VibeRadarMapProps {
   venueCenter: { lat: number | null; lng: number | null };
   /** Pulse a beacon marker at the venue after deploy. */
   showBeaconPulse?: boolean;
+  /** Venue-scoped map beacons (managers); shown on separate clustered layers. */
+  venueBeacons?: MapBeaconRecord[];
 }
 
 /**
- * MapLibre map: soft “hex-like” blobs from aggregated intent cells; volume → size/opacity.
+ * MapLibre map: intent clusters + optional venue beacon layers (native GeoJSON clustering).
  */
 export default function VibeRadarMap({
   clusters,
   venueCenter,
   showBeaconPulse = false,
+  venueBeacons = [],
 }: VibeRadarMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const beaconMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
 
-  // Init map
+  const initCenterRef = useRef<[number, number] | null>(null);
+  if (initCenterRef.current === null) {
+    if (
+      venueCenter.lat != null &&
+      venueCenter.lng != null &&
+      Number.isFinite(venueCenter.lat) &&
+      Number.isFinite(venueCenter.lng)
+    ) {
+      initCenterRef.current = [venueCenter.lng, venueCenter.lat];
+    } else {
+      initCenterRef.current = DEFAULT_CENTER;
+    }
+  }
+
+  const attachInteractions = useCallback((map: maplibregl.Map) => {
+    const expandCluster = (sourceId: string) => (e: maplibregl.MapLayerMouseEvent) => {
+      const f = e.features?.[0];
+      if (!f || f.geometry.type !== "Point") return;
+      const clusId = f.properties?.cluster_id;
+      const src = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (clusId == null || !src?.getClusterExpansionZoom) return;
+      void src.getClusterExpansionZoom(clusId as number).then((z) => {
+        const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+        map.easeTo({ center: coords, zoom: z + 0.35, duration: 420 });
+      });
+    };
+
+    const onBeaconPoint = (e: maplibregl.MapLayerMouseEvent) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const title = escapeMapHtml(String(f.properties?.title ?? "Beacon"));
+      const typ = escapeMapHtml(String(f.properties?.beacon_type ?? ""));
+      const spotify = typeof f.properties?.spotify === "string" ? f.properties.spotify : "";
+      const open = spotify
+        ? `<a href="${escapeMapHtml(spotify)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:10px;color:#67e8f9;font-size:12px;">Open in Spotify →</a>`
+        : "";
+      popupRef.current?.remove();
+      const html = `<div style="color:#fff;background:#18181b;padding:12px 14px;border-radius:12px;border:1px solid #27272a;max-width:240px;">
+        <div style="font-weight:600;color:#e4e4e7;margin-bottom:4px;">${title}</div>
+        <div style="font-size:11px;color:#a1a1aa;">${typ}</div>
+        ${open}
+      </div>`;
+      popupRef.current = new maplibregl.Popup({ offset: 14, closeButton: true, maxWidth: "260px" })
+        .setLngLat(e.lngLat)
+        .setHTML(html)
+        .addTo(map);
+    };
+
+    map.on("click", "vr-intent-clusters", expandCluster(SRC_INTENTS));
+    map.on("click", "vr-official-beacon-clusters", expandCluster(SRC_OFFICIAL));
+    map.on("click", "vr-community-beacon-clusters", expandCluster(SRC_COMMUNITY));
+    map.on("click", "vr-hazard-beacon-clusters", expandCluster(SRC_HAZARDS));
+    map.on("click", "vr-official-beacon-unclustered", onBeaconPoint);
+    map.on("click", "vr-community-beacon-unclustered", onBeaconPoint);
+    map.on("click", "vr-hazard-beacon-unclustered", onBeaconPoint);
+
+    const hoverIds = [
+      "vr-intent-clusters",
+      "vr-intent-unclustered",
+      "vr-official-beacon-clusters",
+      "vr-official-beacon-unclustered",
+      "vr-community-beacon-clusters",
+      "vr-community-beacon-unclustered",
+      "vr-hazard-beacon-clusters",
+      "vr-hazard-beacon-unclustered",
+    ];
+    hoverIds.forEach((id) => {
+      map.on("mouseenter", id, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", id, () => {
+        map.getCanvas().style.cursor = "";
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -57,7 +161,7 @@ export default function VibeRadarMap({
       const map = new maplibregl.Map({
         container: containerRef.current,
         style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-        center: DEFAULT_CENTER,
+        center: initCenterRef.current ?? DEFAULT_CENTER,
         zoom: 12.2,
         attributionControl: false,
       });
@@ -65,60 +169,112 @@ export default function VibeRadarMap({
       map.addControl(new maplibregl.NavigationControl(), "top-right");
 
       map.on("load", () => {
-        map.addSource("vibe-intents", {
+        map.addSource(SRC_INTENTS, {
           type: "geojson",
-          data: buildGeoJson(clusters),
+          data: emptyFc(),
+          cluster: true,
+          clusterMaxZoom: CLUSTER_MAX_ZOOM,
+          clusterRadius: CLUSTER_RADIUS,
         });
 
         map.addLayer({
-          id: "vibe-intents-glow",
+          id: "vr-intent-clusters",
           type: "circle",
-          source: "vibe-intents",
+          source: SRC_INTENTS,
+          filter: ["has", "point_count"],
           paint: {
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["get", "count"],
-              1,
-              18,
-              200,
-              64,
-            ],
-            "circle-color": ["get", "color"],
-            "circle-opacity": [
-              "interpolate",
-              ["linear"],
-              ["get", "count"],
-              1,
-              0.25,
-              200,
-              0.72,
-            ],
-            "circle-blur": 0.85,
+            "circle-color": "#6520c0",
+            "circle-radius": ["step", ["get", "point_count"], 18, 8, 22, 20, 28],
+            "circle-opacity": 0.88,
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "rgba(255,255,255,0.9)",
           },
         });
-
         map.addLayer({
-          id: "vibe-intents-core",
+          id: "vr-intent-cluster-count",
+          type: "symbol",
+          source: SRC_INTENTS,
+          filter: ["has", "point_count"],
+          layout: {
+            "text-field": ["get", "point_count_abbreviated"],
+            "text-size": 11,
+          },
+          paint: { "text-color": "#ffffff" },
+        });
+        map.addLayer({
+          id: "vr-intent-unclustered",
           type: "circle",
-          source: "vibe-intents",
+          source: SRC_INTENTS,
+          filter: ["!", ["has", "point_count"]],
           paint: {
+            "circle-color": ["get", "color"],
             "circle-radius": [
               "interpolate",
               ["linear"],
               ["get", "count"],
               1,
-              5,
+              8,
               200,
-              14,
+              22,
             ],
-            "circle-color": ["get", "color"],
-            "circle-opacity": 0.95,
+            "circle-opacity": 0.92,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": "rgba(255,255,255,0.35)",
           },
         });
 
+        const addBeaconStack = (sourceId: string, prefix: string, fallback: string) => {
+          map.addSource(sourceId, {
+            type: "geojson",
+            data: emptyFc(),
+            cluster: true,
+            clusterMaxZoom: CLUSTER_MAX_ZOOM,
+            clusterRadius: CLUSTER_RADIUS + 4,
+          });
+          map.addLayer({
+            id: `${prefix}-clusters`,
+            type: "circle",
+            source: sourceId,
+            filter: ["has", "point_count"],
+            paint: {
+              "circle-color": fallback,
+              "circle-radius": ["step", ["get", "point_count"], 16, 6, 20, 16, 24],
+              "circle-opacity": 0.88,
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "rgba(255,255,255,0.85)",
+            },
+          });
+          map.addLayer({
+            id: `${prefix}-cluster-count`,
+            type: "symbol",
+            source: sourceId,
+            filter: ["has", "point_count"],
+            layout: {
+              "text-field": ["get", "point_count_abbreviated"],
+              "text-size": 10,
+            },
+            paint: { "text-color": "#0a0a0a" },
+          });
+          map.addLayer({
+            id: `${prefix}-unclustered`,
+            type: "circle",
+            source: sourceId,
+            filter: ["!", ["has", "point_count"]],
+            paint: {
+              "circle-color": ["get", "tint"],
+              "circle-radius": 10,
+              "circle-opacity": 0.95,
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "#ffffff",
+            },
+          });
+        };
+
+        addBeaconStack(SRC_OFFICIAL, "vr-official-beacon", "#22d3ee");
+        addBeaconStack(SRC_COMMUNITY, "vr-community-beacon", "#34d399");
+        addBeaconStack(SRC_HAZARDS, "vr-hazard-beacon", "#f97316");
+
+        attachInteractions(map);
         setMapLoaded(true);
         map.resize();
       });
@@ -135,15 +291,16 @@ export default function VibeRadarMap({
     }
 
     return () => {
+      popupRef.current?.remove();
+      popupRef.current = null;
       beaconMarkerRef.current?.remove();
       beaconMarkerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       setMapLoaded(false);
     };
-  }, []);
+  }, [attachInteractions]);
 
-  // Venue anchor when there are no cells yet
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -158,14 +315,11 @@ export default function VibeRadarMap({
     }
   }, [mapLoaded, clusters.length, venueCenter.lat, venueCenter.lng]);
 
-  // Push cluster updates
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
-    const src = map.getSource("vibe-intents") as maplibregl.GeoJSONSource | undefined;
-    if (src) {
-      src.setData(buildGeoJson(clusters));
-    }
+    const src = map.getSource(SRC_INTENTS) as maplibregl.GeoJSONSource | undefined;
+    src?.setData({ type: "FeatureCollection", features: intentFeatures(clusters) });
 
     if (clusters.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
@@ -173,6 +327,38 @@ export default function VibeRadarMap({
       map.fitBounds(bounds, { padding: 72, maxZoom: 13.5, duration: 600 });
     }
   }, [clusters, mapLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const setData = (id: string, feats: GeoJSON.Feature[]) => {
+      (map.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData({
+        type: "FeatureCollection",
+        features: feats,
+      });
+    };
+    setData(SRC_OFFICIAL, beaconGeoJsonFeatures(venueBeacons, "official"));
+    setData(SRC_COMMUNITY, beaconGeoJsonFeatures(venueBeacons, "community"));
+    setData(SRC_HAZARDS, beaconGeoJsonFeatures(venueBeacons, "hazard"));
+
+    const vis = (on: boolean) => (on ? "visible" : "none");
+    ["vr-intent-clusters", "vr-intent-cluster-count", "vr-intent-unclustered"].forEach((lid) => {
+      if (map.getLayer(lid)) map.setLayoutProperty(lid, "visibility", vis(layers.myNetwork));
+    });
+    ["vr-official-beacon-clusters", "vr-official-beacon-cluster-count", "vr-official-beacon-unclustered"].forEach(
+      (lid) => {
+        if (map.getLayer(lid)) map.setLayoutProperty(lid, "visibility", vis(layers.officialSoundtracks));
+      },
+    );
+    ["vr-community-beacon-clusters", "vr-community-beacon-cluster-count", "vr-community-beacon-unclustered"].forEach(
+      (lid) => {
+        if (map.getLayer(lid)) map.setLayoutProperty(lid, "visibility", vis(layers.communityBeacons));
+      },
+    );
+    ["vr-hazard-beacon-clusters", "vr-hazard-beacon-cluster-count", "vr-hazard-beacon-unclustered"].forEach((lid) => {
+      if (map.getLayer(lid)) map.setLayoutProperty(lid, "visibility", vis(layers.hazards));
+    });
+  }, [mapLoaded, venueBeacons, layers.myNetwork, layers.officialSoundtracks, layers.communityBeacons, layers.hazards]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -233,6 +419,10 @@ export default function VibeRadarMap({
     };
   }, [mapLoaded]);
 
+  const toggle = (key: keyof MapLayerToggles) => {
+    setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   if (mapError) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-12 text-center">
@@ -263,14 +453,49 @@ export default function VibeRadarMap({
 
       <div ref={containerRef} className="absolute inset-0" />
 
+      {mapLoaded && (
+        <div className="absolute top-3 left-3 z-[6] max-w-[220px] rounded-2xl border border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-lg shadow-black/40 p-3 text-xs text-zinc-200">
+          <div className="flex items-center gap-2 mb-2 font-semibold text-white">
+            <Layers className="w-3.5 h-3.5 text-[#8338EC]" />
+            Map layers
+          </div>
+          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
+            <input type="checkbox" className="accent-[#8338EC]" checked={layers.myNetwork} onChange={() => toggle("myNetwork")} />
+            Availability intents
+          </label>
+          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="accent-[#8338EC]"
+              checked={layers.officialSoundtracks}
+              onChange={() => toggle("officialSoundtracks")}
+            />
+            Official Soundtracks
+          </label>
+          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="accent-[#8338EC]"
+              checked={layers.communityBeacons}
+              onChange={() => toggle("communityBeacons")}
+            />
+            Community Beacons
+          </label>
+          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
+            <input type="checkbox" className="accent-[#8338EC]" checked={layers.hazards} onChange={() => toggle("hazards")} />
+            Hazards
+          </label>
+        </div>
+      )}
+
       {mapLoaded && clusters.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           className="absolute bottom-4 left-4 right-4 sm:right-auto max-w-md z-[5] rounded-xl border border-white/10 bg-zinc-950/85 backdrop-blur-md px-4 py-3 text-sm text-zinc-400"
         >
-          No aggregated cells in range yet. When guests share coarse area buckets with active
-          intents, clusters appear here — never individual identities.
+          No aggregated cells in range yet. When guests share coarse area buckets with active intents,
+          clusters appear here — never individual identities.
         </motion.div>
       )}
     </div>
