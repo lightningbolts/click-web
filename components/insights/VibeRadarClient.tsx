@@ -17,6 +17,7 @@ import {
   type VibeRadarApiResponse,
   type VenuePopUpHubBeacon,
 } from "@/lib/insights/vibeRadar";
+import type { MapBeaconRecord } from "@/lib/map/mapBeacons";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,6 +55,8 @@ export default function VibeRadarClient({
     },
   );
 
+  const venueForBeacons =
+    (venueQuery && venueQuery.trim()) || data?.venueId || initialPayload?.venueId || null;
   const view = useMemo((): VibeRadarApiResponse | null => {
     if (!data) return null;
     if (!demoMode) return data;
@@ -67,8 +70,20 @@ export default function VibeRadarClient({
       venueId: data.venueId,
       status: data.status === "no_venue" ? "no_venue" : demo.status,
       message: data.message,
+      trendingVibes: data.trendingVibes?.length ? data.trendingVibes : demo.trendingVibes,
     };
   }, [data, demoMode]);
+
+  const beaconsListUrl =
+    user && venueForBeacons && view && view.status !== "no_venue"
+      ? `/api/insights/${encodeURIComponent(venueForBeacons)}/beacons`
+      : null;
+  const { data: venueBeaconsPayload } = useSWR<{ beacons: MapBeaconRecord[] }>(
+    beaconsListUrl,
+    fetchInsightsApiJson,
+    { revalidateOnFocus: false },
+  );
+  const venueBeacons = venueBeaconsPayload?.beacons ?? [];
 
   const effectiveVenueId = view?.venueId ?? null;
   const demoLocked = demoMode && (!!view && view.status === "no_venue");
@@ -88,6 +103,7 @@ export default function VibeRadarClient({
   const clusters = view?.clusters ?? [];
   const categoryTotals = view?.categoryTotals ?? [];
   const venueCenter = view?.venueCenter ?? { lat: null, lng: null };
+  const trendingVibes = view?.trendingVibes ?? [];
 
   const showSkeleton = !view && (isLoading || isValidating);
 
@@ -133,8 +149,8 @@ export default function VibeRadarClient({
         </motion.p>
       ) : null}
 
-      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-        <GlassPanel className="p-5 xl:col-span-1" hover={false} glow="purple">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6">
+        <GlassPanel className="p-5 xl:col-span-3" hover={false} glow="purple">
           <h3 className="text-sm font-semibold text-white mb-1">Signal strength</h3>
           <p className="text-xs text-zinc-500 mb-4">
             Volume drives blob size; hue reflects intent category.
@@ -160,7 +176,7 @@ export default function VibeRadarClient({
           )}
         </GlassPanel>
 
-        <div className="xl:col-span-2 min-h-[420px]">
+        <div className="xl:col-span-6 min-h-[420px] order-3 xl:order-none">
           {showSkeleton ? (
             <div className="h-[min(56vh,620px)] rounded-2xl border border-white/10 bg-white/5 animate-pulse" />
           ) : (
@@ -168,9 +184,34 @@ export default function VibeRadarClient({
               clusters={clusters}
               venueCenter={venueCenter}
               showBeaconPulse={beaconPulse}
+              venueBeacons={venueBeacons}
             />
           )}
         </div>
+
+        <GlassPanel className="p-5 xl:col-span-3 order-2 xl:order-none" hover={false} glow="blue">
+          <h3 className="text-sm font-semibold text-white mb-1">Trending vibes around you</h3>
+          <p className="text-xs text-zinc-500 mb-4">
+            Beacon density by type within the same radius as intent clusters.
+          </p>
+          {showSkeleton ? (
+            <div className="h-28 rounded-xl bg-white/5 animate-pulse" />
+          ) : trendingVibes.length === 0 ? (
+            <p className="text-sm text-zinc-500">No active community map pins in range yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {trendingVibes.map((t) => (
+                <li
+                  key={t.beacon_type}
+                  className="flex justify-between text-sm border-b border-white/5 pb-2 last:border-0"
+                >
+                  <span className="text-zinc-200 capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
+                  <span className="text-cyan-400/90 tabular-nums font-medium">{t.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </GlassPanel>
       </motion.div>
 
       <BeaconDeployModal
