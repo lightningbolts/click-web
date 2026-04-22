@@ -12,6 +12,7 @@ import {
   type MapBeaconRecord,
   type MapLayerToggles,
   beaconGeoJsonFeatures,
+  isSafeBeaconUri,
 } from "@/lib/map/mapBeacons";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
@@ -110,7 +111,8 @@ export default function VibeRadarMap({
       if (!f) return;
       const title = escapeMapHtml(String(f.properties?.title ?? "Beacon"));
       const typ = escapeMapHtml(String(f.properties?.beacon_type ?? ""));
-      const spotify = typeof f.properties?.spotify === "string" ? f.properties.spotify : "";
+      const spotifyRaw = typeof f.properties?.spotify === "string" ? f.properties.spotify : "";
+      const spotify = spotifyRaw && isSafeBeaconUri(spotifyRaw) ? spotifyRaw : "";
       const open = spotify
         ? `<a href="${escapeMapHtml(spotify)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:10px;color:#67e8f9;font-size:12px;">Open in Spotify →</a>`
         : "";

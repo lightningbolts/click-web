@@ -12,6 +12,7 @@ import {
   type MapLayerToggles,
   type MapBeaconRecord,
   beaconGeoJsonFeatures,
+  isSafeBeaconUri,
   parseMapBeacon,
 } from '@/lib/map/mapBeacons';
 
@@ -290,7 +291,8 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       if (!f) return;
       const title = escapeHtml(String(f.properties?.title ?? 'Beacon'));
       const typ = escapeHtml(String(f.properties?.beacon_type ?? ''));
-      const spotify = typeof f.properties?.spotify === 'string' ? f.properties.spotify : '';
+      const spotifyRaw = typeof f.properties?.spotify === 'string' ? f.properties.spotify : '';
+      const spotify = spotifyRaw && isSafeBeaconUri(spotifyRaw) ? spotifyRaw : '';
       const open = spotify
         ? `<a href="${escapeHtml(spotify)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:10px;color:#67e8f9;font-size:12px;">Open in Spotify →</a>`
         : '';

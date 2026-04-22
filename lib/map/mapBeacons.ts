@@ -96,6 +96,11 @@ export function beaconLayerGroup(
   return "community";
 }
 
+/** Only allow known-safe URI schemes in beacon popup links. */
+export function isSafeBeaconUri(uri: string): boolean {
+  return /^(spotify:|https?:\/\/)/i.test(uri);
+}
+
 export function beaconTint(beaconType: MapBeaconType, group: ReturnType<typeof beaconLayerGroup>): string {
   if (group === "hazard") return "#f97316";
   if (group === "official") return "#22d3ee";
@@ -123,7 +128,8 @@ export function beaconGeoJsonFeatures(
         tint: beaconTint(b.beacon_type, group),
         title: String((b.metadata as { label?: unknown }).label ?? b.beacon_type),
         spotify:
-          typeof (b.metadata as { spotify_playlist_uri?: unknown }).spotify_playlist_uri === "string"
+          typeof (b.metadata as { spotify_playlist_uri?: unknown }).spotify_playlist_uri === "string" &&
+          isSafeBeaconUri((b.metadata as { spotify_playlist_uri: string }).spotify_playlist_uri)
             ? (b.metadata as { spotify_playlist_uri: string }).spotify_playlist_uri
             : "",
       },
