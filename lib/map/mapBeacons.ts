@@ -4,6 +4,8 @@
 
 export const MAP_BEACON_TYPES = [
   "soundtrack",
+  "hazard",
+  "utility",
   "hazard_utility",
   "swag",
   "capacity",
@@ -31,7 +33,9 @@ export type MapBeaconRecord = {
 
 const BEACON_TYPE_LABELS: Record<MapBeaconType, string> = {
   soundtrack: "Soundtrack",
-  hazard_utility: "Hazard / utility",
+  hazard: "Hazard",
+  utility: "Utility",
+  hazard_utility: "Hazard / utility (legacy)",
   swag: "Swag",
   capacity: "Capacity",
   recreation: "Recreation",
@@ -133,7 +137,7 @@ export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
 export function beaconLayerGroup(
   b: Pick<MapBeaconRecord, "beacon_type" | "metadata">,
 ): "official" | "community" | "hazard" {
-  if (b.beacon_type === "hazard_utility") return "hazard";
+  if (b.beacon_type === "hazard" || b.beacon_type === "utility" || b.beacon_type === "hazard_utility") return "hazard";
   const official =
     b.beacon_type === "soundtrack" && Boolean((b.metadata as { is_official?: unknown }).is_official);
   if (official) return "official";
@@ -146,6 +150,7 @@ export function isSafeBeaconUri(uri: string): boolean {
 }
 
 export function beaconTint(beaconType: MapBeaconType, group: ReturnType<typeof beaconLayerGroup>): string {
+  if (beaconType === "utility") return "#3b82f6";
   if (group === "hazard") return "#f97316";
   if (group === "official") return "#22d3ee";
   if (beaconType === "sos") return "#ef4444";
@@ -158,6 +163,7 @@ export function beaconUnclusteredIconChar(
   beaconType: MapBeaconType,
   group: ReturnType<typeof beaconLayerGroup>,
 ): string {
+  if (group === "hazard" && beaconType === "utility") return "⚙";
   if (group === "hazard" || beaconType === "hazard_utility") return "⚠";
   if (beaconType === "soundtrack") return "♪";
   if (beaconType === "sos") return "☎";
