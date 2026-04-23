@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
+import { parseMapBeacon, type MapBeaconRecord, type MapBeaconType } from "@/lib/map/mapBeacons";
 import {
   enrichSoundtrackMetadata,
   isAllowedMusicShareUrl,
@@ -17,6 +17,39 @@ import {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+const MIN_TTL_MS = 15 * 60 * 1000;
+const MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function computeExpiresAtIso(body: Record<string, unknown>, beacon_type: MapBeaconType): string {
+  const now = Date.now();
+
+  let ttlMs: number | null =
+    typeof body.ttl_ms === "number" && Number.isFinite(body.ttl_ms) ? body.ttl_ms : null;
+  if (ttlMs != null && ttlMs <= 0) ttlMs = null;
+
+  let expiresExplicit: number | null = null;
+  if (typeof body.expires_at === "string") {
+    const p = Date.parse(body.expires_at);
+    if (Number.isFinite(p)) expiresExplicit = p;
+  }
+
+  let candidate: number;
+  if (expiresExplicit != null) {
+    candidate = expiresExplicit;
+  } else if (ttlMs != null) {
+    candidate = now + ttlMs;
+  } else if (beacon_type === "soundtrack") {
+    candidate = now + 7 * 24 * 60 * 60 * 1000;
+  } else {
+    candidate = now + 24 * 60 * 60 * 1000;
+  }
+
+  const minExpire = now + MIN_TTL_MS;
+  const maxExpire = now + MAX_TTL_MS;
+  candidate = Math.min(Math.max(candidate, minExpire), maxExpire);
+  return new Date(candidate).toISOString();
 }
 
 /**
@@ -138,6 +171,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const expiresAtIso = computeExpiresAtIso(body, beacon_type);
+
     const { data: inserted, error: insertError } = await supabase
       .from("map_beacons")
       .insert({
@@ -146,7 +181,7 @@ export async function POST(request: NextRequest) {
         beacon_type,
         location: `POINT(${lon} ${lat})`,
         metadata,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: expiresAtIso,
       })
       .select("id, creator_id, venue_id, beacon_type, metadata, created_at, expires_at, location")
       .maybeSingle();
