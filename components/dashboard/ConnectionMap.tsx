@@ -12,9 +12,10 @@ import {
   type MapLayerToggles,
   type MapBeaconRecord,
   beaconGeoJsonFeatures,
-  isSafeBeaconUri,
   parseMapBeacon,
+  rawBeaconRowsFromApiPayload,
 } from '@/lib/map/mapBeacons';
+import { beaconPopupErrorHtml, formatBeaconPopupHtml } from '@/lib/map/beaconPopupHtml';
 
 function atmosphereHtml(conn: ConnectionRecord): string {
   const bits = [conn.weatherSummary, conn.noiseSummary].filter((b): b is string => typeof b === 'string' && b.length > 0);
@@ -109,6 +110,29 @@ const SRC_HAZARDS = 'beacons-hazards-geo';
 
 const CLUSTER_MAX_ZOOM = 14;
 const CLUSTER_RADIUS = 52;
+/** Beacons uncluster at a higher zoom than connections so pins stay legible above the network layer. */
+const BEACON_CLUSTER_MAX_ZOOM = 16;
+const BEACON_CLUSTER_RADIUS = 44;
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dp = ((lat2 - lat1) * Math.PI) / 180;
+  const dl = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dp / 2) * Math.sin(dp / 2) +
+    Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
+  return 2 * R * Math.asin(Math.sqrt(Math.min(1, a)));
+}
+
+/** Query radius for `/api/beacons` from the visible map bounds (half diagonal × padding), clamped to API limits. */
+function radiusMetersFromBounds(bounds: maplibregl.LngLatBounds): number {
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+  const diag = haversineMeters(sw.lat, sw.lng, ne.lat, ne.lng);
+  return Math.min(50_000, Math.max(400, (diag / 2) * 1.28));
+}
 
 function emptyFc() {
   return { type: 'FeatureCollection' as const, features: [] as GeoJSON.Feature[] };
@@ -145,6 +169,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   const [mapError, setMapError] = useState<string | null>(null);
   const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
   const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
+  const beaconsRef = useRef<MapBeaconRecord[]>([]);
+  useEffect(() => {
+    beaconsRef.current = beacons;
+  }, [beacons]);
   const connectionsRef = useRef(connections);
   const onConnectionClickRef = useRef(onConnectionClick);
   useEffect(() => { connectionsRef.current = connections; }, [connections]);
@@ -177,12 +205,63 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
 
   const wantsBeaconFetch = layers.officialSoundtracks || layers.communityBeacons || layers.hazards;
 
+  /** Map viewport for beacon proximity — once the map exists, follows pan/zoom; until then uses connection center. */
+  const [beaconViewport, setBeaconViewport] = useState<{ lng: number; lat: number; radiusM: number } | null>(null);
+  /** Bumps when the session is ready so we retry `/api/beacons` after sign-in. */
+  const [beaconAuthEpoch, setBeaconAuthEpoch] = useState(0);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return undefined;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        session &&
+        (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')
+      ) {
+        setBeaconAuthEpoch((n) => n + 1);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!mapInitialized || !map.current) return undefined;
+    const m = map.current;
+    const syncFromMap = () => {
+      const c = m.getCenter();
+      setBeaconViewport({
+        lng: c.lng,
+        lat: c.lat,
+        radiusM: radiusMetersFromBounds(m.getBounds()),
+      });
+    };
+    syncFromMap();
+    let debounceId: number | null = null;
+    const onMoveEnd = () => {
+      if (debounceId != null) window.clearTimeout(debounceId);
+      debounceId = window.setTimeout(() => {
+        syncFromMap();
+        debounceId = null;
+      }, 420) as unknown as number;
+    };
+    m.on('moveend', onMoveEnd);
+    return () => {
+      m.off('moveend', onMoveEnd);
+      if (debounceId != null) window.clearTimeout(debounceId);
+    };
+  }, [mapInitialized]);
+
+  const beaconQueryLng = beaconViewport?.lng ?? mapCenter[0];
+  const beaconQueryLat = beaconViewport?.lat ?? mapCenter[1];
+  const beaconQueryRadiusM = beaconViewport?.radiusM ?? 15_000;
+
   useEffect(() => {
     if (!wantsBeaconFetch) {
       setBeacons([]);
       return;
     }
-    const [lng, lat] = mapCenter;
     let cancelled = false;
 
     const run = async () => {
@@ -190,12 +269,21 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
       const headers: HeadersInit = { Accept: 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
-      const url = `/api/map/beacons?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&radius_m=15000`;
+      const q = new URLSearchParams({
+        lat: String(beaconQueryLat),
+        lng: String(beaconQueryLng),
+        radius_m: String(Math.round(beaconQueryRadiusM)),
+      });
+      const url = `/api/beacons?${q.toString()}`;
       try {
         const res = await fetch(url, { credentials: 'include', headers });
-        const payload = (await res.json()) as { beacons?: unknown[] };
+        if (!res.ok) {
+          if (!cancelled) setBeacons([]);
+          return;
+        }
+        const json: unknown = await res.json();
         if (cancelled) return;
-        const list = Array.isArray(payload.beacons) ? payload.beacons : [];
+        const list = rawBeaconRowsFromApiPayload(json);
         setBeacons(list.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null));
       } catch {
         if (!cancelled) setBeacons([]);
@@ -203,8 +291,16 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     };
 
     void run();
-    return () => { cancelled = true; };
-  }, [wantsBeaconFetch, mapCenter[0], mapCenter[1]]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    wantsBeaconFetch,
+    beaconQueryLng,
+    beaconQueryLat,
+    beaconQueryRadiusM,
+    beaconAuthEpoch,
+  ]);
 
   const buildConnectionPopupHtml = useCallback((connIdsCsv: string) => {
     const ids = connIdsCsv.split(',').filter(Boolean);
@@ -292,38 +388,64 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     const onBeaconPointClick = (e: maplibregl.MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
-      const title = escapeHtml(String(f.properties?.title ?? 'Beacon'));
-      const typ = escapeHtml(String(f.properties?.beacon_type ?? ''));
-      const spotifyRaw = typeof f.properties?.spotify === 'string' ? f.properties.spotify : '';
-      const spotify = spotifyRaw && isSafeBeaconUri(spotifyRaw) ? spotifyRaw : '';
-      const open = spotify
-        ? `<a href="${escapeHtml(spotify)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:10px;color:#67e8f9;font-size:12px;">Open in Spotify →</a>`
-        : '';
+      const id = f.properties?.id;
+      if (typeof id !== 'string' || id.length === 0) return;
+
+      const beacon = beaconsRef.current.find((b) => b.id === id);
+      const html = beacon
+        ? formatBeaconPopupHtml(beacon)
+        : beaconPopupErrorHtml('This pin is not in the loaded set. Pan or zoom the map to refresh beacons.');
+
       popupRef.current?.remove();
-      const html = `<div style="color:#fff;background:#18181b;padding:12px 14px;border-radius:12px;border:1px solid #27272a;max-width:240px;">
-        <div style="font-weight:600;color:#e4e4e7;margin-bottom:4px;">${title}</div>
-        <div style="font-size:11px;color:#a1a1aa;">${typ}</div>
-        ${open}
-      </div>`;
-      const popup = new maplibregl.Popup({ offset: 14, closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(html);
+      const popup = new maplibregl.Popup({ offset: 14, closeButton: false, maxWidth: '300px' })
+        .setLngLat(e.lngLat)
+        .setHTML(html);
       popup.addTo(mapInstance);
       popupRef.current = popup;
     };
 
     mapInstance.on('click', 'connection-clusters', onConnClusterClick);
     mapInstance.on('click', 'connection-unclustered', onConnPointClick);
-    mapInstance.on('click', 'official-beacon-clusters', beaconClusterClick(SRC_OFFICIAL));
+    const beaconClusterLayerIds = [
+      'official-beacon-clusters',
+      'official-beacon-cluster-mixed',
+      'community-beacon-clusters',
+      'community-beacon-cluster-mixed',
+      'hazard-beacon-clusters',
+      'hazard-beacon-cluster-mixed',
+    ] as const;
+    beaconClusterLayerIds.forEach((layerId) => {
+      const src =
+        layerId.startsWith('official') ? SRC_OFFICIAL
+        : layerId.startsWith('community') ? SRC_COMMUNITY
+        : SRC_HAZARDS;
+      mapInstance.on('click', layerId, beaconClusterClick(src));
+    });
     mapInstance.on('click', 'official-beacon-unclustered', onBeaconPointClick);
-    mapInstance.on('click', 'community-beacon-clusters', beaconClusterClick(SRC_COMMUNITY));
+    mapInstance.on('click', 'official-beacon-unclustered-icon', onBeaconPointClick);
     mapInstance.on('click', 'community-beacon-unclustered', onBeaconPointClick);
-    mapInstance.on('click', 'hazard-beacon-clusters', beaconClusterClick(SRC_HAZARDS));
+    mapInstance.on('click', 'community-beacon-unclustered-icon', onBeaconPointClick);
     mapInstance.on('click', 'hazard-beacon-unclustered', onBeaconPointClick);
+    mapInstance.on('click', 'hazard-beacon-unclustered-icon', onBeaconPointClick);
 
     mapInstance.on('mouseenter', 'connection-clusters', () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
     mapInstance.on('mouseleave', 'connection-clusters', () => { mapInstance.getCanvas().style.cursor = ''; });
     mapInstance.on('mouseenter', 'connection-unclustered', () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
     mapInstance.on('mouseleave', 'connection-unclustered', () => { mapInstance.getCanvas().style.cursor = ''; });
-    ['official-beacon-clusters', 'official-beacon-unclustered', 'community-beacon-clusters', 'community-beacon-unclustered', 'hazard-beacon-clusters', 'hazard-beacon-unclustered'].forEach((id) => {
+    [
+      'official-beacon-clusters',
+      'official-beacon-cluster-mixed',
+      'official-beacon-unclustered',
+      'official-beacon-unclustered-icon',
+      'community-beacon-clusters',
+      'community-beacon-cluster-mixed',
+      'community-beacon-unclustered',
+      'community-beacon-unclustered-icon',
+      'hazard-beacon-clusters',
+      'hazard-beacon-cluster-mixed',
+      'hazard-beacon-unclustered',
+      'hazard-beacon-unclustered-icon',
+    ].forEach((id) => {
       mapInstance.on('mouseenter', id, () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
       mapInstance.on('mouseleave', id, () => { mapInstance.getCanvas().style.cursor = ''; });
     });
@@ -399,8 +521,12 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             type: 'geojson',
             data: emptyFc(),
             cluster: true,
-            clusterMaxZoom: CLUSTER_MAX_ZOOM,
-            clusterRadius: CLUSTER_RADIUS + 4,
+            clusterMaxZoom: BEACON_CLUSTER_MAX_ZOOM,
+            clusterRadius: BEACON_CLUSTER_RADIUS,
+            clusterProperties: {
+              soundtrack_members: ['+', ['case', ['==', ['get', 'beacon_type'], 'soundtrack'], 1, 0]],
+              non_soundtrack_members: ['+', ['case', ['!=', ['get', 'beacon_type'], 'soundtrack'], 1, 0]],
+            },
           });
           mapInstance.addLayer({
             id: `${prefix}-clusters`,
@@ -410,9 +536,9 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             paint: {
               'circle-color': defaultColor,
               'circle-radius': ['step', ['get', 'point_count'], 18, 8, 22, 20, 26],
-              'circle-opacity': 0.88,
+              'circle-opacity': 0.9,
               'circle-stroke-width': 2,
-              'circle-stroke-color': 'rgba(255,255,255,0.85)',
+              'circle-stroke-color': 'rgba(255,255,255,0.9)',
             },
           });
           mapInstance.addLayer({
@@ -423,8 +549,33 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             layout: {
               'text-field': ['get', 'point_count_abbreviated'],
               'text-size': 11,
+              'text-allow-overlap': true,
             },
             paint: { 'text-color': '#0a0a0a' },
+          });
+          mapInstance.addLayer({
+            id: `${prefix}-cluster-mixed`,
+            type: 'symbol',
+            source: sourceId,
+            filter: [
+              'all',
+              ['has', 'point_count'],
+              ['>', ['get', 'point_count'], 1],
+              ['>', ['get', 'soundtrack_members'], 0],
+              ['>', ['get', 'non_soundtrack_members'], 0],
+            ],
+            layout: {
+              'text-field': '★',
+              'text-size': 15,
+              'text-offset': [0, -1.15],
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+            },
+            paint: {
+              'text-color': '#fde047',
+              'text-halo-color': '#18181b',
+              'text-halo-width': 1.35,
+            },
           });
           mapInstance.addLayer({
             id: `${prefix}-unclustered`,
@@ -433,10 +584,27 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
             filter: ['!', ['has', 'point_count']],
             paint: {
               'circle-color': ['get', 'tint'],
-              'circle-radius': 11,
-              'circle-opacity': 0.95,
+              'circle-radius': 13,
+              'circle-opacity': 0.92,
               'circle-stroke-width': 2,
               'circle-stroke-color': '#ffffff',
+            },
+          });
+          mapInstance.addLayer({
+            id: `${prefix}-unclustered-icon`,
+            type: 'symbol',
+            source: sourceId,
+            filter: ['!', ['has', 'point_count']],
+            layout: {
+              'text-field': ['get', 'icon_char'],
+              'text-size': 13,
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+            },
+            paint: {
+              'text-color': '#fafafa',
+              'text-halo-color': ['get', 'tint'],
+              'text-halo-width': 1.65,
             },
           });
         };
@@ -444,6 +612,28 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         addBeaconStack(SRC_OFFICIAL, 'official-beacon', '#22d3ee');
         addBeaconStack(SRC_COMMUNITY, 'community-beacon', '#34d399');
         addBeaconStack(SRC_HAZARDS, 'hazard-beacon', '#f97316');
+
+        /** Append beacon GL layers so they always paint above connection clusters (basemap may register late). */
+        const beaconPaintOrder = [
+          'official-beacon-clusters',
+          'official-beacon-cluster-count',
+          'official-beacon-cluster-mixed',
+          'official-beacon-unclustered',
+          'official-beacon-unclustered-icon',
+          'community-beacon-clusters',
+          'community-beacon-cluster-count',
+          'community-beacon-cluster-mixed',
+          'community-beacon-unclustered',
+          'community-beacon-unclustered-icon',
+          'hazard-beacon-clusters',
+          'hazard-beacon-cluster-count',
+          'hazard-beacon-cluster-mixed',
+          'hazard-beacon-unclustered',
+          'hazard-beacon-unclustered-icon',
+        ] as const;
+        for (const layerId of beaconPaintOrder) {
+          if (mapInstance.getLayer(layerId)) mapInstance.moveLayer(layerId);
+        }
 
         attachMapInteractions(mapInstance);
         setMapInitialized(true);
@@ -535,13 +725,31 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(beacons, 'hazard'));
 
     const vis = (on: boolean) => (on ? 'visible' : 'none');
-    ['official-beacon-clusters', 'official-beacon-cluster-count', 'official-beacon-unclustered'].forEach((lid) => {
+    [
+      'official-beacon-clusters',
+      'official-beacon-cluster-count',
+      'official-beacon-cluster-mixed',
+      'official-beacon-unclustered',
+      'official-beacon-unclustered-icon',
+    ].forEach((lid) => {
       if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.officialSoundtracks));
     });
-    ['community-beacon-clusters', 'community-beacon-cluster-count', 'community-beacon-unclustered'].forEach((lid) => {
+    [
+      'community-beacon-clusters',
+      'community-beacon-cluster-count',
+      'community-beacon-cluster-mixed',
+      'community-beacon-unclustered',
+      'community-beacon-unclustered-icon',
+    ].forEach((lid) => {
       if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.communityBeacons));
     });
-    ['hazard-beacon-clusters', 'hazard-beacon-cluster-count', 'hazard-beacon-unclustered'].forEach((lid) => {
+    [
+      'hazard-beacon-clusters',
+      'hazard-beacon-cluster-count',
+      'hazard-beacon-cluster-mixed',
+      'hazard-beacon-unclustered',
+      'hazard-beacon-unclustered-icon',
+    ].forEach((lid) => {
       if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.hazards));
     });
   }, [mapInitialized, beacons, layers.officialSoundtracks, layers.communityBeacons, layers.hazards]);

@@ -29,6 +29,50 @@ export type MapBeaconRecord = {
   expires_at: string;
 };
 
+const BEACON_TYPE_LABELS: Record<MapBeaconType, string> = {
+  soundtrack: "Soundtrack",
+  hazard_utility: "Hazard / utility",
+  swag: "Swag",
+  capacity: "Capacity",
+  recreation: "Recreation",
+  transit: "Transit",
+  sos: "SOS",
+  study: "Study",
+  hobby: "Hobby",
+  scavenger: "Scavenger",
+};
+
+export function humanizeBeaconType(t: MapBeaconType): string {
+  return BEACON_TYPE_LABELS[t] ?? t;
+}
+
+function metaStr(meta: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const k of keys) {
+    const v = meta[k];
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s.length > 0) return s;
+    }
+  }
+  return null;
+}
+
+/** Map heading for pins and popups (uses enriched soundtrack fields when present). */
+export function displayTitleForBeacon(b: MapBeaconRecord): string {
+  const m = b.metadata;
+  if (b.beacon_type === "soundtrack") {
+    const track = metaStr(m, "track_name", "title", "track_title", "name", "track", "label");
+    const artist = metaStr(m, "artist_name", "artist", "track_artist");
+    if (track && artist) return `${track} — ${artist}`;
+    if (track) return track;
+  }
+  const label = metaStr(m, "label", "title", "name");
+  if (label) return label;
+  const desc = metaStr(m, "description", "text", "message", "body");
+  if (desc) return desc.length > 72 ? `${desc.slice(0, 72)}…` : desc;
+  return humanizeBeaconType(b.beacon_type);
+}
+
 export type MapLayerToggles = {
   myNetwork: boolean;
   officialSoundtracks: boolean;
@@ -39,8 +83,8 @@ export type MapLayerToggles = {
 export const DEFAULT_MAP_LAYER_TOGGLES: MapLayerToggles = {
   myNetwork: true,
   officialSoundtracks: true,
-  communityBeacons: false,
-  hazards: false,
+  communityBeacons: true,
+  hazards: true,
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -109,7 +153,47 @@ export function beaconTint(beaconType: MapBeaconType, group: ReturnType<typeof b
   return "#34d399";
 }
 
-/** GeoJSON point features for MapLibre (clustering layers read `tint`, `title`, `spotify`). */
+/** Single Unicode glyph for MapLibre symbol layers (unclustered beacon pins). */
+export function beaconUnclusteredIconChar(
+  beaconType: MapBeaconType,
+  group: ReturnType<typeof beaconLayerGroup>,
+): string {
+  if (group === "hazard" || beaconType === "hazard_utility") return "⚠";
+  if (beaconType === "soundtrack") return "♪";
+  if (beaconType === "sos") return "☎";
+  if (beaconType === "transit") return "⎋";
+  if (beaconType === "study") return "✎";
+  if (beaconType === "capacity") return "Ⓒ";
+  if (beaconType === "swag") return "★";
+  if (beaconType === "scavenger") return "◎";
+  if (beaconType === "recreation" || beaconType === "hobby") return "◎";
+  return "◆";
+}
+
+/** Parses JSON from `GET /api/beacons` (and legacy `/api/map/beacons`) into raw beacon rows. */
+export function rawBeaconRowsFromApiPayload(payload: unknown): unknown[] {
+  if (payload == null) return [];
+  if (Array.isArray(payload)) return payload;
+  if (typeof payload === "string") {
+    const t = payload.trim();
+    if (t.length === 0) return [];
+    try {
+      return rawBeaconRowsFromApiPayload(JSON.parse(t) as unknown);
+    } catch {
+      return [];
+    }
+  }
+  if (typeof payload === "object") {
+    const rec = payload as Record<string, unknown>;
+    if (Array.isArray(rec.beacons)) return rec.beacons;
+    if (Array.isArray(rec.data)) return rec.data;
+    if (Array.isArray(rec.rows)) return rec.rows;
+    if (Array.isArray(rec.items)) return rec.items;
+  }
+  return [];
+}
+
+/** GeoJSON point features for MapLibre (clustering layers read `beacon_type`; pins read `tint`, `icon_char`, `title`, `spotify`). */
 export function beaconGeoJsonFeatures(
   beacons: MapBeaconRecord[],
   group: "official" | "community" | "hazard",
@@ -126,7 +210,8 @@ export function beaconGeoJsonFeatures(
         id: b.id,
         beacon_type: b.beacon_type,
         tint: beaconTint(b.beacon_type, group),
-        title: String((b.metadata as { label?: unknown }).label ?? b.beacon_type),
+        icon_char: beaconUnclusteredIconChar(b.beacon_type, group),
+        title: displayTitleForBeacon(b),
         spotify:
           typeof (b.metadata as { spotify_playlist_uri?: unknown }).spotify_playlist_uri === "string" &&
           isSafeBeaconUri((b.metadata as { spotify_playlist_uri: string }).spotify_playlist_uri)

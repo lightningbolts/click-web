@@ -50,6 +50,29 @@ export function parseLatLon(searchParams: URLSearchParams): { lat: number; lng: 
   return { lat, lng };
 }
 
+/**
+ * Normalizes `fetch_map_beacons_within` RPC payloads from Supabase/PostgREST.
+ * Some clients return a JSON array; others may stringify JSON or wrap rows.
+ */
+export function normalizeBeaconRpcRows(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (typeof data === "string") {
+    const t = data.trim();
+    if (t.length === 0 || t === "null") return [];
+    try {
+      return normalizeBeaconRpcRows(JSON.parse(t) as unknown);
+    } catch {
+      return [];
+    }
+  }
+  if (data !== null && typeof data === "object") {
+    const rec = data as Record<string, unknown>;
+    const nested = rec.beacons ?? rec.data ?? rec.rows ?? rec.items;
+    if (Array.isArray(nested)) return nested;
+  }
+  return [];
+}
+
 export function parseBeaconTypeFilters(searchParams: URLSearchParams): Set<MapBeaconType> | null {
   const raw = (searchParams.get("filters") ?? searchParams.get("beacon_types") ?? "").trim();
   if (raw.length === 0) return null;
@@ -74,17 +97,31 @@ export function filterBeaconRecords(
   return rows.filter((b) => allowed.has(b.beacon_type));
 }
 
+function parseLatLngFromLocationField(loc: unknown, fallbackLng: number, fallbackLat: number): { lat: number; lng: number } {
+  if (typeof loc === "string") {
+    const wktMatch = /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i.exec(loc);
+    if (wktMatch != null) {
+      return { lng: Number(wktMatch[1]), lat: Number(wktMatch[2]) };
+    }
+  }
+  if (loc !== null && typeof loc === "object" && !Array.isArray(loc)) {
+    const g = loc as { type?: unknown; coordinates?: unknown };
+    if (g.type === "Point" && Array.isArray(g.coordinates) && g.coordinates.length >= 2) {
+      const lng = Number(g.coordinates[0]);
+      const lat = Number(g.coordinates[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+  }
+  return { lat: fallbackLat, lng: fallbackLng };
+}
+
+/** Adds `lat` / `lng` for `parseMapBeacon` from PostGIS `location` (WKT or GeoJSON) on a `map_beacons` row. */
 export function rowFromInsertWithLocation(inserted: unknown, fallbackLng: number, fallbackLat: number): unknown {
   if (inserted == null || typeof inserted !== "object" || Array.isArray(inserted)) {
     return inserted;
   }
   const rec = inserted as Record<string, unknown>;
-  const loc = rec.location;
-  const wktMatch = typeof loc === "string" ? /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i.exec(loc) : null;
-  const parsed =
-    wktMatch != null
-      ? { lng: Number(wktMatch[1]), lat: Number(wktMatch[2]) }
-      : { lng: fallbackLng, lat: fallbackLat };
+  const parsed = parseLatLngFromLocationField(rec.location, fallbackLng, fallbackLat);
   return {
     ...rec,
     lat: parsed.lat,

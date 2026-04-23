@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
 import {
   filterBeaconRecords,
+  normalizeBeaconRpcRows,
   parseBeaconTypeFilters,
   parseLatLon,
   parseRadiusMeters,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to load beacons", detail: error.message }, { status: 500 });
     }
 
-    const rawList = Array.isArray(data) ? data : [];
+    const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
 

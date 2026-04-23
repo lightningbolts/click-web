@@ -8,6 +8,7 @@ import {
 } from "@/lib/map/beaconSoundtrackEnrichment";
 import {
   filterBeaconRecords,
+  normalizeBeaconRpcRows,
   normalizeMobileKindToBeaconType,
   parseBeaconTypeFilters,
   parseInsertedBeacon,
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to load beacons", detail: error.message }, { status: 500 });
     }
 
-    const rawList = Array.isArray(data) ? data : [];
+    const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
 
