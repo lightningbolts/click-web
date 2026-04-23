@@ -1,40 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
+import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
-
-const DEFAULT_RADIUS = 15_000;
-const MIN_RADIUS = 100;
-const MAX_RADIUS = 50_000;
+import {
+  filterBeaconRecords,
+  parseBeaconTypeFilters,
+  parseLatLon,
+  parseRadiusMeters,
+} from "@/lib/map/mapBeaconApiShared";
 
 /**
- * Proximity beacons for the signed-in user's map (RLS: active rows only).
+ * Legacy path: identical behavior to `GET /api/beacons` (admin RPC + optional filters).
+ * Prefer `/api/beacons` for new clients.
  */
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
+    const { user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const lat = Number(searchParams.get("lat"));
-    const lng = Number(searchParams.get("lng"));
-    const radiusRaw = searchParams.get("radius_m");
-    const radius_m =
-      radiusRaw != null && radiusRaw.length > 0
-        ? Number(radiusRaw)
-        : DEFAULT_RADIUS;
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    const latLon = parseLatLon(searchParams);
+    if (latLon == null) {
       return NextResponse.json(
-        { error: "Query params lat and lng must be finite numbers" },
+        { error: "Query params lat and lng (or lon) must be finite numbers" },
         { status: 400 },
       );
     }
+    const { lat, lng } = latLon;
+    const radius = parseRadiusMeters(searchParams);
+    const typeFilter = parseBeaconTypeFilters(searchParams);
 
-    const radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, Number.isFinite(radius_m) ? radius_m : DEFAULT_RADIUS));
-
-    const { data, error } = await supabase.rpc("fetch_map_beacons_within", {
+    const admin = createAdminSupabaseClient();
+    const { data, error } = await admin.rpc("fetch_map_beacons_within", {
       lat,
       lng,
       radius_meters: radius,
@@ -46,7 +45,8 @@ export async function GET(request: NextRequest) {
     }
 
     const rawList = Array.isArray(data) ? data : [];
-    const beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
+    let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
+    beacons = filterBeaconRecords(beacons, typeFilter);
 
     return NextResponse.json({ beacons, radius_meters: radius });
   } catch (e) {
