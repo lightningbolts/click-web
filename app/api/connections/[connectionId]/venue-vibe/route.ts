@@ -9,6 +9,16 @@ const CATEGORIES = new Set([
   "general",
 ]);
 
+type Sentiment = "positive" | "neutral" | "negative";
+
+type VenueVibeCapture = {
+  sentiment: Sentiment;
+  category: string;
+  message?: string;
+  submittedAt: string;
+  rating?: number;
+};
+
 function createAdminClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return createClient(
@@ -16,6 +26,19 @@ function createAdminClient() {
     serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } },
   );
+}
+
+function sentimentFromRating(rating: number | undefined): Sentiment {
+  if (rating === undefined) {
+    return "neutral";
+  }
+  if (rating >= 4) {
+    return "positive";
+  }
+  if (rating <= 2) {
+    return "negative";
+  }
+  return "neutral";
 }
 
 /**
@@ -67,7 +90,7 @@ export async function POST(
 
     const { data: row, error: fetchErr } = await admin
       .from("connections")
-      .select("id, user_ids, memory_capsule, vibe_rating")
+      .select("id, user_ids")
       .eq("id", connectionId)
       .maybeSingle();
 
@@ -80,44 +103,51 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const prevCapsule =
-      row.memory_capsule &&
-      typeof row.memory_capsule === "object" &&
-      !Array.isArray(row.memory_capsule)
-        ? (row.memory_capsule as Record<string, unknown>)
-        : {};
+    const { data: latestEncounter, error: encounterFetchErr } = await admin
+      .from("connection_encounters")
+      .select("id")
+      .eq("connection_id", connectionId)
+      .order("encountered_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const venueVibeCapture = {
-      sentiment:
-        rating === undefined
-          ? "neutral"
-          : rating >= 4
-            ? "positive"
-            : rating <= 2
-              ? "negative"
-              : "neutral",
+    if (encounterFetchErr) {
+      console.error("venue-vibe encounter fetch:", encounterFetchErr);
+      return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+    }
+
+    if (!latestEncounter) {
+      return NextResponse.json({ error: "Encounter not found" }, { status: 404 });
+    }
+
+    const venueVibeCapture: VenueVibeCapture = {
+      sentiment: sentimentFromRating(rating),
       category,
       message: message || undefined,
       submittedAt: new Date().toISOString(),
       ...(rating !== undefined ? { rating } : {}),
     };
 
-    const nextCapsule = {
-      ...prevCapsule,
-      venueVibeCapture,
-    };
+    const { error: encounterUpdateErr } = await admin
+      .from("connection_encounters")
+      .update({ vibe_capture: venueVibeCapture })
+      .eq("id", latestEncounter.id);
 
-    const { error: upErr } = await admin
-      .from("connections")
-      .update({
-        memory_capsule: nextCapsule,
-        ...(rating !== undefined ? { vibe_rating: rating } : {}),
-      })
-      .eq("id", connectionId);
-
-    if (upErr) {
-      console.error("venue-vibe update:", upErr);
+    if (encounterUpdateErr) {
+      console.error("venue-vibe encounter update:", encounterUpdateErr);
       return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+    }
+
+    if (rating !== undefined) {
+      const { error: connectionUpdateErr } = await admin
+        .from("connections")
+        .update({ vibe_rating: rating })
+        .eq("id", connectionId);
+
+      if (connectionUpdateErr) {
+        console.error("venue-vibe connection update:", connectionUpdateErr);
+        return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });
