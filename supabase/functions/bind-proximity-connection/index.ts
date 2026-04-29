@@ -1,7 +1,7 @@
 /**
  * Edge Function: bind-proximity-connection
  *
- * POST JSON { my_token, heard_tokens[], latitude?, longitude?, gps_lat?, gps_lon?,
+ * POST JSON { my_token, tokens[], heard_tokens[], latitude?, longitude?, gps_lat?, gps_lon?,
  *   exact_barometric_elevation_m?, noise_level?, exact_noise_level_db?, context_tags?, height_category?,
  *   lux_level?, motion_variance?, compass_azimuth?, battery_level?, client_context_first? (ignored) }
  * Authorization: Bearer <user JWT>
@@ -33,6 +33,7 @@ const corsHeaders: Record<string, string> = {
 const GHOST_TTL_MS = 5 * 60 * 1000;
 const CLEANUP_GRACE_MS = 6 * 60 * 1000;
 const MATCH_TIME_WINDOW_MS = GHOST_TTL_MS;
+const RECENT_CONNECTION_LOCK_MS = 15 * 1000;
 const PROXIMITY_MATCH_MAX_M = 15;
 const ENCOUNTER_DEBOUNCE_MAX_M = 50;
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -515,6 +516,7 @@ Deno.serve(async (req) => {
 
   let body: {
     my_token?: unknown;
+    tokens?: unknown[];
     heard_tokens?: unknown[];
     latitude?: unknown;
     longitude?: unknown;
@@ -549,7 +551,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  const heardTokens = (Array.isArray(body.heard_tokens) ? body.heard_tokens : [])
+  const tokenInputs = Array.isArray(body.tokens) ? body.tokens : body.heard_tokens;
+  const heardTokens = (Array.isArray(tokenInputs) ? tokenInputs : [])
     .map(normalizeToken)
     .filter((t): t is string => t != null);
 
@@ -661,7 +664,53 @@ Deno.serve(async (req) => {
     await admin.from('proximity_handshake_events').delete().eq('id', String(inserted.id));
   }
 
-  const ids = [...matchedIds];
+  const ids = [...matchedIds].sort();
+  const memberIds = [uid, ...ids].sort();
+  const recentLockCutoffIso = new Date(Date.now() - RECENT_CONNECTION_LOCK_MS).toISOString();
+  if (memberIds.length > 2) {
+    const recentConnection = await lookupConnectionForMemberSet(memberIds, recentLockCutoffIso);
+    if (recentConnection?.id) {
+      const { data: recentUsers, error: recentUsersErr } = await admin
+        .from('users')
+        .select('id, name, email, image, created_at')
+        .in('id', ids);
+      if (recentUsersErr) {
+        console.error('bind-proximity-connection users:', recentUsersErr);
+        return new Response(JSON.stringify({ error: 'Failed to load user profiles' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const matches: UserProfile[] = (recentUsers ?? []).map((u: Record<string, unknown>) => ({
+        id: String(u.id),
+        name: (u.name as string | null | undefined) ?? null,
+        email: (u.email as string | null | undefined) ?? null,
+        image: (u.image as string | null | undefined) ?? null,
+        created_at:
+          typeof u.created_at === 'string'
+            ? Date.parse(u.created_at)
+            : typeof u.created_at === 'number'
+              ? u.created_at
+              : 0,
+        connection_id: String(recentConnection.id),
+        encounter_logged: true,
+        is_new_connection: false,
+        encounter_persisted_on_bind: true,
+      }));
+      return new Response(
+        JSON.stringify({
+          success: true,
+          encounter_logged: true,
+          matches,
+          connection_id: String(recentConnection.id),
+          is_new_connection: false,
+          is_group: true,
+          group_clique_candidate: { member_user_ids: memberIds },
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+  }
 
   const encLat =
     lat != null && lon != null && !(lat === 0 && lon === 0) ? lat : null;
@@ -691,28 +740,36 @@ Deno.serve(async (req) => {
   }
   const resolvedLocationName = manualLocationName ?? specificLocationName;
 
-  async function lookupConnectionIdForPair(peerId: string): Promise<string | null> {
-    const { data, error } = await admin
-      .from('connections')
-      .select('id, user_ids')
-      .contains('user_ids', [uid, peerId]);
-    if (error || !data?.length) return null;
-    const row = (data as { id: string; user_ids?: string[] }[]).find((r) => {
-      const u = r.user_ids ?? [];
-      return u.includes(uid) && u.includes(peerId);
-    });
-    return row?.id ?? null;
+  function sameMemberSet(a: string[] | undefined | null, b: string[]): boolean {
+    const aa = [...new Set(a ?? [])].sort();
+    const bb = [...new Set(b)].sort();
+    return aa.length === bb.length && aa.every((x, i) => x === bb[i]);
   }
 
-  /**
-   * Returns an existing pairwise connection or creates one (+ chat row) using the same shape as mobile `proximity` create.
-   * Never inserts when a row already exists (avoids unique constraint failures on N-way / concurrent binds);
-   * callers still log `connection_encounters` for reunions.
-   */
-  async function ensureConnectionForPair(peerId: string): Promise<{ connectionId: string; isNewConnection: boolean } | null> {
-    const existingId = await lookupConnectionIdForPair(peerId);
-    if (existingId) {
-      return { connectionId: existingId, isNewConnection: false };
+  async function lookupConnectionForMemberSet(
+    memberUserIds: string[],
+    createdAfterIso?: string,
+  ): Promise<{ id: string; user_ids: string[]; is_group?: boolean | null; created?: number | null } | null> {
+    let query = admin
+      .from('connections')
+      .select('id, user_ids, is_group, created')
+      .contains('user_ids', memberUserIds);
+    if (createdAfterIso) {
+      query = query.gte('created_utc', createdAfterIso);
+    }
+    const { data, error } = await query;
+    if (error || !data?.length) return null;
+    const rows = data as { id: string; user_ids?: string[]; is_group?: boolean | null; created?: number | null }[];
+    return rows.find((r) => sameMemberSet(r.user_ids, memberUserIds)) ?? null;
+  }
+
+  async function ensureConnectionForMemberSet(
+    memberUserIds: string[],
+  ): Promise<{ connectionId: string; isNewConnection: boolean; isGroup: boolean } | null> {
+    const members = [...new Set(memberUserIds)].sort();
+    const existing = await lookupConnectionForMemberSet(members);
+    if (existing?.id) {
+      return { connectionId: String(existing.id), isNewConnection: false, isGroup: members.length > 2 };
     }
     const nowMs = Date.now();
     const expiryMs = nowMs + 30 * 24 * 60 * 60 * 1000;
@@ -724,15 +781,15 @@ Deno.serve(async (req) => {
       bind_source: 'bind-proximity-connection',
     };
     const insertRow: Record<string, unknown> = {
-      user_ids: [uid, peerId],
+      user_ids: members,
       created: nowMs,
       expiry: expiryMs,
-      should_continue: [false, false],
+      should_continue: members.map(() => false),
       has_begun: false,
-      expiry_state: 'pending',
-      status: 'pending',
+      expiry_state: members.length > 2 ? 'active' : 'pending',
+      status: members.length > 2 ? 'active' : 'pending',
       include_in_business_insights: true,
-      initiator_id: peerId,
+      initiator_id: uid,
       responder_id: uid,
       connection_method: 'proximity',
       proximity_confidence: proximityConfidence,
@@ -740,12 +797,13 @@ Deno.serve(async (req) => {
       proximity_signals: proximitySignals,
       created_utc: new Date(nowMs).toISOString(),
       time_of_day_utc: utcTimeOfDayLabelFromMs(nowMs),
+      is_group: members.length > 2,
     };
     const { data: ins, error: insErr } = await admin.from('connections').insert(insertRow).select('id').single();
     if (insErr || !ins?.id) {
       if (isDuplicateKeyError(insErr)) {
-        const retry = await lookupConnectionIdForPair(peerId);
-        if (retry) return { connectionId: retry, isNewConnection: false };
+        const retry = await lookupConnectionForMemberSet(members);
+        if (retry?.id) return { connectionId: String(retry.id), isNewConnection: false, isGroup: members.length > 2 };
       }
       console.error('bind-proximity-connection ensureConnection insert:', insErr);
       return null;
@@ -759,7 +817,7 @@ Deno.serve(async (req) => {
     if (chatErr && !isDuplicateKeyError(chatErr)) {
       console.warn('bind-proximity-connection ensureConnection chat:', chatErr.message);
     }
-    return { connectionId, isNewConnection: true };
+    return { connectionId, isNewConnection: true, isGroup: members.length > 2 };
   }
 
   async function insertOrDebounceEncounter(
@@ -855,10 +913,9 @@ Deno.serve(async (req) => {
     reason?: string;
   };
   const peerEncounterLogged: PeerBindMeta[] = [];
-
-  for (const peerId of ids) {
-    const ensured = await ensureConnectionForPair(peerId);
-    if (!ensured) {
+  const ensured = await ensureConnectionForMemberSet(memberIds);
+  if (!ensured) {
+    ids.forEach((peerId) => {
       peerEncounterLogged.push({
         peerId,
         connectionId: null,
@@ -867,19 +924,21 @@ Deno.serve(async (req) => {
         encounterPersistedOnBind: false,
         reason: 'connection_unavailable',
       });
-      continue;
-    }
+    });
+  } else {
     const { connectionId, isNewConnection } = ensured;
-
-    const peerRow = rows.find((r) => r && String(r.user_id) === peerId) as Record<string, unknown> | undefined;
-    const peerMotion = peerRow ? finiteNumber(peerRow.motion_variance) : null;
-    const peerAz = peerRow ? finiteNumber(peerRow.compass_azimuth) : null;
+    const peerRows = ids
+      .map((peerId) => rows.find((r) => r && String(r.user_id) === peerId) as Record<string, unknown> | undefined)
+      .filter((r): r is Record<string, unknown> => r != null);
+    const peerMotionValues = peerRows.map((r) => finiteNumber(r.motion_variance)).filter((v): v is number => v != null);
+    const peerAzValues = peerRows.map((r) => finiteNumber(r.compass_azimuth)).filter((v): v is number => v != null);
+    const avg = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
     const vibeTags = buildVibeContextTags({
       lux: selfLux,
       selfMotion,
-      peerMotion,
+      peerMotion: avg(peerMotionValues),
       selfAz,
-      peerAz,
+      peerAz: avg(peerAzValues),
       battery: selfBattery,
     });
     const mergedContextTags = mergeContextTagLists(clientContextTags, vibeTags);
@@ -889,9 +948,7 @@ Deno.serve(async (req) => {
       context_tags: mergedContextTags,
       display_location: displayLocation,
     };
-    if (resolvedLocationName) {
-      insertRow.location_name = resolvedLocationName;
-    }
+    if (resolvedLocationName) insertRow.location_name = resolvedLocationName;
     if (encLat != null && encLon != null) {
       insertRow.gps_lat = encLat;
       insertRow.gps_lon = encLon;
@@ -899,12 +956,8 @@ Deno.serve(async (req) => {
     if (semanticLocation != null) insertRow.semantic_location = semanticLocation;
     if (noiseLevel != null) insertRow.noise_level = noiseLevel;
     if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
-    if (exactBarometricElevationM != null) {
-      insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
-    }
-    if (clientHeightCategory != null) {
-      insertRow.elevation_category = clientHeightCategory;
-    }
+    if (exactBarometricElevationM != null) insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
+    if (clientHeightCategory != null) insertRow.elevation_category = clientHeightCategory;
     if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
     if (selfLux != null) insertRow.lux_level = selfLux;
     if (selfMotion != null) insertRow.motion_variance = selfMotion;
@@ -915,33 +968,33 @@ Deno.serve(async (req) => {
     if (resolvedWeather == null && encLat != null && encLon != null) {
       resolvedWeather = await fetchOpenMeteoWeatherSnapshot(encLat, encLon);
     }
-    if (resolvedWeather != null) {
-      insertRow.weather_snapshot = resolvedWeather;
-    }
+    if (resolvedWeather != null) insertRow.weather_snapshot = resolvedWeather;
 
     const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
     const persisted = outcome === 'inserted' || outcome === 'debounced';
-    if (outcome === 'rate_limited') {
-      peerEncounterLogged.push({
-        peerId,
-        connectionId,
-        encounterLogged: false,
-        isNewConnection,
-        encounterPersistedOnBind: false,
-        reason: 'rate_limit_active',
-      });
-    } else {
-      peerEncounterLogged.push({
-        peerId,
-        connectionId,
-        encounterLogged: true,
-        isNewConnection,
-        encounterPersistedOnBind: persisted,
-        ...(outcome === 'insert_error' || outcome === 'debounce_update_error'
-          ? { reason: 'encounter_mutation_failed' as const }
-          : {}),
-      });
-    }
+    ids.forEach((peerId) => {
+      if (outcome === 'rate_limited') {
+        peerEncounterLogged.push({
+          peerId,
+          connectionId,
+          encounterLogged: false,
+          isNewConnection,
+          encounterPersistedOnBind: false,
+          reason: 'rate_limit_active',
+        });
+      } else {
+        peerEncounterLogged.push({
+          peerId,
+          connectionId,
+          encounterLogged: true,
+          isNewConnection,
+          encounterPersistedOnBind: persisted,
+          ...(outcome === 'insert_error' || outcome === 'debounce_update_error'
+            ? { reason: 'encounter_mutation_failed' as const }
+            : {}),
+        });
+      }
+    });
   }
 
   const aggregateEncounterLogged = peerEncounterLogged.some((p) => p.encounterLogged);
@@ -990,16 +1043,23 @@ Deno.serve(async (req) => {
     encounter_logged: aggregateEncounterLogged,
     matches,
   };
-  if (matchedIds.size >= 2) {
+  const sharedConnectionId = peerEncounterLogged.find((p) => p.connectionId != null)?.connectionId ?? null;
+  if (sharedConnectionId != null) {
+    responseBody.connection_id = sharedConnectionId;
+    responseBody.is_new_connection = peerEncounterLogged.some((p) => p.isNewConnection);
+    responseBody.is_group = memberIds.length > 2;
+  }
+  if (memberIds.length > 2) {
     responseBody.group_clique_candidate = {
-      member_user_ids: [...component].sort(),
+      member_user_ids: memberIds,
     };
   }
-  if (matches.length === 1) {
+  if (matches.length === 1 && responseBody.connection_id == null) {
     const only = matches[0];
     if (only?.connection_id != null) {
       responseBody.connection_id = only.connection_id;
       responseBody.is_new_connection = only.is_new_connection;
+      responseBody.is_group = false;
     }
   }
 
