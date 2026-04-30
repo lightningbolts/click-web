@@ -38,7 +38,7 @@ export default function LandingScreenshotFrame({
       id={id}
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-40px' }}
+      viewport={{ once: true, margin: '-40px', amount: 0.2 }}
       transition={{ duration: 0.45 }}
       className={`overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-xl shadow-black/40 backdrop-blur-md ${className}`}
     >

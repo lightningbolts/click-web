@@ -11,6 +11,7 @@ import LoginModal from '@/components/LoginModal';
 import LiveConnectionTicker from '@/components/LiveConnectionTicker';
 import BentoScreenshotShowcase from '@/components/landing/BentoScreenshotShowcase';
 import NewFeaturesGrid from '@/components/landing/NewFeaturesGrid';
+import PartnerDashboardShowcase from '@/components/landing/PartnerDashboardShowcase';
 import LandingScreenshotFrame from '@/components/landing/LandingScreenshotFrame';
 import { LANDING_IMG } from '@/lib/landingAssets';
 
@@ -66,11 +67,11 @@ export default function Home() {
 
   return (
     <>
-    <div className="min-h-screen bg-zinc-950 text-white overflow-hidden">
-      {/* Background gradient effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[120px] opacity-20" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[120px] opacity-20" />
+    <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden isolate">
+      {/* Background gradient effects — own compositor layer to reduce backdrop/glass repaint flicker while scrolling */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none isolate">
+        <div className="absolute top-0 left-1/4 h-96 w-96 rounded-full bg-[#8338EC] opacity-20 blur-[120px] transform-gpu" />
+        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-[#8338EC] opacity-20 blur-[120px] transform-gpu" />
       </div>
 
       {/* Hero Section */}
@@ -452,7 +453,7 @@ export default function Home() {
                     <span>Math-backed trust, magic-backed vibes</span>
                   </li>
                 </ul>
-                {/* <div className="mt-8 flex justify-center">
+                <div className="mt-8 flex justify-center">
                   <LandingScreenshotFrame
                     id="landing-shot-group-chat"
                     src={LANDING_IMG.groupChat}
@@ -462,7 +463,7 @@ export default function Home() {
                     sizes="(max-width: 768px) min(100vw, 380px), 360px"
                     imageClassName="rounded-[1.25rem]"
                   />
-                </div> */}
+                </div>
               </div>
             </motion.div>
 
@@ -498,6 +499,16 @@ export default function Home() {
                     <span>Overlap alerts only when it actually matches</span>
                   </li>
                 </ul>
+                <div className="mt-8 flex justify-center">
+                  <LandingScreenshotFrame
+                    id="landing-shot-share-availability"
+                    src={LANDING_IMG.shareAvailability}
+                    alt="Click mobile — Share availability with timeframe and intent tag"
+                    className="mx-auto w-full max-w-[min(100%,380px)]"
+                    aspectClassName="aspect-[9/19]"
+                    sizes="(max-width: 768px) min(100vw, 380px), 360px"
+                  />
+                </div>
               </div>
             </motion.div>
 
@@ -553,15 +564,15 @@ export default function Home() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
               viewport={{ once: true }}
-              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group lg:col-span-2"
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-visible group lg:col-span-2"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className="relative z-10">
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📊</span>
                 </div>
                 <h3 className="text-2xl font-bold mb-4">Event and campus partners</h3>
-                <p className="text-zinc-400 leading-relaxed mb-4 max-w-2xl">
+                <p className="text-zinc-400 leading-relaxed mb-4 max-w-2xl lg:max-w-none">
                   Organizers still get the anonymized pulse of where real introductions cluster, including when verified friend groups show up together. Curious about Vibe Radar or sponsorship-grade insights? See the{' '}
                   <Link href="/enterprise" className="text-[#8338EC] underline-offset-4 hover:underline">
                     enterprise overview
@@ -582,6 +593,7 @@ export default function Home() {
                     <span>Aggregate, consent-forward reporting</span>
                   </li>
                 </ul>
+                <PartnerDashboardShowcase />
               </div>
             </motion.div>
           </div>
