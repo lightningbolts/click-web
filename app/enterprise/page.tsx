@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import EnterpriseProductShot, { ENTERPRISE_SCREENSHOTS } from '@/components/enterprise/EnterpriseProductShot';
 
 const AUDIENCES = [
   {
@@ -293,6 +294,15 @@ export default function EnterprisePage() {
             ))}
           </motion.div>
 
+          <div className="mx-auto mt-10 max-w-6xl md:mt-12">
+            <EnterpriseProductShot
+              id="enterprise-shot-insights-overview"
+              src={ENTERPRISE_SCREENSHOTS.overview}
+              alt="Click Insights — Overview dashboard with Social Sticky Score, connection density, and live occupancy"
+              caption="Click Insights (web) — Overview: social ROI-style KPIs alongside live room signals when enabled."
+            />
+          </div>
+
           <motion.div
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -306,6 +316,15 @@ export default function EnterprisePage() {
               One pilot. One semester.
             </p>
           </motion.div>
+
+          <div className="mx-auto mt-10 max-w-6xl md:mt-12">
+            <EnterpriseProductShot
+              id="enterprise-shot-environment-flow"
+              src={ENTERPRISE_SCREENSHOTS.environment}
+              alt="Click Insights — Environment and flow: acoustic conversion, cross-pollination, weather resilience, and social flow"
+              caption="Environment & flow — acoustics, peaks, cross-pollination, and GCR-style mix in one workspace."
+            />
+          </div>
         </section>
 
         {/* Audiences */}
@@ -389,6 +408,28 @@ export default function EnterprisePage() {
           </div>
         </section>
 
+        <div className="border-t border-zinc-900 bg-zinc-950/50 py-10 md:py-14">
+          <div className="mx-auto max-w-6xl px-6 md:px-12">
+            <EnterpriseProductShot
+              id="enterprise-shot-heatmap-tribes"
+              src={ENTERPRISE_SCREENSHOTS.heatmapGrid}
+              alt="Click Insights — Spatial heatmap, tribe analysis, social activity trends, and vibe stream"
+              caption="Heatmap, tribes, activity, and stream — see where connection clusters and how it moves over time."
+            />
+          </div>
+        </div>
+
+        {/* <div className="border-t border-zinc-900/80 bg-zinc-950/30 py-10 md:py-12">
+          <div className="mx-auto max-w-6xl px-6 md:px-12">
+            <EnterpriseProductShot
+              id="enterprise-shot-insights-map-view"
+              src={ENTERPRISE_SCREENSHOTS.mapView}
+              alt="Click Map — dark map with clusters, layer toggles for network, soundtracks, beacons, and hazards"
+              caption="Click Map — layer-ready map context for where connections and pins show up (demo)."
+            />
+          </div>
+        </div> */}
+
         {/* Business Insights */}
         <section className="border-t border-zinc-900 py-16 md:py-24">
           <div className="mx-auto max-w-6xl px-6 md:px-12">
@@ -437,6 +478,15 @@ export default function EnterprisePage() {
                   </ul>
                 </motion.article>
               ))}
+            </div>
+
+            <div className="mt-10 md:mt-12">
+              <EnterpriseProductShot
+                id="enterprise-shot-vibe-radar"
+                src={ENTERPRISE_SCREENSHOTS.vibeRadar}
+                alt="Click Insights — Vibe Radar tab with intent blobs on the map, signal strength, and trending vibes"
+                caption="Vibe Radar — anonymized availability intents near the venue with map layers and trending categories."
+              />
             </div>
 
             <motion.div

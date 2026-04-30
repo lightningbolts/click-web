@@ -9,6 +9,10 @@ import LoadingScreen from '@/components/LoadingScreen';
 import DashboardView from '@/components/DashboardView';
 import LoginModal from '@/components/LoginModal';
 import LiveConnectionTicker from '@/components/LiveConnectionTicker';
+import BentoScreenshotShowcase from '@/components/landing/BentoScreenshotShowcase';
+import NewFeaturesGrid from '@/components/landing/NewFeaturesGrid';
+import LandingScreenshotFrame from '@/components/landing/LandingScreenshotFrame';
+import { LANDING_IMG } from '@/lib/landingAssets';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -359,6 +363,17 @@ export default function Home() {
             </p>
           </motion.div>
 
+          <div className="mb-12 max-w-6xl px-4 sm:mx-auto sm:px-0">
+            <LandingScreenshotFrame
+              id="landing-shot-memory-dashboard-inline"
+              src={LANDING_IMG.memoryDashboard}
+              alt="Click web — Personal dashboard with stats, availability, and milestones"
+              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 90vw, 1152px"
+              loading="lazy"
+              objectFit="contain"
+            />
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Proximity Tap: Tri-Factor Handshake */}
             <motion.div
@@ -392,6 +407,16 @@ export default function Home() {
                     <span>One gesture, instant connection</span>
                   </li>
                 </ul>
+                <div className="mt-8 flex justify-center">
+                  <LandingScreenshotFrame
+                    id="landing-shot-add-click"
+                    src={LANDING_IMG.addClick}
+                    alt="Click mobile — Add Click with QR, scan, and tap to connect"
+                    className="mx-auto w-full max-w-[280px]"
+                    aspectClassName="aspect-[9/19]"
+                    sizes="(max-width: 768px) min(100vw, 320px), 280px"
+                  />
+                </div>
               </div>
             </motion.div>
 
@@ -427,6 +452,17 @@ export default function Home() {
                     <span>Math-backed trust, magic-backed vibes</span>
                   </li>
                 </ul>
+                {/* <div className="mt-8 flex justify-center">
+                  <LandingScreenshotFrame
+                    id="landing-shot-group-chat"
+                    src={LANDING_IMG.groupChat}
+                    alt="Click mobile — Group chat with messages and shared photo"
+                    className="mx-auto w-full max-w-[min(100%,380px)] overflow-hidden rounded-[1.25rem]"
+                    aspectClassName="aspect-[9/18]"
+                    sizes="(max-width: 768px) min(100vw, 380px), 360px"
+                    imageClassName="rounded-[1.25rem]"
+                  />
+                </div> */}
               </div>
             </motion.div>
 
@@ -498,6 +534,16 @@ export default function Home() {
                     <p className="text-zinc-500 mt-1">Time: Last week</p>
                   </div>
                 </div>
+                <div className="mt-8 flex justify-center">
+                  <LandingScreenshotFrame
+                    id="landing-shot-profile-rich"
+                    src={LANDING_IMG.profileMobile}
+                    alt="Click mobile — Profile with moment, place, time, weather, and interests"
+                    className="mx-auto w-full max-w-[260px]"
+                    aspectClassName="aspect-[754/1024]"
+                    sizes="(max-width: 768px) min(100vw, 320px), 260px"
+                  />
+                </div>
               </div>
             </motion.div>
 
@@ -541,6 +587,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <BentoScreenshotShowcase />
+
+      <NewFeaturesGrid />
 
       {/* The Big Dream Section */}
       <section id="mission" className="relative z-10 px-6 md:px-12 py-32">
