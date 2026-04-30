@@ -13,6 +13,7 @@ import BentoScreenshotShowcase from '@/components/landing/BentoScreenshotShowcas
 import NewFeaturesGrid from '@/components/landing/NewFeaturesGrid';
 import PartnerDashboardShowcase from '@/components/landing/PartnerDashboardShowcase';
 import LandingScreenshotFrame from '@/components/landing/LandingScreenshotFrame';
+import LandingWebScreensCarousel from '@/components/landing/LandingWebScreensCarousel';
 import { LANDING_IMG } from '@/lib/landingAssets';
 
 export default function Home() {
@@ -93,7 +94,7 @@ export default function Home() {
               <span className="text-sm text-zinc-300">In the works</span>
             </motion.div>
 
-            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight">
+            <h1 className="font-heading text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight">
               <span className="text-[#8338EC]">Click</span>
               <span className="text-zinc-500">:</span> From{' '}
               <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
@@ -166,7 +167,7 @@ export default function Home() {
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">Join the Waitlist</h2>
+                <h2 className="font-heading text-2xl font-bold text-white">Join the Waitlist</h2>
                 <p className="mt-2 text-sm text-zinc-400">
                   Leave your email and we&apos;ll reach out when we&apos;re ready.
                 </p>
@@ -238,7 +239,7 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
+            <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
               Why <span className="text-[#8338EC]">Click</span>?
             </h2>
             <p className="text-base sm:text-lg text-zinc-400 leading-relaxed px-4">
@@ -270,7 +271,7 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mb-6">
                   <span className="text-2xl">💀</span>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold mb-4">The Follow-Back Void</h3>
+                <h3 className="font-heading text-xl sm:text-2xl font-bold mb-4">The Follow-Back Void</h3>
                 <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
                   You follow them. They follow back. Neither of you ever sends a message. A month later you see them post something and you've already forgotten their name.
                 </p>
@@ -288,7 +289,7 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
                   <Smartphone className="w-6 h-6 text-amber-400/90" />
                 </div>
-                <h3 className="text-xl sm:text-2xl font-bold mb-4">
+                <h3 className="font-heading text-xl sm:text-2xl font-bold mb-4">
                   The handle handoff
                 </h3>
                 <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
@@ -310,7 +311,7 @@ export default function Home() {
                     <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6">
                       <MapPin className="w-6 h-6 text-amber-400/90" />
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-bold mb-4">A name without a where</h3>
+                    <h3 className="font-heading text-xl sm:text-2xl font-bold mb-4">A name without a where</h3>
                     <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl">
                       Later, they&apos;re a row in your messages or a follow in a list, with no tether to the actual night, venue, or vibe. You remember liking them; you don&apos;t remember <em>where reality collided</em>, so reaching out feels oddly blank.
                     </p>
@@ -334,7 +335,7 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-6 mx-auto">
                   <Zap className="w-6 h-6 text-amber-400/90" />
                 </div>
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
+                <h3 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
                   Built to scroll, not to <span className="text-amber-400/90">follow up</span>
                 </h3>
                 <p className="text-sm sm:text-base md:text-lg text-zinc-400 leading-relaxed max-w-2xl mx-auto">
@@ -356,7 +357,7 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
+            <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
               How <span className="text-[#8338EC]">Click</span> Works
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed px-4">
@@ -375,7 +376,8 @@ export default function Home() {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="flex flex-col gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Proximity Tap: Tri-Factor Handshake */}
             <motion.div
               initial={{ y: 30, opacity: 0 }}
@@ -389,7 +391,7 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <Smartphone className="w-8 h-8 text-[#8338EC]" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Proximity Tap</h3>
+                <h3 className="font-heading text-2xl font-bold mb-4">Proximity Tap</h3>
                 <p className="text-sm font-medium text-[#c4a3ff] mb-2">Tri-Factor Handshake</p>
                 <p className="text-zinc-400 leading-relaxed mb-4">
                   Press connect and let Click run a room-real handshake: secure Bluetooth plus inaudible sound prove you are standing together. Profiles swap when the moment is real, not when someone guessed a handle across the internet.
@@ -421,57 +423,11 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* Multi-Tap: verified group clique */}
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.15 }}
-              viewport={{ once: true }}
-              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
-                  <Users className="w-8 h-8 text-[#8338EC]" />
-                </div>
-                <h3 className="text-2xl font-bold mb-4">Multi-Tap Groups</h3>
-                <p className="text-sm font-medium text-[#c4a3ff] mb-2">Organic Cliques</p>
-                <p className="text-zinc-400 leading-relaxed mb-4">
-                  Met a whole group at once? Everyone hits connect at the same beat. Click checks the graph in the background so every person in that window really opted in together, then drops you into a verified group chat. Boom. Instant clique.
-                </p>
-                <ul className="space-y-2 text-zinc-500 text-sm">
-                  <li className="flex items-center gap-2">
-                    <span className="text-[#8338EC]">✓</span>
-                    <span>N-way validation in plain English: everyone matched the same moment</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-[#8338EC]">✓</span>
-                    <span>No threading DMs to seven people you just met</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-[#8338EC]">✓</span>
-                    <span>Math-backed trust, magic-backed vibes</span>
-                  </li>
-                </ul>
-                <div className="mt-8 flex justify-center">
-                  <LandingScreenshotFrame
-                    id="landing-shot-group-chat"
-                    src={LANDING_IMG.groupChat}
-                    alt="Click mobile — Group chat with messages and shared photo"
-                    className="mx-auto w-full max-w-[min(100%,380px)] overflow-hidden rounded-[1.25rem]"
-                    aspectClassName="aspect-[9/18]"
-                    sizes="(max-width: 768px) min(100vw, 380px), 360px"
-                    imageClassName="rounded-[1.25rem]"
-                  />
-                </div>
-              </div>
-            </motion.div>
-
             {/* Availability Intents */}
             <motion.div
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              transition={{ duration: 0.8, delay: 0.12 }}
               viewport={{ once: true }}
               className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
             >
@@ -480,7 +436,7 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <Megaphone className="w-8 h-8 text-[#8338EC]" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Availability Intents</h3>
+                <h3 className="font-heading text-2xl font-bold mb-4">Availability Intents</h3>
                 <p className="text-sm font-medium text-[#c4a3ff] mb-2">The vibe broadcast</p>
                 <p className="text-zinc-400 leading-relaxed mb-4">
                   Stop guessing who is free. For up to twenty-four hours, broadcast what you are up for, like &quot;Looking for coffee,&quot; &quot;Down to study,&quot; or &quot;Live music.&quot; When your connections&apos; intents overlap, we nudge you both. Less planning theater, more showing up.
@@ -511,8 +467,57 @@ export default function Home() {
                 </div>
               </div>
             </motion.div>
+            </div>
 
-            {/* Contextual Tagging */}
+            {/* Multi-Tap + Click Map: one row, vertical carousel for web screenshots */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.15 }}
+              viewport={{ once: true }}
+              className="glass p-8 rounded-3xl border border-zinc-800 relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
+                  <Users className="w-8 h-8 text-[#8338EC]" />
+                </div>
+                <h3 className="font-heading text-2xl font-bold mb-4">Multi-Tap Groups</h3>
+                <p className="text-sm font-medium text-[#c4a3ff] mb-2">Organic Cliques</p>
+                <p className="text-zinc-400 leading-relaxed mb-6 max-w-3xl">
+                  Met a whole group at once? Everyone hits connect at the same beat. Click checks the graph in the background so every person in that window really opted in together, then drops you into a verified group chat. Boom. Instant clique.
+                </p>
+                <ul className="mb-10 grid gap-2 text-zinc-500 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>N-way validation in plain English: everyone matched the same moment</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>No threading DMs to seven people you just met</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-[#8338EC]">✓</span>
+                    <span>Math-backed trust, magic-backed vibes</span>
+                  </li>
+                </ul>
+
+                <div className="border-t border-white/10 pt-10 mt-2">
+                  <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
+                    <MapPin className="w-8 h-8 text-[#8338EC]" />
+                  </div>
+                  <h3 className="font-heading text-2xl font-bold mb-4">Click Map</h3>
+                  <p className="text-sm font-medium text-[#c4a3ff] mb-2">Where your memories were made</p>
+                  <p className="text-zinc-400 leading-relaxed mb-2 max-w-3xl">
+                    See where you met everyone, then turn on layers for your network, official soundtracks, community beacons, and hazards, all on one map built for the web dashboard.
+                  </p>
+                </div>
+
+                <LandingWebScreensCarousel />
+              </div>
+            </motion.div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <motion.div
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
@@ -525,7 +530,7 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📍</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">You&apos;ll Remember How You Met</h3>
+                <h3 className="font-heading text-2xl font-bold mb-4">You&apos;ll Remember How You Met</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4">
                   After you connect, a quick sheet asks you to label the encounter (presets or a short custom line). With your permission, we attach place, time, weather, and an optional ambient snapshot. That becomes a memory capsule on the connection, so months later you know it was the comedy show at the quiet coffee shop on Pike in the drizzle, not just &quot;some person from that event.&quot;
                 </p>
@@ -571,7 +576,7 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-6">
                   <span className="text-3xl">📊</span>
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Event and campus partners</h3>
+                <h3 className="font-heading text-2xl font-bold mb-4">Event and campus partners</h3>
                 <p className="text-zinc-400 leading-relaxed mb-4 max-w-2xl lg:max-w-none">
                   Organizers still get the anonymized pulse of where real introductions cluster, including when verified friend groups show up together. Curious about Vibe Radar or sponsorship-grade insights? See the{' '}
                   <Link href="/enterprise" className="text-[#8338EC] underline-offset-4 hover:underline">
@@ -597,6 +602,7 @@ export default function Home() {
               </div>
             </motion.div>
           </div>
+          </div>
         </div>
       </section>
 
@@ -616,7 +622,7 @@ export default function Home() {
           >
             <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/5 to-transparent" />
             <div className="relative z-10">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-center">
+              <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-center">
                 Built for the moment{' '}
                 <span className="bg-gradient-to-r from-[#8338EC] to-purple-400 bg-clip-text text-transparent">
                   you put your phone down.
@@ -634,7 +640,7 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-4 mx-auto">
                     <Shield className="w-8 h-8 text-[#8338EC]" />
                   </div>
-                  <h4 className="text-lg font-semibold mb-2">No Tracking</h4>
+                  <h4 className="font-heading text-lg font-semibold mb-2">No Tracking</h4>
                   <p className="text-zinc-500 text-sm">
                     Your data is yours. No ads, no data brokers, no exceptions.
                   </p>
@@ -647,7 +653,7 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-4 mx-auto">
                     <Zap className="w-8 h-8 text-[#8338EC]" />
                   </div>
-                  <h4 className="text-lg font-semibold mb-2">Student Built</h4>
+                  <h4 className="font-heading text-lg font-semibold mb-2">Student Built</h4>
                   <p className="text-zinc-500 text-sm">
                     Built by students who were tired of losing people they actually liked. Launching 2026.
                   </p>
@@ -660,7 +666,7 @@ export default function Home() {
                   <div className="w-16 h-16 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mb-4 mx-auto">
                     <Users className="w-8 h-8 text-[#8338EC]" />
                   </div>
-                  <h4 className="text-lg font-semibold mb-2">Offline First</h4>
+                  <h4 className="font-heading text-lg font-semibold mb-2">Offline First</h4>
                   <p className="text-zinc-500 text-sm">
                     Designed to get you off your phone, not keep you on it. Use Click for what you actually want to do.
                   </p>
@@ -681,7 +687,7 @@ export default function Home() {
             viewport={{ once: true, margin: '-60px' }}
             className="rounded-3xl border border-[#8338EC]/25 bg-gradient-to-b from-[#8338EC]/[0.12] to-zinc-950/80 px-8 py-12 shadow-xl shadow-[#8338EC]/10 backdrop-blur-xl sm:px-12 sm:py-14"
           >
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
               Join us <span className="text-[#8338EC]">today</span>
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg">

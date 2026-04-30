@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { Analytics } from "@vercel/analytics/next";
@@ -7,9 +7,16 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AppToaster from "@/components/AppToaster";
 
-const inter = Inter({
-  variable: "--font-inter",
+const manrope = Manrope({
   subsets: ["latin"],
+  display: "swap",
+  variable: "--font-manrope",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-space-grotesk",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +40,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased bg-[#121212] text-white flex flex-col min-h-screen`}>
+      <body
+        className={`${manrope.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[#121212] text-white flex flex-col min-h-screen`}
+      >
         <AuthProvider>
           <Navbar />
           <main className="flex-1 flex flex-col">

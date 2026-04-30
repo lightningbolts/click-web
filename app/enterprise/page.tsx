@@ -224,7 +224,7 @@ export default function EnterprisePage() {
               <GraduationCap className="h-4 w-4 text-[#8338EC]" />
               <span>Higher ed &amp; Student Affairs</span>
             </div>
-            <h1 className="mb-6 max-w-5xl mx-auto text-3xl font-bold tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
+            <h1 className="font-heading mb-6 max-w-5xl mx-auto text-3xl font-bold tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
               <span className="text-zinc-50">
                 A university can&apos;t measure student loneliness from their contact lists. They can from ours.
               </span>
@@ -284,7 +284,7 @@ export default function EnterprisePage() {
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
                   <v.icon className="h-6 w-6 text-[#8338EC]" />
                 </div>
-                <h2 className="mb-3 text-lg font-bold text-zinc-100">{v.title}</h2>
+                <h2 className="font-heading mb-3 text-lg font-bold text-zinc-100">{v.title}</h2>
                 <p className="mb-4 flex-1 text-sm leading-relaxed text-zinc-400">{v.outcome}</p>
                 <p className="border-t border-zinc-800/80 pt-4 text-xs font-medium uppercase tracking-wide text-[#c4a3ff]">
                   Metric highlighted
@@ -337,7 +337,7 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 text-center md:mb-16"
             >
-              <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
                 Who <span className="text-[#8338EC]">it&apos;s for</span>
               </h2>
               <p className="mx-auto max-w-2xl text-zinc-400">
@@ -357,7 +357,7 @@ export default function EnterprisePage() {
                   <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#8338EC]/15">
                     <block.icon className="h-7 w-7 text-[#8338EC]" />
                   </div>
-                  <h3 className="mb-3 text-xl font-bold md:text-2xl">{block.title}</h3>
+                  <h3 className="font-heading mb-3 text-xl font-bold md:text-2xl">{block.title}</h3>
                   <p className="mb-6 flex-1 text-sm leading-relaxed text-zinc-400 md:text-base">{block.body}</p>
                   <ul className="space-y-2 border-t border-zinc-800/80 pt-6 text-sm text-zinc-500">
                     {block.bullets.map((b) => (
@@ -383,7 +383,7 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 md:mb-16"
             >
-              <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl lg:text-5xl">
+              <h2 className="font-heading mb-4 text-center text-3xl font-bold md:text-4xl lg:text-5xl">
                 Programs we <span className="text-[#8338EC]">hear about</span> first
               </h2>
               <p className="mx-auto max-w-2xl text-center text-zinc-400">
@@ -400,7 +400,7 @@ export default function EnterprisePage() {
                   viewport={{ once: true }}
                   className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 transition-colors hover:border-zinc-700"
                 >
-                  <h3 className="mb-2 text-lg font-semibold text-zinc-100">{u.title}</h3>
+                  <h3 className="font-heading mb-2 text-lg font-semibold text-zinc-100">{u.title}</h3>
                   <p className="text-sm leading-relaxed text-zinc-500">{u.desc}</p>
                 </motion.div>
               ))}
@@ -444,7 +444,7 @@ export default function EnterprisePage() {
                 <BarChart3 className="h-4 w-4" />
                 Business Insights
               </div>
-              <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
                 Analytics for <span className="text-[#8338EC]">social patterns</span> and your team
               </h2>
               <p className="mx-auto max-w-2xl text-zinc-400 md:text-lg">
@@ -466,7 +466,7 @@ export default function EnterprisePage() {
                   <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
                     <pillar.icon className="h-6 w-6 text-[#8338EC]" />
                   </div>
-                  <h3 className="mb-3 text-xl font-bold leading-snug">{pillar.title}</h3>
+                  <h3 className="font-heading mb-3 text-xl font-bold leading-snug">{pillar.title}</h3>
                   <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">{pillar.lead}</p>
                   <ul className="mt-auto space-y-3 border-t border-zinc-800/80 pt-6">
                     {pillar.bullets.map((b) => (
@@ -500,7 +500,7 @@ export default function EnterprisePage() {
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
                   <Users2 className="h-6 w-6 text-[#8338EC]" />
                 </div>
-                <h3 className="mb-3 text-xl font-bold leading-snug">Micro-Community Analytics</h3>
+                <h3 className="font-heading mb-3 text-xl font-bold leading-snug">Micro-Community Analytics</h3>
                 <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">
                   Go beyond basic foot traffic. Click mathematically verifies when groups of friends arrive together, not only
                   isolated visits. See whether your venue behaves like a passive pass-through or a sticky hub for micro-communities,
@@ -521,7 +521,7 @@ export default function EnterprisePage() {
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
                   <Radar className="h-6 w-6 text-[#8338EC]" />
                 </div>
-                <h3 className="mb-3 text-xl font-bold leading-snug">Vibe Radar and Pop-Up Beacons</h3>
+                <h3 className="font-heading mb-3 text-xl font-bold leading-snug">Vibe Radar and Pop-Up Beacons</h3>
                 <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">
                   Stop paying for spammy local ads. Vibe Radar surfaces anonymized availability intents on a geographic hexbin so
                   you can see what people nearby want to do right now. Spot fifty &quot;coffee&quot; intents within a mile? Drop a
@@ -571,7 +571,7 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 text-center md:mb-16"
             >
-              <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
                 What <span className="text-[#8338EC]">you get</span>
               </h2>
               <p className="mx-auto max-w-2xl text-zinc-400">
@@ -592,7 +592,7 @@ export default function EnterprisePage() {
                     <c.icon className="h-6 w-6 text-[#8338EC]" />
                   </div>
                   <div>
-                    <h3 className="mb-2 text-xl font-bold">{c.title}</h3>
+                    <h3 className="font-heading mb-2 text-xl font-bold">{c.title}</h3>
                     <p className="text-sm leading-relaxed text-zinc-400 md:text-base">{c.text}</p>
                   </div>
                 </motion.div>
@@ -611,7 +611,7 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mx-auto max-w-3xl text-center"
             >
-              <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl">
                 Rollout, <span className="text-[#8338EC]">without the big-bang risk</span>
               </h2>
               <p className="mb-10 text-zinc-400">
@@ -636,7 +636,7 @@ export default function EnterprisePage() {
                   <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#8338EC]/20 text-lg font-bold text-[#8338EC]">
                     {item.step}
                   </span>
-                  <h3 className="mb-2 font-bold text-zinc-100">{item.title}</h3>
+                  <h3 className="font-heading mb-2 font-bold text-zinc-100">{item.title}</h3>
                   <p className="text-sm text-zinc-500">{item.desc}</p>
                 </motion.li>
               ))}
@@ -651,7 +651,7 @@ export default function EnterprisePage() {
               initial={{ y: 20, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: true }}
-              className="mb-10 text-center text-3xl font-bold md:text-4xl"
+              className="font-heading mb-10 text-center text-3xl font-bold md:text-4xl"
             >
               Questions <span className="text-[#8338EC]">we expect</span>
             </motion.h2>
@@ -688,7 +688,7 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="glass rounded-3xl border border-[#8338EC]/25 bg-gradient-to-b from-[#8338EC]/10 to-transparent px-8 py-12 md:px-12"
             >
-              <h2 className="mb-4 text-2xl font-bold md:text-3xl">Bring Click to your organization</h2>
+              <h2 className="font-heading mb-4 text-2xl font-bold md:text-3xl">Bring Click to your organization</h2>
               <p className="mx-auto mb-8 max-w-xl text-zinc-400">
                 Tell us about your audience, timeline, and any compliance constraints. We&apos;ll follow up with next steps.
               </p>
@@ -726,7 +726,7 @@ export default function EnterprisePage() {
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">Enterprise waitlist</h2>
+                <h2 className="font-heading text-2xl font-bold text-white">Enterprise waitlist</h2>
                 <p className="mt-2 text-sm text-zinc-400">
                   We&apos;ll note your interest for org-wide pilots and institution programs.
                 </p>
