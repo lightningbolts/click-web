@@ -5,6 +5,7 @@ import {
   normalizeAvailabilityIntentRows,
   normalizeLegacyAvailabilityRecord,
 } from '@/lib/userProfile/availability';
+import { stableKeysForStringList } from '@/lib/react/stableKeysForStringList';
 
 const easeOut = [0.22, 1, 0.36, 1] as const;
 
@@ -108,14 +109,17 @@ export default function CurrentAvailabilitySection({
                   Activities
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {preferredActivities.map((t) => (
+                  {(() => {
+                    const keys = stableKeysForStringList(preferredActivities, 'activity');
+                    return preferredActivities.map((t, i) => (
                     <span
-                      key={t}
+                      key={keys[i]}
                       className="rounded-full border border-[#8338EC]/35 bg-[#8338EC]/10 px-3 py-1 text-xs text-[#c4b5fd]"
                     >
                       {t}
                     </span>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
             ) : null}

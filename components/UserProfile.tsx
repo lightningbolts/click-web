@@ -51,6 +51,7 @@ export default function UserProfile() {
   useEffect(() => {
     if (!isOpen || !triggerRef.current) return;
 
+    let raf = 0;
     const updatePosition = () => {
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
@@ -63,12 +64,21 @@ export default function UserProfile() {
       setMenuPosition({ top, left });
     };
 
+    const schedulePosition = () => {
+      if (raf !== 0) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updatePosition();
+      });
+    };
+
     updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', schedulePosition);
+    window.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
     return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', schedulePosition);
+      window.removeEventListener('scroll', schedulePosition, true);
+      if (raf !== 0) cancelAnimationFrame(raf);
     };
   }, [isOpen]);
 

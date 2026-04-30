@@ -44,6 +44,7 @@ import {
 } from '@/lib/dashboard/connectionEncounters';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 import useSWR, { useSWRConfig } from 'swr';
+import Image from 'next/image';
 import { coerceMessageType } from '@/lib/chat/messages';
 import {
   decodeFileMasterKeyBase64,
@@ -60,6 +61,7 @@ import {
 } from '@/lib/chat/crypto';
 import { createSecureMediaObjectUrl } from '@/lib/chat/useSecureMedia';
 import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
+import { stableKeysForStringList } from '@/lib/react/stableKeysForStringList';
 
 export type { AvailabilityIntentRow };
 
@@ -120,8 +122,8 @@ function formatEncounterWhen(iso: string): string {
   }).format(d);
 }
 
-function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon: LucideIcon; label: string }[] {
-  const out: { key: string; Icon: LucideIcon; label: string }[] = [];
+function encounterMetricPills(enc: ConnectionEncounterRow): { metricKey: string; Icon: LucideIcon; label: string }[] {
+  const out: { metricKey: string; Icon: LucideIcon; label: string }[] = [];
   const ws = normalizeWeatherSnapshot(enc.weatherSnapshot);
   if (ws) {
     const cond =
@@ -130,14 +132,14 @@ function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon:
         : typeof ws.iconCode === 'string' && ws.iconCode.trim()
           ? ws.iconCode.trim().replace(/^./, (c) => c.toUpperCase())
           : null;
-    if (cond) out.push({ key: 'wx-cond', Icon: Cloud, label: cond });
+    if (cond) out.push({ metricKey: 'wx-cond', Icon: Cloud, label: cond });
 
     const temp = typeof ws.temperatureCelsius === 'number' && Number.isFinite(ws.temperatureCelsius)
       ? ws.temperatureCelsius
       : null;
     if (temp != null) {
       const f = Math.round((temp * 9) / 5 + 32);
-      out.push({ key: 'temp', Icon: Thermometer, label: `${f}°F (${Math.round(temp)}°C)` });
+      out.push({ metricKey: 'temp', Icon: Thermometer, label: `${f}°F (${Math.round(temp)}°C)` });
     }
     const windKph =
       typeof ws.windSpeedKph === 'number' && Number.isFinite(ws.windSpeedKph) ? ws.windSpeedKph : null;
@@ -156,46 +158,46 @@ function encounterMetricPills(enc: ConnectionEncounterRow): { key: string; Icon:
         const idx = (Math.floor((x + 22.5) / 45) % 8 + 8) % 8;
         suffix = ` ${dirs[idx]}`;
       }
-      out.push({ key: 'wind', Icon: Wind, label: `${Math.round(windKph)} km/h${suffix}` });
+      out.push({ metricKey: 'wind', Icon: Wind, label: `${Math.round(windKph)} km/h${suffix}` });
     }
     const p = typeof ws.pressureMslHpa === 'number' && Number.isFinite(ws.pressureMslHpa) ? ws.pressureMslHpa : null;
     if (p != null) {
-      out.push({ key: 'hpa', Icon: Gauge, label: `${Math.round(p)} hPa` });
+      out.push({ metricKey: 'hpa', Icon: Gauge, label: `${Math.round(p)} hPa` });
     }
   }
   const noiseCat = enc.noiseLevel?.trim();
   if (noiseCat) {
-    out.push({ key: 'noise-cat', Icon: Volume2, label: prettyNoiseCategoryKey(noiseCat) });
+    out.push({ metricKey: 'noise-cat', Icon: Volume2, label: prettyNoiseCategoryKey(noiseCat) });
   }
   const dbRaw = enc.exactNoiseLevelDb;
   if (dbRaw !== null && dbRaw !== undefined && typeof dbRaw === 'number' && Number.isFinite(dbRaw)) {
-    out.push({ key: 'db', Icon: Volume2, label: `${Math.round(dbRaw)} dB` });
+    out.push({ metricKey: 'db', Icon: Volume2, label: `${Math.round(dbRaw)} dB` });
   }
   const elCat = enc.elevationCategory?.trim();
   if (elCat) {
-    out.push({ key: 'el-cat', Icon: Mountain, label: prettyElevationCategoryKey(elCat) });
+    out.push({ metricKey: 'el-cat', Icon: Mountain, label: prettyElevationCategoryKey(elCat) });
   }
   const elRaw = enc.exactBarometricElevationM;
   if (elRaw !== null && elRaw !== undefined && typeof elRaw === 'number' && Number.isFinite(elRaw)) {
-    out.push({ key: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
+    out.push({ metricKey: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
   }
   const luxRaw = enc.luxLevel;
   if (luxRaw !== null && luxRaw !== undefined && typeof luxRaw === 'number' && Number.isFinite(luxRaw) && luxRaw >= 0) {
     const I = luxRaw < 15 ? Moon : Sun;
-    out.push({ key: 'lux', Icon: I, label: `${Math.round(luxRaw)} lx` });
+    out.push({ metricKey: 'lux', Icon: I, label: `${Math.round(luxRaw)} lx` });
   }
   const bat = enc.batteryLevel;
   if (bat !== null && bat !== undefined && typeof bat === 'number' && Number.isFinite(bat) && bat >= 0 && bat <= 100) {
-    out.push({ key: 'bat', Icon: Battery, label: `${Math.round(bat)}%` });
+    out.push({ metricKey: 'bat', Icon: Battery, label: `${Math.round(bat)}%` });
   }
   const az = enc.compassAzimuth;
   if (az !== null && az !== undefined && typeof az === 'number' && Number.isFinite(az)) {
     const d = Math.round(((az % 360) + 360) % 360);
-    out.push({ key: 'az', Icon: Compass, label: `${d}°` });
+    out.push({ metricKey: 'az', Icon: Compass, label: `${d}°` });
   }
   const mv = enc.motionVariance;
   if (mv !== null && mv !== undefined && typeof mv === 'number' && Number.isFinite(mv) && mv >= 0) {
-    out.push({ key: 'mv', Icon: Activity, label: mv.toFixed(2) });
+    out.push({ metricKey: 'mv', Icon: Activity, label: mv.toFixed(2) });
   }
   return out;
 }
@@ -622,6 +624,16 @@ export default function UserProfileModal({
     if (!requestedUserId || !data?.user?.id) return null;
     return data.user.id === requestedUserId ? data : null;
   }, [data, requestedUserId]);
+
+  const interestTagKeys = useMemo(() => {
+    if (!profileData) return [];
+    return stableKeysForStringList(profileData.tags, `interest:${profileData.user.id}`);
+  }, [profileData]);
+
+  const sharedInterestTagKeys = useMemo(() => {
+    if (!profileData) return [];
+    return stableKeysForStringList(profileData.sharedInterestTags ?? [], `shared:${profileData.user.id}`);
+  }, [profileData]);
 
   const effectiveConnectionId = useMemo(() => {
     const fromProp = connectionId?.trim();
@@ -1060,7 +1072,7 @@ export default function UserProfileModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 p-4 backdrop-blur-sm transform-gpu translate-z-0 will-change-[opacity]"
           onClick={blockingBirthday ? () => {} : onClose}
         >
           <motion.div
@@ -1068,10 +1080,10 @@ export default function UserProfileModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.98 }}
             transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.85 }}
-            className="w-full max-w-md max-h-[min(88vh,640px)] overflow-y-auto rounded-3xl border border-zinc-700/80 bg-zinc-950 shadow-2xl"
+            className="w-full max-w-md max-h-[min(88vh,640px)] overflow-y-auto overscroll-y-contain rounded-3xl border border-zinc-700/80 bg-zinc-950 shadow-2xl transform-gpu translate-z-0 will-change-scroll"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800/90 bg-zinc-950/95 px-4 pt-6 pb-3 backdrop-blur-md">
+            <div className="sticky top-0 z-10 isolate flex items-center justify-between border-b border-zinc-800/90 bg-zinc-950/95 px-4 pt-6 pb-3 backdrop-blur-md transform-gpu translate-z-0 will-change-transform supports-[backdrop-filter]:bg-zinc-950/80">
               <h2 className="text-lg font-semibold text-white">
                 {blockingBirthday ? 'Add your birthday' : 'Profile'}
               </h2>
@@ -1135,12 +1147,17 @@ export default function UserProfileModal({
                 >
                   <div className="flex flex-col items-center gap-3">
                     {profileData.user.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={profileData.user.image}
-                        alt=""
-                        className="h-24 w-24 rounded-full object-cover ring-2 ring-[#8338EC]/40"
-                      />
+                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full ring-2 ring-[#8338EC]/40 transform-gpu translate-z-0">
+                        <Image
+                          src={profileData.user.image}
+                          alt=""
+                          width={96}
+                          height={96}
+                          priority
+                          unoptimized
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
                     ) : (
                       <div
                         className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-3xl font-bold text-white"
@@ -1232,6 +1249,9 @@ export default function UserProfileModal({
                                         <img
                                           src={resolvedMediaUrls[m.id]}
                                           alt={m.caption ?? ''}
+                                          width={400}
+                                          height={112}
+                                          decoding="async"
                                           className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
                                         />
                                       </button>
@@ -1482,9 +1502,9 @@ export default function UserProfileModal({
                       <p className="text-sm text-zinc-500">No interests shared yet</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {profileData.tags.map((t) => (
+                        {profileData.tags.map((t, i) => (
                           <span
-                            key={t}
+                            key={interestTagKeys[i]}
                             className="rounded-full border border-[#8338EC]/35 bg-[#8338EC]/10 px-3 py-1 text-xs text-[#c4b5fd]"
                           >
                             {t}
@@ -1503,9 +1523,9 @@ export default function UserProfileModal({
                         Conversation starters you both listed
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {profileData.sharedInterestTags.map((t) => (
+                        {(profileData.sharedInterestTags ?? []).map((t, i) => (
                           <span
-                            key={t}
+                            key={sharedInterestTagKeys[i]}
                             className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200"
                           >
                             {t}
@@ -1540,7 +1560,7 @@ export default function UserProfileModal({
                       ) : (
                         <div className="relative pl-1">
                           <div
-                            className="absolute left-[15px] top-2 bottom-3 w-px bg-zinc-700/85 pointer-events-none"
+                            className="absolute left-[15px] top-2 bottom-3 w-px bg-zinc-700/85 pointer-events-none transform-gpu translate-z-0"
                             aria-hidden
                           />
                           <ul className="space-y-0">
@@ -1563,7 +1583,7 @@ export default function UserProfileModal({
                               return (
                                 <li key={enc.id} className="relative pb-9 last:pb-1">
                                   <div
-                                    className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-zinc-950 bg-gradient-to-br from-[#8338EC] to-[#3A86FF] shadow-sm"
+                                    className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-zinc-950 bg-gradient-to-br from-[#8338EC] to-[#3A86FF] shadow-sm transform-gpu translate-z-0"
                                     aria-hidden
                                   />
                                   <div className="pl-8">
@@ -1593,9 +1613,9 @@ export default function UserProfileModal({
                                     )}
                                     {pills.length > 0 && (
                                       <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {pills.map(({ key, Icon, label }) => (
+                                        {pills.map(({ metricKey, Icon, label }) => (
                                           <span
-                                            key={key}
+                                            key={`${enc.id}-${metricKey}`}
                                             className="inline-flex items-center gap-1 rounded-full border border-zinc-700/70 bg-zinc-900/55 px-2.5 py-0.5 text-[11px] text-zinc-300"
                                           >
                                             <Icon
