@@ -47,11 +47,10 @@ import {
   mockInsightsHourlyDistribution,
   mockInsightsPeakHour,
 } from "@/lib/insights/mockData";
-import type { VibeMessage } from "@/lib/insights/mockData";
 import { DemoBanner } from "./DemoBanner";
 import { useInsightsDemo } from "./InsightsDemoContext";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
-import type { TribeBubble } from "@/lib/insights/mockData";
+import type { VibeMessage, TribeBubble, HeatmapZone } from "@/lib/insights/mockData";
 import {
   microCommunitiesToTribeBubbles,
   type VenueMicroCommunity,
@@ -70,6 +69,12 @@ interface InsightsResponse {
   status?: string;
   message?: string;
   microCommunities?: unknown;
+  venueName?: string;
+  heatmapZones?: any[];
+  vibeMessages?: any[];
+  liveCount?: any;
+  connectionDensity?: any;
+  stickyScore?: any;
 }
 
 const fetcher = (url: string) => fetchInsightsApiJson<InsightsResponse>(url);
@@ -145,12 +150,37 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         }
       : data;
 
-  const stickyForView = isDemoFallback ? mockVenueInsights.stickyScore : emptyStickyScore;
+  const stickyForView = isDemoFallback
+    ? mockVenueInsights.stickyScore
+    : (data?.stickyScore ?? emptyStickyScore);
   const densityForView = isDemoFallback
     ? mockVenueInsights.connectionDensity
-    : emptyConnectionDensity;
-  const liveForView = isDemoFallback ? mockVenueInsights.liveCount : emptyLiveCount;
-  const vibeMessages: VibeMessage[] = isDemoFallback ? mockVenueInsights.vibeStream : [];
+    : (data?.connectionDensity ?? emptyConnectionDensity);
+  const liveForView = isDemoFallback
+    ? mockVenueInsights.liveCount
+    : (data?.liveCount ?? emptyLiveCount);
+
+  const vibeMessagesForStream: VibeMessage[] = useMemo(() => {
+    if (isDemoFallback) return mockVenueInsights.vibeStream;
+    const raw = data?.vibeMessages;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((m: any, i: number) => ({
+      id: typeof m?.id === "string" ? m.id : `vibe-${i}`,
+      message: typeof m?.message === "string" ? m.message : "",
+      sentiment: (m?.sentiment ?? "neutral") as VibeMessage["sentiment"],
+      category: (m?.category ?? "general") as VibeMessage["category"],
+      timestamp:
+        m?.timestamp instanceof Date
+          ? m.timestamp
+          : new Date(
+              typeof m?.timestamp === "string" || typeof m?.timestamp === "number"
+                ? m.timestamp
+                : Date.now(),
+            ),
+      icon: m?.icon,
+    }));
+  }, [data?.vibeMessages, isDemoFallback]);
+
   const advancedVenueId = venueId ?? (isDemoFallback ? "demo" : undefined);
 
   const tribeChartTribes: TribeBubble[] = useMemo(() => {
@@ -326,7 +356,13 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         variants={itemVariants}
         className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"
       >
-        <HeatmapView zones={isDemoFallback ? mockVenueInsights.heatmapZones : []} />
+        <HeatmapView
+          zones={
+            (isDemoFallback
+              ? mockVenueInsights.heatmapZones
+              : (data?.heatmapZones ?? [])) as HeatmapZone[]
+          }
+        />
         <TribeChart tribes={tribeChartTribes} />
       </motion.div>
 
@@ -433,7 +469,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         </GlassPanel>
 
         {/* Vibe Stream */}
-        <VibeStream messages={vibeMessages} />
+        <VibeStream messages={vibeMessagesForStream} />
       </motion.div>
 
       {/* FOURTH ROW: Additional Analytics */}

@@ -1,6 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
+import { buildInsightsVenueAugmentation } from "@/lib/server/insightsVenueAugmentation";
+
+const emptyAugmentation = {
+  heatmapZones: [] as unknown[],
+  vibeMessages: [] as unknown[],
+  liveCount: {
+    current: 0,
+    peak: 0,
+    peakTime: "—",
+    capacity: 1,
+    trend: Array(12).fill(0),
+  },
+  connectionDensity: {
+    value: 0,
+    totalArea: 0,
+    activeZones: 0,
+    trend: "stable" as const,
+  },
+  stickyScore: {
+    score: 0,
+    trend: "stable" as const,
+    change: 0,
+    breakdown: {
+      repeatVisitors: 0,
+      avgConnectionsPerVisit: 0,
+      communityEngagement: 0,
+    },
+  },
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,16 +50,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. Get Venue ID
     const { searchParams } = new URL(request.url);
     let venueId = searchParams.get("venue_id");
 
     if (!venueId) {
-      // Try to get from user metadata
       venueId = user.user_metadata?.venue_id;
     }
 
-    // No venue linked — return empty aggregates (no demo/sample analytics).
     if (!venueId) {
       return NextResponse.json({
         status: "no_venue",
@@ -42,19 +68,49 @@ export async function GET(request: NextRequest) {
         peakHour: 0,
         retentionRate: "0%",
         busiestDay: "N/A",
+        ...emptyAugmentation,
       });
     }
 
-    // 4. Query Connections
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { data: membership, error: membershipError } = await supabase
+      .from("venue_managers")
+      .select("id")
+      .eq("venue_id", venueId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (membershipError) {
+      console.error("insights/venue venue_managers:", membershipError.message);
+      return NextResponse.json({ error: "Failed to verify access" }, { status: 500 });
+    }
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: "Not a manager for this venue" },
+        { status: 403 },
+      );
+    }
+
+    const { data: venueRow, error: venueError } = await supabase
+      .from("venues")
+      .select("id, name, location")
+      .eq("id", venueId)
+      .maybeSingle();
+
+    if (venueError || !venueRow) {
+      return NextResponse.json({ error: "Venue not found" }, { status: 404 });
+    }
+
+    const venueName = venueRow.name?.trim() || "Venue";
+
+    const thirtyDaysAgoMs = Date.now() - 30 * 86400000;
 
     const { data: connections, error: connectionsError } = await supabase
       .from("connections")
-      .select("created_at, created") // Select both to be safe
-      .eq("location_id", venueId)
+      .select("id, created, expiry_state, last_message_at, vibe_rating")
+      .or(`venue_id.eq.${venueId},location_id.eq.${venueId}`)
       .eq("include_in_business_insights", true)
-      .gte("created_at", thirtyDaysAgo.toISOString());
+      .gt("created", thirtyDaysAgoMs);
 
     if (connectionsError) {
       console.error("Error fetching connections:", connectionsError);
@@ -64,42 +120,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 5. Privacy Check (k-anonymity)
-    const totalConnections = connections.length;
+    const rows = connections ?? [];
+    const totalConnections = rows.length;
     if (totalConnections < 5) {
       return NextResponse.json({
         status: "insufficient_data",
         message:
           "Insufficient Data: Less than 5 connections in the last 30 days.",
+        ...emptyAugmentation,
       });
     }
 
-    // 6. Process Data
-    // Histogram by hour
     const hourlyDistribution = new Array(24).fill(0);
-    // Daily distribution for line chart
     const dailyDistribution: Record<string, number> = {};
+    let keptCount = 0;
 
-    connections.forEach((conn) => {
-      // Use created_at if available, otherwise created (assuming timestamp or ISO)
-      const dateStr = conn.created_at || conn.created;
-      const date = new Date(dateStr);
-
-      // Hourly
+    for (const conn of rows) {
+      const ts = typeof conn.created === "number" ? conn.created : 0;
+      const date = new Date(ts);
       const hour = date.getHours();
       hourlyDistribution[hour]++;
 
-      // Daily (YYYY-MM-DD)
       const dayKey = date.toISOString().split("T")[0];
       dailyDistribution[dayKey] = (dailyDistribution[dayKey] || 0) + 1;
-    });
 
-    // Format daily data for chart
+      if (conn.expiry_state === "kept") keptCount += 1;
+    }
+
     const dailyData = Object.entries(dailyDistribution)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Calculate Peak Hour
     const maxHourlyCount = Math.max(...hourlyDistribution);
     const peakHour = hourlyDistribution.indexOf(maxHourlyCount);
 
@@ -117,13 +168,31 @@ export async function GET(request: NextRequest) {
         })()
       : "N/A";
 
+    const retentionRate =
+      totalConnections > 0
+        ? `${((keptCount / totalConnections) * 100).toFixed(1)}%`
+        : "0%";
+
+    const augmentation = await buildInsightsVenueAugmentation(
+      supabase,
+      venueId,
+      venueName,
+      rows,
+    );
+
     return NextResponse.json({
+      venueName,
       totalConnections,
       hourlyDistribution,
       dailyData,
       peakHour,
-      retentionRate: "N/A",
+      retentionRate,
       busiestDay: busiestRealDay,
+      heatmapZones: augmentation.heatmapZones,
+      vibeMessages: augmentation.vibeMessages,
+      liveCount: augmentation.liveCount,
+      connectionDensity: augmentation.connectionDensity,
+      stickyScore: augmentation.stickyScore,
     });
   } catch (error) {
     console.error("API Error:", error);

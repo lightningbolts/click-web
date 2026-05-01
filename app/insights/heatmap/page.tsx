@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
+import useSWR from 'swr';
 import { MapPin, Flame, TrendingUp, BarChart2 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import HeatmapView from '@/components/insights/HeatmapView';
 import { mockVenueInsights, type HeatmapZone } from '@/lib/insights/mockData';
 import { DemoBanner } from '@/components/insights/DemoBanner';
 import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
+import { useAuth } from '@/lib/AuthContext';
+import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 import {
   BarChart,
   Bar,
@@ -18,6 +22,14 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+
+interface InsightsHeatmapPayload {
+  heatmapZones?: unknown[];
+  status?: string;
+}
+
+const insightsFetcher = (url: string) =>
+  fetchInsightsApiJson<InsightsHeatmapPayload>(url);
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,7 +66,22 @@ function IntensityBadge({ intensity }: { intensity: number }) {
 
 export default function HeatmapPage() {
   const { demoMode } = useInsightsDemo();
-  const zones: HeatmapZone[] = demoMode ? mockVenueInsights.heatmapZones : [];
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const venueId = searchParams.get('venue_id') ?? undefined;
+  const insightsUrl = user
+    ? venueId
+      ? `/api/insights/${venueId}`
+      : '/api/insights/venue'
+    : null;
+  const { data: apiPayload } = useSWR(insightsUrl, insightsFetcher);
+
+  const zones: HeatmapZone[] = useMemo(() => {
+    if (demoMode) return mockVenueInsights.heatmapZones;
+    const raw = apiPayload?.heatmapZones;
+    if (Array.isArray(raw) && raw.length > 0) return raw as HeatmapZone[];
+    return [];
+  }, [demoMode, apiPayload?.heatmapZones]);
   const sorted = [...zones].sort((a, b) => b.connections - a.connections);
   const totalConnections = zones.reduce((s, z) => s + z.connections, 0);
   const maxZoneConnections = sorted[0]?.connections ?? 1;

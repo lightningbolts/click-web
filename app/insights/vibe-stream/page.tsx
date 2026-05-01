@@ -1,6 +1,9 @@
 'use client';
 
+import { useMemo, type ElementType } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'next/navigation';
+import useSWR from 'swr';
 import {
   MessageSquare,
   ThumbsUp,
@@ -17,6 +20,8 @@ import VibeStream from '@/components/insights/VibeStream';
 import { mockVenueInsights, type VibeMessage } from '@/lib/insights/mockData';
 import { DemoBanner } from '@/components/insights/DemoBanner';
 import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
+import { useAuth } from '@/lib/AuthContext';
+import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 import {
   BarChart,
   Bar,
@@ -40,7 +45,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 };
 
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
+const CATEGORY_ICONS: Record<string, ElementType> = {
   music: Music,
   atmosphere: Sparkles,
   crowd: Users,
@@ -62,9 +67,46 @@ const SENTIMENT_CONFIG = {
   neutral: { color: '#f59e0b', icon: Minus, label: 'Neutral' },
 };
 
+interface InsightsVibePayload {
+  vibeMessages?: unknown[];
+  status?: string;
+}
+
+const insightsFetcher = (url: string) =>
+  fetchInsightsApiJson<InsightsVibePayload>(url);
+
 export default function VibeStreamPage() {
   const { demoMode } = useInsightsDemo();
-  const messages: VibeMessage[] = demoMode ? mockVenueInsights.vibeStream : [];
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const venueId = searchParams.get('venue_id') ?? undefined;
+  const insightsUrl = user
+    ? venueId
+      ? `/api/insights/${venueId}`
+      : '/api/insights/venue'
+    : null;
+  const { data: apiPayload } = useSWR(insightsUrl, insightsFetcher);
+
+  const messages: VibeMessage[] = useMemo(() => {
+    if (demoMode) return mockVenueInsights.vibeStream;
+    const raw = apiPayload?.vibeMessages;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((m: any, i: number) => ({
+      id: typeof m?.id === 'string' ? m.id : `vibe-${i}`,
+      message: typeof m?.message === 'string' ? m.message : '',
+      sentiment: (m?.sentiment ?? 'neutral') as VibeMessage['sentiment'],
+      category: (m?.category ?? 'general') as VibeMessage['category'],
+      timestamp:
+        m?.timestamp instanceof Date
+          ? m.timestamp
+          : new Date(
+              typeof m?.timestamp === 'string' || typeof m?.timestamp === 'number'
+                ? m.timestamp
+                : Date.now(),
+            ),
+      icon: m?.icon,
+    }));
+  }, [demoMode, apiPayload?.vibeMessages]);
 
   // Sentiment counts
   const sentiment = {

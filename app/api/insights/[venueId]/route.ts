@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
 import { parseMicroCommunitiesRpc } from '@/lib/insights/microCommunities';
+import { buildInsightsVenueAugmentation } from '@/lib/server/insightsVenueAugmentation';
 
 /**
  * Insights API — returns anonymized, aggregated analytics for a venue.
@@ -26,29 +27,49 @@ export async function GET(
             );
         }
 
-        // Venue ownership check
-        const { data: venue, error: venueError } = await supabase
-            .from('claimed_venues')
-            .select('*')
-            .eq('id', venueId)
-            .eq('owner_user_id', user.id)
-            .single();
+        const { data: membership, error: membershipError } = await supabase
+            .from('venue_managers')
+            .select('id')
+            .eq('venue_id', venueId)
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-        if (venueError || !venue) {
+        if (membershipError) {
+            console.error('insights venue_managers:', membershipError.message);
+            return NextResponse.json({ error: 'Failed to verify access' }, { status: 500 });
+        }
+
+        if (!membership) {
             return NextResponse.json(
                 { error: 'Venue not found or not authorized', status: 'unauthorized' },
                 { status: 403 }
             );
         }
 
-        const venueName = venue.venue_name;
-        const semanticLocation = venue.semantic_location || venueName;
+        const { data: venueRow, error: venueRowError } = await supabase
+            .from('venues')
+            .select('id, name, location')
+            .eq('id', venueId)
+            .maybeSingle();
+
+        if (venueRowError || !venueRow) {
+            return NextResponse.json(
+                { error: 'Venue not found or not authorized', status: 'unauthorized' },
+                { status: 403 }
+            );
+        }
+
+        const venueName = venueRow.name?.trim() || 'Venue';
+        const semanticLocation =
+            (typeof venueRow.location === 'string' && venueRow.location.trim())
+                ? venueRow.location.trim()
+                : venueName;
 
         // Query connections for this venue (anonymized aggregation only)
         const { data: connections, error: connError } = await supabase
             .from('connections')
-            .select('created, expiry_state, last_message_at')
-            .eq('semantic_location', semanticLocation)
+            .select('id, created, expiry_state, last_message_at, vibe_rating')
+            .or(`venue_id.eq.${venueId},location_id.eq.${venueId}`)
             .eq('include_in_business_insights', true);
 
         if (connError) {
@@ -99,26 +120,24 @@ export async function GET(
         const busiestDay = dayNames[dayOfWeekCounts.indexOf(Math.max(...dayOfWeekCounts))];
 
         // Top interest tags among connected users at this venue
-        const { data: tagData } = await supabase
-            .rpc('get_venue_top_tags', { venue_location: semanticLocation })
-            .limit(10);
+        const { data: tagData } = await supabase.rpc('get_venue_top_tags', {
+            venue_location: semanticLocation,
+        });
 
         let microCommunities: ReturnType<typeof parseMicroCommunitiesRpc> = [];
-        const { data: venueManagerRow } = await supabase
-            .from('venue_managers')
-            .select('venue_id')
-            .eq('venue_id', venueId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-        if (venueManagerRow?.venue_id) {
-            const { data: mcJson, error: mcErr } = await supabase.rpc('insights_venue_micro_communities', {
-                venue_id_param: venueManagerRow.venue_id,
-            });
-            if (!mcErr && mcJson != null) {
-                microCommunities = parseMicroCommunitiesRpc(mcJson);
-            }
+        const { data: mcJson, error: mcErr } = await supabase.rpc('insights_venue_micro_communities', {
+            venue_id_param: venueId,
+        });
+        if (!mcErr && mcJson != null) {
+            microCommunities = parseMicroCommunitiesRpc(mcJson);
         }
+
+        const augmentation = await buildInsightsVenueAugmentation(
+            supabase,
+            venueId,
+            venueName,
+            rows,
+        );
 
         return NextResponse.json({
             venueName,
@@ -131,6 +150,11 @@ export async function GET(
             keptRatio: totalConnections > 0 ? +(keptCount / totalConnections).toFixed(2) : 0,
             topTags: tagData || [],
             microCommunities,
+            heatmapZones: augmentation.heatmapZones,
+            vibeMessages: augmentation.vibeMessages,
+            liveCount: augmentation.liveCount,
+            connectionDensity: augmentation.connectionDensity,
+            stickyScore: augmentation.stickyScore,
             status: 'success',
         });
     } catch (error) {

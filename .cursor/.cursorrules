@@ -1,8 +1,7 @@
-CRITICAL CODEBASE EXPLORATION RULES:
-1. NO BASH OR PYTHON SCRIPTS: You are strictly forbidden from using `grep`, `rg`, `find`, `cat`, `sed`, or writing custom Python scripts to search for code, read files, or parse text dumps.
-2. USE THE GRAPH: You must exclusively use your `codebase-memory` MCP tools to find code relationships and implementations.
-3. BE PRECISE, NOT VAGUE: When using `search_graph`, do NOT pass broad sentences into the `query` parameter. Instead, use:
-   - `name_pattern` for exact component/route names (e.g., ".*Insights.*")
-   - `semantic_query` with specific arrays of keywords (e.g., ["insights", "vibe", "radar", "page"])
-   - `label` to restrict searches (e.g., "Function", "Module", "Class")
-4. FETCH EXACT NODES: If you need to see the code inside a file, use the graph tools to fetch the exact node source rather than dumping the entire file into context.
+MCP TOOL USAGE
+- Use the `codebase-memory` MCP server exclusively for structural searches.
+- When commanded to "Index this project", run `index_repository` immediately with zero preliminary exploration or verification searches.
+
+CODE PRACTICES
+- Make sure all test cases pass and builds compile correctly for both iOS, Android, and Web whenever applicable.
+- Ensure NO regressions to the UI layout and backend existing logic. It is imperative for the implementation to be 100% correct because this will go into production and our company will depend on these features.
