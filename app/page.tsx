@@ -460,9 +460,9 @@ export default function Home() {
                     id="landing-shot-share-availability"
                     src={LANDING_IMG.shareAvailability}
                     alt="Click mobile — Share availability with timeframe and intent tag"
-                    className="mx-auto w-full max-w-[min(100%,380px)]"
+                    className="mx-auto w-full max-w-[280px]"
                     aspectClassName="aspect-[9/19]"
-                    sizes="(max-width: 768px) min(100vw, 380px), 360px"
+                    sizes="(max-width: 768px) min(100vw, 320px), 280px"
                   />
                 </div>
               </div>
