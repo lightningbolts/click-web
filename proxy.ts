@@ -67,6 +67,18 @@ export async function proxy(request: NextRequest) {
     );
   }
 
+  const pathname = request.nextUrl.pathname;
+  // API routes authenticate in each Route Handler (`getSupabaseFromRouteRequest`, etc.). Running
+  // `getUser()` here duplicates a network round-trip to Supabase Auth on every `/api/*` request and
+  // dominated dev timing (see Next `proxy.ts` segment). Page navigations still refresh the session below.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -98,7 +110,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
   const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
 
   if (adminRoute) {

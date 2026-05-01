@@ -1598,38 +1598,27 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     try {
       const headers = await getAuthHeaders();
-      const [activeRes, archivedRes, mapRes] = await Promise.all([
-        fetch('/api/connections', { headers, cache: 'no-store' }),
-        fetch('/api/connections?statusScope=archived', { headers, cache: 'no-store' }),
-        fetch('/api/connections?statusScope=map', { headers, cache: 'no-store' }),
-      ]);
+      const bundleRes = await fetch('/api/connections?bundle=dashboard', {
+        headers,
+        cache: 'no-store',
+      });
 
-      if (!activeRes.ok) {
-        const errPayload = (await activeRes.json().catch(() => ({}))) as { error?: string };
-        console.error('Error fetching connections:', errPayload.error || activeRes.statusText);
+      if (!bundleRes.ok) {
+        const errPayload = (await bundleRes.json().catch(() => ({}))) as { error?: string };
+        console.error('Error fetching connections:', errPayload.error || bundleRes.statusText);
         setEmptyConnections();
         return;
       }
 
-      if (!archivedRes.ok) {
-        console.warn('Archived connections fetch skipped:', archivedRes.statusText);
-      }
+      const bundlePayload = (await bundleRes.json()) as {
+        active?: Record<string, unknown>[];
+        archived?: Record<string, unknown>[];
+        map?: Record<string, unknown>[];
+      };
 
-      if (!mapRes.ok) {
-        console.warn('Map connections fetch skipped:', mapRes.statusText);
-      }
-
-      const activePayload = (await activeRes.json()) as { connections?: Record<string, unknown>[] };
-      const archivedPayload = archivedRes.ok
-        ? ((await archivedRes.json()) as { connections?: Record<string, unknown>[] })
-        : { connections: [] };
-      const mapPayload = mapRes.ok
-        ? ((await mapRes.json()) as { connections?: Record<string, unknown>[] })
-        : { connections: [] };
-
-      const activeRows = activePayload.connections ?? [];
-      const archivedRows = archivedPayload.connections ?? [];
-      const mapRows = mapPayload.connections ?? [];
+      const activeRows = bundlePayload.active ?? [];
+      const archivedRows = bundlePayload.archived ?? [];
+      const mapRows = bundlePayload.map ?? [];
 
       const archivedIds = new Set(
         archivedRows
@@ -1927,7 +1916,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
 
       setConnectionRecords(records);
-      setMapConnectionRecords(mapRes.ok ? mapRecords : records);
+      setMapConnectionRecords(mapRecords);
     } catch (err) {
       console.error('Unexpected error fetching connections:', err);
       setEmptyConnections();

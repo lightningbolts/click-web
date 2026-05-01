@@ -15,7 +15,7 @@ import {
 /**
  * Connections API
  *
- * GET    → Fetch connections (`statusScope`: default active | `archived` | `map` = all non-hidden for memory map)
+ * GET    → Fetch connections (`statusScope`: default active | `archived` | `map` = all non-hidden for memory map), or `bundle=dashboard` for active+archived+map in one response
  * POST   → Create a new connection with proximity validation (Layers 2 & 3)
  * DELETE → Per-user hide: insert into `connection_hidden` (no `connections` row delete, no `status = removed`)
  * PATCH  → Restore from archive: delete `connection_archives` row (legacy `status = archived` fallback)
@@ -387,6 +387,8 @@ async function enrichEncounterRelativeAltitude(
 const INSIGHTS_QUERY_PARAM = 'includeInsights';
 /** `active` (default) | `archived` — ignored when `includeInsights` is set */
 const STATUS_SCOPE_PARAM = 'statusScope';
+/** Dashboard: one HTTP round-trip for active + archived + map (`?bundle=dashboard`). */
+const BUNDLE_PARAM = 'bundle';
 
 function isInsightsScope(searchParams: URLSearchParams): boolean {
   const v = searchParams.get(INSIGHTS_QUERY_PARAM);
@@ -453,6 +455,64 @@ function dedupeIds(ids: string[]): string[] {
   return [...new Set(ids)];
 }
 
+async function executeActiveConnectionsQuery(
+  supabase: UserScopedSupabase,
+  userId: string,
+  excludedIds: string[],
+) {
+  let query = supabase
+    .from('connections')
+    .select('*, connection_encounters(*)')
+    .contains('user_ids', [userId])
+    .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
+    .order('created', { ascending: false })
+    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+
+  if (excludedIds.length > 0) {
+    query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+  }
+
+  return await query;
+}
+
+async function executeArchivedConnectionsQuery(
+  supabase: UserScopedSupabase,
+  userId: string,
+  includeIds: string[],
+) {
+  if (includeIds.length === 0) {
+    return { data: [], error: null };
+  }
+
+  return await supabase
+    .from('connections')
+    .select('*, connection_encounters(*)')
+    .contains('user_ids', [userId])
+    .in('id', includeIds)
+    .order('created', { ascending: false })
+    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+}
+
+async function executeMapConnectionsQuery(
+  supabase: UserScopedSupabase,
+  userId: string,
+  hiddenForUser: string[],
+) {
+  const hiddenSet = new Set(hiddenForUser);
+  let mapQuery = supabase
+    .from('connections')
+    .select('*, connection_encounters(*)')
+    .contains('user_ids', [userId])
+    .order('created', { ascending: false })
+    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+
+  if (hiddenSet.size > 0) {
+    mapQuery = mapQuery.not('id', 'in', `(${[...hiddenSet].join(',')})`);
+  }
+
+  return await mapQuery;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { supabase, user, authError: userError } = await getSupabaseFromRouteRequest(request);
@@ -460,14 +520,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const searchParams = request.nextUrl.searchParams;
+    const insights = isInsightsScope(searchParams);
+
     const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
     if (!sweep.ok) {
       console.error('[connections GET] sweep_stale_connections_for_user failed:', sweep.message);
       return NextResponse.json({ error: sweep.message }, { status: 400 });
     }
-
-    const searchParams = request.nextUrl.searchParams;
-    const insights = isInsightsScope(searchParams);
 
     // Insights: full history — no junction filtering (avoids hiding rows from analytics views).
     if (insights) {
@@ -485,6 +545,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ connections: connections || [] });
     }
 
+    // Dashboard bundle: one sweep + one junction fetch + parallel selects (replaces 3 HTTP calls).
+    if (searchParams.get(BUNDLE_PARAM)?.toLowerCase() === 'dashboard') {
+      const [archivedForUser, hiddenForUser] = await Promise.all([
+        fetchJunctionConnectionIds(supabase, 'connection_archives', user.id),
+        fetchJunctionConnectionIds(supabase, 'connection_hidden', user.id),
+      ]);
+
+      const excludedIds = dedupeIds([...archivedForUser, ...hiddenForUser]);
+      const hiddenSet = new Set(hiddenForUser);
+      const includeArchivedIds = archivedForUser.filter((id) => !hiddenSet.has(id));
+
+      const [activeResult, archivedResult, mapResult] = await Promise.all([
+        executeActiveConnectionsQuery(supabase, user.id, excludedIds),
+        executeArchivedConnectionsQuery(supabase, user.id, includeArchivedIds),
+        executeMapConnectionsQuery(supabase, user.id, hiddenForUser),
+      ]);
+
+      if (activeResult.error) {
+        console.error('Error fetching connections (bundle active):', activeResult.error);
+        return NextResponse.json({ error: activeResult.error.message }, { status: 400 });
+      }
+      if (archivedResult.error) {
+        console.error('Error fetching connections (bundle archived):', archivedResult.error);
+        return NextResponse.json({ error: archivedResult.error.message }, { status: 400 });
+      }
+      if (mapResult.error) {
+        console.error('Error fetching connections (bundle map):', mapResult.error);
+        return NextResponse.json({ error: mapResult.error.message }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        active: activeResult.data ?? [],
+        archived: archivedResult.data ?? [],
+        map: mapResult.data ?? [],
+      });
+    }
+
     const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
 
     const [archivedForUser, hiddenForUser] = await Promise.all([
@@ -494,19 +591,11 @@ export async function GET(request: NextRequest) {
 
     // ─── Memory map: every connection the user is on, minus `connection_hidden` only (no archive filter) ───
     if (scope === 'map') {
-      const hiddenSet = new Set(hiddenForUser);
-      let mapQuery = supabase
-        .from('connections')
-        .select('*, connection_encounters(*)')
-        .contains('user_ids', [user.id])
-        .order('created', { ascending: false })
-        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
-
-      if (hiddenSet.size > 0) {
-        mapQuery = mapQuery.not('id', 'in', `(${[...hiddenSet].join(',')})`);
-      }
-
-      const { data: mapConnections, error: mapError } = await mapQuery;
+      const { data: mapConnections, error: mapError } = await executeMapConnectionsQuery(
+        supabase,
+        user.id,
+        hiddenForUser,
+      );
 
       if (mapError) {
         console.error('Error fetching map connections:', mapError);
@@ -521,17 +610,11 @@ export async function GET(request: NextRequest) {
       const hiddenSet = new Set(hiddenForUser);
       const includeIds = archivedForUser.filter((id) => !hiddenSet.has(id));
 
-      if (includeIds.length === 0) {
-        return NextResponse.json({ connections: [] });
-      }
-
-      const { data: connections, error } = await supabase
-        .from('connections')
-        .select('*, connection_encounters(*)')
-        .contains('user_ids', [user.id])
-        .in('id', includeIds)
-        .order('created', { ascending: false })
-        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+      const { data: connections, error } = await executeArchivedConnectionsQuery(
+        supabase,
+        user.id,
+        includeIds,
+      );
 
       if (error) {
         console.error('Error fetching archived connections:', error);
@@ -543,19 +626,11 @@ export async function GET(request: NextRequest) {
     // ─── Active channel: visible lifecycle states, excluding archived ∪ hidden junction ids ───
     const excludedIds = dedupeIds([...archivedForUser, ...hiddenForUser]);
 
-    let query = supabase
-      .from('connections')
-      .select('*, connection_encounters(*)')
-      .contains('user_ids', [user.id])
-      .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
-      .order('created', { ascending: false })
-      .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
-
-    if (excludedIds.length > 0) {
-      query = query.not('id', 'in', `(${excludedIds.join(',')})`);
-    }
-
-    const { data: connections, error } = await query;
+    const { data: connections, error } = await executeActiveConnectionsQuery(
+      supabase,
+      user.id,
+      excludedIds,
+    );
 
     if (error) {
       console.error('Error fetching connections:', error);

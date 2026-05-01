@@ -155,7 +155,7 @@ function buildConnectionFeatures(positioned: PositionedConnection[]): GeoJSON.Fe
 /**
  * MapLibre GL map for connection locations + optional map beacon layers (clustered).
  *
- * **Data contract:** pass rows from `GET /api/connections?statusScope=map` (or equivalent).
+ * **Data contract:** pass rows from `GET /api/connections?statusScope=map` or the `map` array from `?bundle=dashboard`.
  */
 export default function ConnectionMap({ connections, onConnectionClick }: ConnectionMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
