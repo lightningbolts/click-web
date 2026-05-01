@@ -1,0 +1,8 @@
+CRITICAL CODEBASE EXPLORATION RULES:
+1. NO BASH OR PYTHON SCRIPTS: You are strictly forbidden from using `grep`, `rg`, `find`, `cat`, `sed`, or writing custom Python scripts to search for code, read files, or parse text dumps.
+2. USE THE GRAPH: You must exclusively use your `codebase-memory` MCP tools to find code relationships and implementations.
+3. BE PRECISE, NOT VAGUE: When using `search_graph`, do NOT pass broad sentences into the `query` parameter. Instead, use:
+   - `name_pattern` for exact component/route names (e.g., ".*Insights.*")
+   - `semantic_query` with specific arrays of keywords (e.g., ["insights", "vibe", "radar", "page"])
+   - `label` to restrict searches (e.g., "Function", "Module", "Class")
+4. FETCH EXACT NODES: If you need to see the code inside a file, use the graph tools to fetch the exact node source rather than dumping the entire file into context.
