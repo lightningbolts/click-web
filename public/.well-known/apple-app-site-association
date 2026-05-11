@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.click.app",
+        "paths": ["/api/users/*/public-profile", "/u/*", "/users/*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.com.click.app"]
+  }
+}

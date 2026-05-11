@@ -40,7 +40,7 @@ export async function assertHubGeofenceFromCoords(
 
   const { data: venue, error } = await admin
     .from('hub_venues')
-    .select('id, geofence_lat, geofence_long, radius_meters')
+    .select('id, geofence_lat, geofence_long, radius_meters, expires_at')
     .eq('id', trimmed)
     .maybeSingle();
 
@@ -50,6 +50,14 @@ export async function assertHubGeofenceFromCoords(
   }
   if (!venue) {
     return NextResponse.json({ error: 'Unknown hub' }, { status: 404 });
+  }
+
+  const expiresRaw = venue.expires_at as string | null | undefined;
+  if (expiresRaw) {
+    const expMs = Date.parse(expiresRaw);
+    if (Number.isFinite(expMs) && expMs <= Date.now()) {
+      return NextResponse.json({ error: 'Hub expired' }, { status: 410 });
+    }
   }
 
   const radius =
