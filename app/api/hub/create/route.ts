@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   const admin = createChatGatekeeperAdmin();
 
-  const hubRow = {
+  const { error: hubErr } = await admin.from('hub_venues').insert({
     id: hubId,
     name,
     category,
@@ -77,16 +77,20 @@ export async function POST(request: NextRequest) {
     radius_meters: location.radius,
     expires_at: expires_at_iso,
     creator_id: auth.user.id,
-  };
+  });
 
-  const { error: rpcErr } = await admin.rpc('create_hub_with_participant', {
-    hub_row: hubRow,
+  if (hubErr) {
+    console.error('hub/create insert error:', hubErr.message);
+    return NextResponse.json({ error: 'Failed to create hub' }, { status: 500 });
+  }
+
+  const { error: partErr } = await admin.from('hub_participants').insert({
+    hub_id: hubId,
     user_id: auth.user.id,
   });
 
-  if (rpcErr) {
-    console.error('hub/create RPC error:', rpcErr.message);
-    return NextResponse.json({ error: 'Failed to create hub' }, { status: 500 });
+  if (partErr) {
+    console.error('hub/create participant insert error:', partErr.message);
   }
 
   return NextResponse.json({
