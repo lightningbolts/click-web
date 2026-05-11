@@ -12,6 +12,16 @@ function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
+function isEncounterRateLimitError(err: { message?: string; details?: string; hint?: string } | null): boolean {
+  if (!err) return false;
+  const combined = [
+    err.message ?? '',
+    err.details ?? '',
+    err.hint ?? '',
+  ].join(' ');
+  return combined.includes('encounter_rate_limit_3h');
+}
+
 type ConnectionRow = { id: string; user_ids?: string[] | null };
 
 function pickPairwiseConnection(rows: ConnectionRow[] | null, selfId: string, peerId: string): string | null {
@@ -89,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     if (insErr) {
       const msg = insErr.message ?? '';
-      if (msg.includes('encounter_rate_limit_3h')) {
+      if (isEncounterRateLimitError(insErr)) {
         return NextResponse.json(
           {
             success: false,
@@ -101,7 +111,7 @@ export async function POST(request: NextRequest) {
         );
       }
       console.error('connections/encounter insert:', msg);
-      return NextResponse.json({ error: 'Failed to record encounter', detail: msg }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to record encounter' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -112,6 +122,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unexpected error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error('connections/encounter error:', msg);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

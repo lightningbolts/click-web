@@ -16,12 +16,27 @@ const files = [
   join(root, 'public', '.well-known', 'assetlinks.json'),
 ];
 
+const PLACEHOLDER_PATTERNS = ['<%=', '{{', '__REPLACE__', 'REPLACE_ME'];
+
 let failed = false;
 for (const f of files) {
   const raw = readFileSync(f, 'utf8');
   try {
     JSON.parse(raw);
-    console.log(`OK  ${f}`);
+
+    // Check for placeholder tokens
+    let foundPlaceholder = false;
+    for (const pattern of PLACEHOLDER_PATTERNS) {
+      if (raw.includes(pattern)) {
+        failed = true;
+        foundPlaceholder = true;
+        console.error(`BAD ${f}: Contains deploy-time placeholder token "${pattern}"`);
+      }
+    }
+
+    if (!foundPlaceholder) {
+      console.log(`OK  ${f}`);
+    }
   } catch (e) {
     failed = true;
     console.error(`BAD ${f}:`, e instanceof Error ? e.message : e);

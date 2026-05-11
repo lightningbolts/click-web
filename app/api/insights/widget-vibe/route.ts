@@ -9,7 +9,7 @@ import { buildWidgetVibePayload } from '@/lib/insights/widgetVibePayload';
 
 export const revalidate = 300;
 
-const CACHE_HEADER = 'private, s-maxage=300, stale-while-revalidate';
+const CACHE_HEADER = 'public, s-maxage=300, stale-while-revalidate=300';
 
 export async function GET(request: NextRequest) {
   const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);

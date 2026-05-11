@@ -63,6 +63,16 @@ function firstNonEmptyString(values: unknown[]): string | null {
   return null;
 }
 
+function isEncounterRateLimitError(err: { message?: string; details?: string; hint?: string } | null): boolean {
+  if (!err) return false;
+  const combined = [
+    err.message ?? '',
+    err.details ?? '',
+    err.hint ?? '',
+  ].join(' ');
+  return combined.includes('encounter_rate_limit_3h');
+}
+
 function extractDisplayLocation(semanticLocation: Record<string, unknown>): string {
   const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
   if (!address) return DISPLAY_LOCATION_FALLBACK;
@@ -1153,8 +1163,7 @@ export async function POST(request: NextRequest) {
     let encounter_logged = true;
     let encounter_reason: string | undefined;
     if (encounterErr) {
-      const msg = encounterErr.message ?? '';
-      if (msg.includes('encounter_rate_limit_3h')) {
+      if (isEncounterRateLimitError(encounterErr)) {
         encounter_logged = false;
         encounter_reason = 'rate_limit_active';
         await adminClient.from('chats').update({ updated_at: now }).eq('connection_id', connection.id);

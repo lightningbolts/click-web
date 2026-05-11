@@ -79,20 +79,14 @@ export async function POST(request: NextRequest) {
     creator_id: auth.user.id,
   };
 
-  const { error: hubErr } = await admin.from('hub_venues').insert(hubRow);
-  if (hubErr) {
-    console.error('hub/create hub_venues:', hubErr.message);
-    return NextResponse.json({ error: 'Failed to create hub', detail: hubErr.message }, { status: 500 });
-  }
-
-  const { error: partErr } = await admin.from('hub_participants').insert({
-    hub_id: hubId,
+  const { error: rpcErr } = await admin.rpc('create_hub_with_participant', {
+    hub_row: hubRow,
     user_id: auth.user.id,
   });
-  if (partErr) {
-    console.error('hub/create hub_participants:', partErr.message);
-    await admin.from('hub_venues').delete().eq('id', hubId);
-    return NextResponse.json({ error: 'Failed to register hub participant', detail: partErr.message }, { status: 500 });
+
+  if (rpcErr) {
+    console.error('hub/create RPC error:', rpcErr.message);
+    return NextResponse.json({ error: 'Failed to create hub' }, { status: 500 });
   }
 
   return NextResponse.json({

@@ -235,6 +235,16 @@ function isDuplicateKeyError(err: { message?: string; code?: string } | null): b
   return code === '23505' || msg.includes('duplicate key') || msg.includes('unique constraint');
 }
 
+function isEncounterRateLimitError(err: { message?: string; details?: string; hint?: string } | null): boolean {
+  if (!err) return false;
+  const combined = [
+    err.message ?? '',
+    err.details ?? '',
+    err.hint ?? '',
+  ].join(' ');
+  return combined.includes('encounter_rate_limit_3h');
+}
+
 /** Client `context_tags`: trimmed non-empty strings, order preserved, deduped. */
 function normalizeContextTagsArray(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -831,8 +841,7 @@ Deno.serve(async (req) => {
     if (encLat == null || encLon == null || newBlock == null) {
       const { error: encErr } = await admin.from('connection_encounters').insert(insertRow);
       if (encErr) {
-        const msg = encErr.message ?? '';
-        if (msg.includes('encounter_rate_limit_3h')) {
+        if (isEncounterRateLimitError(encErr)) {
           const nowMs = Date.now();
           await admin.from('chats').update({ updated_at: nowMs }).eq('connection_id', connectionId);
           return 'rate_limited';
@@ -892,8 +901,7 @@ Deno.serve(async (req) => {
 
     const { error: encErr } = await admin.from('connection_encounters').insert(insertRow);
     if (encErr) {
-      const msg = encErr.message ?? '';
-      if (msg.includes('encounter_rate_limit_3h')) {
+      if (isEncounterRateLimitError(encErr)) {
         const nowMs = Date.now();
         await admin.from('chats').update({ updated_at: nowMs }).eq('connection_id', connectionId);
         return 'rate_limited';

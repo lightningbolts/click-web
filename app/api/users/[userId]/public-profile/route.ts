@@ -3,8 +3,8 @@
  * Unauthenticated App Clip / deep-link preview: only non-sensitive display fields.
  */
 
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { createSupabaseServiceRoleClient } from '@/lib/server/supabaseServer';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -25,13 +25,6 @@ function displayName(row: PublicProfileRow): string {
   return 'Click member';
 }
 
-function createServiceReader() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ userId: string }> },
@@ -42,10 +35,7 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
   }
 
-  const admin = createServiceReader();
-  if (!admin) {
-    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
-  }
+  const admin = createSupabaseServiceRoleClient();
 
   const { data, error } = await admin
     .from('users')
@@ -55,7 +45,7 @@ export async function GET(
 
   if (error) {
     console.error('public-profile:', error.message);
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
   if (!data) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
