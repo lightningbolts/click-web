@@ -913,6 +913,8 @@ Deno.serve(async (req) => {
     reason?: string;
   };
   const peerEncounterLogged: PeerBindMeta[] = [];
+  /** True only when this bind created a new row in `connections` (strict server boolean for clients). */
+  let handshakeCreatedNewConnection = false;
   const ensured = await ensureConnectionForMemberSet(memberIds);
   if (!ensured) {
     ids.forEach((peerId) => {
@@ -920,13 +922,14 @@ Deno.serve(async (req) => {
         peerId,
         connectionId: null,
         encounterLogged: false,
-        isNewConnection: true,
+        isNewConnection: false,
         encounterPersistedOnBind: false,
         reason: 'connection_unavailable',
       });
     });
   } else {
     const { connectionId, isNewConnection } = ensured;
+    handshakeCreatedNewConnection = isNewConnection;
     const peerRows = ids
       .map((peerId) => rows.find((r) => r && String(r.user_id) === peerId) as Record<string, unknown> | undefined)
       .filter((r): r is Record<string, unknown> => r != null);
@@ -1031,7 +1034,7 @@ Deno.serve(async (req) => {
             : 0,
       connection_id: meta?.connectionId ?? null,
       encounter_logged,
-      is_new_connection: meta?.isNewConnection ?? true,
+      is_new_connection: meta != null ? meta.isNewConnection : false,
       encounter_persisted_on_bind: meta?.encounterPersistedOnBind ?? false,
       ...(meta?.reason ? { reason: meta.reason } : {}),
     };
@@ -1046,7 +1049,7 @@ Deno.serve(async (req) => {
   const sharedConnectionId = peerEncounterLogged.find((p) => p.connectionId != null)?.connectionId ?? null;
   if (sharedConnectionId != null) {
     responseBody.connection_id = sharedConnectionId;
-    responseBody.is_new_connection = peerEncounterLogged.some((p) => p.isNewConnection);
+    responseBody.is_new_connection = handshakeCreatedNewConnection;
     responseBody.is_group = memberIds.length > 2;
   }
   if (memberIds.length > 2) {
