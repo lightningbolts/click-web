@@ -73,11 +73,12 @@ export async function assertHubGeofenceFromCoords(
   if (distanceM > radius) {
     return NextResponse.json(
       {
-        error: 'Outside hub geofence',
+        error: 'OUT_OF_BOUNDS',
+        message: 'You are no longer at this location.',
         distance_meters: Math.round(distanceM * 100) / 100,
         radius_meters: radius,
       },
-      { status: 403 },
+      { status: 400 },
     );
   }
 
