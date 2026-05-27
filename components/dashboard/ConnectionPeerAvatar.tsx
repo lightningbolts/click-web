@@ -26,12 +26,14 @@ export function ConnectionPeerAvatar({
   imageUrl,
   size = 'md',
   showOnline = false,
+  isCore = false,
   className = '',
 }: {
   label: string;
   imageUrl?: string | null;
   size?: Size;
   showOnline?: boolean;
+  isCore?: boolean;
   className?: string;
 }) {
   const initial = (label.trim().charAt(0) || '?').toUpperCase();
@@ -39,22 +41,29 @@ export function ConnectionPeerAvatar({
   const showImg = trimmed.length > 0;
   const dim = sizeClass[size];
 
+  const coreRing =
+    'rounded-full p-[2.5px] bg-gradient-to-br from-[#9D4EDD] via-[#E8B923] to-[#7B2CBF] shadow-[0_0_12px_rgba(157,78,221,0.35)]';
+
+  const avatarNode = showImg ? (
+    <img src={trimmed} alt="" className={`${dim} rounded-full object-cover`} />
+  ) : (
+    <div
+      className={`flex ${dim} items-center justify-center rounded-full font-semibold text-white shadow-inner`}
+      style={{ background: gradientForLabel(label) }}
+      aria-hidden
+    >
+      {initial}
+    </div>
+  );
+
   return (
     <div className={`relative shrink-0 ${className}`}>
-      {showImg ? (
-        <img
-          src={trimmed}
-          alt=""
-          className={`${dim} rounded-full object-cover`}
-        />
-      ) : (
-        <div
-          className={`flex ${dim} items-center justify-center rounded-full font-semibold text-white shadow-inner`}
-          style={{ background: gradientForLabel(label) }}
-          aria-hidden
-        >
-          {initial}
+      {isCore ? (
+        <div className={coreRing} title="Core connection">
+          <div className="rounded-full bg-zinc-950 p-[1.5px]">{avatarNode}</div>
         </div>
+      ) : (
+        avatarNode
       )}
       {showOnline ? (
         <span

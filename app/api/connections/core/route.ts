@@ -57,7 +57,7 @@ export async function DELETE(request: NextRequest) {
     const gate = await requireConnectionParticipant(request, connectionId);
     if (!gate.ok) return gate.response;
 
-    const { user, connectionId, admin } = gate;
+    const { user, admin } = gate;
 
     const { error } = await admin
       .from('connection_core')

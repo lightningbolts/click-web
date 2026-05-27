@@ -2969,6 +2969,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                           imageUrl={conn.avatarUrl}
                                           size="md"
                                           showOnline={listPeerOnline}
+                                          isCore={coreConnectionIds.has(conn.id)}
                                         />
                                       </button>
                                     ) : (
@@ -2978,20 +2979,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                           imageUrl={conn.avatarUrl}
                                           size="md"
                                           showOnline={false}
+                                          isCore={coreConnectionIds.has(conn.id)}
                                         />
                                       </div>
                                     )}
                                     <div className="min-w-0 flex-1">
                                       <div className="flex min-w-0 items-center gap-2 pr-2">
                                         <p className="truncate font-semibold text-white">{conn.name}</p>
-                                        {coreConnectionIds.has(conn.id) ? (
-                                          <span
-                                            className="inline-flex shrink-0 items-center text-[#7cc3ff]"
-                                            title="Core connection"
-                                          >
-                                            <Star className="h-3.5 w-3.5 fill-current" aria-hidden />
-                                          </span>
-                                        ) : null}
                                         {!isGroupCliqueRow && conn.intentOverlapLabel ? (
                                           <span
                                             className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
