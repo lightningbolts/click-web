@@ -21,6 +21,7 @@ import {
   Zap,
   Volume2,
   Mountain,
+  Star,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -164,6 +165,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
   const [chatListTab, setChatListTab] = useState<'active' | 'archived'>('active');
   const [archivedConnectionIds, setArchivedConnectionIds] = useState<Set<string>>(new Set());
+  const [coreConnectionIds, setCoreConnectionIds] = useState<Set<string>>(new Set());
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
   const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
@@ -1614,6 +1616,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         active?: Record<string, unknown>[];
         archived?: Record<string, unknown>[];
         map?: Record<string, unknown>[];
+        core?: string[];
       };
 
       const activeRows = bundlePayload.active ?? [];
@@ -1626,6 +1629,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
           .filter((id): id is string => typeof id === 'string' && id.length > 0),
       );
       setArchivedConnectionIds(archivedIds);
+      const coreIds = new Set(
+        (bundlePayload.core ?? []).filter((id): id is string => typeof id === 'string' && id.length > 0),
+      );
+      setCoreConnectionIds(coreIds);
       const archiveKey = user.id ? `click:archived-connections:${user.id}` : null;
       if (archiveKey && typeof window !== 'undefined') {
         localStorage.setItem(archiveKey, JSON.stringify(Array.from(archivedIds)));
@@ -2185,6 +2192,62 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
   }, [archiveTableAvailable, isMissingArchiveTableError, updateArchivedIds, user?.id]);
 
+  const addConnectionToCore = useCallback(async (connectionId: string): Promise<boolean> => {
+    setMenuConnectionId(null);
+    setCoreConnectionIds((prev) => new Set(prev).add(connectionId));
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/connections/core', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionId }),
+      });
+      if (!res.ok) {
+        setCoreConnectionIds((prev) => {
+          const next = new Set(prev);
+          next.delete(connectionId);
+          return next;
+        });
+        return false;
+      }
+      return true;
+    } catch {
+      setCoreConnectionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(connectionId);
+        return next;
+      });
+      return false;
+    }
+  }, [getAuthHeaders]);
+
+  const removeConnectionFromCore = useCallback(async (connectionId: string): Promise<boolean> => {
+    setMenuConnectionId(null);
+    setCoreConnectionIds((prev) => {
+      const next = new Set(prev);
+      next.delete(connectionId);
+      return next;
+    });
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(
+        `/api/connections/core?connection_id=${encodeURIComponent(connectionId)}`,
+        {
+          method: 'DELETE',
+          headers,
+        },
+      );
+      if (!res.ok) {
+        setCoreConnectionIds((prev) => new Set(prev).add(connectionId));
+        return false;
+      }
+      return true;
+    } catch {
+      setCoreConnectionIds((prev) => new Set(prev).add(connectionId));
+      return false;
+    }
+  }, [getAuthHeaders]);
+
   const unarchiveConnection = useCallback(
     async (connectionId: string): Promise<boolean> => {
       setMenuConnectionId(null);
@@ -2380,10 +2443,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const activeConnections = useMemo(
     () =>
-      chatCandidates.filter(
-        (c) => !archivedConnectionIds.has(c.id) && c.status !== 'archived',
-      ),
-    [archivedConnectionIds, chatCandidates],
+      chatCandidates
+        .filter((c) => !archivedConnectionIds.has(c.id) && c.status !== 'archived')
+        .sort((left, right) => {
+          const leftCore = coreConnectionIds.has(left.id) ? 1 : 0;
+          const rightCore = coreConnectionIds.has(right.id) ? 1 : 0;
+          if (leftCore !== rightCore) return rightCore - leftCore;
+          const leftTimestamp = left.chatLastMessageAt ?? left.chatUpdatedAt ?? left.dateMet.getTime();
+          const rightTimestamp = right.chatLastMessageAt ?? right.chatUpdatedAt ?? right.dateMet.getTime();
+          return rightTimestamp - leftTimestamp;
+        }),
+    [archivedConnectionIds, chatCandidates, coreConnectionIds],
   );
 
   const archivedConnections = useMemo(() => {
@@ -2702,6 +2772,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
                           selectedConnection.status === 'archived'
                         }
                         isBlocked={selectedConnection.otherUserId ? blockedUserIds.has(selectedConnection.otherUserId) : false}
+                        isCore={coreConnectionIds.has(selectedConnection.id)}
+                        onAddToCore={() => addConnectionToCore(selectedConnection.id)}
+                        onRemoveFromCore={() => removeConnectionFromCore(selectedConnection.id)}
                         onArchive={() => archiveConnection(selectedConnection.id)}
                         onUnarchive={() => unarchiveConnection(selectedConnection.id)}
                         onRemove={() => removeConnection(selectedConnection.id)}
@@ -2911,6 +2984,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     <div className="min-w-0 flex-1">
                                       <div className="flex min-w-0 items-center gap-2 pr-2">
                                         <p className="truncate font-semibold text-white">{conn.name}</p>
+                                        {coreConnectionIds.has(conn.id) ? (
+                                          <span
+                                            className="inline-flex shrink-0 items-center text-[#7cc3ff]"
+                                            title="Core connection"
+                                          >
+                                            <Star className="h-3.5 w-3.5 fill-current" aria-hidden />
+                                          </span>
+                                        ) : null}
                                         {!isGroupCliqueRow && conn.intentOverlapLabel ? (
                                           <span
                                             className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
@@ -3109,6 +3190,23 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         </>
                                       ) : (
                                         <>
+                                          {coreConnectionIds.has(conn.id) ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => removeConnectionFromCore(conn.id)}
+                                              className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                            >
+                                              Remove from Core
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => addConnectionToCore(conn.id)}
+                                              className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                            >
+                                              Add to Core
+                                            </button>
+                                          )}
                                           {isArchived ? (
                                             <button
                                               type="button"

@@ -440,7 +440,7 @@ async function sweepStaleConnectionsForUser(
 
 async function fetchJunctionConnectionIds(
   supabase: UserScopedSupabase,
-  table: 'connection_archives' | 'connection_hidden',
+  table: 'connection_archives' | 'connection_hidden' | 'connection_core',
   userId: string,
 ): Promise<string[]> {
   const { data, error } = await supabase.from(table).select('connection_id').eq('user_id', userId);
@@ -557,9 +557,10 @@ export async function GET(request: NextRequest) {
 
     // Dashboard bundle: one sweep + one junction fetch + parallel selects (replaces 3 HTTP calls).
     if (searchParams.get(BUNDLE_PARAM)?.toLowerCase() === 'dashboard') {
-      const [archivedForUser, hiddenForUser] = await Promise.all([
+      const [archivedForUser, hiddenForUser, coreForUser] = await Promise.all([
         fetchJunctionConnectionIds(supabase, 'connection_archives', user.id),
         fetchJunctionConnectionIds(supabase, 'connection_hidden', user.id),
+        fetchJunctionConnectionIds(supabase, 'connection_core', user.id),
       ]);
 
       const excludedIds = dedupeIds([...archivedForUser, ...hiddenForUser]);
@@ -589,6 +590,7 @@ export async function GET(request: NextRequest) {
         active: activeResult.data ?? [],
         archived: archivedResult.data ?? [],
         map: mapResult.data ?? [],
+        core: coreForUser,
       });
     }
 

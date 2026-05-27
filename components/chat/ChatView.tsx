@@ -12,6 +12,7 @@ import {
   MapPin,
   Calendar,
   Sparkles,
+  Star,
   MoreHorizontal,
   Archive,
   UserMinus,
@@ -85,6 +86,9 @@ interface ChatViewProps {
   otherUserName: string;
   isArchived: boolean;
   isBlocked: boolean;
+  isCore?: boolean;
+  onAddToCore?: () => Promise<boolean> | boolean;
+  onRemoveFromCore?: () => Promise<boolean> | boolean;
   onArchive: () => Promise<boolean> | boolean;
   onUnarchive: () => Promise<boolean> | boolean;
   onRemove: () => Promise<boolean> | boolean;
@@ -181,6 +185,9 @@ export default function ChatView({
   otherUserName,
   isArchived,
   isBlocked,
+  isCore = false,
+  onAddToCore,
+  onRemoveFromCore,
   onArchive,
   onUnarchive,
   onRemove,
@@ -1983,6 +1990,38 @@ export default function ChatView({
                       </>
                     ) : (
                       <>
+                        {isCore && onRemoveFromCore ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const success = await onRemoveFromCore();
+                              setActionToast(success
+                                ? { type: 'success', message: 'Removed from Core' }
+                                : { type: 'error', message: 'Could not update Core list' }
+                              );
+                              setShowHeaderMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                          >
+                            <Star className="w-4 h-4" /> Remove from Core
+                          </button>
+                        ) : onAddToCore ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const success = await onAddToCore();
+                              setActionToast(success
+                                ? { type: 'success', message: 'Added to Core' }
+                                : { type: 'error', message: 'Could not update Core list' }
+                              );
+                              setShowHeaderMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                          >
+                            <Star className="w-4 h-4" /> Add to Core
+                          </button>
+                        ) : null}
+
                         {isArchived ? (
                           <button
                             type="button"
