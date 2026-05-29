@@ -129,7 +129,9 @@ export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
   const show_creator_name =
     typeof showCreatorRaw === "boolean"
       ? showCreatorRaw
-      : showCreatorRaw === "true" || showCreatorRaw === 1;
+      : showCreatorRaw === "true" || showCreatorRaw === 1
+        ? true
+        : false;
 
   return {
     id,

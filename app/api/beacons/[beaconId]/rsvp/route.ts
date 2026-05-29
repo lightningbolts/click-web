@@ -4,19 +4,37 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
-type AttendeeRow = {
-  user_id: string;
-  created_at: string;
-  users: {
-    id: string;
-    name: string | null;
-    image: string | null;
-    first_name: string | null;
-    last_name: string | null;
-  } | null;
+type UserProfileRow = {
+  id: string;
+  name: string | null;
+  image: string | null;
+  first_name: string | null;
+  last_name: string | null;
 };
 
-function displayNameFromUser(user: AttendeeRow["users"]): string {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/** PostgREST may return an embedded FK row as an object or a one-element array. */
+function joinedUserProfile(raw: unknown): UserProfileRow | null {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) {
+    return joinedUserProfile(raw[0] ?? null);
+  }
+  if (!isRecord(raw)) return null;
+  const id = typeof raw.id === "string" ? raw.id : null;
+  if (id == null) return null;
+  return {
+    id,
+    name: typeof raw.name === "string" ? raw.name : null,
+    image: typeof raw.image === "string" ? raw.image : null,
+    first_name: typeof raw.first_name === "string" ? raw.first_name : null,
+    last_name: typeof raw.last_name === "string" ? raw.last_name : null,
+  };
+}
+
+function displayNameFromUser(user: UserProfileRow | null): string {
   if (user == null) return "Attendee";
   const first = user.first_name?.trim() ?? "";
   const last = user.last_name?.trim() ?? "";
@@ -25,6 +43,27 @@ function displayNameFromUser(user: AttendeeRow["users"]): string {
   const name = user.name?.trim();
   if (name != null && name.length > 0) return name;
   return "Attendee";
+}
+
+function parseAttendeeRows(data: unknown): Array<{
+  user_id: string;
+  created_at: string;
+  users: UserProfileRow | null;
+}> {
+  if (!Array.isArray(data)) return [];
+  const rows: Array<{ user_id: string; created_at: string; users: UserProfileRow | null }> = [];
+  for (const item of data) {
+    if (!isRecord(item)) continue;
+    const userId = typeof item.user_id === "string" ? item.user_id : null;
+    const createdAt = typeof item.created_at === "string" ? item.created_at : null;
+    if (userId == null || createdAt == null) continue;
+    rows.push({
+      user_id: userId,
+      created_at: createdAt,
+      users: joinedUserProfile(item.users),
+    });
+  }
+  return rows;
 }
 
 /**
@@ -83,7 +122,7 @@ export async function GET(
       return NextResponse.json({ error: "Failed to load attendees" }, { status: 500 });
     }
 
-    const attendees = (data as AttendeeRow[]).map((row) => ({
+    const attendees = parseAttendeeRows(data).map((row) => ({
       user_id: row.user_id,
       name: displayNameFromUser(row.users),
       avatar_url: row.users?.image ?? null,
@@ -153,11 +192,13 @@ export async function POST(
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
-    const { data: profile } = await admin
+    const { data: profileRaw } = await admin
       .from("users")
       .select("id, name, image, first_name, last_name")
       .eq("id", user.id)
       .maybeSingle();
+
+    const profile = joinedUserProfile(profileRaw);
 
     return NextResponse.json({
       ok: true,
