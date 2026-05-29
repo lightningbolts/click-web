@@ -8,6 +8,7 @@ import {
   parseBeaconTypeFilters,
   parseLatLon,
   parseRadiusMeters,
+  enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
 
 /**
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
+    beacons = await enrichBeaconCreatorNames(admin, beacons);
 
     return NextResponse.json({ beacons, radius_meters: radius });
   } catch (e) {

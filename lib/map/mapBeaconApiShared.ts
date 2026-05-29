@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MapBeaconRecord, MapBeaconType } from "@/lib/map/mapBeacons";
 import { MAP_BEACON_TYPES, parseMapBeacon } from "@/lib/map/mapBeacons";
 
@@ -136,4 +137,54 @@ export function parseInsertedBeacon(
   fallbackLat: number,
 ): MapBeaconRecord | null {
   return parseMapBeacon(rowFromInsertWithLocation(inserted, fallbackLng, fallbackLat));
+}
+
+function displayNameFromUserRow(user: {
+  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+}): string | null {
+  const first = user.first_name?.trim() ?? "";
+  const last = user.last_name?.trim() ?? "";
+  const combined = [first, last].filter((s) => s.length > 0).join(" ").trim();
+  if (combined.length > 0) return combined;
+  const name = user.name?.trim();
+  return name != null && name.length > 0 ? name : null;
+}
+
+/** Attach `creator_name` for proximity list rows when `show_creator_name` is true. */
+export async function enrichBeaconCreatorNames(
+  admin: SupabaseClient,
+  beacons: MapBeaconRecord[],
+): Promise<MapBeaconRecord[]> {
+  const flagged = beacons.filter((b) => b.show_creator_name);
+  if (flagged.length === 0) return beacons;
+
+  const creatorIds = [...new Set(flagged.map((b) => b.creator_id))];
+  const { data, error } = await admin
+    .from("users")
+    .select("id, name, first_name, last_name")
+    .in("id", creatorIds);
+
+  if (error != null || !Array.isArray(data)) return beacons;
+
+  const nameById = new Map<string, string>();
+  for (const row of data) {
+    if (row == null || typeof row !== "object" || typeof (row as { id?: unknown }).id !== "string") {
+      continue;
+    }
+    const userRow = row as { id: string; name?: unknown; first_name?: unknown; last_name?: unknown };
+    const label = displayNameFromUserRow({
+      name: typeof userRow.name === "string" ? userRow.name : null,
+      first_name: typeof userRow.first_name === "string" ? userRow.first_name : null,
+      last_name: typeof userRow.last_name === "string" ? userRow.last_name : null,
+    });
+    if (label != null) nameById.set(userRow.id, label);
+  }
+
+  return beacons.map((b) =>
+    b.show_creator_name
+      ? { ...b, creator_name: nameById.get(b.creator_id) ?? b.creator_name ?? null }
+      : b,
+  );
 }

@@ -14,6 +14,7 @@ import {
   parseInsertedBeacon,
   parseLatLon,
   parseRadiusMeters,
+  enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -91,6 +92,7 @@ export async function GET(request: NextRequest) {
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
+    beacons = await enrichBeaconCreatorNames(admin, beacons);
 
     return NextResponse.json({ beacons, radius_meters: radius });
   } catch (e) {
@@ -203,7 +205,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Insert failed" }, { status: 500 });
     }
 
-    return NextResponse.json({ beacon });
+    const admin = createAdminSupabaseClient();
+    const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);
+
+    return NextResponse.json({ beacon: enriched ?? beacon });
   } catch (e) {
     console.error("POST /api/beacons:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
