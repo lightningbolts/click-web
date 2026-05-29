@@ -15,6 +15,7 @@ export const MAP_BEACON_TYPES = [
   "study",
   "hobby",
   "scavenger",
+  "event",
 ] as const;
 
 export type MapBeaconType = (typeof MAP_BEACON_TYPES)[number];
@@ -24,11 +25,13 @@ export type MapBeaconRecord = {
   creator_id: string;
   venue_id: string | null;
   beacon_type: MapBeaconType;
+  show_creator_name: boolean;
   lat: number;
   lng: number;
   metadata: Record<string, unknown>;
   created_at: string;
   expires_at: string;
+  creator_name?: string | null;
 };
 
 const BEACON_TYPE_LABELS: Record<MapBeaconType, string> = {
@@ -44,6 +47,7 @@ const BEACON_TYPE_LABELS: Record<MapBeaconType, string> = {
   study: "Study",
   hobby: "Hobby",
   scavenger: "Scavenger",
+  event: "Event / Activity",
 };
 
 export function humanizeBeaconType(t: MapBeaconType): string {
@@ -121,16 +125,24 @@ export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
 
   if (!MAP_BEACON_TYPES.includes(beacon_type as MapBeaconType)) return null;
 
+  const showCreatorRaw = row.show_creator_name;
+  const show_creator_name =
+    typeof showCreatorRaw === "boolean"
+      ? showCreatorRaw
+      : showCreatorRaw === "true" || showCreatorRaw === 1;
+
   return {
     id,
     creator_id,
     venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
     beacon_type: beacon_type as MapBeaconType,
+    show_creator_name,
     lat,
     lng,
     metadata,
     created_at,
     expires_at,
+    creator_name: typeof row.creator_name === "string" ? row.creator_name : null,
   };
 }
 

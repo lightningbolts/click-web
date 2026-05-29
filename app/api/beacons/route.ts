@@ -174,17 +174,23 @@ export async function POST(request: NextRequest) {
 
     const expiresAtIso = computeExpiresAtIso(body, beacon_type);
 
+    const showCreatorName =
+      body.show_creator_name === true ||
+      body.show_creator_name === "true" ||
+      body.showCreatorName === true;
+
     const { data: inserted, error: insertError } = await supabase
       .from("map_beacons")
       .insert({
         creator_id: user.id,
         venue_id: null,
         beacon_type,
+        show_creator_name: showCreatorName,
         location: `POINT(${lon} ${lat})`,
         metadata,
         expires_at: expiresAtIso,
       })
-      .select("id, creator_id, venue_id, beacon_type, metadata, created_at, expires_at, location")
+      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .maybeSingle();
 
     if (insertError) {

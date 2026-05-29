@@ -27,6 +27,7 @@ export function normalizeMobileKindToBeaconType(kindRaw: string): MapBeaconType 
     capacity: "capacity",
     transit: "transit",
     scavenger: "scavenger",
+    event: "event",
     other: "hobby",
   };
   return map[v] ?? null;

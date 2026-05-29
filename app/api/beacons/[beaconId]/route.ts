@@ -27,7 +27,7 @@ export async function GET(
     const admin = createAdminSupabaseClient();
     const { data, error } = await admin
       .from("map_beacons")
-      .select("id, creator_id, venue_id, beacon_type, metadata, created_at, expires_at, location")
+      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .eq("id", beaconId)
       .maybeSingle();
 
@@ -48,6 +48,25 @@ export async function GET(
     }
 
     const normalized = rowFromInsertWithLocation(row, 0, 0) as Record<string, unknown>;
+    if (row.show_creator_name === true) {
+      const { data: creator } = await admin
+        .from("users")
+        .select("id, name, first_name, last_name")
+        .eq("id", row.creator_id as string)
+        .maybeSingle();
+      if (creator != null) {
+        const first = typeof creator.first_name === "string" ? creator.first_name.trim() : "";
+        const last = typeof creator.last_name === "string" ? creator.last_name.trim() : "";
+        const combined = [first, last].filter((s) => s.length > 0).join(" ").trim();
+        normalized.creator_name =
+          combined.length > 0
+            ? combined
+            : typeof creator.name === "string"
+              ? creator.name
+              : null;
+      }
+    }
+
     const beacon = parseMapBeacon(normalized);
     if (beacon == null) {
       return NextResponse.json({ error: "Malformed beacon" }, { status: 500 });
