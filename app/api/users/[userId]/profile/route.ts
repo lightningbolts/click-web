@@ -3,8 +3,8 @@
  * Returns joined profile for a user (respects RLS — typically connections only).
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import {
@@ -14,90 +14,20 @@ import {
 } from '@/lib/userProfile/availability';
 import { getSharedInterestTags } from '@/lib/userProfile/sharedInterests';
 
-function createAdminClient() {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } },
-  );
-}
-
-/** Trimmed display strings (legacy / dual-write) and deduped lowercase names for `interests.name`. */
-function parseProfileTagsInput(raw: unknown[]): { legacy: string[]; normalizedUnique: string[] } {
-  const legacy: string[] = [];
+/** Trim and case-insensitively dedupe interest tag strings for `user_interests.tags`. */
+function parseProfileTagsInput(raw: unknown[]): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
   for (const item of raw) {
     if (typeof item !== 'string') continue;
     const t = item.trim();
     if (t.length === 0) continue;
-    legacy.push(t);
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(t);
   }
-  const seen = new Set<string>();
-  const normalizedUnique: string[] = [];
-  for (const t of legacy) {
-    const n = t.toLowerCase();
-    if (seen.has(n)) continue;
-    seen.add(n);
-    normalizedUnique.push(n);
-  }
-  return { legacy, normalizedUnique };
-}
-
-/**
- * Upsert master interests, replace `user_interest_links` for this user.
- * Order: upsert `interests` → delete links → insert links.
- */
-async function syncUserInterestNormalization(
-  supabase: SupabaseClient,
-  userId: string,
-  normalizedUniqueNames: string[],
-): Promise<{ error: string | null }> {
-  try {
-    let idByName: Map<string, string> | null = null;
-
-    if (normalizedUniqueNames.length > 0) {
-      const { data: interestRows, error: upErr } = await supabase
-        .from('interests')
-        .upsert(
-          normalizedUniqueNames.map((name) => ({ name })),
-          { onConflict: 'name' },
-        )
-        .select('id, name');
-
-      if (upErr) return { error: upErr.message };
-      if (!interestRows?.length) {
-        return { error: 'interest upsert returned no rows' };
-      }
-
-      idByName = new Map(
-        (interestRows as { id: string; name: string }[]).map((r) => [r.name, r.id]),
-      );
-      for (const n of normalizedUniqueNames) {
-        if (!idByName.has(n)) {
-          return { error: `missing interest row for "${n}"` };
-        }
-      }
-    }
-
-    const { error: delErr } = await supabase
-      .from('user_interest_links')
-      .delete()
-      .eq('user_id', userId);
-    if (delErr) return { error: delErr.message };
-
-    if (normalizedUniqueNames.length > 0 && idByName) {
-      const rows = normalizedUniqueNames.map((name) => ({
-        user_id: userId,
-        interest_id: idByName.get(name)!,
-      }));
-      const { error: insErr } = await supabase.from('user_interest_links').insert(rows);
-      if (insErr) return { error: insErr.message };
-    }
-
-    return { error: null };
-  } catch (e: unknown) {
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
+  return tags;
 }
 
 export type AvailabilityIntentPayload = AvailabilityIntentRow;
@@ -265,7 +195,7 @@ function normalizeBirthdayInput(raw: string): string {
 /**
  * PATCH /api/users/[userId]/profile
  * Updates `public.users` (and optionally `user_interests.tags`) for the signed-in user only.
- * When `tags` is sent, also normalizes into `interests` + `user_interest_links` and dual-writes `users.tags`.
+ * When `tags` is sent, upserts `user_interests.tags` (canonical interest store).
  */
 export async function PATCH(
   req: NextRequest,
@@ -366,15 +296,11 @@ export async function PATCH(
   }
 
   let tags: string[] | null = null;
-  let tagsNormalizedUnique: string[] | null = null;
   if (Object.prototype.hasOwnProperty.call(body, 'tags')) {
     if (!Array.isArray(body.tags)) {
       return NextResponse.json({ error: 'tags must be an array of strings' }, { status: 400 });
     }
-    const { legacy, normalizedUnique } = parseProfileTagsInput(body.tags);
-    tags = legacy;
-    tagsNormalizedUnique = normalizedUnique;
-    updates.tags = legacy;
+    tags = parseProfileTagsInput(body.tags);
   }
 
   if (Object.keys(updates).length === 0 && tags == null) {
@@ -388,18 +314,6 @@ export async function PATCH(
   }
 
   try {
-    if (tags != null && tagsNormalizedUnique != null) {
-      const { error: normErr } = await syncUserInterestNormalization(
-        supabase,
-        userId,
-        tagsNormalizedUnique,
-      );
-      if (normErr) {
-        console.error('users profile PATCH interest normalization:', normErr);
-        return NextResponse.json({ error: 'Interest normalization failed' }, { status: 500 });
-      }
-    }
-
     const persistTasks = [];
     if (Object.keys(updates).length > 0) {
       persistTasks.push(supabase.from('users').update(updates).eq('id', userId));
