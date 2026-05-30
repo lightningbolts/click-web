@@ -47,7 +47,7 @@ const BEACON_TYPE_LABELS: Record<MapBeaconType, string> = {
   study: "Study",
   hobby: "Hobby",
   scavenger: "Scavenger",
-  event: "Event / Activity",
+  event: "Event",
 };
 
 export function humanizeBeaconType(t: MapBeaconType): string {

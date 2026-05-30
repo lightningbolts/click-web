@@ -21,6 +21,60 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+function normalizeMusicUrlForDedup(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const u = new URL(trimmed);
+    u.hash = "";
+    return u.toString().toLowerCase();
+  } catch {
+    return trimmed.toLowerCase();
+  }
+}
+
+function musicUrlsFromMetadata(meta: Record<string, unknown>): string[] {
+  const keys = ["original_url", "music_url", "url", "link", "spotify_id", "apple_music_id"];
+  const out: string[] = [];
+  for (const k of keys) {
+    const v = meta[k];
+    if (typeof v === "string" && v.trim().length > 0) {
+      out.push(normalizeMusicUrlForDedup(v));
+    }
+  }
+  return out;
+}
+
+async function findActiveSoundtrackBeacon(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  creatorId: string,
+  musicUrl: string,
+): Promise<MapBeaconRecord | null> {
+  const target = normalizeMusicUrlForDedup(musicUrl);
+  const { data, error } = await admin
+    .from("map_beacons")
+    .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+    .eq("creator_id", creatorId)
+    .eq("beacon_type", "soundtrack")
+    .gt("expires_at", new Date().toISOString());
+
+  if (error || !Array.isArray(data)) {
+    if (error) {
+      console.error("findActiveSoundtrackBeacon:", error.message);
+    }
+    return null;
+  }
+
+  for (const row of data) {
+    if (!isRecord(row)) continue;
+    const meta = isRecord(row.metadata) ? row.metadata : {};
+    const urls = musicUrlsFromMetadata(meta);
+    if (urls.includes(target)) {
+      return parseInsertedBeacon(row, 0, 0);
+    }
+  }
+  return null;
+}
+
 const MIN_TTL_MS = 15 * 60 * 1000;
 const MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -180,6 +234,23 @@ export async function POST(request: NextRequest) {
       body.show_creator_name === true ||
       body.show_creator_name === "true" ||
       body.showCreatorName === true;
+
+    if (beacon_type === "soundtrack") {
+      const musicUrl =
+        (typeof metadata.original_url === "string" && metadata.original_url.trim()) ||
+        (typeof metadata.music_url === "string" && metadata.music_url.trim()) ||
+        (typeof metadata.url === "string" && metadata.url.trim()) ||
+        (typeof metadata.link === "string" && metadata.link.trim()) ||
+        "";
+      if (musicUrl.length > 0) {
+        const admin = createAdminSupabaseClient();
+        const existing = await findActiveSoundtrackBeacon(admin, user.id, musicUrl);
+        if (existing != null) {
+          const [enrichedExisting] = await enrichBeaconCreatorNames(admin, [existing]);
+          return NextResponse.json({ beacon: enrichedExisting ?? existing, deduplicated: true });
+        }
+      }
+    }
 
     const { data: inserted, error: insertError } = await supabase
       .from("map_beacons")

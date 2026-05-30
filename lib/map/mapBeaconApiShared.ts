@@ -76,6 +76,14 @@ export function normalizeBeaconRpcRows(data: unknown): unknown[] {
 }
 
 export function parseBeaconTypeFilters(searchParams: URLSearchParams): Set<MapBeaconType> | null {
+  const categoryRaw = (searchParams.get("category") ?? "").trim().toLowerCase();
+  if (categoryRaw.length > 0) {
+    const mapped = normalizeMobileKindToBeaconType(categoryRaw);
+    if (mapped != null) {
+      return new Set([mapped]);
+    }
+  }
+
   const raw = (searchParams.get("filters") ?? searchParams.get("beacon_types") ?? "").trim();
   if (raw.length === 0) return null;
   const parts = raw
