@@ -16,6 +16,29 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+/** Parses an optional finite latitude/longitude pair from a request body. */
+function parseRsvpLatLon(body: unknown): { latitude: number | null; longitude: number | null } {
+  if (!isRecord(body)) return { latitude: null, longitude: null };
+  const lat =
+    typeof body.latitude === "number"
+      ? body.latitude
+      : typeof body.lat === "number"
+        ? body.lat
+        : Number(body.latitude ?? body.lat);
+  const lon =
+    typeof body.longitude === "number"
+      ? body.longitude
+      : typeof body.lng === "number"
+        ? body.lng
+        : typeof body.lon === "number"
+          ? body.lon
+          : Number(body.longitude ?? body.lng ?? body.lon);
+  return {
+    latitude: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
+    longitude: Number.isFinite(lon) && lon >= -180 && lon <= 180 ? lon : null,
+  };
+}
+
 /** PostgREST may return an embedded FK row as an object or a one-element array. */
 function joinedUserProfile(raw: unknown): UserProfileRow | null {
   if (raw == null) return null;
@@ -155,6 +178,15 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Body is optional; when present we persist the attendee's RSVP location.
+    let body: unknown = null;
+    try {
+      body = await request.json();
+    } catch {
+      body = null;
+    }
+    const { latitude, longitude } = parseRsvpLatLon(body);
+
     const admin = createAdminSupabaseClient();
     const { data: beacon, error: beaconError } = await admin
       .from("map_beacons")
@@ -179,12 +211,16 @@ export async function POST(
       return NextResponse.json({ error: "Expired" }, { status: 404 });
     }
 
+    // Upsert (not ignoreDuplicates) so a repeat RSVP refreshes the stored location + timestamp.
     const { error: insertError } = await supabase.from("beacon_attendees").upsert(
       {
         beacon_id: beaconId,
         user_id: user.id,
+        latitude,
+        longitude,
+        rsvpd_at: new Date().toISOString(),
       },
-      { onConflict: "beacon_id,user_id", ignoreDuplicates: true },
+      { onConflict: "beacon_id,user_id" },
     );
 
     if (insertError) {
@@ -210,6 +246,44 @@ export async function POST(
     });
   } catch (e) {
     console.error("POST /api/beacons/[beaconId]/rsvp:", e);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE — current user cancels their RSVP for the beacon (removes the junction row).
+ * Idempotent: returns ok even if no row existed.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ beaconId: string }> },
+) {
+  try {
+    const { beaconId } = await params;
+    if (!UUID_RE.test(beaconId)) {
+      return NextResponse.json({ error: "Invalid beacon id" }, { status: 400 });
+    }
+
+    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // RLS policy `beacon_attendees_delete_own` scopes this to the caller's own row.
+    const { error: deleteError } = await supabase
+      .from("beacon_attendees")
+      .delete()
+      .eq("beacon_id", beaconId)
+      .eq("user_id", user.id);
+
+    if (deleteError) {
+      console.error("DELETE /api/beacons/[beaconId]/rsvp:", deleteError.message);
+      return NextResponse.json({ error: deleteError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ ok: true, user_id: user.id });
+  } catch (e) {
+    console.error("DELETE /api/beacons/[beaconId]/rsvp:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
