@@ -152,10 +152,22 @@ export async function GET(
       signed_up_at: row.created_at,
     }));
 
+    const { data: selfRow, error: selfError } = await admin
+      .from("beacon_attendees")
+      .select("user_id")
+      .eq("beacon_id", beaconId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (selfError) {
+      console.error("GET /api/beacons/[beaconId]/rsvp self:", selfError.message);
+      return NextResponse.json({ error: "Failed to load RSVP status" }, { status: 500 });
+    }
+
     return NextResponse.json({
       beacon_id: beaconId,
       attendees,
-      current_user_signed_up: attendees.some((a) => a.user_id === user.id),
+      current_user_signed_up: selfRow != null,
     });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/rsvp:", e);
