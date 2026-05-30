@@ -173,7 +173,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid beacon id" }, { status: 400 });
     }
 
-    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
+    const { user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -211,8 +211,9 @@ export async function POST(
       return NextResponse.json({ error: "Expired" }, { status: 404 });
     }
 
-    // Upsert (not ignoreDuplicates) so a repeat RSVP refreshes the stored location + timestamp.
-    const { error: insertError } = await supabase.from("beacon_attendees").upsert(
+    // Upsert via service role: PostgREST upsert requires UPDATE table privilege and an UPDATE
+    // RLS policy; the authenticated role only had INSERT/DELETE grants. Auth is enforced above.
+    const { error: insertError } = await admin.from("beacon_attendees").upsert(
       {
         beacon_id: beaconId,
         user_id: user.id,
