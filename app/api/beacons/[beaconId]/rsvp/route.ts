@@ -68,25 +68,44 @@ function displayNameFromUser(user: UserProfileRow | null): string {
   return "Attendee";
 }
 
-function parseAttendeeRows(data: unknown): Array<{
-  user_id: string;
-  created_at: string;
-  users: UserProfileRow | null;
-}> {
+function parseAttendeeRows(data: unknown): Array<{ user_id: string; signed_up_at: string }> {
   if (!Array.isArray(data)) return [];
-  const rows: Array<{ user_id: string; created_at: string; users: UserProfileRow | null }> = [];
+  const rows: Array<{ user_id: string; signed_up_at: string }> = [];
   for (const item of data) {
     if (!isRecord(item)) continue;
     const userId = typeof item.user_id === "string" ? item.user_id : null;
-    const createdAt = typeof item.created_at === "string" ? item.created_at : null;
-    if (userId == null || createdAt == null) continue;
-    rows.push({
-      user_id: userId,
-      created_at: createdAt,
-      users: joinedUserProfile(item.users),
-    });
+    const signedUpAt =
+      (typeof item.created_at === "string" ? item.created_at : null) ??
+      (typeof item.rsvpd_at === "string" ? item.rsvpd_at : null);
+    if (userId == null || signedUpAt == null) continue;
+    rows.push({ user_id: userId, signed_up_at: signedUpAt });
   }
   return rows;
+}
+
+async function loadAttendeeProfiles(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  userIds: string[],
+): Promise<Map<string, UserProfileRow>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  if (unique.length === 0) return new Map();
+
+  const { data, error } = await admin
+    .from("users")
+    .select("id, name, image, first_name, last_name")
+    .in("id", unique);
+
+  if (error != null || !Array.isArray(data)) {
+    console.error("loadAttendeeProfiles:", error?.message);
+    return new Map();
+  }
+
+  const out = new Map<string, UserProfileRow>();
+  for (const raw of data) {
+    const profile = joinedUserProfile(raw);
+    if (profile != null) out.set(profile.id, profile);
+  }
+  return out;
 }
 
 /**
@@ -134,9 +153,7 @@ export async function GET(
 
     const { data, error } = await admin
       .from("beacon_attendees")
-      .select(
-        "user_id, created_at, users:users!beacon_attendees_user_id_fkey(id, name, image, first_name, last_name)",
-      )
+      .select("user_id, created_at, rsvpd_at")
       .eq("beacon_id", beaconId)
       .order("created_at", { ascending: true });
 
@@ -145,12 +162,21 @@ export async function GET(
       return NextResponse.json({ error: "Failed to load attendees" }, { status: 500 });
     }
 
-    const attendees = parseAttendeeRows(data).map((row) => ({
-      user_id: row.user_id,
-      name: displayNameFromUser(row.users),
-      avatar_url: row.users?.image ?? null,
-      signed_up_at: row.created_at,
-    }));
+    const attendeeRows = parseAttendeeRows(data);
+    const profiles = await loadAttendeeProfiles(
+      admin,
+      attendeeRows.map((row) => row.user_id),
+    );
+
+    const attendees = attendeeRows.map((row) => {
+      const profile = profiles.get(row.user_id) ?? null;
+      return {
+        user_id: row.user_id,
+        name: displayNameFromUser(profile),
+        avatar_url: profile?.image ?? null,
+        signed_up_at: row.signed_up_at,
+      };
+    });
 
     const { data: selfRow, error: selfError } = await admin
       .from("beacon_attendees")

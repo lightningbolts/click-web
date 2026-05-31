@@ -20,12 +20,15 @@ export const MAP_BEACON_TYPES = [
 
 export type MapBeaconType = (typeof MAP_BEACON_TYPES)[number];
 
+export type BeaconVisibilityAudience = "everyone" | "connections" | "core_connections";
+
 export type MapBeaconRecord = {
   id: string;
   creator_id: string;
   venue_id: string | null;
   beacon_type: MapBeaconType;
   show_creator_name: boolean;
+  visibility_audience: BeaconVisibilityAudience;
   lat: number;
   lng: number;
   metadata: Record<string, unknown>;
@@ -133,12 +136,21 @@ export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
         ? true
         : false;
 
+  const visRaw = row.visibility_audience;
+  let visibility_audience: BeaconVisibilityAudience = "everyone";
+  if (typeof visRaw === "string") {
+    const v = visRaw.trim().toLowerCase();
+    if (v === "connections") visibility_audience = "connections";
+    else if (v === "core_connections" || v === "core") visibility_audience = "core_connections";
+  }
+
   return {
     id,
     creator_id,
     venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
     beacon_type: beacon_type as MapBeaconType,
     show_creator_name,
+    visibility_audience,
     lat,
     lng,
     metadata,

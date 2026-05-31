@@ -16,6 +16,7 @@ import {
   parseRadiusMeters,
   enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
+import { filterBeaconsForViewer, parseVisibilityAudienceFromBody } from "@/lib/map/beaconVisibility";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -146,6 +147,7 @@ export async function GET(request: NextRequest) {
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
+    beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
     return NextResponse.json({ beacons, radius_meters: radius });
@@ -235,6 +237,8 @@ export async function POST(request: NextRequest) {
       body.show_creator_name === "true" ||
       body.showCreatorName === true;
 
+    const visibilityAudience = parseVisibilityAudienceFromBody(body);
+
     if (beacon_type === "soundtrack") {
       const musicUrl =
         (typeof metadata.original_url === "string" && metadata.original_url.trim()) ||
@@ -259,11 +263,14 @@ export async function POST(request: NextRequest) {
         venue_id: null,
         beacon_type,
         show_creator_name: showCreatorName,
+        visibility_audience: visibilityAudience,
         location: `POINT(${lon} ${lat})`,
         metadata,
         expires_at: expiresAtIso,
       })
-      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+      .select(
+        "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
+      )
       .maybeSingle();
 
     if (insertError) {

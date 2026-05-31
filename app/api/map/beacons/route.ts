@@ -10,6 +10,7 @@ import {
   parseRadiusMeters,
   enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
+import { filterBeaconsForViewer } from "@/lib/map/beaconVisibility";
 
 /**
  * Legacy path: identical behavior to `GET /api/beacons` (admin RPC + optional filters).
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
+    beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
     return NextResponse.json({ beacons, radius_meters: radius });
