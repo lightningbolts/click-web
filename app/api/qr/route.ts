@@ -457,12 +457,13 @@ export async function POST(request: NextRequest) {
         ]),
       ];
 
-      // Build RPC params — include scanner GPS for proximity gate
-      const rpcParams: Record<string, unknown> = { p_token: token };
-      if (gpsPair.lat != null && gpsPair.lon != null) {
-        rpcParams.p_scanner_lat = gpsPair.lat;
-        rpcParams.p_scanner_lon = gpsPair.lon;
-      }
+      // Always pass all RPC args so PostgREST does not hit PGRST203 when both
+      // redeem_qr_token(text) and redeem_qr_token(text, float8, float8) exist in DB.
+      const rpcParams: Record<string, unknown> = {
+        p_token: token,
+        p_scanner_lat: gpsPair.lat,
+        p_scanner_lon: gpsPair.lon,
+      };
 
       // Atomically redeem the token via RPC (includes proximity check)
       const { data: rpcResult, error: rpcError } = await adminClient
