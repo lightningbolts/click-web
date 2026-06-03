@@ -5,8 +5,18 @@
 import { classifyEncounterVibe } from '@/lib/enrichment/vibeClassification';
 import { classifyTemporalBlock } from '@/lib/enrichment/temporalProfiler';
 import { classifySolarState, solarElevationDegrees } from '@/lib/enrichment/astronomicalProfiler';
-import { profileAcademicCalendar, isNearUwCampus } from '@/lib/enrichment/academicCalendar';
-import { parseSemanticLocation, classifyZoningCategory } from '@/lib/enrichment/spatialZoning';
+import {
+  profileAcademicCalendar,
+  isNearUwCampus,
+  getFinalsWindow,
+  formatYmd,
+} from '@/lib/enrichment/academicCalendar';
+import {
+  parseSemanticLocation,
+  classifyZoningCategory,
+  evaluateSpaceProbability,
+  scoreIndoorLikelihood,
+} from '@/lib/enrichment/spatialZoning';
 import { resolveConnectionArchetype } from '@/lib/enrichment/connectionArchetype';
 
 describe('temporalProfiler', () => {
@@ -41,15 +51,72 @@ describe('academicCalendar', () => {
     expect(isNearUwCampus(40.7, -74.0)).toBe(false);
   });
 
-  it('resolves UW spring quarter finals era', () => {
-    const profile = profileAcademicCalendar('2026-06-01', 47.655, -122.303);
-    expect(profile.academic_term).toContain('Spring Quarter 2026');
-    expect(profile.academic_era).toBe('Finals Week');
+  it('places finals the week after instruction ends', () => {
+    const spring = {
+      id: 'uw-spring-2026',
+      title: 'UW Spring Quarter 2026',
+      start: '2026-03-30',
+      end: '2026-06-05',
+    };
+    const finals = getFinalsWindow(spring);
+    expect(formatYmd(finals.start)).toBe('2026-06-06');
+    expect(formatYmd(finals.end)).toBe('2026-06-12');
   });
 
-  it('resolves winter break', () => {
+  it('marks in-session before finals and finals week after quarter end', () => {
+    const duringClasses = profileAcademicCalendar('2026-06-01', 47.655, -122.303);
+    expect(duringClasses.academic_term).toContain('Spring Quarter 2026');
+    expect(duringClasses.academic_era).toBe('In Session');
+
+    const duringFinals = profileAcademicCalendar('2026-06-08', 47.655, -122.303);
+    expect(duringFinals.academic_era).toBe('Finals Week');
+  });
+
+  it('resolves winter break after autumn finals week', () => {
     const profile = profileAcademicCalendar('2025-12-20', 47.655, -122.303);
     expect(profile.academic_era).toBe('Winter Break');
+  });
+});
+
+describe('evaluateSpaceProbability', () => {
+  it('marks indoor for dorm zoning without lux telemetry', () => {
+    const parsed = parseSemanticLocation({
+      address: { neighbourhood: 'West Campus', building: 'dormitory' },
+    });
+    const result = evaluateSpaceProbability({
+      zoningCategory: 'Residential / Dorm',
+      parsed,
+      elevation_category: 'HIGH_RISE',
+      likelyNighttime: true,
+    });
+    expect(result.indoor).toBe(true);
+  });
+
+  it('marks outdoor for bright lux and park zoning', () => {
+    const parsed = parseSemanticLocation({ class: 'leisure', type: 'park' });
+    const score = scoreIndoorLikelihood({
+      zoningCategory: 'Outdoor / Green Space',
+      parsed,
+      lux_level: 15_000,
+    });
+    expect(score).toBeLessThan(2);
+    expect(
+      evaluateSpaceProbability({
+        zoningCategory: 'Outdoor / Green Space',
+        parsed,
+        lux_level: 15_000,
+      }).indoor,
+    ).toBe(false);
+  });
+
+  it('marks indoor for well-lit cafe (lux > 100)', () => {
+    const parsed = parseSemanticLocation({ class: 'amenity', type: 'cafe' });
+    const result = evaluateSpaceProbability({
+      zoningCategory: 'Third Place / Social Space',
+      parsed,
+      lux_level: 500,
+    });
+    expect(result.indoor).toBe(true);
   });
 });
 
@@ -114,7 +181,7 @@ describe('classifyEncounterVibe', () => {
     expect(result!.archetype).toBeTruthy();
     expect(result!.temporal_block).toBe('Morning Routine');
     expect(result!.zoning_profile).toContain('University District');
-    expect(result!.space_probability.indoor).toBe(false);
+    expect(result!.space_probability.indoor).toBe(true);
   });
 
   it('flags elevated indoor for high-rise dim lighting above commercial', () => {
@@ -129,6 +196,19 @@ describe('classifyEncounterVibe', () => {
     });
 
     expect(result!.space_probability.elevated).toBe(true);
+    expect(result!.space_probability.indoor).toBe(true);
+  });
+
+  it('infers indoor for west campus dorm at night without lux', () => {
+    const result = classifyEncounterVibe({
+      encountered_at: '2026-02-05T06:00:00.000Z',
+      lat: 47.655,
+      lon: -122.303,
+      semantic_location: {
+        address: { neighbourhood: 'West Campus', suburb: 'University District', building: 'dormitory' },
+      },
+      elevation_category: 'HIGH_RISE',
+    });
     expect(result!.space_probability.indoor).toBe(true);
   });
 });

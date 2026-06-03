@@ -1,17 +1,21 @@
 import type { AcademicEra } from '@/lib/enrichment/vibeCaptureSchema';
 
 const DEG = Math.PI / 180;
+const MS_PER_DAY = 86400000;
+/** Finals run for 7 calendar days immediately after the last day of instruction. */
+export const FINALS_WEEK_DAYS = 7;
 
 /** UW main campus centroid — within ~8 km uses UW calendar */
 const UW_CAMPUS = { lat: 47.6553, lon: -122.3035 };
 const UW_RADIUS_KM = 8;
 
-type TermWindow = {
+export type TermWindow = {
   id: string;
   title: string;
-  start: string; // YYYY-MM-DD inclusive
-  end: string; // YYYY-MM-DD inclusive
-  finalsStart: string;
+  /** First day of instruction (YYYY-MM-DD, inclusive) */
+  start: string;
+  /** Last day of instruction — finals begin the next calendar day */
+  end: string;
 };
 
 type BreakWindow = {
@@ -27,50 +31,45 @@ const UW_TERMS: TermWindow[] = [
     title: 'UW Autumn Quarter 2025',
     start: '2025-09-24',
     end: '2025-12-12',
-    finalsStart: '2025-12-06',
   },
   {
     id: 'uw-winter-2026',
     title: 'UW Winter Quarter 2026',
     start: '2026-01-05',
     end: '2026-03-13',
-    finalsStart: '2026-03-07',
   },
   {
     id: 'uw-spring-2026',
     title: 'UW Spring Quarter 2026',
     start: '2026-03-30',
     end: '2026-06-05',
-    finalsStart: '2026-05-30',
   },
   {
     id: 'uw-summer-2026',
     title: 'UW Summer Quarter 2026',
     start: '2026-06-22',
     end: '2026-08-21',
-    finalsStart: '2026-08-15',
   },
   {
     id: 'uw-autumn-2026',
     title: 'UW Autumn Quarter 2026',
     start: '2026-09-23',
     end: '2026-12-11',
-    finalsStart: '2026-12-05',
   },
   {
     id: 'uw-winter-2027',
     title: 'UW Winter Quarter 2027',
     start: '2027-01-04',
     end: '2027-03-12',
-    finalsStart: '2027-03-06',
   },
 ];
 
+/** Breaks are outside instruction + finals windows */
 const UW_BREAKS: BreakWindow[] = [
-  { era: 'Winter Break', start: '2025-12-13', end: '2026-01-04' },
-  { era: 'Spring Break', start: '2026-03-14', end: '2026-03-29' },
-  { era: 'Summer Break', start: '2026-06-06', end: '2026-06-21' },
-  { era: 'Winter Break', start: '2026-12-12', end: '2027-01-03' },
+  { era: 'Winter Break', start: '2025-12-20', end: '2026-01-04' },
+  { era: 'Spring Break', start: '2026-02-21', end: '2026-03-01' },
+  { era: 'Summer Break', start: '2026-06-13', end: '2026-06-21' },
+  { era: 'Winter Break', start: '2026-12-20', end: '2027-01-03' },
 ];
 
 /** Generic quarter template when not near a mapped campus */
@@ -80,29 +79,48 @@ const GENERIC_TERMS: TermWindow[] = [
     title: 'Spring Term 2026',
     start: '2026-01-10',
     end: '2026-05-15',
-    finalsStart: '2026-05-09',
   },
   {
     id: 'generic-fall-2026',
     title: 'Fall Term 2026',
     start: '2026-08-20',
     end: '2026-12-15',
-    finalsStart: '2026-12-09',
   },
 ];
 
 const GENERIC_BREAKS: BreakWindow[] = [
-  { era: 'Summer Break', start: '2026-05-16', end: '2026-08-19' },
-  { era: 'Winter Break', start: '2025-12-16', end: '2026-01-09' },
+  { era: 'Summer Break', start: '2026-05-23', end: '2026-08-19' },
+  { era: 'Winter Break', start: '2025-12-23', end: '2026-01-09' },
 ];
 
-function parseYmd(ymd: string): Date {
+export function parseYmd(ymd: string): Date {
   const [y, m, d] = ymd.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 }
 
+export function formatYmd(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function addUtcDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * MS_PER_DAY);
+}
+
+/**
+ * UW finals: first day is the calendar day after `end`, then {@link FINALS_WEEK_DAYS} days inclusive.
+ */
+export function getFinalsWindow(term: TermWindow): { start: Date; end: Date } {
+  const instructionEnd = parseYmd(term.end);
+  const start = addUtcDays(instructionEnd, 1);
+  const end = addUtcDays(start, FINALS_WEEK_DAYS - 1);
+  return { start, end };
+}
+
 function daysBetween(start: Date, end: Date): number {
-  return Math.floor((end.getTime() - start.getTime()) / 86400000);
+  return Math.floor((end.getTime() - start.getTime()) / MS_PER_DAY);
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -131,28 +149,36 @@ function findBreak(
   return null;
 }
 
-function findTerm(date: Date, terms: TermWindow[]): TermWindow | null {
+export function findTerm(date: Date, terms: TermWindow[]): TermWindow | null {
   for (const t of terms) {
     const start = parseYmd(t.start);
-    const end = parseYmd(t.end);
-    if (date >= start && date <= end) return t;
+    const instructionEnd = parseYmd(t.end);
+    if (date >= start && date <= instructionEnd) return t;
+
+    const finals = getFinalsWindow(t);
+    if (date >= finals.start && date <= finals.end) return t;
   }
   return null;
 }
 
-function eraWithinTerm(date: Date, term: TermWindow): AcademicEra {
+export function isInFinalsWeek(date: Date, term: TermWindow): boolean {
+  const finals = getFinalsWindow(term);
+  return date >= finals.start && date <= finals.end;
+}
+
+function eraWithinInstruction(date: Date, term: TermWindow): AcademicEra {
   const start = parseYmd(term.start);
-  const finalsStart = parseYmd(term.finalsStart);
-  const end = parseYmd(term.end);
-
-  if (date >= finalsStart && date <= end) return 'Finals Week';
-
   const dayIndex = daysBetween(start, date);
   const weekIndex = Math.floor(dayIndex / 7) + 1;
 
   if (weekIndex === 1) return 'Syllabus Week';
   if (weekIndex >= 4 && weekIndex <= 6) return 'Midterms Grind';
   return 'In Session';
+}
+
+export function eraForTermDate(date: Date, term: TermWindow): AcademicEra {
+  if (isInFinalsWeek(date, term)) return 'Finals Week';
+  return eraWithinInstruction(date, term);
 }
 
 export type AcademicProfile = {
@@ -190,7 +216,7 @@ export function profileAcademicCalendar(
   }
 
   return {
-    academic_era: eraWithinTerm(date, term),
+    academic_era: eraForTermDate(date, term),
     academic_term: term.title,
   };
 }
@@ -201,8 +227,5 @@ export function localCalendarYmd(utcIso: string, lon: number): string | null {
   if (Number.isNaN(utc.getTime())) return null;
   const offsetHours = Math.round((lon / 15) * 2) / 2;
   const local = new Date(utc.getTime() + offsetHours * 3600000);
-  const y = local.getUTCFullYear();
-  const m = String(local.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(local.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return formatYmd(local);
 }

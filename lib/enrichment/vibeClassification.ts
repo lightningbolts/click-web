@@ -39,8 +39,11 @@ export function classifyEncounterVibe(input: VibeClassificationInput): VibeCaptu
     elevation_category: input.elevation_category,
     lux_level: input.lux_level,
     exact_barometric_elevation_m: input.exact_barometric_elevation_m,
+    noise_level: input.noise_level,
+    exact_noise_level_db: input.exact_noise_level_db,
     zoningCategory,
     parsed,
+    likelyNighttime: solar.solar_state === 'Nighttime' || solar.solar_state === 'Blue Hour',
   });
 
   const archetype = resolveConnectionArchetype({

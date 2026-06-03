@@ -160,29 +160,106 @@ export type SpaceProbability = {
   elevated: boolean;
 };
 
-export function evaluateSpaceProbability(input: {
+/** Aligns with proximity bind + mobile UI (lux < 15 → dimly lit). */
+const LUX_DIM_INDOOR = 15;
+const LUX_MODERATE_INDOOR = 150;
+const LUX_BRIGHT_OUTDOOR = 10_000;
+
+const INDOOR_ZONING = new Set<ZoningCategory>([
+  'Residential / Dorm',
+  'Institutional / Study Space',
+  'Third Place / Social Space',
+  'Commercial / Retail',
+]);
+
+const OUTDOOR_ZONING = new Set<ZoningCategory>(['Outdoor / Green Space']);
+
+export type SpaceProbabilityInput = {
   elevation_category?: string | null;
   lux_level?: number | null;
   exact_barometric_elevation_m?: number | null;
+  noise_level?: string | null;
+  exact_noise_level_db?: number | null;
   zoningCategory: ZoningCategory;
   parsed: ParsedSemanticLocation;
-}): SpaceProbability {
+  /** When true (e.g. solar Nighttime), indoor bias for built-environment zones */
+  likelyNighttime?: boolean;
+};
+
+/**
+ * Multi-signal indoor inference. Lux alone is insufficient: many rows lack lux,
+ * and lit interiors often exceed 100 lux. Zoning + elevation + noise fill gaps.
+ */
+export function scoreIndoorLikelihood(input: SpaceProbabilityInput): number {
+  let score = 0;
+  const elev = (input.elevation_category ?? '').toUpperCase();
+  const lux = input.lux_level;
+  const noise = (input.noise_level ?? '').toUpperCase();
+  const noiseDb = input.exact_noise_level_db;
+  const { zoningCategory } = input;
+
+  if (typeof lux === 'number' && Number.isFinite(lux)) {
+    if (lux < LUX_DIM_INDOOR) score += 3;
+    else if (lux < LUX_MODERATE_INDOOR) score += 2;
+    else if (lux < 1000) score += 1;
+    if (lux >= LUX_BRIGHT_OUTDOOR) score -= 4;
+  } else if (INDOOR_ZONING.has(zoningCategory)) {
+    // No lux telemetry — lean on place type (common for historical rows)
+    score += 2;
+  }
+
+  if (INDOOR_ZONING.has(zoningCategory)) score += 2;
+  if (OUTDOOR_ZONING.has(zoningCategory)) score -= 4;
+  if (zoningCategory === 'Transitional Transit Zone') score -= 1;
+
+  if (elev === 'BELOW_GROUND' || elev === 'HIGH_RISE' || elev === 'ELEVATED') {
+    score += 2;
+  }
+
+  if (noise === 'VERY_QUIET' || noise === 'QUIET') score += 1;
+  if (typeof noiseDb === 'number' && Number.isFinite(noiseDb) && noiseDb < 48) {
+    score += 1;
+  }
+  if (noise === 'LOUD' || noise === 'VERY_LOUD') score -= 1;
+
+  const building = (input.parsed.building ?? '').toLowerCase();
+  if (
+    building === 'dormitory' ||
+    building === 'apartments' ||
+    building === 'residential' ||
+    building === 'university'
+  ) {
+    score += 1;
+  }
+
+  if (input.likelyNighttime && INDOOR_ZONING.has(zoningCategory)) {
+    score += 1;
+  }
+
+  return score;
+}
+
+export function evaluateSpaceProbability(input: SpaceProbabilityInput): SpaceProbability {
   const elev = (input.elevation_category ?? '').toUpperCase();
   const lux = input.lux_level;
   const isHighRise = elev === 'HIGH_RISE' || elev === 'ELEVATED';
-  const dimIndoor = typeof lux === 'number' && Number.isFinite(lux) && lux < 100;
+  const dimLux =
+    typeof lux === 'number' && Number.isFinite(lux) && lux < LUX_MODERATE_INDOOR;
 
   const groundCommercial =
     input.zoningCategory === 'Third Place / Social Space' ||
     input.zoningCategory === 'Commercial / Retail';
 
-  const elevatedIndoor = isHighRise && dimIndoor && groundCommercial;
+  const elevatedIndoor = isHighRise && dimLux && groundCommercial;
 
   const baro = input.exact_barometric_elevation_m;
   const highBaro = typeof baro === 'number' && Number.isFinite(baro) && baro >= 20;
 
+  const indoorScore = scoreIndoorLikelihood(input);
+  const indoor = indoorScore >= 2;
+
   return {
-    indoor: dimIndoor || elevatedIndoor,
+    indoor,
     elevated: elevatedIndoor || (isHighRise && highBaro),
   };
 }
