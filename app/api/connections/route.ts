@@ -11,6 +11,7 @@ import {
   resolveContextTagId,
   type ContextTagPayload,
 } from '@/lib/server/connectionEncounterContextTag';
+import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
 
 /**
  * Connections API
@@ -1161,7 +1162,11 @@ export async function POST(request: NextRequest) {
       encounterInsert.exact_barometric_elevation_m = encElev;
     }
 
-    const { error: encounterErr } = await adminClient.from('connection_encounters').insert(encounterInsert);
+    const { data: insertedEnc, error: encounterErr } = await adminClient
+      .from('connection_encounters')
+      .insert(encounterInsert)
+      .select('id')
+      .maybeSingle();
     let encounter_logged = true;
     let encounter_reason: string | undefined;
     if (encounterErr) {
@@ -1172,6 +1177,21 @@ export async function POST(request: NextRequest) {
       } else {
         console.error('connection_encounters insert error:', encounterErr);
       }
+    } else if (
+      insertedEnc?.id &&
+      Number.isFinite(geoLocation.lat) &&
+      Number.isFinite(geoLocation.lon) &&
+      !(geoLocation.lat === 0 && geoLocation.lon === 0)
+    ) {
+      scheduleEventEnrichment({
+        encounter_id: String(insertedEnc.id),
+        lat: geoLocation.lat,
+        lon: geoLocation.lon,
+        timestamp:
+          typeof encounterInsert.encountered_at === 'string'
+            ? encounterInsert.encountered_at
+            : new Date().toISOString(),
+      });
     }
 
     void enrichEncounterWeather(

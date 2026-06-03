@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { buildEncounterInsertFromSensor } from '@/lib/connections/encounterSensorPayload';
+import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -114,9 +115,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to record encounter' }, { status: 500 });
     }
 
+    const encounterId = inserted?.id != null ? String(inserted.id) : null;
+    const gpsLat = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
+    const gpsLon = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
+    if (encounterId && gpsLat != null && gpsLon != null) {
+      scheduleEventEnrichment({
+        encounter_id: encounterId,
+        lat: gpsLat,
+        lon: gpsLon,
+        timestamp:
+          typeof insertRow.encountered_at === 'string'
+            ? insertRow.encountered_at
+            : new Date().toISOString(),
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      encounter_id: inserted?.id != null ? String(inserted.id) : null,
+      encounter_id: encounterId,
       connection_id: connectionId,
       rate_limited: false,
     });
