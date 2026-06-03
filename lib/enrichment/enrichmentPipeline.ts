@@ -12,18 +12,46 @@ import {
   linkEncounterToEvent,
   saveVenueToCache,
 } from '@/lib/enrichment/eventCache';
-import { fetchVenueFromOverpass } from '@/lib/enrichment/overpassClient';
 import {
   fetchEventFromTicketmaster,
   fetchSportsFallbackEvent,
 } from '@/lib/enrichment/ticketmasterClient';
+import { resolveEventVenueName } from '@/lib/enrichment/resolveEventVenue';
 
 export type EnrichmentInput = {
   encounter_id: string;
   lat: number;
   lon: number;
   timestamp: string;
+  /** POI label from encounter insert / Nominatim */
+  location_name?: string | null;
+  semantic_location?: unknown;
+  /** Skip slow Overpass calls (use encounter + cache only) */
+  skip_overpass?: boolean;
 };
+
+async function hydrateEncounterVenueHints(
+  supabase: SupabaseClient,
+  input: EnrichmentInput,
+): Promise<EnrichmentInput> {
+  if (input.location_name !== undefined && input.semantic_location !== undefined) {
+    return input;
+  }
+
+  const { data, error } = await supabase
+    .from('connection_encounters')
+    .select('location_name, semantic_location')
+    .eq('id', input.encounter_id)
+    .maybeSingle();
+
+  if (error || !data) return input;
+
+  return {
+    ...input,
+    location_name: input.location_name ?? data.location_name,
+    semantic_location: input.semantic_location ?? data.semantic_location,
+  };
+}
 
 /**
  * Cache-first waterfall: registry → OSM venue cache → Ticketmaster → sports fallback.
@@ -33,7 +61,8 @@ export async function runEventEnrichmentPipeline(
   supabase: SupabaseClient,
   input: EnrichmentInput,
 ): Promise<EnrichmentPipelineResult> {
-  const { encounter_id, lat, lon, timestamp } = input;
+  const hydrated = await hydrateEncounterVenueHints(supabase, input);
+  const { encounter_id, lat, lon, timestamp } = hydrated;
   const eventDate = toEventDate(timestamp);
   let degraded = false;
   let venueName: string | null = null;
@@ -58,15 +87,15 @@ export async function runEventEnrichmentPipeline(
     }
   }
 
-  // 2. Spatial resolution (Overpass / OSM)
+  // 2. Encounter Nominatim → Overpass (optional)
   if (!venueName) {
-    const resolved = await fetchVenueFromOverpass(lat, lon);
-    if (resolved) {
-      venueName = resolved;
-      await saveVenueToCache(supabase, lat, lon, venueName);
-    } else {
-      degraded = true;
-    }
+    const resolved = await resolveEventVenueName(supabase, lat, lon, {
+      location_name: hydrated.location_name,
+      semantic_location: hydrated.semantic_location,
+      skip_overpass: hydrated.skip_overpass,
+    });
+    venueName = resolved.venue_name;
+    if (resolved.degraded) degraded = true;
   }
 
   if (!venueName) {
@@ -144,7 +173,8 @@ export async function previewEventEnrichmentPipeline(
   supabase: SupabaseClient,
   input: EnrichmentInput,
 ): Promise<EnrichmentPreviewResult> {
-  const { encounter_id, lat, lon, timestamp } = input;
+  const hydrated = await hydrateEncounterVenueHints(supabase, input);
+  const { encounter_id, lat, lon, timestamp } = hydrated;
   const eventDate = toEventDate(timestamp);
   const grid = gridCoords(lat, lon);
   let degraded = false;
@@ -182,9 +212,13 @@ export async function previewEventEnrichmentPipeline(
   }
 
   if (!venueName) {
-    const resolved = await fetchVenueFromOverpass(lat, lon);
-    if (resolved) {
-      venueName = resolved;
+    const resolved = await resolveEventVenueName(supabase, lat, lon, {
+      location_name: hydrated.location_name,
+      semantic_location: hydrated.semantic_location,
+      skip_overpass: hydrated.skip_overpass,
+    });
+    if (resolved.venue_name) {
+      venueName = resolved.venue_name;
       wouldUpsertVenue = true;
     } else {
       degraded = true;

@@ -14,11 +14,18 @@
  *
  * Env:
  *   BATCH_SIZE            default 50
- *   ENRICHMENT_DELAY_MS   default 1500 — pause between rows (Overpass/TM rate limits)
+ *   ENRICHMENT_DELAY_MS   default 2500 — pause between rows (Overpass rate limits)
+ *   OVERPASS_TIMEOUT_MS   default 20000
+ *   OVERPASS_RETRIES      default 2 (tries kumi + overpass-api.de mirrors)
+ *   SKIP_OVERPASS=1       use location_name / semantic_location only (fast backfill)
+ *   TICKETMASTER_API_KEY  required for event_id linking (otherwise venue_only is normal)
  *   DRY_RUN=1             list candidate rows; no external APIs, no DB writes
  *   PREVIEW=1             resolve venues/events via APIs; log upsert payloads; no DB writes
  *   FORCE=1               include rows that already have event_id
  *   LIMIT=N               stop after N rows (for testing)
+ *
+ * Recommended when Overpass times out:
+ *   SKIP_OVERPASS=1 ENRICHMENT_DELAY_MS=500 npx tsx scripts/backfill_event_enrichment.ts
  */
 
 import { loadEnvFiles } from './loadEnv';
@@ -34,7 +41,9 @@ import type { EnrichmentPipelineResult, EnrichmentPreviewResult } from '../types
 import { gridCoords } from '../lib/enrichment/gridCoords';
 
 const BATCH_SIZE = Number.parseInt(process.env.BATCH_SIZE ?? '50', 10);
-const DELAY_MS = Number.parseInt(process.env.ENRICHMENT_DELAY_MS ?? '1500', 10);
+const DELAY_MS = Number.parseInt(process.env.ENRICHMENT_DELAY_MS ?? '2500', 10);
+const SKIP_OVERPASS =
+  process.env.SKIP_OVERPASS === '1' || process.env.SKIP_OVERPASS === 'true';
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 const PREVIEW = process.env.PREVIEW === '1' || process.env.PREVIEW === 'true';
 const FORCE = process.env.FORCE === '1' || process.env.FORCE === 'true';
@@ -46,6 +55,8 @@ type EncounterRow = {
   gps_lon: number | null;
   encountered_at: string;
   event_id: string | null;
+  location_name: string | null;
+  semantic_location: unknown;
 };
 
 function parseGps(
@@ -69,7 +80,7 @@ async function loadBatch(
 ): Promise<EncounterRow[]> {
   let query = supabase
     .from('connection_encounters')
-    .select('id, gps_lat, gps_lon, encountered_at, event_id')
+    .select('id, gps_lat, gps_lon, encountered_at, event_id, location_name, semantic_location')
     .not('gps_lat', 'is', null)
     .not('gps_lon', 'is', null)
     .order('id', { ascending: true })
@@ -151,10 +162,18 @@ async function main(): Promise<void> {
     dryRun: DRY_RUN,
     preview: PREVIEW,
     force: FORCE,
+    skipOverpass: SKIP_OVERPASS,
     batchSize: BATCH_SIZE,
     delayMs: DELAY_MS,
     limit: LIMIT,
+    ticketmasterConfigured: Boolean(process.env.TICKETMASTER_API_KEY?.trim()),
   });
+
+  if (!process.env.TICKETMASTER_API_KEY?.trim()) {
+    console.warn(
+      '[event-backfill] TICKETMASTER_API_KEY not set — expect venue_only (venue cached) not resolved events',
+    );
+  }
 
   let processed = 0;
   let skipped = 0;
@@ -204,6 +223,9 @@ async function main(): Promise<void> {
             lat,
             lon,
             timestamp: row.encountered_at,
+            location_name: row.location_name,
+            semantic_location: row.semantic_location,
+            skip_overpass: SKIP_OVERPASS,
           });
           statusCounts[preview.status] = (statusCounts[preview.status] ?? 0) + 1;
           if (preview.degraded) statusCounts.degraded = (statusCounts.degraded ?? 0) + 1;
@@ -228,6 +250,9 @@ async function main(): Promise<void> {
           lat,
           lon,
           timestamp: row.encountered_at,
+          location_name: row.location_name,
+          semantic_location: row.semantic_location,
+          skip_overpass: SKIP_OVERPASS,
         });
 
         tally(statusCounts, result);
