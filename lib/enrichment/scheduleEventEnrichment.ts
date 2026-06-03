@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
-import { runEventEnrichmentPipeline } from '@/lib/enrichment/enrichmentPipeline';
+import { runEncounterEnrichment } from '@/lib/enrichment/runEncounterEnrichment';
 
 export type ScheduleEventEnrichmentInput = {
   encounter_id: string;
@@ -11,7 +11,8 @@ export type ScheduleEventEnrichmentInput = {
 };
 
 /**
- * Fire-and-forget event enrichment — never awaited by proximity bind paths.
+ * Fire-and-forget encounter enrichment (events + structural vibe classification).
+ * Never awaited by proximity bind paths.
  */
 export function scheduleEventEnrichment(input: ScheduleEventEnrichmentInput): void {
   if (
@@ -25,7 +26,7 @@ export function scheduleEventEnrichment(input: ScheduleEventEnrichmentInput): vo
   void (async () => {
     try {
       const supabase = createAdminSupabaseClient();
-      await runEventEnrichmentPipeline(supabase, input);
+      await runEncounterEnrichment(supabase, input);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn('[enrichment] schedule failed:', msg);

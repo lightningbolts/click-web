@@ -12,8 +12,8 @@ jest.mock('@/lib/server/admin/supabaseAdmin', () => ({
   createAdminSupabaseClient: () => mockCreateAdmin(),
 }));
 
-jest.mock('@/lib/enrichment/enrichmentPipeline', () => ({
-  runEventEnrichmentPipeline: (...args: unknown[]) => mockRunPipeline(...args),
+jest.mock('@/lib/enrichment/runEncounterEnrichment', () => ({
+  runEncounterEnrichment: (...args: unknown[]) => mockRunPipeline(...args),
 }));
 
 describe('POST /api/enrichment/event contract', () => {
@@ -27,10 +27,17 @@ describe('POST /api/enrichment/event contract', () => {
 
   it('returns 200 with pipeline result on valid payload', async () => {
     mockRunPipeline.mockResolvedValue({
-      encounter_id: encounterId,
-      event_id: 'tm_abc123',
-      venue_name: 'T-Mobile Park',
-      status: 'resolved',
+      event: {
+        encounter_id: encounterId,
+        event_id: 'tm_abc123',
+        venue_name: 'T-Mobile Park',
+        status: 'resolved',
+      },
+      vibe: {
+        encounter_id: encounterId,
+        status: 'classified',
+        vibe_capture: { archetype: 'Night Out' },
+      },
     });
 
     const req = new NextRequest('http://localhost/api/enrichment/event', {
@@ -49,6 +56,9 @@ describe('POST /api/enrichment/event contract', () => {
     const json = (await res.json()) as Record<string, unknown>;
     expect(json.success).toBe(true);
     expect(json.event_id).toBe('tm_abc123');
+    expect(json.vibe).toEqual(
+      expect.objectContaining({ status: 'classified' }),
+    );
     expect(mockRunPipeline).toHaveBeenCalledTimes(1);
   });
 

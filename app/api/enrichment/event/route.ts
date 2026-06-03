@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
-import { runEventEnrichmentPipeline } from '@/lib/enrichment/enrichmentPipeline';
+import { runEncounterEnrichment } from '@/lib/enrichment/runEncounterEnrichment';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminSupabaseClient();
-    const result = await runEventEnrichmentPipeline(supabase, {
+    const result = await runEncounterEnrichment(supabase, {
       encounter_id: encounterId,
       lat,
       lon,
@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        ...result,
+        ...result.event,
+        vibe: result.vibe,
       },
       { status: 200 },
     );

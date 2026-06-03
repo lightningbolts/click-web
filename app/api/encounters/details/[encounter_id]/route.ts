@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type {
   ConnectionEncounterEnrichmentRow,
   EncounterDetailsResponse,
+  VibeCaptureStructural,
 } from '@/types/enrichment-schema';
 import { getVenueFromCache, getRegistryEventById } from '@/lib/enrichment/eventCache';
 import { resolveDynamicContext } from '@/lib/enrichment/dynamicResolvers';
@@ -14,6 +15,42 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
+function extractVibeStructural(
+  vibeCapture: Record<string, unknown> | null | undefined,
+): VibeCaptureStructural | null {
+  if (!vibeCapture || typeof vibeCapture !== 'object') return null;
+  const archetype = vibeCapture.archetype;
+  if (typeof archetype !== 'string' || !archetype.trim()) return null;
+
+  const space = vibeCapture.space_probability;
+  const space_probability =
+    space &&
+    typeof space === 'object' &&
+    !Array.isArray(space) &&
+    typeof (space as { indoor?: unknown }).indoor === 'boolean' &&
+    typeof (space as { elevated?: unknown }).elevated === 'boolean'
+      ? {
+          indoor: (space as { indoor: boolean }).indoor,
+          elevated: (space as { elevated: boolean }).elevated,
+        }
+      : { indoor: false, elevated: false };
+
+  return {
+    solar_state: String(vibeCapture.solar_state ?? ''),
+    temporal_block: String(vibeCapture.temporal_block ?? ''),
+    academic_era: String(vibeCapture.academic_era ?? ''),
+    academic_term: String(vibeCapture.academic_term ?? ''),
+    zoning_profile: String(vibeCapture.zoning_profile ?? ''),
+    space_probability,
+    archetype: archetype.trim(),
+    classified_at:
+      typeof vibeCapture.classified_at === 'string' ? vibeCapture.classified_at : undefined,
+    neighbourhood:
+      typeof vibeCapture.neighbourhood === 'string' ? vibeCapture.neighbourhood : undefined,
+    suburb: typeof vibeCapture.suburb === 'string' ? vibeCapture.suburb : undefined,
+  };
 }
 
 export async function GET(
@@ -34,7 +71,7 @@ export async function GET(
     const { data: encounterRow, error: encErr } = await supabase
       .from('connection_encounters')
       .select(
-        'id, connection_id, encountered_at, location_name, gps_lat, gps_lon, event_id, weather_snapshot, context_tags',
+        'id, connection_id, encountered_at, location_name, gps_lat, gps_lon, event_id, weather_snapshot, context_tags, vibe_capture, semantic_location, elevation_category, lux_level',
       )
       .eq('id', encounterId)
       .maybeSingle();
@@ -99,12 +136,15 @@ export async function GET(
       enrichment_status = 'venue_only';
     }
 
+    const vibe_structural = extractVibeStructural(encounter.vibe_capture);
+
     const payload: EncounterDetailsResponse = {
       encounter,
       event,
       venue_cache,
       dynamic,
       enrichment_status,
+      vibe_structural,
     };
 
     return NextResponse.json(payload, { status: 200 });

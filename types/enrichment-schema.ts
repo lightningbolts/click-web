@@ -47,6 +47,20 @@ export interface EventVenuesCacheInsert {
   created_at?: string;
 }
 
+/** Structural keys written to `connection_encounters.vibe_capture` by background enrichment. */
+export interface VibeCaptureStructural {
+  solar_state: string;
+  temporal_block: string;
+  academic_era: string;
+  academic_term: string;
+  zoning_profile: string;
+  space_probability: { indoor: boolean; elevated: boolean };
+  archetype: string;
+  classified_at?: string;
+  neighbourhood?: string;
+  suburb?: string;
+}
+
 /** Subset of `connection_encounters` columns used by enrichment + detail resolver. */
 export interface ConnectionEncounterEnrichmentRow {
   id: string;
@@ -58,6 +72,10 @@ export interface ConnectionEncounterEnrichmentRow {
   event_id: string | null;
   weather_snapshot: Record<string, unknown> | null;
   context_tags: string[] | null;
+  vibe_capture: Record<string, unknown> | null;
+  semantic_location?: unknown;
+  elevation_category?: string | null;
+  lux_level?: number | null;
 }
 
 /** Overpass API JSON response (subset). */
@@ -143,6 +161,8 @@ export interface EncounterDetailsResponse {
   venue_cache: Pick<EventVenuesCacheRow, 'venue_name' | 'lat' | 'lon'> | null;
   dynamic: EncounterDynamicContext | null;
   enrichment_status: 'linked' | 'venue_only' | 'base_only';
+  /** Parsed structural vibe classification when present on the encounter row */
+  vibe_structural: VibeCaptureStructural | null;
 }
 
 export type EnrichmentPipelineResult = {
