@@ -1,4 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { loadEnvFiles } from './loadEnv';
+
+loadEnvFiles();
 
 const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;

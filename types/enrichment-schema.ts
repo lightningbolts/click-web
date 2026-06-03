@@ -153,6 +153,24 @@ export type EnrichmentPipelineResult = {
   degraded?: boolean;
 };
 
+/** Read-only preview of DB writes the pipeline would perform (no mutations). */
+export type EnrichmentPreviewResult = {
+  encounter_id: string;
+  event_date: string;
+  grid: { lat: number; lon: number };
+  status: EnrichmentPipelineResult['status'];
+  degraded: boolean;
+  would_write: {
+    event_venues_cache: EventVenuesCacheInsert | null;
+    events_registry: EventsRegistryInsert | null;
+    connection_encounters: { event_id: string } | null;
+  };
+  existing: {
+    venue_cache_hit: boolean;
+    registry_hit: boolean;
+  };
+};
+
 /** Optional: merge into generated `Database['public']['Tables']`. */
 export type EnrichmentPublicTables = {
   events_registry: {

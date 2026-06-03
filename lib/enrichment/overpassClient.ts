@@ -2,6 +2,13 @@ import type { OverpassResponse } from '@/types/enrichment-schema';
 import { fetchWithTimeout, safeExternalFetch } from '@/lib/enrichment/fetchWithTimeout';
 
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
+
+const OVERPASS_HEADERS = {
+  Accept: 'application/json',
+  'Content-Type': 'application/x-www-form-urlencoded',
+  'User-Agent': OVERPASS_USER_AGENT,
+} as const;
 
 const AMENITY_PATTERN = 'theatre|stadium';
 const BUILDING_TAG = 'building';
@@ -44,8 +51,8 @@ export async function fetchVenueFromOverpass(
     const query = buildOverpassQuery(lat, lon);
     const res = await fetchWithTimeout(OVERPASS_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(query)}`,
+      headers: OVERPASS_HEADERS,
+      body: new URLSearchParams({ data: query }).toString(),
       cache: 'no-store',
     });
 
