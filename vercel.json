@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/friction-intent-expirations",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/disposable-reveal",
+      "schedule": "0 * * * *"
     }
   ]
 }

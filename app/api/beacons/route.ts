@@ -17,6 +17,10 @@ import {
   enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
 import { filterBeaconsForViewer, parseVisibilityAudienceFromBody } from "@/lib/map/beaconVisibility";
+import {
+  COLLABORATION_MAP_DROP_WINDOW_MS,
+  SQUAD_PIN_MULTIPLIER,
+} from "@/lib/collaboration/collaborationTtl";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -202,6 +206,44 @@ export async function POST(request: NextRequest) {
     const baseMeta: Record<string, unknown> = isRecord(metaRaw) ? { ...metaRaw } : {};
 
     let metadata: Record<string, unknown> = baseMeta;
+    let squadMultiplier = 1.0;
+
+    const encounterIdRaw =
+      (typeof body.encounter_id === "string" && body.encounter_id.trim()) ||
+      (typeof body.encounterId === "string" && body.encounterId.trim()) ||
+      "";
+    if (encounterIdRaw.length > 0) {
+      const admin = createAdminSupabaseClient();
+      const { data: session, error: sessionErr } = await admin
+        .from("collaboration_sessions")
+        .select("id, created_at")
+        .eq("id", encounterIdRaw)
+        .maybeSingle();
+
+      if (sessionErr || !session) {
+        return NextResponse.json(
+          { error: "Invalid or unknown encounter_id" },
+          { status: 400 },
+        );
+      }
+
+      const createdMs = Date.parse(String(session.created_at));
+      const ageMs = Number.isFinite(createdMs) ? Date.now() - createdMs : Number.POSITIVE_INFINITY;
+      if (ageMs > COLLABORATION_MAP_DROP_WINDOW_MS) {
+        return NextResponse.json(
+          { error: "encounter_id expired (must be within 15 minutes of bump)" },
+          { status: 400 },
+        );
+      }
+
+      squadMultiplier = SQUAD_PIN_MULTIPLIER;
+      metadata = {
+        ...metadata,
+        encounter_id: encounterIdRaw,
+        squad_multiplier: squadMultiplier,
+        radius_multiplier: squadMultiplier,
+      };
+    }
 
     if (beacon_type === "soundtrack") {
       const musicUrl =
@@ -230,7 +272,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const expiresAtIso = computeExpiresAtIso(body, beacon_type);
+    let expiresAtIso = computeExpiresAtIso(body, beacon_type);
+    if (squadMultiplier > 1.0) {
+      const baseMs = Date.parse(expiresAtIso);
+      const now = Date.now();
+      if (Number.isFinite(baseMs) && baseMs > now) {
+        const ttlMs = baseMs - now;
+        expiresAtIso = new Date(now + ttlMs * squadMultiplier).toISOString();
+      }
+    }
 
     const showCreatorName =
       body.show_creator_name === true ||

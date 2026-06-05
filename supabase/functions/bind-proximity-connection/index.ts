@@ -68,6 +68,19 @@ type EncounterMutationOutcome =
   | 'insert_error'
   | 'debounce_update_error';
 
+/** 10:00 AM local on the day after bump (offset minutes east of UTC). */
+function computeCollaborationTtl(offsetMinutes: number, nowUtcMs: number = Date.now()): string {
+  const safeOffset = Number.isFinite(offsetMinutes) ? Math.trunc(offsetMinutes) : 0;
+  const localNowMs = nowUtcMs + safeOffset * 60_000;
+  const localNow = new Date(localNowMs);
+  const y = localNow.getUTCFullYear();
+  const mo = localNow.getUTCMonth();
+  const day = localNow.getUTCDate();
+  const targetLocalAsUtc = Date.UTC(y, mo, day + 1, 10, 0, 0, 0);
+  const targetUtcMs = targetLocalAsUtc - safeOffset * 60_000;
+  return new Date(targetUtcMs).toISOString();
+}
+
 function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6_371_000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -545,6 +558,7 @@ Deno.serve(async (req) => {
     location_name?: unknown;
     weather_snapshot?: unknown;
     simulator_mock?: unknown;
+    timezone_offset_minutes?: unknown;
   };
   try {
     body = await req.json();
@@ -582,6 +596,8 @@ Deno.serve(async (req) => {
       is_new_connection: false,
       encounter_persisted_on_bind: true,
     };
+    const mockTtl = computeCollaborationTtl(0);
+    const mockEncounterId = crypto.randomUUID();
     return new Response(
       JSON.stringify({
         success: true,
@@ -591,6 +607,8 @@ Deno.serve(async (req) => {
         is_new_connection: false,
         is_group: false,
         simulator_mock: true,
+        encounter_id: mockEncounterId,
+        collaboration_ttl: mockTtl,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
@@ -616,6 +634,7 @@ Deno.serve(async (req) => {
     typeof body.location_name === 'string' && body.location_name.trim().length > 0
       ? body.location_name.trim()
       : null;
+  const timezoneOffsetMinutes = finiteNumber(body.timezone_offset_minutes) ?? 0;
 
   const clientWeatherSnapshot =
     typeof body.weather_snapshot === 'string' && body.weather_snapshot.trim().length > 0
@@ -1101,6 +1120,35 @@ Deno.serve(async (req) => {
       responseBody.connection_id = only.connection_id;
       responseBody.is_new_connection = only.is_new_connection;
       responseBody.is_group = false;
+    }
+  }
+
+  // Re-engagement: existing friends unlock Disposable Roll + Squad map drops.
+  if (!handshakeCreatedNewConnection && sharedConnectionId != null) {
+    const collaborationTtl = computeCollaborationTtl(timezoneOffsetMinutes);
+    const participantIds = [...new Set([uid, ...memberIds])].sort();
+    let chatId: string | null = null;
+    const { data: chatRow } = await admin
+      .from('chats')
+      .select('id')
+      .eq('connection_id', sharedConnectionId)
+      .maybeSingle();
+    if (chatRow?.id) chatId = String(chatRow.id);
+
+    const encounterId = crypto.randomUUID();
+    const { error: collabErr } = await admin.from('collaboration_sessions').insert({
+      id: encounterId,
+      connection_id: sharedConnectionId,
+      chat_id: chatId,
+      collaboration_ttl: collaborationTtl,
+      participant_user_ids: participantIds,
+      notification_sent: false,
+    });
+    if (collabErr) {
+      console.warn('bind-proximity-connection collaboration_session:', collabErr.message);
+    } else {
+      responseBody.encounter_id = encounterId;
+      responseBody.collaboration_ttl = collaborationTtl;
     }
   }
 
