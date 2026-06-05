@@ -345,22 +345,25 @@ export async function GET(request: NextRequest) {
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
         request.nextUrl.origin);
 
-    const connectionUrl = `${baseUrl}/connect/${user.id}`;
+    const connectionUrl = `${baseUrl}/c/${user.id}`;
+    const legacyConnectionUrl = `${baseUrl}/connect/${user.id}`;
     const clickId = `CLICK-${user.id.substring(0, 8).toUpperCase()}`;
 
     return NextResponse.json({
       success: true,
       data: {
-        // New token-based payload (encode this as the QR code content)
-        qrPayload: JSON.stringify(qrPayload),
+        // Universal Link payload — never raw JSON (OS cameras misread JSON as phone numbers)
+        qrPayload: connectionUrl,
         token,
         expiresAt,
         // Legacy fields for display
         userId: user.id,
         clickId,
         connectionUrl,
+        legacyConnectionUrl,
         deepLink: `click://connect/${user.id}`,
         universalLink: connectionUrl,
+        qrToken: qrPayload,
         userName: displayNameFromUserMetadata(user.user_metadata) || null,
         userEmail: user.email,
       }
