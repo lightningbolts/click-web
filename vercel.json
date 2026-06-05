@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/friction-intent-expirations",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
