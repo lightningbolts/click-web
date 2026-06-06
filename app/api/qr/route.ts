@@ -9,6 +9,7 @@ import {
   normalizeContextTagsArray,
   resolveContextTagId,
 } from '@/lib/server/connectionEncounterContextTag';
+import { computeCollaborationTtl } from '@/lib/collaboration/collaborationTtl';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -541,6 +542,8 @@ export async function POST(request: NextRequest) {
 
       let encounterLogged = true;
       let encounterReason: string | undefined;
+      let encounterIdForCollab: string | null = null;
+      let collaborationTtl: string | null = null;
 
       if (existingConnection?.id) {
         let semanticLocation: Record<string, unknown> | null = null;
@@ -652,6 +655,33 @@ export async function POST(request: NextRequest) {
             { status: 500 }
           );
         }
+
+        const timezoneOffsetMinutes = finiteNumber(body.timezone_offset_minutes) ?? 0;
+        encounterIdForCollab = crypto.randomUUID();
+        collaborationTtl = computeCollaborationTtl(timezoneOffsetMinutes);
+
+        const participantIds = [user.id, targetUserId].sort();
+        let chatId: string | null = null;
+        const { data: chatRow } = await adminClient
+          .from('chats')
+          .select('id')
+          .eq('connection_id', existingConnection.id)
+          .maybeSingle();
+        if (chatRow?.id) chatId = String(chatRow.id);
+
+        const { error: collabErr } = await adminClient.from('collaboration_sessions').insert({
+          id: encounterIdForCollab,
+          connection_id: existingConnection.id,
+          chat_id: chatId,
+          collaboration_ttl: collaborationTtl,
+          participant_user_ids: participantIds,
+          notification_sent: false,
+        });
+        if (collabErr) {
+          console.warn('QR API collaboration_session:', collabErr.message);
+          encounterIdForCollab = null;
+          collaborationTtl = null;
+        }
       }
 
       return NextResponse.json({
@@ -659,6 +689,8 @@ export async function POST(request: NextRequest) {
         encounter_logged: encounterLogged,
         ...(encounterReason ? { reason: encounterReason } : {}),
         connection_id: existingConnection?.id ?? null,
+        ...(encounterIdForCollab ? { encounter_id: encounterIdForCollab } : {}),
+        ...(collaborationTtl ? { collaboration_ttl: collaborationTtl } : {}),
         data: {
           targetUserId,
           targetUserName: targetUser?.name || 'Click User',
@@ -667,6 +699,8 @@ export async function POST(request: NextRequest) {
           connectionId: existingConnection?.id ?? null,
           encounterLogged,
           ...(encounterReason ? { reason: encounterReason } : {}),
+          ...(encounterIdForCollab ? { encounterId: encounterIdForCollab } : {}),
+          ...(collaborationTtl ? { collaborationTtl } : {}),
           message: 'Token redeemed — ready to create connection',
         }
       });
