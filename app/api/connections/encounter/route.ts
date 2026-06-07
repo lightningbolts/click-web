@@ -60,9 +60,16 @@ export async function POST(request: NextRequest) {
     }
 
     const raw = body as Record<string, unknown>;
-    const openDisposableRoll = raw.open_disposable_roll === true;
     const connectionIdDirect =
       typeof raw.connection_id === 'string' ? raw.connection_id.trim() : '';
+    const userIdEarly = typeof raw.user_id === 'string' ? raw.user_id.trim() : '';
+    const peerIdEarly = typeof raw.peer_id === 'string' ? raw.peer_id.trim() : '';
+    const openDisposableRoll =
+      raw.open_disposable_roll === true ||
+      (connectionIdDirect.length > 0 &&
+        isUuidLike(connectionIdDirect) &&
+        userIdEarly.length === 0 &&
+        peerIdEarly.length === 0);
 
     if (openDisposableRoll) {
       if (!connectionIdDirect || !isUuidLike(connectionIdDirect)) {
