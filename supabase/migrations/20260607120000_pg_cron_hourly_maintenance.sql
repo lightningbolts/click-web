@@ -1,0 +1,48 @@
+-- Hourly maintenance cron (Disposable Roll reveal + friction intent expirations)
+-- Replaces Vercel vercel.json crons — runs inside Supabase via pg_cron + pg_net.
+--
+-- ONE-TIME SETUP (Supabase Dashboard → SQL Editor):
+--
+-- 1) Enable extensions (Database → Extensions, or):
+--      CREATE EXTENSION IF NOT EXISTS pg_net;
+--      CREATE EXTENSION IF NOT EXISTS pg_cron;
+--
+-- 2) Deploy the edge function from click-web/:
+--      supabase functions deploy cron-hourly-maintenance --no-verify-jwt
+--    Ensure send-push-notification is already deployed (click/supabase/functions).
+--
+-- 3) Store secrets in Vault (replace placeholders — never commit real keys):
+--      SELECT vault.create_secret('https://YOUR_PROJECT_REF.supabase.co', 'project_url');
+--      SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'cron_service_role_key');
+--
+-- 4) Schedule the job (hourly at :00 UTC):
+--      SELECT cron.schedule(
+--        'click-hourly-maintenance',
+--        '0 * * * *',
+--        $$
+--        SELECT net.http_post(
+--          url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'project_url')
+--                 || '/functions/v1/cron-hourly-maintenance',
+--          headers := jsonb_build_object(
+--            'Content-Type', 'application/json',
+--            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_service_role_key')
+--          ),
+--          body := '{}'::jsonb
+--        ) AS request_id;
+--        $$
+--      );
+--
+-- 5) Verify:
+--      SELECT jobid, jobname, schedule, active FROM cron.job WHERE jobname = 'click-hourly-maintenance';
+--
+-- 6) To remove later:
+--      SELECT cron.unschedule('click-hourly-maintenance');
+--
+-- Manual test (replace URL + service role):
+--   curl -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/cron-hourly-maintenance' \
+--     -H 'Authorization: Bearer YOUR_SERVICE_ROLE_KEY' \
+--     -H 'Content-Type: application/json' \
+--     -d '{}'
+
+-- This migration is documentation-only; pg_cron must be configured in the SQL Editor
+-- because project URL and service role belong in Vault, not in git.
