@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { createAdminClient } from '@/lib/server/connectionWriteAuth';
+import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import { buildEncounterInsertFromSensor } from '@/lib/connections/encounterSensorPayload';
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
 
@@ -58,6 +60,60 @@ export async function POST(request: NextRequest) {
     }
 
     const raw = body as Record<string, unknown>;
+    const openDisposableRoll = raw.open_disposable_roll === true;
+    const connectionIdDirect =
+      typeof raw.connection_id === 'string' ? raw.connection_id.trim() : '';
+
+    if (openDisposableRoll) {
+      if (!connectionIdDirect || !isUuidLike(connectionIdDirect)) {
+        return NextResponse.json({ error: 'connection_id required' }, { status: 400 });
+      }
+
+      const { data: rollConn, error: rollConnErr } = await supabase
+        .from('connections')
+        .select('id, user_ids')
+        .eq('id', connectionIdDirect)
+        .maybeSingle();
+
+      if (rollConnErr) {
+        console.error('connections/encounter roll connection lookup:', rollConnErr.message);
+        return NextResponse.json({ error: 'Failed to resolve connection' }, { status: 500 });
+      }
+      if (rollConn?.id == null) {
+        return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
+      }
+
+      const rollUserIds = Array.isArray(rollConn.user_ids)
+        ? rollConn.user_ids.filter((id): id is string => typeof id === 'string')
+        : [];
+      if (!rollUserIds.includes(user.id)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      let timezoneOffsetMinutes = 0;
+      if (typeof raw.timezone_offset_minutes === 'number' && Number.isFinite(raw.timezone_offset_minutes)) {
+        timezoneOffsetMinutes = Math.trunc(raw.timezone_offset_minutes);
+      }
+
+      const admin = createAdminClient();
+      const created = await createCollaborationSessionForConnection(
+        admin,
+        connectionIdDirect,
+        rollUserIds,
+        timezoneOffsetMinutes,
+      );
+
+      if (created == null) {
+        return NextResponse.json({ error: 'Failed to open collaboration session' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        ok: true,
+        encounter_id: created.encounterId,
+        collaboration_ttl: created.collaborationTtl,
+      });
+    }
+
     const userId = typeof raw.user_id === 'string' ? raw.user_id.trim() : '';
     const peerId = typeof raw.peer_id === 'string' ? raw.peer_id.trim() : '';
     const sensorData = raw.sensor_data;
