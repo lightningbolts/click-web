@@ -1124,7 +1124,7 @@ Deno.serve(async (req) => {
   }
 
   // Re-engagement: existing friends unlock Disposable Roll + Squad map drops.
-  if (!handshakeCreatedNewConnection && sharedConnectionId != null) {
+  if (sharedConnectionId != null) {
     const collaborationTtl = computeCollaborationTtl(timezoneOffsetMinutes);
     const participantIds = [...new Set([uid, ...memberIds])].sort();
     let chatId: string | null = null;

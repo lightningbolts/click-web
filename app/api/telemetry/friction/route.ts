@@ -4,6 +4,7 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 type FrictionBody = {
   event?: unknown;
+  event_type?: unknown;
   duration_sec?: unknown;
   pan_count?: unknown;
   action_taken?: unknown;
@@ -37,7 +38,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const eventType = typeof body.event === 'string' ? body.event.trim() : '';
+  const rawEvent =
+    typeof body.event === 'string'
+      ? body.event
+      : typeof body.event_type === 'string'
+        ? body.event_type
+        : '';
+  const eventType = rawEvent.trim();
   if (!ALLOWED_EVENTS.has(eventType)) {
     return NextResponse.json({ error: 'Unsupported event type' }, { status: 400 });
   }

@@ -12,6 +12,7 @@ import {
   type ContextTagPayload,
 } from '@/lib/server/connectionEncounterContextTag';
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
+import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 
 /**
  * Connections API
@@ -1217,6 +1218,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const timezoneOffsetMinutes =
+      typeof body.timezone_offset_minutes === 'number' && Number.isFinite(body.timezone_offset_minutes)
+        ? Math.trunc(body.timezone_offset_minutes)
+        : 0;
+    const collabSession = await createCollaborationSessionForConnection(
+      adminClient,
+      String(connection.id),
+      userIdsForRow,
+      timezoneOffsetMinutes,
+    );
+
     return NextResponse.json({
       success: true,
       encounter_logged,
@@ -1224,6 +1236,12 @@ export async function POST(request: NextRequest) {
       connection_id: connection.id,
       connection,
       proximityConfidence,
+      ...(collabSession
+        ? {
+            encounter_id: collabSession.encounterId,
+            collaboration_ttl: collabSession.collaborationTtl,
+          }
+        : {}),
     });
 
   } catch (error) {

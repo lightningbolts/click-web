@@ -10,6 +10,7 @@ import {
   resolveContextTagId,
 } from '@/lib/server/connectionEncounterContextTag';
 import { computeCollaborationTtl } from '@/lib/collaboration/collaborationTtl';
+import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -631,11 +632,24 @@ export async function POST(request: NextRequest) {
           if (isEncounterRateLimitError(encounterErr)) {
             encounterLogged = false;
             encounterReason = 'rate_limit_active';
+            const timezoneOffsetMinutes = finiteNumber(body.timezone_offset_minutes) ?? 0;
+            const collabOnLimit = await createCollaborationSessionForConnection(
+              adminClient,
+              existingConnection.id,
+              [user.id, targetUserId],
+              timezoneOffsetMinutes,
+            );
             return NextResponse.json({
               success: true,
               encounter_logged: false,
               reason: encounterReason,
               connection_id: existingConnection.id,
+              ...(collabOnLimit
+                ? {
+                    encounter_id: collabOnLimit.encounterId,
+                    collaboration_ttl: collabOnLimit.collaborationTtl,
+                  }
+                : {}),
               data: {
                 targetUserId,
                 targetUserName: targetUser?.name || 'Click User',
@@ -644,6 +658,12 @@ export async function POST(request: NextRequest) {
                 connectionId: existingConnection.id,
                 encounterLogged: false,
                 reason: encounterReason,
+                ...(collabOnLimit
+                  ? {
+                      encounterId: collabOnLimit.encounterId,
+                      collaborationTtl: collabOnLimit.collaborationTtl,
+                    }
+                  : {}),
                 message: 'Token redeemed — encounter logging is rate limited',
               },
             });
