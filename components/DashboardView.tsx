@@ -3465,6 +3465,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
       <UserProfileModal
         userId={profileUserId}
         getAuthHeaders={getAuthHeaders}
+        currentUserId={user?.id ?? null}
         onClose={() => {
           setProfileUserId(null);
           setBirthdayProfileGateOpen(false);
@@ -3476,9 +3477,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
         decryptedMessages={profileDecryptedMessages}
       />
 
-      {vibePromptConnection ? (
+      {vibePromptConnection && user?.id ? (
         <PostConnectionVibePrompt
           connectionId={vibePromptConnection.id}
+          currentUserId={user.id}
           venueLabel={vibePromptConnection.location || 'This place'}
           getAuthHeaders={getAuthHeaders}
           onClose={() => setVibePromptConnection(null)}

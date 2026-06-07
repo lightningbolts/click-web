@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Camera,
   X,
   Download,
   ExternalLink,
+  Loader2,
   Sparkles,
   MapPin,
   Clock,
@@ -61,6 +63,7 @@ import {
 } from '@/lib/chat/crypto';
 import { createSecureMediaObjectUrl } from '@/lib/chat/useSecureMedia';
 import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
+import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import { stableKeysForStringList } from '@/lib/react/stableKeysForStringList';
 
 export type { AvailabilityIntentRow };
@@ -233,6 +236,7 @@ type UserProfileModalProps = {
   userId: string | null;
   getAuthHeaders: () => Promise<HeadersInit>;
   onClose: () => void;
+  currentUserId?: string | null;
   /**
    * When true (own profile only), the sheet cannot be dismissed until birthday is saved to
    * `public.users` — backdrop taps and the header close control are disabled.
@@ -276,6 +280,11 @@ type ChatMessagesPayload = {
     message_type: string;
     metadata: Record<string, unknown> | null;
   }>;
+};
+
+type CollaborationSessionResponse = {
+  encounter_id?: unknown;
+  collaboration_ttl?: unknown;
 };
 
 type MediaItem = {
@@ -584,16 +593,19 @@ export default function UserProfileModal({
   userId,
   getAuthHeaders,
   onClose,
+  currentUserId = null,
   forceOwnProfileBirthdayCompletion = false,
   connectionId = null,
   decryptedMessages = [],
 }: UserProfileModalProps) {
   const { mutate } = useSWRConfig();
+  const rollInputRef = useRef<HTMLInputElement>(null);
   const requestedUserId = userId?.trim() || null;
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
   const [birthdayDraft, setBirthdayDraft] = useState('');
   const [birthdaySaveError, setBirthdaySaveError] = useState<string | null>(null);
   const [birthdaySaving, setBirthdaySaving] = useState(false);
+  const [rollStatus, setRollStatus] = useState<'idle' | 'opening' | 'uploading' | 'done' | 'error'>('idle');
   const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
@@ -636,10 +648,10 @@ export default function UserProfileModal({
   }, [profileData]);
 
   const effectiveConnectionId = useMemo(() => {
-    const fromProp = connectionId?.trim();
-    if (fromProp) return fromProp;
     const fromProfile = (profileData?.sharedConnection as Record<string, unknown> | null)?.id;
-    return typeof fromProfile === 'string' && fromProfile.trim() ? fromProfile.trim() : null;
+    if (typeof fromProfile === 'string' && fromProfile.trim()) return fromProfile.trim();
+    const fromProp = connectionId?.trim();
+    return fromProp || null;
   }, [connectionId, profileData?.sharedConnection]);
 
   const tabsPath = effectiveConnectionId
@@ -973,6 +985,82 @@ export default function UserProfileModal({
     [downloadUrl, resolveFileUrl],
   );
 
+  const jsonHeaders = useCallback(async () => {
+    const headers = new Headers(await getAuthHeaders());
+    headers.set('Content-Type', 'application/json');
+    return headers;
+  }, [getAuthHeaders]);
+
+  const openCollaborationSession = useCallback(async () => {
+    if (!effectiveConnectionId) {
+      throw new Error('Missing connection for Disposable Roll');
+    }
+    const headers = await jsonHeaders();
+    const res = await fetch(`/api/connections/${encodeURIComponent(effectiveConnectionId)}/collaboration-session`, {
+      method: 'POST',
+      headers,
+    });
+    const body = (await res.json().catch(() => ({}))) as CollaborationSessionResponse;
+    if (!res.ok) {
+      throw new Error('Could not open Disposable Roll');
+    }
+    const encounterId = typeof body.encounter_id === 'string' ? body.encounter_id.trim() : '';
+    const collaborationTtl = typeof body.collaboration_ttl === 'string' ? body.collaboration_ttl.trim() : '';
+    if (!encounterId || !collaborationTtl) {
+      throw new Error('Disposable Roll session was incomplete');
+    }
+    return { encounterId, collaborationTtl };
+  }, [effectiveConnectionId, jsonHeaders]);
+
+  const openRollPicker = useCallback(() => {
+    if (!effectiveConnectionId || !currentUserId?.trim()) return;
+    if (rollStatus === 'opening' || rollStatus === 'uploading') return;
+    rollInputRef.current?.click();
+  }, [currentUserId, effectiveConnectionId, rollStatus]);
+
+  const onRollPhotoSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      if (!file.type.startsWith('image/') || !effectiveConnectionId || !currentUserId?.trim()) {
+        setRollStatus('error');
+        return;
+      }
+
+      setRollStatus('opening');
+      try {
+        const session = await openCollaborationSession();
+        setRollStatus('uploading');
+        const { publicUrl } = await uploadChatMediaBlob(currentUserId.trim(), file, file.type);
+        const headers = await jsonHeaders();
+        const messageRes = await fetch('/api/chat/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            connectionId: effectiveConnectionId,
+            content: ' ',
+            message_type: 'image',
+            metadata: {
+              media_url: publicUrl,
+              original_mime_type: file.type || 'image/jpeg',
+              disposable_roll: true,
+              encounter_id: session.encounterId,
+              collaboration_ttl: session.collaborationTtl,
+            },
+          }),
+        });
+        if (!messageRes.ok) {
+          throw new Error('Could not send Disposable Roll photo');
+        }
+        setRollStatus('done');
+      } catch {
+        setRollStatus('error');
+      }
+    },
+    [currentUserId, effectiveConnectionId, jsonHeaders, openCollaborationSession],
+  );
+
   useEffect(() => {
     // Reset derived state whenever the sheet opens for a new user.
     if (!requestedUserId) return;
@@ -983,6 +1071,7 @@ export default function UserProfileModal({
     setBirthdayDraft('');
     setBirthdaySaveError(null);
     setBirthdaySaving(false);
+    setRollStatus('idle');
   }, [requestedUserId]);
 
   useEffect(() => {
@@ -1024,6 +1113,8 @@ export default function UserProfileModal({
     forceOwnProfileBirthdayCompletion &&
     !!profileData &&
     (profileData.user.birthday == null || !String(profileData.user.birthday).trim());
+  const rollBusy = rollStatus === 'opening' || rollStatus === 'uploading';
+  const canOpenDisposableRoll = Boolean(effectiveConnectionId && currentUserId?.trim() && !blockingBirthday);
 
   const saveOwnBirthday = async () => {
     if (!requestedUserId || !profilePath) return;
@@ -1177,6 +1268,43 @@ export default function UserProfileModal({
                       )}
                     </div>
                   </div>
+
+                  {canOpenDisposableRoll && (
+                    <section aria-label="Profile actions" className="grid grid-cols-1 gap-2">
+                      <input
+                        ref={rollInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        capture="environment"
+                        className="hidden"
+                        onChange={onRollPhotoSelected}
+                      />
+                      <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.98 }}
+                        onClick={openRollPicker}
+                        disabled={rollBusy}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-violet-300/25 bg-white/10 px-4 py-3 text-left shadow-lg shadow-violet-500/10 backdrop-blur-md transition-colors hover:border-violet-300/45 hover:bg-white/[0.14] disabled:cursor-wait disabled:opacity-70"
+                      >
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-violet-200">
+                          {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold text-white">Disposable Roll</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-zinc-400">
+                            {rollStatus === 'uploading'
+                              ? 'Dropping your photo into the shared roll...'
+                              : rollStatus === 'done'
+                                ? 'Captured to the roll.'
+                                : 'Open the camera for a time-locked shared drop.'}
+                          </span>
+                        </span>
+                      </motion.button>
+                      {rollStatus === 'error' && (
+                        <p className="text-xs text-red-400">Couldn&apos;t open Disposable Roll — try again.</p>
+                      )}
+                    </section>
+                  )}
 
                   {/*
                     Four-tab secondary nav mirroring the KMP [ProfileBottomSheet]

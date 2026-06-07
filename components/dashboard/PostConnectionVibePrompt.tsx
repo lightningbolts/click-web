@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Sparkles, X } from "lucide-react";
+import { Camera, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
+import { uploadChatMediaBlob } from "@/lib/chat/chatMediaStorage";
 
 const CATEGORIES = [
   { id: "atmosphere", label: "Atmosphere" },
@@ -14,21 +15,30 @@ const CATEGORIES = [
 
 type Props = {
   connectionId: string;
+  currentUserId: string;
   venueLabel: string;
   getAuthHeaders: () => Promise<HeadersInit>;
   onClose: () => void;
 };
 
+type CollaborationSessionResponse = {
+  encounter_id?: unknown;
+  collaboration_ttl?: unknown;
+};
+
 export default function PostConnectionVibePrompt({
   connectionId,
+  currentUserId,
   venueLabel,
   getAuthHeaders,
   onClose,
 }: Props) {
+  const rollInputRef = useRef<HTMLInputElement>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [category, setCategory] = useState<string>("atmosphere");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [rollStatus, setRollStatus] = useState<"idle" | "opening" | "uploading" | "done" | "error">("idle");
 
   const skip = () => {
     try {
@@ -43,10 +53,10 @@ export default function PostConnectionVibePrompt({
     if (rating === null && !message.trim()) return;
     setStatus("saving");
     try {
-      const headers = await getAuthHeaders();
+      const headers = await jsonHeaders();
       const res = await fetch(`/api/connections/${encodeURIComponent(connectionId)}/venue-vibe`, {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           ...(rating !== null ? { rating } : {}),
           category,
@@ -63,6 +73,77 @@ export default function PostConnectionVibePrompt({
       setStatus("error");
     }
   };
+
+  const jsonHeaders = async () => {
+    const headers = new Headers(await getAuthHeaders());
+    headers.set("Content-Type", "application/json");
+    return headers;
+  };
+
+  const openCollaborationSession = async () => {
+    const headers = await jsonHeaders();
+    const res = await fetch(`/api/connections/${encodeURIComponent(connectionId)}/collaboration-session`, {
+      method: "POST",
+      headers,
+    });
+    const body = (await res.json().catch(() => ({}))) as CollaborationSessionResponse;
+    if (!res.ok) {
+      throw new Error("Could not open Disposable Roll");
+    }
+    const encounterId = typeof body.encounter_id === "string" ? body.encounter_id.trim() : "";
+    const collaborationTtl = typeof body.collaboration_ttl === "string" ? body.collaboration_ttl.trim() : "";
+    if (!encounterId || !collaborationTtl) {
+      throw new Error("Disposable Roll session was incomplete");
+    }
+    return { encounterId, collaborationTtl };
+  };
+
+  const openRollPicker = () => {
+    if (rollStatus === "opening" || rollStatus === "uploading") return;
+    rollInputRef.current?.click();
+  };
+
+  const onRollPhotoSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setRollStatus("error");
+      return;
+    }
+
+    setRollStatus("opening");
+    try {
+      const session = await openCollaborationSession();
+      setRollStatus("uploading");
+      const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
+      const headers = await jsonHeaders();
+      const messageRes = await fetch("/api/chat/messages", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          connectionId,
+          content: " ",
+          message_type: "image",
+          metadata: {
+            media_url: publicUrl,
+            original_mime_type: file.type || "image/jpeg",
+            disposable_roll: true,
+            encounter_id: session.encounterId,
+            collaboration_ttl: session.collaborationTtl,
+          },
+        }),
+      });
+      if (!messageRes.ok) {
+        throw new Error("Could not send Disposable Roll photo");
+      }
+      setRollStatus("done");
+    } catch {
+      setRollStatus("error");
+    }
+  };
+
+  const rollBusy = rollStatus === "opening" || rollStatus === "uploading";
 
   return (
     <AnimatePresence>
@@ -154,11 +235,44 @@ export default function PostConnectionVibePrompt({
             />
           </div>
 
+          <input
+            ref={rollInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            capture="environment"
+            className="hidden"
+            onChange={onRollPhotoSelected}
+          />
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98 }}
+            onClick={openRollPicker}
+            disabled={rollBusy}
+            className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-violet-400/30 bg-white/[0.07] px-4 py-3 text-left shadow-lg shadow-violet-500/10 transition-colors hover:border-violet-300/50 hover:bg-white/[0.1] disabled:cursor-wait disabled:opacity-70"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-violet-200">
+              {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-white">Disposable Roll</span>
+              <span className="mt-0.5 block text-xs leading-5 text-zinc-400">
+                {rollStatus === "uploading"
+                  ? "Dropping your photo into the shared roll..."
+                  : rollStatus === "done"
+                    ? "Captured to the roll."
+                    : "Open the camera for a time-locked shared drop."}
+              </span>
+            </span>
+          </motion.button>
+
           {status === "error" && (
             <p className="mb-3 text-sm text-red-400">Couldn&apos;t save — try again later.</p>
           )}
           {status === "done" && (
             <p className="mb-3 text-sm text-emerald-400">Thanks — captured for the venue.</p>
+          )}
+          {rollStatus === "error" && (
+            <p className="mb-3 text-sm text-red-400">Couldn&apos;t open Disposable Roll — try again.</p>
           )}
 
           <div className="flex gap-2">
