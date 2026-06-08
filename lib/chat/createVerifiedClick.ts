@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { deriveKeysForConnection, encryptContent } from '@/lib/chat/crypto';
-import { findActivePairwiseConnectionId } from '@/lib/chat/groupCliqueKey';
+import { findActivePairwiseConnectionId, unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 
 function randomBytes32(): Uint8Array {
   const b = new Uint8Array(32);
@@ -116,6 +116,80 @@ export async function renameCliqueRpc(
   const { error } = await supabase.rpc('rename_clique', {
     target_group_id: groupId,
     new_name: newName,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Adds a member to a verified clique: server unwraps the group master key for the
+ * creator and re-wraps it for the new member (thin client / fat server).
+ */
+export async function addCliqueMemberFromConnections(
+  supabase: SupabaseClient,
+  currentUserId: string,
+  groupId: string,
+  newMemberUserId: string,
+): Promise<void> {
+  const trimmedGroup = groupId.trim();
+  const trimmedMember = newMemberUserId.trim();
+  if (!trimmedGroup || !trimmedMember) throw new Error('group_id and new_member_user_id are required');
+
+  const { data: group, error: gErr } = await supabase
+    .from('groups')
+    .select('id, created_by, key_anchor_user_id')
+    .eq('id', trimmedGroup)
+    .maybeSingle();
+  if (gErr) throw new Error(gErr.message);
+  if (!group) throw new Error('Group not found');
+  if (String((group as { created_by: string }).created_by) !== currentUserId) {
+    throw new Error('Only the group creator can add members');
+  }
+
+  const { data: members, error: mErr } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', trimmedGroup);
+  if (mErr) throw new Error(mErr.message);
+  const memberIds = (members ?? []).map((r) => String((r as { user_id: string }).user_id));
+  if (memberIds.includes(trimmedMember)) throw new Error('User is already a member');
+
+  const expanded = [...new Set([...memberIds, trimmedMember])].sort();
+  if (!(await verifiedCliqueEdgesExist(supabase, expanded))) {
+    throw new Error('Missing verified connection for new member');
+  }
+
+  const master = await unwrapGroupMasterKeyBytes(supabase, {
+    groupId: trimmedGroup,
+    viewerUserId: currentUserId,
+  });
+  if (!master) throw new Error('Could not access group encryption key');
+
+  const b64 = toStdBase64(new Uint8Array(master));
+  const createdBy = String((group as { created_by: string }).created_by);
+  const keyAnchorUserId = (group as { key_anchor_user_id: string | null }).key_anchor_user_id;
+  const wrapPeer = trimmedMember === createdBy ? keyAnchorUserId : createdBy;
+  if (!wrapPeer) throw new Error('Invalid group key anchor');
+  const connId = await findActivePairwiseConnectionId(supabase, trimmedMember, wrapPeer);
+  if (!connId) throw new Error('Missing verified connection for new member');
+  const keys = await deriveKeysForConnection(connId, [trimmedMember, wrapPeer].sort());
+  const encrypted = await encryptContent(b64, keys);
+
+  const { error } = await supabase.rpc('add_clique_member', {
+    target_group_id: trimmedGroup,
+    new_member_user_id: trimmedMember,
+    encrypted_group_key: encrypted,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeCliqueMemberRpc(
+  supabase: SupabaseClient,
+  groupId: string,
+  memberUserId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('remove_clique_member', {
+    target_group_id: groupId.trim(),
+    member_user_id: memberUserId.trim(),
   });
   if (error) throw new Error(error.message);
 }
