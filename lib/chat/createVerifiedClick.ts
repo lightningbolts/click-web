@@ -141,9 +141,15 @@ export async function addCliqueMemberFromConnections(
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
   if (!group) throw new Error('Group not found');
-  if (String((group as { created_by: string }).created_by) !== currentUserId) {
-    throw new Error('Only the group creator can add members');
-  }
+
+  const { data: callerMember, error: callerErr } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', trimmedGroup)
+    .eq('user_id', currentUserId)
+    .maybeSingle();
+  if (callerErr) throw new Error(callerErr.message);
+  if (!callerMember) throw new Error('Must be a group member to add others');
 
   const { data: members, error: mErr } = await supabase
     .from('group_members')

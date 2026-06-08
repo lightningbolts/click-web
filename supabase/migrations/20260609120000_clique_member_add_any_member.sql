@@ -1,4 +1,4 @@
--- Verified clique admin: any member may add; only creator may remove.
+-- Allow any group member (not only creator) to add verified connections.
 
 CREATE OR REPLACE FUNCTION public.add_clique_member(
     target_group_id uuid,
@@ -79,50 +79,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.add_clique_member(uuid, uuid, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.add_clique_member(uuid, uuid, text) TO authenticated;
-
 COMMENT ON FUNCTION public.add_clique_member(uuid, uuid, text) IS
     'Group member adds someone to a verified clique after the server distributes the group master key.';
-
-CREATE OR REPLACE FUNCTION public.remove_clique_member(
-    target_group_id uuid,
-    member_user_id uuid
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-SET row_security = off
-AS $$
-BEGIN
-    IF auth.uid() IS NULL THEN
-        RAISE EXCEPTION 'not authenticated';
-    END IF;
-
-    IF member_user_id = auth.uid() THEN
-        RAISE EXCEPTION 'use leave_clique to remove yourself';
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM public.groups g
-        WHERE g.id = target_group_id AND g.created_by = auth.uid()
-    ) THEN
-        RAISE EXCEPTION 'forbidden: only group creator may remove members';
-    END IF;
-
-    DELETE FROM public.group_members
-    WHERE group_id = target_group_id
-      AND user_id = member_user_id;
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'member not found in group';
-    END IF;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.remove_clique_member(uuid, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.remove_clique_member(uuid, uuid) TO authenticated;
-
-COMMENT ON FUNCTION public.remove_clique_member(uuid, uuid) IS
-    'Creator removes another member from a verified clique (revokes group access).';
