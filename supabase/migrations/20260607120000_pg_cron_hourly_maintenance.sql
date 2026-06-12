@@ -1,5 +1,5 @@
--- Hourly maintenance cron (Disposable Roll reveal + friction intent expirations)
--- Replaces Vercel vercel.json crons — runs inside Supabase via pg_cron + pg_net.
+-- Hourly maintenance cron (Click Drops reveal + event reminders + friction intent expirations)
+-- Runs inside Supabase via pg_cron + pg_net — no Vercel cron required (vercel.json is empty).
 --
 -- ONE-TIME SETUP (Supabase Dashboard → SQL Editor):
 --

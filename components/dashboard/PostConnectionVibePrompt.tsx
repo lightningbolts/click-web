@@ -1,5 +1,7 @@
 "use client";
 
+import { computeClickDropRevealTtlIso } from "@/lib/collaboration/clickDropReveal";
+
 import { useRef, useState, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
@@ -88,12 +90,12 @@ export default function PostConnectionVibePrompt({
     });
     const body = (await res.json().catch(() => ({}))) as CollaborationSessionResponse;
     if (!res.ok) {
-      throw new Error("Could not open Disposable Roll");
+      throw new Error("Could not open Click Drop");
     }
     const encounterId = typeof body.encounter_id === "string" ? body.encounter_id.trim() : "";
     const collaborationTtl = typeof body.collaboration_ttl === "string" ? body.collaboration_ttl.trim() : "";
     if (!encounterId || !collaborationTtl) {
-      throw new Error("Disposable Roll session was incomplete");
+      throw new Error("Click Drop session was incomplete");
     }
     return { encounterId, collaborationTtl };
   };
@@ -130,12 +132,12 @@ export default function PostConnectionVibePrompt({
             original_mime_type: file.type || "image/jpeg",
             disposable_roll: true,
             encounter_id: session.encounterId,
-            collaboration_ttl: session.collaborationTtl,
+            collaboration_ttl: computeClickDropRevealTtlIso(),
           },
         }),
       });
       if (!messageRes.ok) {
-        throw new Error("Could not send Disposable Roll photo");
+        throw new Error("Could not send Click Drop photo");
       }
       setRollStatus("done");
     } catch {
@@ -254,7 +256,7 @@ export default function PostConnectionVibePrompt({
               {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-white">Disposable Roll</span>
+              <span className="block text-sm font-semibold text-white">Click Drop</span>
               <span className="mt-0.5 block text-xs leading-5 text-zinc-400">
                 {rollStatus === "uploading"
                   ? "Dropping your photo into the shared roll..."
@@ -272,7 +274,7 @@ export default function PostConnectionVibePrompt({
             <p className="mb-3 text-sm text-emerald-400">Thanks — captured for the venue.</p>
           )}
           {rollStatus === "error" && (
-            <p className="mb-3 text-sm text-red-400">Couldn&apos;t open Disposable Roll — try again.</p>
+            <p className="mb-3 text-sm text-red-400">Couldn&apos;t open Click Drop — try again.</p>
           )}
 
           <div className="flex gap-2">

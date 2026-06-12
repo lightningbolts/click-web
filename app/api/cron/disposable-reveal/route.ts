@@ -16,6 +16,7 @@ type CollaborationSessionRow = {
 
 /**
  * Hourly sweep: collaboration sessions past [collaboration_ttl] → reveal push to all participants.
+ * Optional HTTP route — production uses Supabase pg_cron → cron-hourly-maintenance edge function.
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -57,8 +58,8 @@ export async function GET(request: NextRequest) {
           },
           body: JSON.stringify({
             recipient_user_id: userId,
-            title: 'Disposable Roll',
-            body: '📸 Your Disposable Roll from last night has been revealed!',
+            title: 'Click Drops',
+            body: '📸 Your Click Drop has been revealed!',
             data: {
               type: 'disposable_reveal',
               encounter_id: session.id,

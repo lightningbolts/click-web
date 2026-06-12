@@ -37,7 +37,7 @@ import {
   prettyNoiseCategoryKey,
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
-import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
+import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropReveal';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
 import {
   originEncounter,
@@ -993,7 +993,7 @@ export default function UserProfileModal({
 
   const openCollaborationSession = useCallback(async () => {
     if (!effectiveConnectionId) {
-      throw new Error('Missing connection for Disposable Roll');
+      throw new Error('Missing connection for Click Drop');
     }
     const headers = await jsonHeaders();
     const res = await fetch(`/api/connections/${encodeURIComponent(effectiveConnectionId)}/collaboration-session`, {
@@ -1002,12 +1002,12 @@ export default function UserProfileModal({
     });
     const body = (await res.json().catch(() => ({}))) as CollaborationSessionResponse;
     if (!res.ok) {
-      throw new Error('Could not open Disposable Roll');
+      throw new Error('Could not open Click Drop');
     }
     const encounterId = typeof body.encounter_id === 'string' ? body.encounter_id.trim() : '';
     const collaborationTtl = typeof body.collaboration_ttl === 'string' ? body.collaboration_ttl.trim() : '';
     if (!encounterId || !collaborationTtl) {
-      throw new Error('Disposable Roll session was incomplete');
+      throw new Error('Click Drop session was incomplete');
     }
     return { encounterId, collaborationTtl };
   }, [effectiveConnectionId, jsonHeaders]);
@@ -1046,12 +1046,12 @@ export default function UserProfileModal({
               original_mime_type: file.type || 'image/jpeg',
               disposable_roll: true,
               encounter_id: session.encounterId,
-              collaboration_ttl: session.collaborationTtl,
+              collaboration_ttl: computeClickDropRevealTtlIso(),
             },
           }),
         });
         if (!messageRes.ok) {
-          throw new Error('Could not send Disposable Roll photo');
+          throw new Error('Could not send Click Drop photo');
         }
         setRollStatus('done');
       } catch {
@@ -1290,7 +1290,7 @@ export default function UserProfileModal({
                           {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold text-white">Disposable Roll</span>
+                          <span className="block text-sm font-semibold text-white">Click Drop</span>
                           <span className="mt-0.5 block text-xs leading-5 text-zinc-400">
                             {rollStatus === 'uploading'
                               ? 'Dropping your photo into the shared roll...'
@@ -1301,7 +1301,7 @@ export default function UserProfileModal({
                         </span>
                       </motion.button>
                       {rollStatus === 'error' && (
-                        <p className="text-xs text-red-400">Couldn&apos;t open Disposable Roll — try again.</p>
+                        <p className="text-xs text-red-400">Couldn&apos;t open Click Drop — try again.</p>
                       )}
                     </section>
                   )}
