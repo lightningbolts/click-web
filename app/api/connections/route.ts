@@ -467,6 +467,13 @@ function dedupeIds(ids: string[]): string[] {
   return [...new Set(ids)];
 }
 
+/**
+ * Dashboard surfaces only show the most recent encounters per connection; capping the
+ * embedded rows keeps long-lived connections (hundreds of encounters) from inflating
+ * every dashboard payload. Insights mode intentionally stays uncapped for analytics.
+ */
+const DASHBOARD_ENCOUNTERS_PER_CONNECTION = 25;
+
 async function executeActiveConnectionsQuery(
   supabase: UserScopedSupabase,
   userId: string,
@@ -478,7 +485,8 @@ async function executeActiveConnectionsQuery(
     .contains('user_ids', [userId])
     .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
     .order('created', { ascending: false })
-    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
+    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' });
 
   if (excludedIds.length > 0) {
     query = query.not('id', 'in', `(${excludedIds.join(',')})`);
@@ -502,7 +510,8 @@ async function executeArchivedConnectionsQuery(
     .contains('user_ids', [userId])
     .in('id', includeIds)
     .order('created', { ascending: false })
-    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
+    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' });
 }
 
 async function executeMapConnectionsQuery(
@@ -516,7 +525,8 @@ async function executeMapConnectionsQuery(
     .select('*, connection_encounters(*)')
     .contains('user_ids', [userId])
     .order('created', { ascending: false })
-    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
+    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' });
 
   if (hiddenSet.size > 0) {
     mapQuery = mapQuery.not('id', 'in', `(${[...hiddenSet].join(',')})`);

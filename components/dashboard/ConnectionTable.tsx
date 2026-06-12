@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -110,10 +110,14 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
     'all' | 'kept' | 'active' | 'pending' | 'archived' | 'removed' | 'expired'
   >('all');
 
+  // Defer the search term so each keystroke updates the input immediately while
+  // the O(n) filter/sort over the full table runs at lower priority.
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+
   // Filter and sort connections
   const filteredConnections = useMemo(() => {
     let filtered = connections.filter((conn) => {
-      const q = searchQuery.toLowerCase();
+      const q = deferredSearchQuery.toLowerCase();
       const matchesSearch = 
         conn.name.toLowerCase().includes(q) ||
         conn.location.toLowerCase().includes(q) ||
@@ -148,7 +152,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
     });
 
     return filtered;
-  }, [connections, searchQuery, sortField, sortOrder, statusFilter]);
+  }, [connections, deferredSearchQuery, sortField, sortOrder, statusFilter]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
