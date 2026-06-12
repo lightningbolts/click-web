@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { parseMapBeacon, type MapBeaconRecord, type MapBeaconType } from "@/lib/map/mapBeacons";
+import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
 import {
   enrichSoundtrackMetadata,
   isAllowedMusicShareUrl,
@@ -16,6 +16,10 @@ import {
   parseRadiusMeters,
   enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
+import {
+  filterActiveBeaconsForDiscovery,
+  resolveBeaconExpiresAtIso,
+} from "@/lib/map/eventSchedule";
 import { filterBeaconsForViewer, parseVisibilityAudienceFromBody } from "@/lib/map/beaconVisibility";
 import {
   COLLABORATION_MAP_DROP_WINDOW_MS,
@@ -80,39 +84,6 @@ async function findActiveSoundtrackBeacon(
   return null;
 }
 
-const MIN_TTL_MS = 15 * 60 * 1000;
-const MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-function computeExpiresAtIso(body: Record<string, unknown>, beacon_type: MapBeaconType): string {
-  const now = Date.now();
-
-  let ttlMs: number | null =
-    typeof body.ttl_ms === "number" && Number.isFinite(body.ttl_ms) ? body.ttl_ms : null;
-  if (ttlMs != null && ttlMs <= 0) ttlMs = null;
-
-  let expiresExplicit: number | null = null;
-  if (typeof body.expires_at === "string") {
-    const p = Date.parse(body.expires_at);
-    if (Number.isFinite(p)) expiresExplicit = p;
-  }
-
-  let candidate: number;
-  if (expiresExplicit != null) {
-    candidate = expiresExplicit;
-  } else if (ttlMs != null) {
-    candidate = now + ttlMs;
-  } else if (beacon_type === "soundtrack") {
-    candidate = now + 7 * 24 * 60 * 60 * 1000;
-  } else {
-    candidate = now + 24 * 60 * 60 * 1000;
-  }
-
-  const minExpire = now + MIN_TTL_MS;
-  const maxExpire = now + MAX_TTL_MS;
-  candidate = Math.min(Math.max(candidate, minExpire), maxExpire);
-  return new Date(candidate).toISOString();
-}
-
 /**
  * Proximity map beacons (PostGIS ST_DWithin via SECURITY DEFINER RPC) using the service role
  * on the server after JWT verification — clients never query `map_beacons` directly.
@@ -151,6 +122,7 @@ export async function GET(request: NextRequest) {
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
+    beacons = filterActiveBeaconsForDiscovery(beacons);
     beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
@@ -272,7 +244,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let expiresAtIso = computeExpiresAtIso(body, beacon_type);
+    let expiresAtIso: string;
+    const expiresResolved = resolveBeaconExpiresAtIso(beacon_type, metadata, body);
+    if ("error" in expiresResolved) {
+      return NextResponse.json({ error: expiresResolved.error }, { status: 400 });
+    }
+    expiresAtIso = expiresResolved.expiresAtIso;
     if (squadMultiplier > 1.0) {
       const baseMs = Date.parse(expiresAtIso);
       const now = Date.now();

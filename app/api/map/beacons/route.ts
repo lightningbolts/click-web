@@ -10,6 +10,7 @@ import {
   parseRadiusMeters,
   enrichBeaconCreatorNames,
 } from "@/lib/map/mapBeaconApiShared";
+import { filterActiveBeaconsForDiscovery } from "@/lib/map/eventSchedule";
 import { filterBeaconsForViewer } from "@/lib/map/beaconVisibility";
 
 /**
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
     beacons = filterBeaconRecords(beacons, typeFilter);
+    beacons = filterActiveBeaconsForDiscovery(beacons);
     beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
