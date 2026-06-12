@@ -22,7 +22,6 @@ function eventBeacon(
     lng: 2,
     created_at: new Date(0).toISOString(),
     expires_at: new Date(0).toISOString(),
-    metadata: {},
     ...overrides,
   };
 }

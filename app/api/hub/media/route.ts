@@ -41,6 +41,14 @@ export async function POST(request: NextRequest) {
   const denied = await assertHubGeofenceFromCoords(admin, hubId, userLat, userLong);
   if (denied) return denied;
 
+  // Keep the uploader registered as a participant (participant-scoped hub_messages RLS).
+  const { error: participantErr } = await admin
+    .from('hub_participants')
+    .upsert({ hub_id: hubId, user_id: auth.user.id }, { onConflict: 'hub_id,user_id', ignoreDuplicates: true });
+  if (participantErr) {
+    console.error('[hub/media] participant upsert:', participantErr.message);
+  }
+
   const firstSeg = objectPath.split('/')[0]?.trim();
   if (firstSeg !== auth.user.id) {
     return NextResponse.json({ error: 'object_path must start with the authenticated user id' }, { status: 403 });

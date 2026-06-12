@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
+import { isAdminUser } from '@/lib/server/adminRole';
 
 type ActionType = 'notice' | 'error';
 
@@ -35,8 +36,7 @@ async function requireAdminSession(): Promise<void> {
     redirectWithStatus('error', 'You must be signed in as an admin.');
   }
 
-  const role = user.user_metadata?.role;
-  if (role !== 'admin') {
+  if (!isAdminUser(user)) {
     redirectWithStatus('error', 'Admin role required.');
   }
 }

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
+import { isAdminUser } from '@/lib/server/adminRole';
 
 const CONNECTIONS_RATE_LIMIT = 10;
 const CONNECTIONS_RATE_WINDOW_MS = 60_000;
@@ -113,8 +114,7 @@ export async function proxy(request: NextRequest) {
   const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
 
   if (adminRoute) {
-    const role = user?.user_metadata?.role;
-    if (!user || role !== 'admin') {
+    if (!user || !isAdminUser(user)) {
       const redirect = NextResponse.redirect(new URL('/', request.url));
       supabaseResponse.cookies.getAll().forEach((c) => {
         redirect.cookies.set(c.name, c.value);

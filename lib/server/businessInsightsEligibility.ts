@@ -1,9 +1,17 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
-/** Dev allowlist — must stay in sync with any server routes that gate business tools. */
-export const BUSINESS_INSIGHTS_DEV_EMAILS: readonly string[] = [
-  'timberlake2025@gmail.com',
-];
+/**
+ * Dev allowlist comes from the environment so production deploys don't ship a
+ * hardcoded paid-feature bypass. Set BUSINESS_INSIGHTS_DEV_EMAILS to a
+ * comma-separated list of emails in non-production environments.
+ */
+function businessInsightsDevEmails(): string[] {
+  const raw = process.env.BUSINESS_INSIGHTS_DEV_EMAILS ?? '';
+  return raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+}
 
 function subscriptionAllowsInsights(status: string | null | undefined): boolean {
   return status === 'active' || status === 'trialing';
@@ -30,8 +38,8 @@ export async function userMayAccessBusinessInsights(
   supabase: SupabaseClient,
   user: User,
 ): Promise<boolean> {
-  const email = user.email ?? '';
-  if (BUSINESS_INSIGHTS_DEV_EMAILS.includes(email)) {
+  const email = (user.email ?? '').toLowerCase();
+  if (email && businessInsightsDevEmails().includes(email)) {
     return true;
   }
 

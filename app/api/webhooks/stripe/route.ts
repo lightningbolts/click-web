@@ -104,6 +104,22 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 }
 
+/**
+ * Idempotency guard: Stripe retries deliveries, and replays must not repeat
+ * side effects (venue updates, manager inserts). Returns true when this event
+ * id has already been recorded.
+ */
+async function eventAlreadyProcessed(eventId: string): Promise<boolean> {
+  const admin = createSupabaseServiceRoleClient();
+  const { error } = await admin.from('stripe_webhook_events').insert({ id: eventId });
+  if (!error) return false;
+  if (error.code === '23505') return true; // duplicate delivery
+  // Table missing or transient failure — log and process anyway rather than
+  // dropping a billing event.
+  console.error('Stripe webhook: idempotency insert failed', error.message);
+  return false;
+}
+
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
@@ -128,12 +144,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Webhook Error: ${message}` }, { status: 400 });
   }
 
+  if (await eventAlreadyProcessed(event.id)) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
         break;
       case 'customer.subscription.updated':
+      // Deleted subscriptions arrive with status 'canceled'; the shared handler
+      // maps that onto venues.subscription_status and revokes insights gating.
+      case 'customer.subscription.deleted':
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
         break;
       default:

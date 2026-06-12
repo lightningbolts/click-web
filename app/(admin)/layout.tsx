@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
+import { isAdminUser } from '@/lib/server/adminRole';
 
 export const metadata: Metadata = {
   title: 'Click Admin Dashboard',
@@ -20,8 +21,7 @@ async function requireAdminRole(): Promise<{ email: string }> {
     redirect('/');
   }
 
-  const role = user.user_metadata?.role;
-  if (role !== 'admin') {
+  if (!isAdminUser(user)) {
     redirect('/');
   }
 

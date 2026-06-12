@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
   const denied = await assertHubGeofenceFromCoords(admin, hubId, userLat, userLong);
   if (denied) return denied;
 
+  // Geofence passed — make sure the sender is registered as a participant so
+  // participant-scoped hub_messages RLS lets them read replies and realtime rows.
+  const { error: participantErr } = await admin
+    .from('hub_participants')
+    .upsert({ hub_id: hubId, user_id: auth.user.id }, { onConflict: 'hub_id,user_id', ignoreDuplicates: true });
+  if (participantErr) {
+    console.error('[hub/messages] participant upsert:', participantErr.message);
+  }
+
   const messageType =
     typeof payload.message_type === 'string' && payload.message_type.trim()
       ? payload.message_type.trim()
