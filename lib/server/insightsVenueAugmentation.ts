@@ -5,6 +5,11 @@ import type {
   LiveCount,
   StickyScore,
 } from "@/lib/insights/mockData";
+import {
+  clusterConnectionEncountersForMap,
+  type ConnectionEncounterCoordinate,
+  type VerifiedConnectionMapNode,
+} from "@/lib/insights/connectionEncounterClustering";
 
 type ConnRow = {
   id?: string;
@@ -19,6 +24,8 @@ type EncounterRow = {
   location_name: string | null;
   encountered_at: string | null;
   context_tags: string[] | null;
+  gps_lat?: number | null;
+  gps_lon?: number | null;
 };
 
 type NfcAnchor = {
@@ -137,6 +144,10 @@ export type InsightsVenueAugmentation = {
   liveCount: LiveCount;
   connectionDensity: ConnectionDensity;
   stickyScore: StickyScore;
+  /** Raw lossless encounter coordinates (never averaged server-side). */
+  connectionEncounterCoordinates: ConnectionEncounterCoordinate[];
+  /** Client-side centroid nodes grouped by connection_id for map display. */
+  verifiedConnectionNodes: VerifiedConnectionMapNode[];
 };
 
 /**
@@ -159,7 +170,7 @@ export async function buildInsightsVenueAugmentation(
   if (ids.length > 0) {
     const { data: encData, error: encErr } = await supabase
       .from("connection_encounters")
-      .select("connection_id, location_name, encountered_at, context_tags")
+      .select("connection_id, location_name, encountered_at, context_tags, gps_lat, gps_lon")
       .in("connection_id", ids)
       .gte("encountered_at", sevenDaysAgoIso)
       .order("encountered_at", { ascending: false })
@@ -303,11 +314,31 @@ export async function buildInsightsVenueAugmentation(
     trend: "stable",
   };
 
+  const connectionEncounterCoordinates: ConnectionEncounterCoordinate[] = [];
+  for (const e of encounters) {
+    const lat = typeof e.gps_lat === "number" ? e.gps_lat : Number(e.gps_lat);
+    const lon = typeof e.gps_lon === "number" ? e.gps_lon : Number(e.gps_lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const row: ConnectionEncounterCoordinate = {
+      connectionId: String(e.connection_id),
+      gpsLat: lat,
+      gpsLon: lon,
+    };
+    if (typeof e.encountered_at === "string" && e.encountered_at.length > 0) {
+      row.encounteredAt = e.encountered_at;
+    }
+    connectionEncounterCoordinates.push(row);
+  }
+
+  const verifiedConnectionNodes = clusterConnectionEncountersForMap(connectionEncounterCoordinates);
+
   return {
     heatmapZones,
     vibeMessages,
     liveCount,
     connectionDensity,
     stickyScore,
+    connectionEncounterCoordinates,
+    verifiedConnectionNodes,
   };
 }

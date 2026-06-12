@@ -48,7 +48,7 @@ export async function GET(
 
         const { data: venueRow, error: venueRowError } = await supabase
             .from('venues')
-            .select('id, name, location')
+            .select('id, name, location, latitude, longitude')
             .eq('id', venueId)
             .maybeSingle();
 
@@ -141,6 +141,8 @@ export async function GET(
 
         return NextResponse.json({
             venueName,
+            venueLatitude: typeof venueRow.latitude === 'number' ? venueRow.latitude : null,
+            venueLongitude: typeof venueRow.longitude === 'number' ? venueRow.longitude : null,
             totalConnections,
             hourlyDistribution,
             dailyData,
@@ -155,6 +157,8 @@ export async function GET(
             liveCount: augmentation.liveCount,
             connectionDensity: augmentation.connectionDensity,
             stickyScore: augmentation.stickyScore,
+            connectionEncounterCoordinates: augmentation.connectionEncounterCoordinates,
+            verifiedConnectionNodes: augmentation.verifiedConnectionNodes,
             status: 'success',
         });
     } catch (error) {

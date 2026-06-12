@@ -879,12 +879,30 @@ Deno.serve(async (req) => {
     return { connectionId, isNewConnection: true, isGroup: members.length > 2 };
   }
 
+  function memberGpsFromHandshake(
+    memberId: string,
+    bindingUserId: string,
+    bindingLat: number | null,
+    bindingLon: number | null,
+    latestByUser: Map<string, HandshakeRowLite>,
+  ): { lat: number | null; lon: number | null } {
+    if (memberId === bindingUserId) {
+      return { lat: bindingLat, lon: bindingLon };
+    }
+    const row = latestByUser.get(memberId);
+    return { lat: finiteNumber(row?.lat), lon: finiteNumber(row?.lon) };
+  }
+
   async function insertOrDebounceEncounter(
     connectionId: string,
     insertRow: Record<string, unknown>,
     encLat: number | null,
     encLon: number | null,
+    reportingUserId?: string | null,
   ): Promise<EncounterMutationOutcome> {
+    if (reportingUserId) {
+      insertRow.reporting_user_id = reportingUserId;
+    }
     const encounteredAtIso = String(insertRow.encountered_at ?? '');
     const newBlock = twelveHourUtcBlockId(encounteredAtIso);
     if (encLat == null || encLon == null || newBlock == null) {
@@ -901,10 +919,14 @@ Deno.serve(async (req) => {
       return 'inserted';
     }
 
-    const { data: lastRow, error: lastErr } = await admin
+    let lastEncounterQuery = admin
       .from('connection_encounters')
       .select('id, gps_lat, gps_lon, encountered_at, context_tags')
-      .eq('connection_id', connectionId)
+      .eq('connection_id', connectionId);
+    if (reportingUserId) {
+      lastEncounterQuery = lastEncounterQuery.eq('reporting_user_id', reportingUserId);
+    }
+    const { data: lastRow, error: lastErr } = await lastEncounterQuery
       .order('encountered_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -1002,35 +1024,72 @@ Deno.serve(async (req) => {
       battery: selfBattery,
     });
     const mergedContextTags = mergeContextTagLists(clientContextTags, vibeTags);
-    const insertRow: Record<string, unknown> = {
+    const encounteredAtIso = new Date().toISOString();
+    const bindingInsertRow: Record<string, unknown> = {
       connection_id: connectionId,
-      encountered_at: new Date().toISOString(),
+      encountered_at: encounteredAtIso,
       context_tags: mergedContextTags,
       display_location: displayLocation,
+      reporting_user_id: uid,
     };
-    if (resolvedLocationName) insertRow.location_name = resolvedLocationName;
+    if (resolvedLocationName) bindingInsertRow.location_name = resolvedLocationName;
     if (encLat != null && encLon != null) {
-      insertRow.gps_lat = encLat;
-      insertRow.gps_lon = encLon;
+      bindingInsertRow.gps_lat = encLat;
+      bindingInsertRow.gps_lon = encLon;
     }
-    if (semanticLocation != null) insertRow.semantic_location = semanticLocation;
-    if (noiseLevel != null) insertRow.noise_level = noiseLevel;
-    if (exactNoiseLevelDb != null) insertRow.exact_noise_level_db = exactNoiseLevelDb;
-    if (exactBarometricElevationM != null) insertRow.exact_barometric_elevation_m = exactBarometricElevationM;
-    if (clientHeightCategory != null) insertRow.elevation_category = clientHeightCategory;
-    if (relativeAltitudeM != null) insertRow.relative_altitude_m = relativeAltitudeM;
-    if (selfLux != null) insertRow.lux_level = selfLux;
-    if (selfMotion != null) insertRow.motion_variance = selfMotion;
-    if (selfAz != null) insertRow.compass_azimuth = selfAz;
-    if (selfBattery != null) insertRow.battery_level = selfBattery;
+    if (semanticLocation != null) bindingInsertRow.semantic_location = semanticLocation;
+    if (noiseLevel != null) bindingInsertRow.noise_level = noiseLevel;
+    if (exactNoiseLevelDb != null) bindingInsertRow.exact_noise_level_db = exactNoiseLevelDb;
+    if (exactBarometricElevationM != null) bindingInsertRow.exact_barometric_elevation_m = exactBarometricElevationM;
+    if (clientHeightCategory != null) bindingInsertRow.elevation_category = clientHeightCategory;
+    if (relativeAltitudeM != null) bindingInsertRow.relative_altitude_m = relativeAltitudeM;
+    if (selfLux != null) bindingInsertRow.lux_level = selfLux;
+    if (selfMotion != null) bindingInsertRow.motion_variance = selfMotion;
+    if (selfAz != null) bindingInsertRow.compass_azimuth = selfAz;
+    if (selfBattery != null) bindingInsertRow.battery_level = selfBattery;
 
     let resolvedWeather = clientWeatherSnapshot;
     if (resolvedWeather == null && encLat != null && encLon != null) {
       resolvedWeather = await fetchOpenMeteoWeatherSnapshot(encLat, encLon);
     }
-    if (resolvedWeather != null) insertRow.weather_snapshot = resolvedWeather;
+    if (resolvedWeather != null) bindingInsertRow.weather_snapshot = resolvedWeather;
 
-    const outcome = await insertOrDebounceEncounter(connectionId, insertRow, encLat, encLon);
+    // Lossless spatial telemetry: one row per matched member with their individual handshake GPS.
+    // Never average coordinates — centroid snapping happens client-side on the B2B map.
+    let outcome: EncounterMutationOutcome = 'inserted';
+    for (const memberId of memberIds) {
+      const { lat: memberLat, lon: memberLon } = memberGpsFromHandshake(
+        memberId,
+        uid,
+        encLat,
+        encLon,
+        latestByUser,
+      );
+      const memberRow: Record<string, unknown> =
+        memberId === uid
+          ? { ...bindingInsertRow }
+          : {
+              connection_id: connectionId,
+              encountered_at: encounteredAtIso,
+              context_tags: mergedContextTags,
+              display_location: displayLocation,
+              reporting_user_id: memberId,
+            };
+      if (memberLat != null && memberLon != null && !(memberLat === 0 && memberLon === 0)) {
+        memberRow.gps_lat = memberLat;
+        memberRow.gps_lon = memberLon;
+      }
+      const memberOutcome = await insertOrDebounceEncounter(
+        connectionId,
+        memberRow,
+        memberLat,
+        memberLon,
+        memberId,
+      );
+      if (memberId === uid) {
+        outcome = memberOutcome;
+      }
+    }
     const persisted = outcome === 'inserted' || outcome === 'debounced';
     ids.forEach((peerId) => {
       if (outcome === 'rate_limited') {

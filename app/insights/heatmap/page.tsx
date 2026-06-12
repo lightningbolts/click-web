@@ -7,7 +7,9 @@ import useSWR from 'swr';
 import { MapPin, Flame, TrendingUp, BarChart2 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import HeatmapView from '@/components/insights/HeatmapView';
+import InsightsMap from '@/components/insights/InsightsMap';
 import { mockVenueInsights, type HeatmapZone } from '@/lib/insights/mockData';
+import type { VerifiedConnectionMapNode } from '@/lib/insights/connectionEncounterClustering';
 import { DemoBanner } from '@/components/insights/DemoBanner';
 import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -25,6 +27,9 @@ import {
 
 interface InsightsHeatmapPayload {
   heatmapZones?: unknown[];
+  verifiedConnectionNodes?: VerifiedConnectionMapNode[];
+  venueLatitude?: number | null;
+  venueLongitude?: number | null;
   status?: string;
 }
 
@@ -75,6 +80,27 @@ export default function HeatmapPage() {
       : '/api/insights/venue'
     : null;
   const { data: apiPayload } = useSWR(insightsUrl, insightsFetcher);
+
+  const verifiedNodes: VerifiedConnectionMapNode[] = useMemo(() => {
+    const raw = apiPayload?.verifiedConnectionNodes;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (n): n is VerifiedConnectionMapNode =>
+        n != null &&
+        typeof n === 'object' &&
+        typeof (n as VerifiedConnectionMapNode).connectionId === 'string' &&
+        typeof (n as VerifiedConnectionMapNode).latitude === 'number' &&
+        typeof (n as VerifiedConnectionMapNode).longitude === 'number',
+    );
+  }, [apiPayload?.verifiedConnectionNodes]);
+
+  const venueCenter = useMemo(
+    () => ({
+      lat: typeof apiPayload?.venueLatitude === 'number' ? apiPayload.venueLatitude : null,
+      lng: typeof apiPayload?.venueLongitude === 'number' ? apiPayload.venueLongitude : null,
+    }),
+    [apiPayload?.venueLatitude, apiPayload?.venueLongitude],
+  );
 
   const zones: HeatmapZone[] = useMemo(() => {
     if (demoMode) return mockVenueInsights.heatmapZones;
@@ -163,6 +189,19 @@ export default function HeatmapPage() {
       {/* Large heatmap */}
       <motion.div variants={itemVariants}>
         <HeatmapView zones={zones} />
+      </motion.div>
+
+      {/* Verified connection map — client-side centroid clustering of raw encounter GPS */}
+      <motion.div variants={itemVariants}>
+        <GlassPanel className="p-6">
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-white">Verified Connection Map</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Raw GPS is stored per participant; multi-user handshakes snap to a centroid here only.
+            </p>
+          </div>
+          <InsightsMap nodes={verifiedNodes} venueCenter={venueCenter} />
+        </GlassPanel>
       </motion.div>
 
       {/* Zone table + type distribution */}
