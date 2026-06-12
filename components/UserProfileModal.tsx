@@ -38,6 +38,7 @@ import {
   type SharedConnectionPayload,
 } from '@/lib/userProfile/formatSharedConnection';
 import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropReveal';
+import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
 import {
   originEncounter,
