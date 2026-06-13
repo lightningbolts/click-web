@@ -2266,6 +2266,42 @@ export default function DashboardView({ user }: DashboardViewProps) {
           }
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'connection_core',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const row = payload.new as { connection_id?: string } | undefined;
+          const connectionId = row?.connection_id;
+          if (typeof connectionId === 'string' && connectionId.length > 0) {
+            setCoreConnectionIds((prev) => new Set(prev).add(connectionId));
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'connection_core',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const row = payload.old as { connection_id?: string } | undefined;
+          const connectionId = row?.connection_id;
+          if (typeof connectionId === 'string' && connectionId.length > 0) {
+            setCoreConnectionIds((prev) => {
+              const next = new Set(prev);
+              next.delete(connectionId);
+              return next;
+            });
+          }
+        },
+      )
       .subscribe();
 
     return () => {
