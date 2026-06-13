@@ -14,6 +14,28 @@ type CollaborationSessionRow = {
   participant_user_ids: string[] | null;
 };
 
+async function hasRevealedDisposableMessage(
+  admin: ReturnType<typeof createAdminClient>,
+  session: CollaborationSessionRow,
+  nowIso: string,
+): Promise<boolean> {
+  if (!session.chat_id) return false;
+  const { data, error } = await admin
+    .from('messages')
+    .select('id')
+    .eq('chat_id', session.chat_id)
+    .eq('metadata->>disposable_roll', 'true')
+    .eq('metadata->>encounter_id', session.id)
+    .lte('metadata->>collaboration_ttl', nowIso)
+    .limit(1);
+
+  if (error) {
+    console.warn('[cron/disposable-reveal] message reveal check:', session.id, error.message);
+    return false;
+  }
+  return (data ?? []).length > 0;
+}
+
 /**
  * Hourly sweep: collaboration sessions past [collaboration_ttl] → reveal push to all participants.
  * Optional HTTP route — production uses Supabase pg_cron → cron-hourly-maintenance edge function.
@@ -46,6 +68,9 @@ export async function GET(request: NextRequest) {
   let pushAttempts = 0;
 
   for (const session of rows) {
+    const revealed = await hasRevealedDisposableMessage(admin, session, nowIso);
+    if (!revealed) continue;
+
     const participantIds = (session.participant_user_ids ?? []).filter(Boolean);
     for (const userId of participantIds) {
       if (!pushFunctionUrl) continue;

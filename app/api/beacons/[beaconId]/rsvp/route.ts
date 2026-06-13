@@ -68,22 +68,6 @@ function displayNameFromUser(user: UserProfileRow | null): string {
   return "Attendee";
 }
 
-function displayNameFromAuthMetadata(metadata: unknown, email?: string | null): string {
-  const raw = isRecord(metadata) ? metadata : {};
-  const first = typeof raw.first_name === "string" ? raw.first_name.trim() : "";
-  const last = typeof raw.last_name === "string" ? raw.last_name.trim() : "";
-  const fullName = typeof raw.full_name === "string" ? raw.full_name.trim() : "";
-  const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  const combined = [first, last].filter((s) => s.length > 0).join(" ").trim();
-  return combined || fullName || name || email?.trim() || "You";
-}
-
-function avatarFromAuthMetadata(metadata: unknown): string | null {
-  if (!isRecord(metadata)) return null;
-  const avatar = metadata.avatar_url ?? metadata.picture ?? metadata.image;
-  return typeof avatar === "string" && avatar.trim().length > 0 ? avatar.trim() : null;
-}
-
 function parseAttendeeRows(data: unknown): Array<{ user_id: string; signed_up_at: string }> {
   if (!Array.isArray(data)) return [];
   const rows: Array<{ user_id: string; signed_up_at: string }> = [];
@@ -271,12 +255,14 @@ export async function POST(
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
+    const profile = (await loadAttendeeProfiles(admin, [user.id])).get(user.id) ?? null;
+
     return NextResponse.json({
       ok: true,
       attendee: {
         user_id: user.id,
-        name: displayNameFromAuthMetadata(user.user_metadata, user.email),
-        avatar_url: avatarFromAuthMetadata(user.user_metadata),
+        name: displayNameFromUser(profile),
+        avatar_url: profile?.image ?? null,
       },
     });
   } catch (e) {

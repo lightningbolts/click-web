@@ -40,6 +40,24 @@ describe('buildMessageInsertRow', () => {
     expect(row.local_sent_at).toBe(199);
     expect(row.content).toBe('e2e:opaque');
   });
+
+  it('server-normalizes disposable reveal metadata to 24 hours after insert', () => {
+    const now = Date.parse('2026-06-13T20:00:00.000Z');
+    const row = buildMessageInsertRow({
+      chatId: 'c1',
+      userId: 'u1',
+      content: ' ',
+      now,
+      messageType: 'image',
+      metadata: {
+        disposable_roll: true,
+        encounter_id: 'enc-1',
+        collaboration_ttl: '2026-06-14T10:00:00.000Z',
+      },
+    });
+    expect(row.metadata.collaboration_ttl).toBe('2026-06-14T20:00:00.000Z');
+    expect(row.metadata.reveal_at).toBe('2026-06-14T20:00:00.000Z');
+  });
 });
 
 describe('normalizeDbMessage', () => {

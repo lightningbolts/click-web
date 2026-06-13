@@ -3,6 +3,7 @@
  */
 
 import type { Message, MessageType } from '@/lib/chat/types';
+import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropReveal';
 
 export function coerceMessageType(value: unknown): MessageType {
   const s = typeof value === 'string' ? value.toLowerCase() : '';
@@ -124,13 +125,19 @@ export function buildMessageInsertRow(params: {
   metadata?: unknown;
   localSentAtMs?: number | null;
 }): MessageInsertRow {
+  const metadata = coerceMetadata(params.metadata);
+  if (metadata.disposable_roll === true) {
+    const revealAt = computeClickDropRevealTtlIso(params.now);
+    metadata.collaboration_ttl = revealAt;
+    metadata.reveal_at = revealAt;
+  }
   const row: MessageInsertRow = {
     chat_id: params.chatId,
     user_id: params.userId,
     content: params.content,
     time_created: params.now,
     message_type: params.messageType ?? 'text',
-    metadata: coerceMetadata(params.metadata),
+    metadata,
   };
   const local = params.localSentAtMs;
   if (local != null) {

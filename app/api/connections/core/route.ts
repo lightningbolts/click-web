@@ -11,13 +11,12 @@ type Body = { connection_id?: string };
 /** GET — list core connection IDs for the signed-in user. */
 export async function GET(request: NextRequest) {
   try {
-    const { user, authError } = await getSupabaseFromRouteRequest(request);
+    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const admin = createAdminClient();
-    const { data, error } = await admin
+    const { data, error } = await supabase
       .from('connection_core')
       .select('connection_id')
       .eq('user_id', user.id);
