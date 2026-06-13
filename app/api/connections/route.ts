@@ -567,6 +567,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ connections: connections || [] });
     }
 
+    // Single connection patch (Realtime row refresh without full dashboard bundle).
+    const singleConnectionId = searchParams.get('connectionId')?.trim();
+    if (singleConnectionId) {
+      const { data: connection, error } = await supabase
+        .from('connections')
+        .select('*, connection_encounters(*)')
+        .eq('id', singleConnectionId)
+        .contains('user_ids', [user.id])
+        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
+        .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' })
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching connection row:', error);
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      if (!connection) {
+        return NextResponse.json({ connection: null }, { status: 404 });
+      }
+      return NextResponse.json({ connection });
+    }
+
     // Dashboard bundle: one sweep + one junction fetch + parallel selects (replaces 3 HTTP calls).
     if (searchParams.get(BUNDLE_PARAM)?.toLowerCase() === 'dashboard') {
       const [archivedForUser, hiddenForUser, coreForUser] = await Promise.all([

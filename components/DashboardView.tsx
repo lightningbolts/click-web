@@ -201,6 +201,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const chatConnectionMapRef = useRef<Map<string, string>>(new Map());
   /** Verified clique rows keyed by `chats.id` (group message realtime + previews). */
   const groupRecordByChatIdRef = useRef<Map<string, ConnectionRecord>>(new Map());
+  const mapRowToRecordRef = useRef<((conn: Record<string, unknown>) => ConnectionRecord) | null>(null);
+  const realtimePatchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
@@ -1914,6 +1916,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
         };
       };
 
+      mapRowToRecordRef.current = mapRowToRecord;
+
       const records: ConnectionRecord[] = merged
         .map(mapRowToRecord)
         .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
@@ -1932,6 +1936,67 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
   }, [user?.id, getAuthHeaders]);
 
+  const patchConnectionRow = useCallback(
+    async (connectionId: string) => {
+      if (!user?.id || !connectionId.trim()) return;
+      const mapper = mapRowToRecordRef.current;
+      if (!mapper) {
+        void loadConnections();
+        return;
+      }
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(
+          `/api/connections?connectionId=${encodeURIComponent(connectionId.trim())}`,
+          { headers, cache: 'no-store' },
+        );
+        if (!res.ok) {
+          if (res.status === 404) {
+            setConnectionRecords((prev) => prev.filter((r) => r.id !== connectionId));
+            setMapConnectionRecords((prev) => prev.filter((r) => r.id !== connectionId));
+            return;
+          }
+          void loadConnections();
+          return;
+        }
+        const payload = (await res.json()) as { connection?: Record<string, unknown> };
+        const conn = payload.connection;
+        if (!conn || typeof conn.id !== 'string') {
+          setConnectionRecords((prev) => prev.filter((r) => r.id !== connectionId));
+          setMapConnectionRecords((prev) => prev.filter((r) => r.id !== connectionId));
+          return;
+        }
+        const record = mapper(conn);
+        const sortByDate = (a: ConnectionRecord, b: ConnectionRecord) =>
+          b.dateMet.getTime() - a.dateMet.getTime();
+        setConnectionRecords((prev) => {
+          const next = prev.filter((r) => r.id !== record.id);
+          next.push(record);
+          return next.sort(sortByDate);
+        });
+        setMapConnectionRecords((prev) => {
+          const next = prev.filter((r) => r.id !== record.id);
+          next.push(record);
+          return next.sort(sortByDate);
+        });
+      } catch {
+        void loadConnections();
+      }
+    },
+    [getAuthHeaders, loadConnections, user?.id],
+  );
+
+  const scheduleConnectionPatch = useCallback(
+    (connectionId: string) => {
+      if (realtimePatchDebounceRef.current) clearTimeout(realtimePatchDebounceRef.current);
+      realtimePatchDebounceRef.current = setTimeout(() => {
+        realtimePatchDebounceRef.current = null;
+        void patchConnectionRow(connectionId);
+      }, 250);
+    },
+    [patchConnectionRow],
+  );
+
   // Fetch user connections (initial load + refetch). Reset gate when the signed-in user changes.
   useEffect(() => {
     if (!user?.id) return;
@@ -1940,80 +2005,32 @@ export default function DashboardView({ user }: DashboardViewProps) {
       setConnectionsInitialLoadComplete(false);
       setConnectionRecords([]);
       setMapConnectionRecords([]);
-      setArchivedConnectionIds(new Set());
+      const archiveKey = `click:archived-connections:${user.id}`;
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(archiveKey);
+          if (raw) {
+            const parsed = JSON.parse(raw) as unknown;
+            if (Array.isArray(parsed)) {
+              setArchivedConnectionIds(
+                new Set(
+                  parsed.filter((id): id is string => typeof id === 'string' && id.length > 0),
+                ),
+              );
+            } else {
+              setArchivedConnectionIds(new Set());
+            }
+          } else {
+            setArchivedConnectionIds(new Set());
+          }
+        } catch {
+          setArchivedConnectionIds(new Set());
+        }
+      } else {
+        setArchivedConnectionIds(new Set());
+      }
     }
     void loadConnections();
-  }, [user?.id, loadConnections]);
-
-  // Stay in sync when a new connection is created or updated (e.g. app user scans this user’s web QR)
-  useEffect(() => {
-    if (!user?.id) return;
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const uid = user.id;
-    const channel = supabase
-      .channel(`dashboard-connections:${uid}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'connections' },
-        () => {
-          void loadConnections();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'connection_archives',
-          filter: `user_id=eq.${uid}`,
-        },
-        () => {
-          void loadConnections();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'connection_archives',
-          filter: `user_id=eq.${uid}`,
-        },
-        () => {
-          void loadConnections();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'connection_hidden',
-          filter: `user_id=eq.${uid}`,
-        },
-        () => {
-          void loadConnections();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'connection_hidden',
-          filter: `user_id=eq.${uid}`,
-        },
-        () => {
-          void loadConnections();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
   }, [user?.id, loadConnections]);
 
   // After a new connection appears, offer optional venue vibe capture (Business Insights).
@@ -2161,6 +2178,101 @@ export default function DashboardView({ user }: DashboardViewProps) {
       return next;
     });
   }, [writeArchivedToLocalStorage]);
+
+  // Stay in sync when a connection row or junction table changes (patch single row when possible).
+  useEffect(() => {
+    if (!user?.id) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+
+    const uid = user.id;
+    const channel = supabase
+      .channel(`dashboard-connections:${uid}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'connections' },
+        (payload) => {
+          const row = payload.new as Record<string, unknown> | undefined;
+          const connectionId = typeof row?.id === 'string' ? row.id : null;
+          if (connectionId) scheduleConnectionPatch(connectionId);
+          else void loadConnections();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'connection_archives',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const row = payload.new as { connection_id?: string } | undefined;
+          const connectionId = row?.connection_id;
+          if (typeof connectionId === 'string' && connectionId.length > 0) {
+            updateArchivedIds((prev) => new Set(prev).add(connectionId));
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'connection_archives',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const row = payload.old as { connection_id?: string } | undefined;
+          const connectionId = row?.connection_id;
+          if (typeof connectionId === 'string' && connectionId.length > 0) {
+            updateArchivedIds((prev) => {
+              const next = new Set(prev);
+              next.delete(connectionId);
+              return next;
+            });
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'connection_hidden',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const row = payload.new as { connection_id?: string } | undefined;
+          const connectionId = row?.connection_id;
+          if (typeof connectionId !== 'string' || connectionId.length === 0) return;
+          setConnectionRecords((prev) => prev.filter((r) => r.id !== connectionId));
+          setMapConnectionRecords((prev) => prev.filter((r) => r.id !== connectionId));
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'connection_hidden',
+          filter: `user_id=eq.${uid}`,
+        },
+        (payload) => {
+          const row = payload.old as { connection_id?: string } | undefined;
+          const connectionId = row?.connection_id;
+          if (typeof connectionId === 'string' && connectionId.length > 0) {
+            scheduleConnectionPatch(connectionId);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (realtimePatchDebounceRef.current) clearTimeout(realtimePatchDebounceRef.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [loadConnections, scheduleConnectionPatch, updateArchivedIds, user?.id]);
 
   const archiveConnection = useCallback(async (connectionId: string): Promise<boolean> => {
     updateArchivedIds((prev) => {
