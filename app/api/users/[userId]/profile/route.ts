@@ -146,13 +146,14 @@ export async function GET(
 
     let sharedConnection: Record<string, unknown> | null = null;
     if (user.id !== userId) {
-      // Full edge row + all `connection_encounters` (newest first). The web profile uses the latest
-      // crossing for the summary card and the full list for the timeline — same source of truth as the app.
+      // Full edge row + bounded `connection_encounters` (newest first). Keep the profile payload
+      // predictable; full encounter history should be fetched through an explicit paginated surface.
       const { data: mutualRows, error: mutualErr } = await supabase
         .from('connections')
         .select('*, connection_encounters(*)')
         .contains('user_ids', [user.id, userId])
-        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' });
+        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
+        .limit(25, { referencedTable: 'connection_encounters' });
       if (mutualErr) {
         console.warn('profile mutual connection:', mutualErr.message);
       } else if (mutualRows && mutualRows.length > 0) {

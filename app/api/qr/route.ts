@@ -348,14 +348,18 @@ export async function GET(request: NextRequest) {
         request.nextUrl.origin);
 
     const connectionUrl = `${baseUrl}/c/${user.id}`;
+    const tokenLink = new URL(connectionUrl);
+    tokenLink.searchParams.set('token', token);
+    tokenLink.searchParams.set('exp', String(expiresAt));
+    tokenLink.searchParams.set('iat', String(now));
     const legacyConnectionUrl = `${baseUrl}/connect/${user.id}`;
     const clickId = `CLICK-${user.id.substring(0, 8).toUpperCase()}`;
 
     return NextResponse.json({
       success: true,
       data: {
-        // Universal Link payload — never raw JSON (OS cameras misread JSON as phone numbers)
-        qrPayload: connectionUrl,
+        // Universal/App Clip link payload — never raw JSON, but still token-bearing for redemption.
+        qrPayload: tokenLink.toString(),
         token,
         expiresAt,
         // Legacy fields for display
@@ -365,6 +369,7 @@ export async function GET(request: NextRequest) {
         legacyConnectionUrl,
         deepLink: `click://connect/${user.id}`,
         universalLink: connectionUrl,
+        tokenLink: tokenLink.toString(),
         qrToken: qrPayload,
         userName: displayNameFromUserMetadata(user.user_metadata) || null,
         userEmail: user.email,

@@ -13,20 +13,51 @@ interface QRIdentityCardProps {
 }
 
 interface QRData {
-  qrPayload: string;       // JSON token payload; encode this in the QR
+  qrPayload: string;       // Token-bearing Universal/App Clip link; encode this in the QR
   connectionUrl: string;   // For display and fallback
   clickId: string;
   expiresAt: number;       // ms timestamp
 }
 
 const TOKEN_TTL_MS = 90_000; // 90 seconds
+const QR_LOCATION_TIMEOUT_MS = 1_500;
+
+async function resolveQrLocationParams(): Promise<string> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return '';
+
+  const position = await new Promise<GeolocationPosition | null>((resolve) => {
+    const timeout = window.setTimeout(() => resolve(null), QR_LOCATION_TIMEOUT_MS);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        window.clearTimeout(timeout);
+        resolve(pos);
+      },
+      () => {
+        window.clearTimeout(timeout);
+        resolve(null);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 30_000,
+        timeout: QR_LOCATION_TIMEOUT_MS,
+      },
+    );
+  });
+
+  const lat = position?.coords.latitude;
+  const lon = position?.coords.longitude;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) return '';
+
+  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+  return `?${params.toString()}`;
+}
 
 /**
  * QRIdentityCard - Displays a time-bounded, single-use Click QR token
  *
  * Auto-refreshes every 90 seconds before the token expires.
- * The QR encodes a JSON payload: { token, userId, exp }
- * which the mobile scanner redeems server-side for proximity verification.
+ * The QR encodes a token-bearing Universal/App Clip link, which the mobile scanner
+ * redeems server-side for proximity verification.
  */
 export default function QRIdentityCard({ userId, userName, userEmail }: QRIdentityCardProps) {
   const [copied, setCopied] = useState(false);
@@ -52,7 +83,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         'Content-Type': 'application/json',
         ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
       };
-      const response = await fetch('/api/qr', { headers, credentials: 'include' });
+      const locationParams = await resolveQrLocationParams();
+      const response = await fetch(`/api/qr${locationParams}`, { headers, credentials: 'include' });
       const data = await response.json();
 
       if (data.success && data.data?.qrPayload) {
