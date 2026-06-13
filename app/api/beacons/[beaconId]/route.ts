@@ -180,6 +180,16 @@ export async function PATCH(
     if (isRecord(metaPatch)) {
       const nextMeta = { ...existingMeta, ...metaPatch };
       if (beaconType !== "soundtrack") {
+        const titlePatch =
+          (typeof metaPatch.title === "string" && metaPatch.title.trim()) ||
+          (typeof metaPatch.event_title === "string" && metaPatch.event_title.trim()) ||
+          "";
+        if (titlePatch.length > 80) {
+          return NextResponse.json({ error: "metadata.title is too long" }, { status: 400 });
+        }
+        if (titlePatch.length > 0) {
+          nextMeta.title = titlePatch;
+        }
         const desc =
           (typeof metaPatch.description === "string" && metaPatch.description.trim()) ||
           (typeof metaPatch.text === "string" && metaPatch.text.trim()) ||

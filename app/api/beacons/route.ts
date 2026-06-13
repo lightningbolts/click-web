@@ -229,34 +229,53 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      metadata = await enrichSoundtrackMetadata(musicUrl, baseMeta);
-    } else {
+      const title =
+        (typeof baseMeta.title === "string" && baseMeta.title.trim()) ||
+        (typeof baseMeta.event_title === "string" && baseMeta.event_title.trim()) ||
+        "";
+      if (title.length === 0) {
+        return NextResponse.json({ error: "metadata.title is required" }, { status: 400 });
+      }
+      if (title.length > 80) {
+        return NextResponse.json({ error: "metadata.title is too long" }, { status: 400 });
+      }
       const desc =
         (typeof baseMeta.description === "string" && baseMeta.description.trim()) ||
         (typeof baseMeta.text === "string" && baseMeta.text.trim()) ||
         (typeof baseMeta.message === "string" && baseMeta.message.trim()) ||
         "";
-      if (beacon_type === "event") {
-        const title =
-          (typeof baseMeta.title === "string" && baseMeta.title.trim()) ||
-          (typeof baseMeta.event_title === "string" && baseMeta.event_title.trim()) ||
-          "";
-        if (title.length === 0) {
-          return NextResponse.json(
-            { error: "metadata.title is required for event beacons" },
-            { status: 400 },
-          );
-        }
-        if (title.length > 80) {
-          return NextResponse.json({ error: "metadata.title is too long" }, { status: 400 });
-        }
-      }
-      if (desc.length === 0) {
-        return NextResponse.json({ error: "metadata.description is required for this beacon type" }, { status: 400 });
-      }
       if (desc.length > 500) {
         return NextResponse.json({ error: "metadata.description is too long" }, { status: 400 });
       }
+      metadata = await enrichSoundtrackMetadata(musicUrl, {
+        ...baseMeta,
+        title,
+        ...(desc.length > 0 ? { description: desc } : {}),
+      });
+    } else {
+      const title =
+        (typeof baseMeta.title === "string" && baseMeta.title.trim()) ||
+        (typeof baseMeta.event_title === "string" && baseMeta.event_title.trim()) ||
+        "";
+      if (title.length === 0) {
+        return NextResponse.json({ error: "metadata.title is required" }, { status: 400 });
+      }
+      if (title.length > 80) {
+        return NextResponse.json({ error: "metadata.title is too long" }, { status: 400 });
+      }
+      const desc =
+        (typeof baseMeta.description === "string" && baseMeta.description.trim()) ||
+        (typeof baseMeta.text === "string" && baseMeta.text.trim()) ||
+        (typeof baseMeta.message === "string" && baseMeta.message.trim()) ||
+        "";
+      if (desc.length > 500) {
+        return NextResponse.json({ error: "metadata.description is too long" }, { status: 400 });
+      }
+      metadata = {
+        ...metadata,
+        title,
+        ...(desc.length > 0 ? { description: desc } : {}),
+      };
     }
 
     let expiresAtIso: string;
