@@ -13,10 +13,12 @@ import {
   haversineMeters,
   isDuplicateKeyError,
   isEncounterRateLimitError,
+  hasProximityPeerEvidence,
   latestHandshakeRowPerUser,
   mergeContextTagLists,
   normalizeToken,
   parseHeardTokensField,
+  peerEvidenceTokens,
   RECENT_CONNECTION_LOCK_MS,
   sameMemberSet,
   twelveHourUtcBlockId,
@@ -26,6 +28,7 @@ import {
 import type {
   PendingHandshakeRow,
   ProximityBindOkResponse,
+  ProximityBindIgnoredResponse,
   ProximityBindPendingResponse,
   ProximityHandshakeRequest,
   ProximityMatchUserProfile,
@@ -45,6 +48,7 @@ const PENDING_HANDSHAKE_SELECT =
 type BindResult =
   | { kind: 'ok'; status: 200; body: ProximityBindOkResponse }
   | { kind: 'pending'; status: 202; body: ProximityBindPendingResponse }
+  | { kind: 'ignored'; status: 200; body: ProximityBindIgnoredResponse }
   | { kind: 'error'; status: number; body: { error: string } };
 
 type EncounterMutationOutcome =
@@ -217,6 +221,7 @@ function pendingRowToHandshakeLite(row: PendingHandshakeRow): HandshakeRowLite {
     motion_variance: row.motion_variance,
     compass_azimuth: row.compass_azimuth,
     battery_level: row.battery_level,
+    sensor_payload: row.sensor_payload,
   };
 }
 
@@ -266,6 +271,24 @@ export async function bindProximityHandshake(
   const heardTokens = (Array.isArray(tokenInputs) ? tokenInputs : [])
     .map(normalizeToken)
     .filter((t): t is string => t != null);
+  const detectedDevices = (Array.isArray(body.detected_devices) ? body.detected_devices : [])
+    .map(normalizeToken)
+    .filter((t): t is string => t != null);
+  const combinedEvidenceTokens = [...new Set([...heardTokens, ...detectedDevices])];
+
+  if (body.simulator_mock !== true && !hasProximityPeerEvidence(heardTokens, detectedDevices)) {
+    return {
+      kind: 'ignored',
+      status: 200,
+      body: {
+        success: false,
+        status: 'ignored_empty_payload',
+        message: 'No peer tokens or BLE devices in handshake payload.',
+        encounter_logged: false,
+        matches: [],
+      },
+    };
+  }
 
   if (body.simulator_mock === true && myToken === '1234' && heardTokens.includes('5678')) {
     const connectionId = '00000000-0000-4000-8000-000000000123';
@@ -307,6 +330,8 @@ export async function bindProximityHandshake(
   const selfBattery = finiteBatteryPct(body.battery_level);
   const timezoneOffsetMinutes = finiteNumber(body.timezone_offset_minutes) ?? 0;
   const sensorPayload = buildSensorPayload(body, timezoneOffsetMinutes);
+  sensorPayload.detected_devices_ble = detectedDevices;
+  sensorPayload.heard_tokens_audio = heardTokens;
   const clientContextTags = sensorPayload.context_tags ?? [];
   const exactBarometricElevationM = sensorPayload.exact_barometric_elevation_m ?? null;
   const exactNoiseLevelDb = sensorPayload.exact_noise_level_db ?? null;
@@ -331,7 +356,7 @@ export async function bindProximityHandshake(
     .insert({
       user_id: uid,
       my_token: myToken,
-      heard_tokens: heardTokens,
+      heard_tokens: combinedEvidenceTokens.length > 0 ? combinedEvidenceTokens : heardTokens,
       lat,
       lon,
       lux_level: selfLux,
@@ -351,11 +376,16 @@ export async function bindProximityHandshake(
 
   const insertedRow = inserted as PendingHandshakeRow;
 
-  const { data: pendingRows, error: qErr } = await admin
+  let pendingQuery = admin
     .from('pending_handshakes')
     .select(PENDING_HANDSHAKE_SELECT)
     .gt('expires_at', nowIso)
     .is('matched_at', null);
+  if (combinedEvidenceTokens.length > 0) {
+    const tokenCsv = combinedEvidenceTokens.join(',');
+    pendingQuery = pendingQuery.or(`heard_tokens.ov.{${tokenCsv}},my_token.in.(${tokenCsv})`);
+  }
+  const { data: pendingRows, error: qErr } = await pendingQuery;
 
   if (qErr) {
     console.error('[proximity] pending query:', qErr);

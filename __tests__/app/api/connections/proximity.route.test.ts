@@ -51,6 +51,16 @@ function createInMemoryAdmin() {
         created_at: '2026-01-02T00:00:00.000Z',
       },
     ],
+    [
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      {
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        name: 'User C',
+        email: 'c@click.test',
+        image: null,
+        created_at: '2026-01-03T00:00:00.000Z',
+      },
+    ],
   ]);
 
   const from = jest.fn((table: string) => {
@@ -109,11 +119,32 @@ function createInMemoryAdmin() {
         })),
         select: jest.fn(() => ({
           gt: (_col: string, val: string) => ({
-            is: (_col2: string, val2: null) =>
-              Promise.resolve({
-                data: pending.filter((r) => r.expires_at > val && r.matched_at === val2),
-                error: null,
-              }),
+            is: (_col2: string, val2: null) => {
+              const filterRows = (mode: 'all' | 'or', overlapTokens: string[] | null) => {
+                let rows = pending.filter((r) => r.expires_at > val && r.matched_at === val2);
+                if (mode === 'or' && overlapTokens != null && overlapTokens.length > 0) {
+                  rows = rows.filter(
+                    (r) =>
+                      r.heard_tokens.some((t) => overlapTokens.includes(t)) ||
+                      overlapTokens.includes(r.my_token),
+                  );
+                }
+                return { data: rows, error: null };
+              };
+              return {
+                or: (_expr: string) => {
+                  const tokens = _expr
+                    .split('my_token.in.(')[1]
+                    ?.split(')')[0]
+                    ?.split(',')
+                    .filter(Boolean) ?? [];
+                  return Promise.resolve(filterRows('or', tokens));
+                },
+                then: (
+                  resolve: (v: { data: PendingHandshakeRow[]; error: null }) => void,
+                ) => Promise.resolve(filterRows('all', null)).then(resolve),
+              };
+            },
           }),
         })),
         update: jest.fn((patch: { matched_at: string }) => ({
@@ -233,6 +264,7 @@ function createInMemoryAdmin() {
 describe('POST /api/connections/proximity contract', () => {
   const userA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const userB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const userC = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   const sharedLat = 47.655;
   const sharedLon = -122.303;
 
@@ -314,6 +346,66 @@ describe('POST /api/connections/proximity contract', () => {
     expect(matched.matches[0]?.connection_id).toBe('conn-1');
     expect(adminStore._connections).toHaveLength(1);
     expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB].sort());
+
+    dateSpy.mockRestore();
+  });
+
+  it('ignores empty peer-evidence payloads without inserting pending rows', async () => {
+    const res = await proximityPost(
+      makeRequest(userA, {
+        my_token: '1234',
+        heard_tokens: [],
+        detected_devices: [],
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; success: boolean };
+    expect(body.status).toBe('ignored_empty_payload');
+    expect(body.success).toBe(false);
+    expect(adminStore._pending).toHaveLength(0);
+  });
+
+  it('matches a three-user group via graph clustering (1-to-N)', async () => {
+    const t0 = Date.parse('2026-06-26T12:00:00.000Z');
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+
+    await proximityPost(
+      makeRequest(userA, {
+        my_token: '1111',
+        heard_tokens: ['2222'],
+        gps_lat: sharedLat,
+        gps_lon: sharedLon,
+      }),
+    );
+    await proximityPost(
+      makeRequest(userB, {
+        my_token: '2222',
+        heard_tokens: ['3333'],
+        gps_lat: sharedLat,
+        gps_lon: sharedLon,
+      }),
+    );
+
+    const resC = await proximityPost(
+      makeRequest(userC, {
+        my_token: '3333',
+        heard_tokens: ['2222', '1111'],
+        gps_lat: sharedLat,
+        gps_lon: sharedLon,
+      }),
+    );
+    expect(resC.status).toBe(200);
+    const matched = (await resC.json()) as {
+      success: boolean;
+      is_group?: boolean;
+      matches: { id: string }[];
+      connection_id?: string;
+    };
+    expect(matched.success).toBe(true);
+    expect(matched.is_group).toBe(true);
+    expect(matched.matches).toHaveLength(2);
+    expect(matched.connection_id).toBe('conn-1');
+    expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB, userC].sort());
 
     dateSpy.mockRestore();
   });

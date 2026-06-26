@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result.body, { status: result.status });
     }
 
+    if (result.kind === 'ignored') {
+      return NextResponse.json(result.body, { status: result.status });
+    }
+
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error('[api/connections/proximity]', error);

@@ -15,6 +15,7 @@ export interface ProximityHandshakeRequest {
   my_token?: unknown;
   tokens?: unknown[];
   heard_tokens?: unknown[];
+  detected_devices?: unknown[];
   latitude?: unknown;
   longitude?: unknown;
   gps_lat?: unknown;
@@ -44,6 +45,8 @@ export interface ProximitySensorPayloadJson extends Record<string, Json | undefi
   height_category?: string | null;
   location_name?: string | null;
   weather_snapshot?: string | null;
+  detected_devices_ble?: string[];
+  heard_tokens_audio?: string[];
   timezone_offset_minutes?: number;
 }
 
@@ -95,6 +98,14 @@ export interface ProximityBindPendingResponse {
   status: 'pending_match';
   pending_handshake_id: string;
   expires_at: string;
+  encounter_logged: false;
+  matches: [];
+}
+
+export interface ProximityBindIgnoredResponse {
+  success: false;
+  status: 'ignored_empty_payload';
+  message: string;
   encounter_logged: false;
   matches: [];
 }

@@ -19,6 +19,7 @@ export type HandshakeRowLite = {
   motion_variance?: unknown;
   compass_azimuth?: unknown;
   battery_level?: unknown;
+  sensor_payload?: unknown;
 };
 
 export function normalizeToken(t: unknown): string | null {
@@ -30,6 +31,43 @@ export function normalizeToken(t: unknown): string | null {
 export function parseHeardTokensField(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.map(normalizeToken).filter((t): t is string => t != null);
+}
+
+export function parseDetectedDevicesField(raw: unknown): string[] {
+  return parseHeardTokensField(raw);
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Union of audio heard_tokens + BLE detected_devices stored on a pending row. */
+export function peerEvidenceTokens(row: HandshakeRowLite): string[] {
+  const heard = parseHeardTokensField(row.heard_tokens);
+  const payload = isRecord(row.sensor_payload) ? row.sensor_payload : null;
+  const bleFromPayload = parseDetectedDevicesField(
+    payload?.detected_devices_ble ?? payload?.detected_devices,
+  );
+  return [...new Set([...heard, ...bleFromPayload])];
+}
+
+export function hasProximityPeerEvidence(heardTokens: string[], detectedDevices: string[]): boolean {
+  return heardTokens.length > 0 || detectedDevices.length > 0;
+}
+
+/** Tokens shared by every row in a candidate clique (1-to-N group overlap). */
+export function sharedOverlappingPeerTokens(rows: HandshakeRowLite[]): string[] {
+  if (rows.length === 0) return [];
+  const sets = rows.map((r) => new Set(peerEvidenceTokens(r)));
+  const [first, ...rest] = sets;
+  if (!first) return [];
+  const shared: string[] = [];
+  for (const token of first) {
+    if (rest.every((s) => s.has(token))) {
+      shared.push(token);
+    }
+  }
+  return shared;
 }
 
 export function rowMyTokenNorm(row: HandshakeRowLite): string | null {
@@ -84,8 +122,8 @@ export function tokenEvidenceBetweenRows(a: HandshakeRowLite, b: HandshakeRowLit
   const ta = rowMyTokenNorm(a);
   const tb = rowMyTokenNorm(b);
   if (!ta || !tb) return false;
-  const heardA = parseHeardTokensField(a.heard_tokens);
-  const heardB = parseHeardTokensField(b.heard_tokens);
+  const heardA = peerEvidenceTokens(a);
+  const heardB = peerEvidenceTokens(b);
   const mutual = heardA.includes(tb) && heardB.includes(ta);
   if (mutual) return true;
   return tokenSetsIntersect(heardA, heardB);
