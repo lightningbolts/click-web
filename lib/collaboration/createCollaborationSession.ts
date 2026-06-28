@@ -49,3 +49,35 @@ export async function createCollaborationSessionForConnection(
 
   return { encounterId, collaborationTtl };
 }
+
+export async function createCollaborationSessionForChat(
+  adminClient: SupabaseClient,
+  chatId: string,
+  participantUserIds: string[],
+  timezoneOffsetMinutes: number = 0,
+): Promise<CollaborationSessionCreated | null> {
+  const cid = chatId.trim();
+  if (!cid) return null;
+
+  const participants = [...new Set(participantUserIds.map((id) => id.trim()).filter(Boolean))].sort();
+  if (participants.length < 2) return null;
+
+  const collaborationTtl = computeCollaborationTtl(timezoneOffsetMinutes);
+  const encounterId = crypto.randomUUID();
+
+  const { error } = await adminClient.from('collaboration_sessions').insert({
+    id: encounterId,
+    connection_id: null,
+    chat_id: cid,
+    collaboration_ttl: collaborationTtl,
+    participant_user_ids: participants,
+    notification_sent: false,
+  });
+
+  if (error) {
+    console.warn('[collaboration_session_chat]', error.message);
+    return null;
+  }
+
+  return { encounterId, collaborationTtl };
+}
