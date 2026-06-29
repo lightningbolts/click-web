@@ -522,6 +522,69 @@ describe('POST /api/connections/proximity contract', () => {
     dateSpy.mockRestore();
   });
 
+  it('keeps GPS/time fallback peers in a partial-token three-phone match', async () => {
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    const expiresAt = new Date(t0 + PENDING_HANDSHAKE_TTL_MS).toISOString();
+    adminStore._pending.push(
+      {
+        id: 'pending-a',
+        user_id: userA,
+        my_token: '1111',
+        heard_tokens: [],
+        lat: sharedLat,
+        lon: sharedLon,
+        lux_level: null,
+        motion_variance: null,
+        compass_azimuth: null,
+        battery_level: null,
+        sensor_payload: {},
+        created_at: new Date(t0 - 5_000).toISOString(),
+        expires_at: expiresAt,
+        matched_at: null,
+      },
+      {
+        id: 'pending-b',
+        user_id: userB,
+        my_token: '2222',
+        heard_tokens: ['3333'],
+        lat: sharedLat + 0.00001,
+        lon: sharedLon + 0.00001,
+        lux_level: null,
+        motion_variance: null,
+        compass_azimuth: null,
+        battery_level: null,
+        sensor_payload: {},
+        created_at: new Date(t0 - 4_000).toISOString(),
+        expires_at: expiresAt,
+        matched_at: null,
+      },
+    );
+
+    const resC = await proximityPost(
+      makeRequest(userC, {
+        my_token: '3333',
+        heard_tokens: ['2222'],
+        gps_lat: sharedLat + 0.00002,
+        gps_lon: sharedLon + 0.00002,
+      }),
+    );
+
+    expect(resC.status).toBe(200);
+    const matched = (await resC.json()) as {
+      success: boolean;
+      is_group?: boolean;
+      matches: { id: string }[];
+      group_clique_candidate?: { member_user_ids: string[] };
+    };
+    expect(matched.success).toBe(true);
+    expect(matched.is_group).toBe(true);
+    expect(matched.matches.map((m) => m.id).sort()).toEqual([userA, userB].sort());
+    expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual([userA, userB, userC].sort());
+
+    dateSpy.mockRestore();
+  });
+
   it('matches five simultaneous nearby phones into one group connection', async () => {
     await expectSimultaneousGroupMatch(5);
   });

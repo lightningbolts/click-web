@@ -153,7 +153,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No pairwise connection found for this pair' }, { status: 404 });
     }
 
-    const insertRow = buildEncounterInsertFromSensor(connectionId, sensorData);
+    const insertRow: Record<string, unknown> = {
+      ...buildEncounterInsertFromSensor(connectionId, sensorData),
+      reporting_user_id: userId,
+    };
 
     const { data: inserted, error: insErr } = await supabase
       .from('connection_encounters')

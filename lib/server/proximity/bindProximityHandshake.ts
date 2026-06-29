@@ -23,6 +23,7 @@ import {
   RECENT_CONNECTION_LOCK_MS,
   sameMemberSet,
   twelveHourUtcBlockId,
+  tokenEvidenceBetweenRows,
   type HandshakeRowLite,
   utcTimeOfDayLabelFromMs,
 } from '@/lib/server/proximity/matching';
@@ -372,15 +373,11 @@ export async function bindProximityHandshake(
     await sleep(PROXIMITY_GROUP_COALESCE_MIN_MS);
   }
 
-  let pendingQuery = admin
+  const pendingQuery = admin
     .from('pending_handshakes')
     .select(PENDING_HANDSHAKE_SELECT)
     .gt('expires_at', nowIso)
     .is('matched_at', null);
-  if (combinedEvidenceTokens.length > 0) {
-    const tokenCsv = combinedEvidenceTokens.join(',');
-    pendingQuery = pendingQuery.or(`heard_tokens.ov.{${tokenCsv}},my_token.in.(${tokenCsv})`);
-  }
   const { data: pendingRows, error: qErr } = await pendingQuery;
 
   if (qErr) {
@@ -433,13 +430,16 @@ export async function bindProximityHandshake(
   const ids = [...matchedIds].sort();
   const memberIds = [uid, ...ids].sort();
   const recentLockCutoffIso = new Date(Date.now() - RECENT_CONNECTION_LOCK_MS).toISOString();
-  const hasTokenEvidenceInComponent = nodeRows
-    .filter((row) => memberIds.includes(String(row.user_id)))
-    .some((row) => peerEvidenceTokens(row).length > 0);
+  const memberNodeRows = nodeRows.filter((row) => memberIds.includes(String(row.user_id)));
+  const directTokenEvidenceForPair =
+    memberNodeRows.length === 2 &&
+    memberNodeRows[0] != null &&
+    memberNodeRows[1] != null &&
+    tokenEvidenceBetweenRows(memberNodeRows[0], memberNodeRows[1]);
   const insertedCreatedAtMs = handshakeCreatedAtMs(insertedRow);
   if (
-    !hasTokenEvidenceInComponent &&
     memberIds.length === 2 &&
+    !directTokenEvidenceForPair &&
     insertedCreatedAtMs != null &&
     Date.now() - insertedCreatedAtMs < PROXIMITY_GROUP_COALESCE_MIN_MS
   ) {
