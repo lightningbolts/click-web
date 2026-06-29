@@ -250,3 +250,103 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+async function loadAuthorEntry(
+  admin: SupabaseClient,
+  entryId: string,
+  userId: string,
+): Promise<{ ok: true; row: TimelineEntryRow } | { ok: false; response: NextResponse }> {
+  const { data: row, error } = await admin
+    .from('profile_timeline_entries')
+    .select('id, target_type, target_id, author_user_id, body, visibility, created_at')
+    .eq('id', entryId)
+    .maybeSingle();
+  if (error) return { ok: false, response: NextResponse.json({ error: error.message }, { status: 500 }) };
+  if (!row) return { ok: false, response: NextResponse.json({ error: 'Journal entry not found' }, { status: 404 }) };
+  const entry = row as TimelineEntryRow;
+  if (entry.author_user_id !== userId) {
+    return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+  return { ok: true, row: entry };
+}
+
+export async function PUT(request: NextRequest) {
+  const { user, authError } = await getSupabaseFromRouteRequest(request);
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  let body: { id?: unknown; body?: unknown; visibility?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const entryId = typeof body.id === 'string' ? body.id.trim() : '';
+  const text = typeof body.body === 'string' ? body.body.trim() : '';
+  const visibility = typeof body.visibility === 'string' ? body.visibility.trim().toLowerCase() : 'private';
+  if (!entryId) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  if (!text) return NextResponse.json({ error: 'Journal entry is required' }, { status: 400 });
+  if (text.length > 1200) return NextResponse.json({ error: 'Journal entry is too long' }, { status: 400 });
+  if (visibility !== 'private' && visibility !== 'shared') {
+    return NextResponse.json({ error: 'visibility must be private or shared' }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const loaded = await loadAuthorEntry(admin, entryId, user.id);
+  if (!loaded.ok) return loaded.response;
+  const auth = await authorizeTarget(admin, user.id, loaded.row.target_type, loaded.row.target_id);
+  if (!auth.ok) return auth.response;
+
+  const { error } = await admin
+    .from('profile_timeline_entries')
+    .update({ body: text, visibility, updated_at: new Date().toISOString() })
+    .eq('id', entryId)
+    .eq('author_user_id', user.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  try {
+    return NextResponse.json(
+      await buildPayload(admin, user.id, loaded.row.target_type, loaded.row.target_id, auth.participantIds),
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to load timeline';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const { user, authError } = await getSupabaseFromRouteRequest(request);
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  let body: { id?: unknown };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const entryId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (!entryId) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+  const admin = createAdminClient();
+  const loaded = await loadAuthorEntry(admin, entryId, user.id);
+  if (!loaded.ok) return loaded.response;
+  const auth = await authorizeTarget(admin, user.id, loaded.row.target_type, loaded.row.target_id);
+  if (!auth.ok) return auth.response;
+
+  const { error } = await admin
+    .from('profile_timeline_entries')
+    .delete()
+    .eq('id', entryId)
+    .eq('author_user_id', user.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  try {
+    return NextResponse.json(
+      await buildPayload(admin, user.id, loaded.row.target_type, loaded.row.target_id, auth.participantIds),
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed to load timeline';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
