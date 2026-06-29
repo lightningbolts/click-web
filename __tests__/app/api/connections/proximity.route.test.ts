@@ -258,6 +258,7 @@ function createInMemoryAdmin() {
     from,
     _pending: pending,
     _connections: connections,
+    _encounters: encounters,
   };
 }
 
@@ -316,6 +317,7 @@ describe('POST /api/connections/proximity contract', () => {
     expect(Date.parse(pendingA.expires_at) - t0).toBe(PENDING_HANDSHAKE_TTL_MS);
     expect(adminStore._pending).toHaveLength(1);
     expect(adminStore._connections).toHaveLength(0);
+    expect(adminStore._encounters).toHaveLength(0);
 
     // User A tapped first; peer row ages 2h before User B uploads offline replay.
     adminStore._pending[0]!.created_at = new Date(t0 - twoHoursMs).toISOString();
@@ -366,6 +368,8 @@ describe('POST /api/connections/proximity contract', () => {
     expect(body.success).toBe(true);
     expect(body.pending_handshake_id).toBeTruthy();
     expect(adminStore._pending).toHaveLength(1);
+    expect(adminStore._connections).toHaveLength(0);
+    expect(adminStore._encounters).toHaveLength(0);
   });
 
   it('matches two simultaneous nearby payloads even when both missed radio tokens', async () => {
