@@ -1,6 +1,7 @@
 /** Token normalization, GPS proximity, and graph matching for async proximity binds. */
 
 export const PROXIMITY_MATCH_MAX_M = 15;
+export const PROXIMITY_SIMULTANEOUS_TAP_WINDOW_MS = 45 * 1000;
 export const RECENT_CONNECTION_LOCK_MS = 15 * 1000;
 export const ENCOUNTER_DEBOUNCE_MAX_M = 50;
 export const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -129,14 +130,45 @@ export function tokenEvidenceBetweenRows(a: HandshakeRowLite, b: HandshakeRowLit
   return tokenSetsIntersect(heardA, heardB);
 }
 
-/** Async matching: no sliding time window — token + GPS evidence only. */
+function rowCreatedAtMs(row: HandshakeRowLite): number | null {
+  const ms = Date.parse(String(row.created_at));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function rowHasUsableGps(row: HandshakeRowLite): row is HandshakeRowLite & { lat: number; lon: number } {
+  const lat = finiteNumber(row.lat);
+  const lon = finiteNumber(row.lon);
+  return lat != null && lon != null && !(lat === 0 && lon === 0);
+}
+
+/**
+ * Radio/audio can race on simultaneous taps. When token exchange is missing or one-sided,
+ * allow a tightly bounded same-time/same-place fallback instead of dropping the tap.
+ */
+export function simultaneousTapEvidenceBetweenRows(a: HandshakeRowLite, b: HandshakeRowLite): boolean {
+  const at = rowCreatedAtMs(a);
+  const bt = rowCreatedAtMs(b);
+  if (at == null || bt == null) return false;
+  if (Math.abs(at - bt) > PROXIMITY_SIMULTANEOUS_TAP_WINDOW_MS) return false;
+  if (!rowHasUsableGps(a) || !rowHasUsableGps(b)) return false;
+  return gpsPairWithinProximityMax(
+    finiteNumber(a.lat),
+    finiteNumber(a.lon),
+    finiteNumber(b.lat),
+    finiteNumber(b.lon),
+  );
+}
+
+/** Async matching: token evidence first, then a tight same-time/same-place fallback. */
 export function handshakeRowsLinked(a: HandshakeRowLite, b: HandshakeRowLite): boolean {
-  if (!tokenEvidenceBetweenRows(a, b)) return false;
   const la = finiteNumber(a.lat);
   const lo = finiteNumber(a.lon);
   const lb = finiteNumber(b.lat);
   const mb = finiteNumber(b.lon);
-  return gpsPairWithinProximityMax(la, lo, lb, mb);
+  if (tokenEvidenceBetweenRows(a, b)) {
+    return gpsPairWithinProximityMax(la, lo, lb, mb);
+  }
+  return simultaneousTapEvidenceBetweenRows(a, b);
 }
 
 export function latestHandshakeRowPerUser(rows: HandshakeRowLite[]): Map<string, HandshakeRowLite> {

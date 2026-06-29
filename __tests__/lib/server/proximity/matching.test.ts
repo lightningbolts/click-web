@@ -4,6 +4,7 @@ import {
   hasProximityPeerEvidence,
   peerEvidenceTokens,
   sharedOverlappingPeerTokens,
+  simultaneousTapEvidenceBetweenRows,
   tokenEvidenceBetweenRows,
   type HandshakeRowLite,
 } from '@/lib/server/proximity/matching';
@@ -62,5 +63,24 @@ describe('proximity matching peer evidence', () => {
     const adj = buildUserAdjacency(nodes);
     const component = bfsComponent('a', adj);
     expect([...component].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('links simultaneous nearby taps when neither radio heard a token', () => {
+    const now = '2026-06-26T12:00:00.000Z';
+    const a = row('a', '1111', [], { created_at: now });
+    const b = row('b', '2222', [], { created_at: '2026-06-26T12:00:20.000Z' });
+
+    expect(tokenEvidenceBetweenRows(a, b)).toBe(false);
+    expect(simultaneousTapEvidenceBetweenRows(a, b)).toBe(true);
+    const adj = buildUserAdjacency([a, b]);
+    expect([...bfsComponent('a', adj)].sort()).toEqual(['a', 'b']);
+  });
+
+  it('does not use simultaneous fallback for stale nearby pending rows', () => {
+    const a = row('a', '1111', [], { created_at: '2026-06-26T12:00:00.000Z' });
+    const b = row('b', '2222', [], { created_at: '2026-06-26T12:02:00.000Z' });
+
+    expect(simultaneousTapEvidenceBetweenRows(a, b)).toBe(false);
+    expect([...bfsComponent('a', buildUserAdjacency([a, b]))]).toEqual([]);
   });
 });

@@ -294,7 +294,7 @@ describe('POST /api/connections/proximity contract', () => {
 
   it('resolves two payloads submitted 2 hours apart into a single connection', async () => {
     const twoHoursMs = 2 * 60 * 60 * 1000;
-    const t0 = Date.parse('2026-06-26T10:00:00.000Z');
+    const t0 = Date.now();
     const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
 
     const resA = await proximityPost(
@@ -350,23 +350,61 @@ describe('POST /api/connections/proximity contract', () => {
     dateSpy.mockRestore();
   });
 
-  it('ignores empty peer-evidence payloads without inserting pending rows', async () => {
+  it('stores empty peer-evidence payloads as pending server matches', async () => {
     const res = await proximityPost(
       makeRequest(userA, {
         my_token: '1234',
         heard_tokens: [],
         detected_devices: [],
+        gps_lat: sharedLat,
+        gps_lon: sharedLon,
       }),
     );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { status: string; success: boolean };
-    expect(body.status).toBe('ignored_empty_payload');
-    expect(body.success).toBe(false);
-    expect(adminStore._pending).toHaveLength(0);
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as { status: string; success: boolean; pending_handshake_id: string };
+    expect(body.status).toBe('pending_match');
+    expect(body.success).toBe(true);
+    expect(body.pending_handshake_id).toBeTruthy();
+    expect(adminStore._pending).toHaveLength(1);
+  });
+
+  it('matches two simultaneous nearby payloads even when both missed radio tokens', async () => {
+    const resA = await proximityPost(
+      makeRequest(userA, {
+        my_token: '1234',
+        heard_tokens: [],
+        detected_devices: [],
+        gps_lat: sharedLat,
+        gps_lon: sharedLon,
+      }),
+    );
+    expect(resA.status).toBe(202);
+
+    const resB = await proximityPost(
+      makeRequest(userB, {
+        my_token: '5678',
+        heard_tokens: [],
+        detected_devices: [],
+        gps_lat: sharedLat + 0.00001,
+        gps_lon: sharedLon + 0.00001,
+      }),
+    );
+    expect(resB.status).toBe(200);
+    const matched = (await resB.json()) as {
+      success: boolean;
+      matches: { id: string; connection_id: string | null }[];
+      connection_id?: string;
+    };
+
+    expect(matched.success).toBe(true);
+    expect(matched.connection_id).toBe('conn-1');
+    expect(matched.matches).toHaveLength(1);
+    expect(matched.matches[0]?.id).toBe(userA);
+    expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB].sort());
   });
 
   it('matches a three-user group via graph clustering (1-to-N)', async () => {
-    const t0 = Date.parse('2026-06-26T12:00:00.000Z');
+    const t0 = Date.now();
     const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
 
     await proximityPost(

@@ -13,7 +13,6 @@ import {
   haversineMeters,
   isDuplicateKeyError,
   isEncounterRateLimitError,
-  hasProximityPeerEvidence,
   latestHandshakeRowPerUser,
   mergeContextTagLists,
   normalizeToken,
@@ -44,6 +43,7 @@ const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 
 const PENDING_HANDSHAKE_SELECT =
   'id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at';
+const USER_PROFILE_SELECT = 'id, name, email, image, created_at:createdAt';
 
 type BindResult =
   | { kind: 'ok'; status: 200; body: ProximityBindOkResponse }
@@ -276,20 +276,6 @@ export async function bindProximityHandshake(
     .filter((t): t is string => t != null);
   const combinedEvidenceTokens = [...new Set([...heardTokens, ...detectedDevices])];
 
-  if (body.simulator_mock !== true && !hasProximityPeerEvidence(heardTokens, detectedDevices)) {
-    return {
-      kind: 'ignored',
-      status: 200,
-      body: {
-        success: false,
-        status: 'ignored_empty_payload',
-        message: 'No peer tokens or BLE devices in handshake payload.',
-        encounter_logged: false,
-        matches: [],
-      },
-    };
-  }
-
   if (body.simulator_mock === true && myToken === '1234' && heardTokens.includes('5678')) {
     const connectionId = '00000000-0000-4000-8000-000000000123';
     const mockUserId = '00000000-0000-4000-8000-000000000567';
@@ -443,7 +429,7 @@ export async function bindProximityHandshake(
     if (recentConnection?.id) {
       const { data: recentUsers, error: recentUsersErr } = await admin
         .from('users')
-        .select('id, name, email, image, created_at')
+        .select(USER_PROFILE_SELECT)
         .in('id', ids);
       if (recentUsersErr) {
         console.error('[proximity] users:', recentUsersErr);
@@ -803,7 +789,7 @@ export async function bindProximityHandshake(
 
   const { data: users, error: uErr } = await admin
     .from('users')
-    .select('id, name, email, image, created_at')
+    .select(USER_PROFILE_SELECT)
     .in('id', ids);
 
   if (uErr) {
