@@ -4,6 +4,7 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 const MAX_BYTES = 2_000_000;
 const AVATARS_BUCKET = 'avatars';
+const PROFILE_CHANGE_COOLDOWN_MS = 60_000;
 
 type RouteParams = { params: Promise<{ groupId: string }> };
 type AvatarUploadJsonBody = {
@@ -54,6 +55,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (memberErr) return NextResponse.json({ error: memberErr.message }, { status: 500 });
   if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  const { data: group, error: groupErr } = await admin
+    .from('groups')
+    .select('id, profile_updated_at')
+    .eq('id', groupId)
+    .maybeSingle();
+  if (groupErr) return NextResponse.json({ error: groupErr.message }, { status: 500 });
+  if (!group) return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+
+  const lastChangedRaw =
+    typeof group.profile_updated_at === 'string' && group.profile_updated_at.trim()
+      ? Date.parse(group.profile_updated_at)
+      : Number.NaN;
+  if (Number.isFinite(lastChangedRaw)) {
+    const waitMs = PROFILE_CHANGE_COOLDOWN_MS - (Date.now() - lastChangedRaw);
+    if (waitMs > 0) {
+      return NextResponse.json(
+        {
+          error: `Please wait ${Math.ceil(waitMs / 1000)}s before changing this group profile again.`,
+        },
+        { status: 429 },
+      );
+    }
+  }
+
   let parsedBody: AvatarUploadJsonBody | null = null;
   try {
     parsedBody = (await request.json()) as AvatarUploadJsonBody;
@@ -92,9 +117,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const { data: groupRow, error: updateErr } = await admin
     .from('groups')
-    .update({ avatar_url: publicUrl })
+    .update({
+      avatar_url: publicUrl,
+      profile_updated_at: new Date().toISOString(),
+      profile_updated_by: user.id,
+    })
     .eq('id', groupId)
-    .select('id, name, avatar_url')
+    .select('id, name, avatar_url, profile_updated_at')
     .maybeSingle();
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
