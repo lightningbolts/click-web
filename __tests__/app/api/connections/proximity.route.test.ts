@@ -24,7 +24,7 @@ type PendingInsert = Omit<PendingHandshakeRow, 'id' | 'created_at' | 'matched_at
   matched_at?: string | null;
 };
 
-function createInMemoryAdmin() {
+function createInMemoryAdmin(extraUserIds: string[] = []) {
   const pending: PendingHandshakeRow[] = [];
   let connectionSeq = 0;
   const connections: { id: string; user_ids: string[]; created_utc: string }[] = [];
@@ -62,6 +62,16 @@ function createInMemoryAdmin() {
       },
     ],
   ]);
+  extraUserIds.forEach((id, index) => {
+    if (users.has(id)) return;
+    users.set(id, {
+      id,
+      name: `User ${index + 1}`,
+      email: `extra-${index + 1}@click.test`,
+      image: null,
+      created_at: new Date(Date.parse('2026-02-01T00:00:00.000Z') + index * 1_000).toISOString(),
+    });
+  });
 
   const from = jest.fn((table: string) => {
     if (table === 'pending_handshakes') {
@@ -266,6 +276,18 @@ describe('POST /api/connections/proximity contract', () => {
   const userA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const userB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const userC = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const extraGroupUsers = [
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000002',
+    '00000000-0000-4000-8000-000000000003',
+    '00000000-0000-4000-8000-000000000004',
+    '00000000-0000-4000-8000-000000000005',
+    '00000000-0000-4000-8000-000000000006',
+    '00000000-0000-4000-8000-000000000007',
+    '00000000-0000-4000-8000-000000000008',
+    '00000000-0000-4000-8000-000000000009',
+    '00000000-0000-4000-8000-000000000010',
+  ];
   const sharedLat = 47.655;
   const sharedLon = -122.303;
 
@@ -291,6 +313,50 @@ describe('POST /api/connections/proximity contract', () => {
       },
       body: JSON.stringify(body),
     });
+  }
+
+  async function expectSimultaneousGroupMatch(size: 5 | 10) {
+    const userIds = extraGroupUsers.slice(0, size);
+    adminStore = createInMemoryAdmin(userIds);
+    mockCreateAdminClient.mockReturnValue(adminStore);
+
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    try {
+      const responses = await Promise.all(
+        userIds.map((userId, i) =>
+          proximityPost(
+            makeRequest(userId, {
+              my_token: `${2000 + i}`,
+              heard_tokens: [],
+              detected_devices: [],
+              gps_lat: sharedLat + i * 0.000001,
+              gps_lon: sharedLon + i * 0.000001,
+            }),
+          ),
+        ),
+      );
+      const finalResponses = responses.filter((res) => res.status === 200);
+      expect(finalResponses.length).toBeGreaterThanOrEqual(1);
+
+      const matched = (await finalResponses[0]!.json()) as {
+        success: boolean;
+        is_group?: boolean;
+        matches: { id: string }[];
+        connection_id?: string;
+        group_clique_candidate?: { member_user_ids: string[] };
+      };
+
+      expect(matched.success).toBe(true);
+      expect(matched.is_group).toBe(true);
+      expect(matched.connection_id).toBe('conn-1');
+      expect(matched.matches).toHaveLength(size - 1);
+      expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual(userIds.sort());
+      expect(adminStore._connections).toHaveLength(1);
+      expect(adminStore._connections[0]?.user_ids.sort()).toEqual(userIds.sort());
+    } finally {
+      dateSpy.mockRestore();
+    }
   }
 
   it('resolves two payloads submitted 2 hours apart into a single connection', async () => {
@@ -373,6 +439,8 @@ describe('POST /api/connections/proximity contract', () => {
   });
 
   it('matches two simultaneous nearby payloads even when both missed radio tokens', async () => {
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
     const resA = await proximityPost(
       makeRequest(userA, {
         my_token: '1234',
@@ -384,6 +452,7 @@ describe('POST /api/connections/proximity contract', () => {
     );
     expect(resA.status).toBe(202);
 
+    dateSpy.mockReturnValue(t0 + 5_000);
     const resB = await proximityPost(
       makeRequest(userB, {
         my_token: '5678',
@@ -405,6 +474,7 @@ describe('POST /api/connections/proximity contract', () => {
     expect(matched.matches).toHaveLength(1);
     expect(matched.matches[0]?.id).toBe(userA);
     expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB].sort());
+    dateSpy.mockRestore();
   });
 
   it('matches a three-user group via graph clustering (1-to-N)', async () => {
@@ -450,5 +520,13 @@ describe('POST /api/connections/proximity contract', () => {
     expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB, userC].sort());
 
     dateSpy.mockRestore();
+  });
+
+  it('matches five simultaneous nearby phones into one group connection', async () => {
+    await expectSimultaneousGroupMatch(5);
+  });
+
+  it('matches ten simultaneous nearby phones into one group connection', async () => {
+    await expectSimultaneousGroupMatch(10);
   });
 });

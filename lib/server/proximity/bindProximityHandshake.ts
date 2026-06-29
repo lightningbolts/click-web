@@ -11,6 +11,7 @@ import {
   finiteBatteryPct,
   finiteNumber,
   haversineMeters,
+  handshakeCreatedAtMs,
   isDuplicateKeyError,
   isEncounterRateLimitError,
   latestHandshakeRowPerUser,
@@ -18,6 +19,7 @@ import {
   normalizeToken,
   parseHeardTokensField,
   peerEvidenceTokens,
+  PROXIMITY_GROUP_COALESCE_MIN_MS,
   RECENT_CONNECTION_LOCK_MS,
   sameMemberSet,
   twelveHourUtcBlockId,
@@ -44,6 +46,10 @@ const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 const PENDING_HANDSHAKE_SELECT =
   'id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at';
 const USER_PROFILE_SELECT = 'id, name, email, image, created_at:createdAt';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 type BindResult =
   | { kind: 'ok'; status: 200; body: ProximityBindOkResponse }
@@ -362,6 +368,10 @@ export async function bindProximityHandshake(
 
   const insertedRow = inserted as PendingHandshakeRow;
 
+  if (combinedEvidenceTokens.length === 0) {
+    await sleep(PROXIMITY_GROUP_COALESCE_MIN_MS);
+  }
+
   let pendingQuery = admin
     .from('pending_handshakes')
     .select(PENDING_HANDSHAKE_SELECT)
@@ -423,6 +433,29 @@ export async function bindProximityHandshake(
   const ids = [...matchedIds].sort();
   const memberIds = [uid, ...ids].sort();
   const recentLockCutoffIso = new Date(Date.now() - RECENT_CONNECTION_LOCK_MS).toISOString();
+  const hasTokenEvidenceInComponent = nodeRows
+    .filter((row) => memberIds.includes(String(row.user_id)))
+    .some((row) => peerEvidenceTokens(row).length > 0);
+  const insertedCreatedAtMs = handshakeCreatedAtMs(insertedRow);
+  if (
+    !hasTokenEvidenceInComponent &&
+    memberIds.length === 2 &&
+    insertedCreatedAtMs != null &&
+    Date.now() - insertedCreatedAtMs < PROXIMITY_GROUP_COALESCE_MIN_MS
+  ) {
+    return {
+      kind: 'pending',
+      status: 202,
+      body: {
+        success: true,
+        status: 'pending_match',
+        pending_handshake_id: insertedRow.id,
+        expires_at: insertedRow.expires_at,
+        encounter_logged: false,
+        matches: [],
+      },
+    };
+  }
 
   if (memberIds.length > 2) {
     const recentConnection = await lookupConnectionForMemberSet(memberIds, recentLockCutoffIso);

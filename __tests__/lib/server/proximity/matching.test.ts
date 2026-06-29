@@ -65,6 +65,21 @@ describe('proximity matching peer evidence', () => {
     expect([...component].sort()).toEqual(['a', 'b', 'c']);
   });
 
+  it('buildUserAdjacency clusters ten simultaneous nearby taps', () => {
+    const now = '2026-06-26T12:00:00.000Z';
+    const nodes = Array.from({ length: 10 }, (_, i) =>
+      row(`u${i + 1}`, `${1000 + i}`, [], {
+        created_at: new Date(Date.parse(now) + i * 1_000).toISOString(),
+        lat: 47.655 + i * 0.000001,
+        lon: -122.303 + i * 0.000001,
+      }),
+    );
+
+    const component = bfsComponent('u1', buildUserAdjacency(nodes));
+
+    expect([...component].sort()).toEqual(nodes.map((n) => n.user_id).sort());
+  });
+
   it('links simultaneous nearby taps when neither radio heard a token', () => {
     const now = '2026-06-26T12:00:00.000Z';
     const a = row('a', '1111', [], { created_at: now });
