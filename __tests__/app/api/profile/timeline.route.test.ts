@@ -204,6 +204,34 @@ describe('/api/profile/timeline', () => {
     expect(body.journal_entries?.map((entry) => entry.body)).toEqual(['Great coffee chat']);
   });
 
+  it('shows shared entries from either side of a one-to-one connection timeline', async () => {
+    const admin = createTimelineAdmin();
+    admin.entries.push({
+      id: 'peer-entry',
+      target_type: 'user',
+      target_id: admin.userA,
+      author_user_id: admin.userB,
+      body: 'Test',
+      visibility: 'shared',
+      created_at: new Date().toISOString(),
+    });
+    mockCreateAdminClient.mockReturnValue(admin);
+    mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({
+      supabase: {},
+      user: { id: admin.userA },
+      authError: null,
+    });
+
+    const get = await GET(
+      new NextRequest(
+        `http://localhost/api/profile/timeline?target_type=user&target_id=${admin.userB}`,
+      ),
+    );
+    const body = (await get.json()) as { journal_entries?: Entry[] };
+    expect(get.status).toBe(200);
+    expect(body.journal_entries?.map((entry) => entry.body)).toEqual(['Test']);
+  });
+
   it('canonicalizes group timelines and lets group members read everyone entries', async () => {
     const admin = createTimelineAdmin();
     mockCreateAdminClient.mockReturnValue(admin);

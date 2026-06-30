@@ -128,7 +128,7 @@ async function authorizeTarget(
     .maybeSingle();
   if (error) return { ok: false, response: NextResponse.json({ error: error.message }, { status: 400 }) };
   if (!connection) return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  return { ok: true, targetId, targetIds: [targetId], participantIds: [userId, targetId] };
+  return { ok: true, targetId, targetIds: [targetId, userId], participantIds: [userId, targetId] };
 }
 
 async function loadSharedInterests(admin: SupabaseClient, participantIds: string[]) {
