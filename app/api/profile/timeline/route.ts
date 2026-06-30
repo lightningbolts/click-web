@@ -12,13 +12,20 @@ type TimelineEntryRow = {
   target_id: string;
   author_user_id: string;
   body: string;
-  visibility: 'private' | 'shared';
+  visibility: 'private' | 'shared' | 'everyone';
   created_at: string;
 };
 
 function normalizeTargetType(raw: unknown): TargetType | null {
   const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
   return value === 'user' || value === 'chat' ? value : null;
+}
+
+function normalizeTimelineVisibility(raw: unknown): 'private' | 'shared' | null {
+  const value = typeof raw === 'string' ? raw.trim().toLowerCase() : 'private';
+  if (value === 'private') return 'private';
+  if (value === 'shared' || value === 'everyone') return 'shared';
+  return null;
 }
 
 function displayName(row: Record<string, unknown> | null | undefined): string | null {
@@ -163,7 +170,7 @@ async function buildPayload(
       .select('id, target_type, target_id, author_user_id, body, visibility, created_at')
       .eq('target_type', targetType)
       .eq('target_id', targetId)
-      .or(`visibility.eq.shared,author_user_id.eq.${viewerUserId}`)
+      .or(`visibility.in.(shared,everyone),author_user_id.eq.${viewerUserId}`)
       .order('created_at', { ascending: false })
       .limit(100),
     targetType === 'chat' ? loadSharedInterests(admin, participantIds) : Promise.resolve([]),
@@ -219,15 +226,15 @@ export async function POST(request: NextRequest) {
   const targetType = normalizeTargetType(body.target_type);
   const targetId = typeof body.target_id === 'string' ? body.target_id.trim() : '';
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  const visibility = typeof body.visibility === 'string' ? body.visibility.trim().toLowerCase() : 'private';
+  const visibility = normalizeTimelineVisibility(body.visibility);
 
   if (!targetType || !targetId) {
     return NextResponse.json({ error: 'target_type and target_id are required' }, { status: 400 });
   }
   if (!text) return NextResponse.json({ error: 'Journal entry is required' }, { status: 400 });
   if (text.length > 1200) return NextResponse.json({ error: 'Journal entry is too long' }, { status: 400 });
-  if (visibility !== 'private' && visibility !== 'shared') {
-    return NextResponse.json({ error: 'visibility must be private or shared' }, { status: 400 });
+  if (visibility == null) {
+    return NextResponse.json({ error: 'visibility must be private, shared, or everyone' }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -283,12 +290,12 @@ export async function PUT(request: NextRequest) {
 
   const entryId = typeof body.id === 'string' ? body.id.trim() : '';
   const text = typeof body.body === 'string' ? body.body.trim() : '';
-  const visibility = typeof body.visibility === 'string' ? body.visibility.trim().toLowerCase() : 'private';
+  const visibility = normalizeTimelineVisibility(body.visibility);
   if (!entryId) return NextResponse.json({ error: 'id is required' }, { status: 400 });
   if (!text) return NextResponse.json({ error: 'Journal entry is required' }, { status: 400 });
   if (text.length > 1200) return NextResponse.json({ error: 'Journal entry is too long' }, { status: 400 });
-  if (visibility !== 'private' && visibility !== 'shared') {
-    return NextResponse.json({ error: 'visibility must be private or shared' }, { status: 400 });
+  if (visibility == null) {
+    return NextResponse.json({ error: 'visibility must be private, shared, or everyone' }, { status: 400 });
   }
 
   const admin = createAdminClient();
