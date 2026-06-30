@@ -60,18 +60,27 @@ async function authorizeTarget(
   userId: string,
   targetType: TargetType,
   targetId: string,
-): Promise<{ ok: true; participantIds: string[] } | { ok: false; response: NextResponse }> {
+): Promise<{ ok: true; participantIds: string[]; targetId: string; targetIds: string[] } | { ok: false; response: NextResponse }> {
   if (targetType === 'chat') {
-    const denied = await assertChatWritable(admin, userId, targetId);
-    if (denied) return { ok: false, response: denied };
-
     const { data: chat, error: chatErr } = await admin
       .from('chats')
       .select('id, connection_id, group_id')
-      .eq('id', targetId)
+      .or(`id.eq.${targetId},connection_id.eq.${targetId},group_id.eq.${targetId}`)
       .maybeSingle();
     if (chatErr) return { ok: false, response: NextResponse.json({ error: chatErr.message }, { status: 400 }) };
     if (!chat) return { ok: false, response: NextResponse.json({ error: 'Chat not found' }, { status: 404 }) };
+
+    const chatId = typeof chat.id === 'string' ? chat.id : '';
+    if (!chatId) return { ok: false, response: NextResponse.json({ error: 'Invalid chat configuration' }, { status: 400 }) };
+    const targetIds = [
+      chatId,
+      typeof chat.connection_id === 'string' ? chat.connection_id : '',
+      typeof chat.group_id === 'string' ? chat.group_id : '',
+      targetId,
+    ].filter((id, index, arr) => id.length > 0 && arr.indexOf(id) === index);
+
+    const denied = await assertChatWritable(admin, userId, chatId);
+    if (denied) return { ok: false, response: denied };
 
     if (chat.group_id) {
       const { data: members, error } = await admin
@@ -81,6 +90,8 @@ async function authorizeTarget(
       if (error) return { ok: false, response: NextResponse.json({ error: error.message }, { status: 400 }) };
       return {
         ok: true,
+        targetId: chatId,
+        targetIds,
         participantIds: (members ?? [])
           .map((row: { user_id?: unknown }) => (typeof row.user_id === 'string' ? row.user_id : ''))
           .filter(Boolean),
@@ -96,6 +107,8 @@ async function authorizeTarget(
       if (error) return { ok: false, response: NextResponse.json({ error: error.message }, { status: 400 }) };
       return {
         ok: true,
+        targetId: chatId,
+        targetIds,
         participantIds: Array.isArray(conn?.user_ids)
           ? conn.user_ids.filter((id): id is string => typeof id === 'string')
           : [],
@@ -105,7 +118,7 @@ async function authorizeTarget(
     return { ok: false, response: NextResponse.json({ error: 'Invalid chat configuration' }, { status: 400 }) };
   }
 
-  if (targetId === userId) return { ok: true, participantIds: [userId] };
+  if (targetId === userId) return { ok: true, targetId, targetIds: [targetId], participantIds: [userId] };
 
   const { data: connection, error } = await admin
     .from('connections')
@@ -115,7 +128,7 @@ async function authorizeTarget(
     .maybeSingle();
   if (error) return { ok: false, response: NextResponse.json({ error: error.message }, { status: 400 }) };
   if (!connection) return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  return { ok: true, participantIds: [userId, targetId] };
+  return { ok: true, targetId, targetIds: [targetId], participantIds: [userId, targetId] };
 }
 
 async function loadSharedInterests(admin: SupabaseClient, participantIds: string[]) {
@@ -163,13 +176,16 @@ async function buildPayload(
   targetType: TargetType,
   targetId: string,
   participantIds: string[],
+  targetIds: string[] = [targetId],
 ) {
+  const ids = [...new Set(targetIds.map((id) => id.trim()).filter(Boolean))];
+  let entriesQuery = admin
+    .from('profile_timeline_entries')
+    .select('id, target_type, target_id, author_user_id, body, visibility, created_at')
+    .eq('target_type', targetType);
+  entriesQuery = ids.length > 1 ? entriesQuery.in('target_id', ids) : entriesQuery.eq('target_id', targetId);
   const [entriesRes, sharedInterests] = await Promise.all([
-    admin
-      .from('profile_timeline_entries')
-      .select('id, target_type, target_id, author_user_id, body, visibility, created_at')
-      .eq('target_type', targetType)
-      .eq('target_id', targetId)
+    entriesQuery
       .or(`visibility.in.(shared,everyone),author_user_id.eq.${viewerUserId}`)
       .order('created_at', { ascending: false })
       .limit(100),
@@ -205,7 +221,7 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   try {
-    return NextResponse.json(await buildPayload(admin, user.id, targetType, targetId, auth.participantIds));
+    return NextResponse.json(await buildPayload(admin, user.id, targetType, auth.targetId, auth.participantIds, auth.targetIds));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to load timeline';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -243,7 +259,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await admin.from('profile_timeline_entries').insert({
     target_type: targetType,
-    target_id: targetId,
+    target_id: auth.targetId,
     author_user_id: user.id,
     body: text,
     visibility,
@@ -251,7 +267,7 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   try {
-    return NextResponse.json(await buildPayload(admin, user.id, targetType, targetId, auth.participantIds));
+    return NextResponse.json(await buildPayload(admin, user.id, targetType, auth.targetId, auth.participantIds, auth.targetIds));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to load timeline';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -313,7 +329,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     return NextResponse.json(
-      await buildPayload(admin, user.id, loaded.row.target_type, loaded.row.target_id, auth.participantIds),
+      await buildPayload(admin, user.id, loaded.row.target_type, auth.targetId, auth.participantIds, auth.targetIds),
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to load timeline';
@@ -350,7 +366,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     return NextResponse.json(
-      await buildPayload(admin, user.id, loaded.row.target_type, loaded.row.target_id, auth.participantIds),
+      await buildPayload(admin, user.id, loaded.row.target_type, auth.targetId, auth.participantIds, auth.targetIds),
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to load timeline';

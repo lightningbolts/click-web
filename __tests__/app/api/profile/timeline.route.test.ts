@@ -33,6 +33,9 @@ type Entry = {
 function createTimelineAdmin() {
   const userA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const userB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const chatId = '11111111-1111-4111-8111-111111111111';
+  const connectionId = '22222222-2222-4222-8222-222222222222';
+  const groupId = '33333333-3333-4333-8333-333333333333';
   const entries: Entry[] = [];
   const users = new Map<string, Record<string, unknown>>([
     [userA, { id: userA, name: 'User A', email: 'a@click.test' }],
@@ -44,12 +47,16 @@ function createTimelineAdmin() {
       return {
         select: jest.fn(() => {
           let targetType = '';
-          let targetId = '';
+          let targetIds: string[] = [];
           let viewerId = '';
           const chain = {
             eq: (col: string, value: string) => {
               if (col === 'target_type') targetType = value;
-              if (col === 'target_id') targetId = value;
+              if (col === 'target_id') targetIds = [value];
+              return chain;
+            },
+            in: (col: string, values: string[]) => {
+              if (col === 'target_id') targetIds = values;
               return chain;
             },
             or: (expr: string) => {
@@ -59,7 +66,7 @@ function createTimelineAdmin() {
             order: () => chain,
             limit: async () => ({
               data: entries
-                .filter((entry) => entry.target_type === targetType && entry.target_id === targetId)
+                .filter((entry) => entry.target_type === targetType && targetIds.includes(entry.target_id))
                 .filter(
                   (entry) =>
                     entry.author_user_id === viewerId ||
@@ -91,6 +98,40 @@ function createTimelineAdmin() {
               maybeSingle: async () => ({ data: { user_ids: [userA, userB] }, error: null }),
             }),
           }),
+          eq: () => ({
+            maybeSingle: async () => ({ data: { user_ids: [userA, userB] }, error: null }),
+          }),
+        })),
+      };
+    }
+
+    if (table === 'chats') {
+      return {
+        select: jest.fn(() => ({
+          or: (expr: string) => ({
+            maybeSingle: async () => {
+              const found =
+                expr.includes(`id.eq.${chatId}`) ||
+                expr.includes(`connection_id.eq.${connectionId}`) ||
+                expr.includes(`group_id.eq.${groupId}`);
+              return {
+                data: found ? { id: chatId, connection_id: connectionId, group_id: groupId } : null,
+                error: null,
+              };
+            },
+          }),
+        })),
+      };
+    }
+
+    if (table === 'group_members') {
+      return {
+        select: jest.fn(() => ({
+          eq: () =>
+            Promise.resolve({
+              data: [{ user_id: userA }, { user_id: userB }],
+              error: null,
+            }),
         })),
       };
     }
@@ -118,7 +159,7 @@ function createTimelineAdmin() {
     throw new Error(`unexpected table ${table}`);
   });
 
-  return { from, entries, userA, userB };
+  return { from, entries, userA, userB, chatId, connectionId, groupId };
 }
 
 describe('/api/profile/timeline', () => {
@@ -161,5 +202,75 @@ describe('/api/profile/timeline', () => {
     const body = (await get.json()) as { journal_entries?: Entry[] };
     expect(get.status).toBe(200);
     expect(body.journal_entries?.map((entry) => entry.body)).toEqual(['Great coffee chat']);
+  });
+
+  it('canonicalizes group timelines and lets group members read everyone entries', async () => {
+    const admin = createTimelineAdmin();
+    mockCreateAdminClient.mockReturnValue(admin);
+    mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({
+      supabase: {},
+      user: { id: admin.userA },
+      authError: null,
+    });
+
+    const post = await POST(
+      new NextRequest('http://localhost/api/profile/timeline', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          target_type: 'chat',
+          target_id: admin.connectionId,
+          body: 'Group memory',
+          visibility: 'everyone',
+        }),
+      }),
+    );
+
+    expect(post.status).toBe(200);
+    expect(admin.entries[0]?.target_id).toBe(admin.chatId);
+    expect(admin.entries[0]?.visibility).toBe('shared');
+
+    mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({
+      supabase: {},
+      user: { id: admin.userB },
+      authError: null,
+    });
+
+    const get = await GET(
+      new NextRequest(
+        `http://localhost/api/profile/timeline?target_type=chat&target_id=${admin.groupId}`,
+      ),
+    );
+    const body = (await get.json()) as { journal_entries?: Entry[] };
+    expect(get.status).toBe(200);
+    expect(body.journal_entries?.map((entry) => entry.body)).toEqual(['Group memory']);
+  });
+
+  it('reads older group entries stored under connection ids', async () => {
+    const admin = createTimelineAdmin();
+    admin.entries.push({
+      id: 'legacy-entry',
+      target_type: 'chat',
+      target_id: admin.connectionId,
+      author_user_id: admin.userA,
+      body: 'Legacy group memory',
+      visibility: 'everyone',
+      created_at: new Date().toISOString(),
+    });
+    mockCreateAdminClient.mockReturnValue(admin);
+    mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({
+      supabase: {},
+      user: { id: admin.userB },
+      authError: null,
+    });
+
+    const get = await GET(
+      new NextRequest(
+        `http://localhost/api/profile/timeline?target_type=chat&target_id=${admin.groupId}`,
+      ),
+    );
+    const body = (await get.json()) as { journal_entries?: Entry[] };
+    expect(get.status).toBe(200);
+    expect(body.journal_entries?.map((entry) => entry.body)).toEqual(['Legacy group memory']);
   });
 });
