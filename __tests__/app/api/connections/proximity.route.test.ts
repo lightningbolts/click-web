@@ -297,6 +297,34 @@ describe('POST /api/connections/proximity contract', () => {
     adminStore = createInMemoryAdmin();
     mockCreateAdminClient.mockReturnValue(adminStore);
     mockGetSupabaseFromRouteRequest.mockReset();
+    jest.spyOn(global, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('open-meteo.com')) {
+        return {
+          ok: true,
+          json: async () => ({
+            current: {
+              temperature_2m: 17,
+              weather_code: 3,
+              wind_speed_10m: 7,
+              wind_direction_10m: 225,
+              pressure_msl: 1018,
+            },
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          address: { city: 'Seattle', state: 'Washington', road: 'Test Way', house_number: '1' },
+          display_name: '1 Test Way, Seattle, Washington',
+        }),
+      } as Response;
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   function makeRequest(userId: string, body: Record<string, unknown>) {
@@ -352,7 +380,7 @@ describe('POST /api/connections/proximity contract', () => {
       expect(matched.connection_id).toBe('conn-1');
       expect(matched.matches).toHaveLength(size - 1);
       expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual(userIds.sort());
-      expect(adminStore._connections).toHaveLength(1);
+      expect(adminStore._connections).toHaveLength(1 + (size * (size - 1)) / 2);
       expect(adminStore._connections[0]?.user_ids.sort()).toEqual(userIds.sort());
     } finally {
       dateSpy.mockRestore();
@@ -477,7 +505,7 @@ describe('POST /api/connections/proximity contract', () => {
     dateSpy.mockRestore();
   });
 
-  it('matches a three-user group via graph clustering (1-to-N)', async () => {
+  it('matches a three-user group via graph clustering and creates every pair edge', async () => {
     const t0 = Date.now();
     const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
 
@@ -518,6 +546,14 @@ describe('POST /api/connections/proximity contract', () => {
     expect(matched.matches).toHaveLength(2);
     expect(matched.connection_id).toBe('conn-1');
     expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB, userC].sort());
+    expect(adminStore._connections.map((c) => c.user_ids.sort())).toEqual(
+      expect.arrayContaining([
+        [userA, userB, userC].sort(),
+        [userA, userB].sort(),
+        [userA, userC].sort(),
+        [userB, userC].sort(),
+      ]),
+    );
 
     dateSpy.mockRestore();
   });
@@ -581,6 +617,76 @@ describe('POST /api/connections/proximity contract', () => {
     expect(matched.is_group).toBe(true);
     expect(matched.matches.map((m) => m.id).sort()).toEqual([userA, userB].sort());
     expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual([userA, userB, userC].sort());
+    expect(adminStore._connections.map((c) => c.user_ids.sort())).toEqual(
+      expect.arrayContaining([
+        [userA, userB, userC].sort(),
+        [userA, userB].sort(),
+        [userA, userC].sort(),
+        [userB, userC].sort(),
+      ]),
+    );
+
+    dateSpy.mockRestore();
+  });
+
+  it('copies non-binding user telemetry into that user encounter row', async () => {
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+
+    await proximityPost(
+      makeRequest(userA, {
+        my_token: '1234',
+        heard_tokens: ['5678'],
+        exact_noise_level_db: 42.5,
+        noise_level: 'QUIET',
+        exact_barometric_elevation_m: 12.25,
+        height_category: 'ELEVATED',
+        lux_level: 150,
+        motion_variance: 0.12,
+        compass_azimuth: 180,
+        battery_level: 88,
+      }),
+    );
+
+    const resB = await proximityPost(
+      makeRequest(userB, {
+        my_token: '5678',
+        heard_tokens: ['1234'],
+        exact_noise_level_db: 61.5,
+        noise_level: 'MODERATE',
+        exact_barometric_elevation_m: 7.5,
+        height_category: 'GROUND_LEVEL',
+        lux_level: 600,
+        motion_variance: 0.42,
+        compass_azimuth: 12,
+        battery_level: 55,
+      }),
+    );
+
+    expect(resB.status).toBe(200);
+    expect(adminStore._encounters).toHaveLength(2);
+    const userARow = adminStore._encounters.find((row) => row.reporting_user_id === userA);
+    const userBRow = adminStore._encounters.find((row) => row.reporting_user_id === userB);
+    expect(userARow).toMatchObject({
+      noise_level: 'QUIET',
+      exact_noise_level_db: 42.5,
+      exact_barometric_elevation_m: 12.25,
+      elevation_category: 'ELEVATED',
+      lux_level: 150,
+      motion_variance: 0.12,
+      compass_azimuth: 180,
+      battery_level: 88,
+    });
+    expect(userBRow).toMatchObject({
+      noise_level: 'MODERATE',
+      exact_noise_level_db: 61.5,
+      exact_barometric_elevation_m: 7.5,
+      elevation_category: 'GROUND_LEVEL',
+      lux_level: 600,
+      motion_variance: 0.42,
+      compass_azimuth: 12,
+      battery_level: 55,
+    });
 
     dateSpy.mockRestore();
   });

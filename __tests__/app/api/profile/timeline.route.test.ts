@@ -33,6 +33,7 @@ type Entry = {
 function createTimelineAdmin() {
   const userA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const userB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const userC = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   const chatId = '11111111-1111-4111-8111-111111111111';
   const connectionId = '22222222-2222-4222-8222-222222222222';
   const groupId = '33333333-3333-4333-8333-333333333333';
@@ -40,7 +41,12 @@ function createTimelineAdmin() {
   const users = new Map<string, Record<string, unknown>>([
     [userA, { id: userA, name: 'User A', email: 'a@click.test' }],
     [userB, { id: userB, name: 'User B', email: 'b@click.test' }],
+    [userC, { id: userC, name: 'User C', email: 'c@click.test' }],
   ]);
+  const oneToOneConnections = [
+    [userA, userB].sort(),
+    [userA, userC].sort(),
+  ];
 
   const from = jest.fn((table: string) => {
     if (table === 'profile_timeline_entries') {
@@ -93,9 +99,15 @@ function createTimelineAdmin() {
     if (table === 'connections') {
       return {
         select: jest.fn(() => ({
-          contains: () => ({
+          contains: (_col: string, values: string[]) => ({
             limit: () => ({
-              maybeSingle: async () => ({ data: { user_ids: [userA, userB] }, error: null }),
+              maybeSingle: async () => {
+                const requested = [...values].sort();
+                const found = oneToOneConnections.find(
+                  (pair) => pair.length === requested.length && pair.every((id, index) => id === requested[index]),
+                );
+                return { data: found ? { user_ids: found } : null, error: null };
+              },
             }),
           }),
           eq: () => ({
@@ -159,7 +171,7 @@ function createTimelineAdmin() {
     throw new Error(`unexpected table ${table}`);
   });
 
-  return { from, entries, userA, userB, chatId, connectionId, groupId };
+  return { from, entries, userA, userB, userC, chatId, connectionId, groupId };
 }
 
 describe('/api/profile/timeline', () => {
@@ -196,7 +208,7 @@ describe('/api/profile/timeline', () => {
 
     const get = await GET(
       new NextRequest(
-        `http://localhost/api/profile/timeline?target_type=user&target_id=${admin.userB}`,
+        `http://localhost/api/profile/timeline?target_type=user&target_id=${admin.userA}`,
       ),
     );
     const body = (await get.json()) as { journal_entries?: Entry[] };
@@ -230,6 +242,34 @@ describe('/api/profile/timeline', () => {
     const body = (await get.json()) as { journal_entries?: Entry[] };
     expect(get.status).toBe(200);
     expect(body.journal_entries?.map((entry) => entry.body)).toEqual(['Test']);
+  });
+
+  it('does not leak shared one-to-one entries into another connection timeline', async () => {
+    const admin = createTimelineAdmin();
+    admin.entries.push({
+      id: 'bob-entry-on-alice',
+      target_type: 'user',
+      target_id: admin.userA,
+      author_user_id: admin.userB,
+      body: 'Only Alice and Bob should see this',
+      visibility: 'shared',
+      created_at: new Date().toISOString(),
+    });
+    mockCreateAdminClient.mockReturnValue(admin);
+    mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({
+      supabase: {},
+      user: { id: admin.userC },
+      authError: null,
+    });
+
+    const get = await GET(
+      new NextRequest(
+        `http://localhost/api/profile/timeline?target_type=user&target_id=${admin.userA}`,
+      ),
+    );
+    const body = (await get.json()) as { journal_entries?: Entry[] };
+    expect(get.status).toBe(200);
+    expect(body.journal_entries).toEqual([]);
   });
 
   it('canonicalizes group timelines and lets group members read everyone entries', async () => {

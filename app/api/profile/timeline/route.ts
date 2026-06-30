@@ -193,7 +193,12 @@ async function buildPayload(
   ]);
   if (entriesRes.error) throw new Error(entriesRes.error.message);
 
-  const rows = (entriesRes.data ?? []) as TimelineEntryRow[];
+  const participantSet = new Set(participantIds.map((id) => id.trim()).filter(Boolean));
+  const rows = ((entriesRes.data ?? []) as TimelineEntryRow[]).filter((row) => {
+    if (row.author_user_id === viewerUserId) return true;
+    if (row.visibility !== 'shared' && row.visibility !== 'everyone') return false;
+    return participantSet.has(row.author_user_id);
+  });
   const names = await loadUserNameMap(admin, rows.map((row) => row.author_user_id));
   return {
     target_type: targetType,

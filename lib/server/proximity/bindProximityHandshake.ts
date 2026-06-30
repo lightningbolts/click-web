@@ -232,6 +232,14 @@ function pendingRowToHandshakeLite(row: PendingHandshakeRow): HandshakeRowLite {
   };
 }
 
+function sensorPayloadFromRow(row: HandshakeRowLite | null | undefined): ProximitySensorPayloadJson {
+  return isRecord(row?.sensor_payload) ? (row.sensor_payload as ProximitySensorPayloadJson) : {};
+}
+
+function nonEmptyPayloadString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
 function buildSensorPayload(body: ProximityHandshakeRequest, timezoneOffsetMinutes: number): ProximitySensorPayloadJson {
   const exactBarometricElevationM = finiteNumber(body.exact_barometric_elevation_m);
   const exactNoiseLevelDb = finiteNumber(body.exact_noise_level_db);
@@ -523,7 +531,6 @@ export async function bindProximityHandshake(
     displayLocation = geocoded.displayLocation;
     specificLocationName = geocoded.specificLocationName;
   }
-  const resolvedLocationName = manualLocationName ?? specificLocationName;
 
   async function ensureConnectionForMemberSet(
     memberUserIds: string[],
@@ -583,18 +590,148 @@ export async function bindProximityHandshake(
     return { connectionId, isNewConnection: true, isGroup: members.length > 2 };
   }
 
-  function memberGpsFromHandshake(
+  function memberSensorValues(memberId: string): {
+    row: HandshakeRowLite | null;
+    payload: ProximitySensorPayloadJson;
+    lat: number | null;
+    lon: number | null;
+    lux: number | null;
+    motion: number | null;
+    azimuth: number | null;
+    battery: number | null;
+    exactNoiseLevelDb: number | null;
+    noiseLevel: string | null;
+    exactBarometricElevationM: number | null;
+    heightCategory: string | null;
+    manualLocationName: string | null;
+    weatherSnapshot: string | null;
+    contextTags: string[];
+  } {
+    const row =
+      memberId === uid
+        ? pendingRowToHandshakeLite(insertedRow)
+        : latestByUser.get(memberId) ?? null;
+    const payload = sensorPayloadFromRow(row);
+    const latValue = memberId === uid ? encLat : finiteNumber(row?.lat);
+    const lonValue = memberId === uid ? encLon : finiteNumber(row?.lon);
+    return {
+      row,
+      payload,
+      lat: latValue != null && lonValue != null && !(latValue === 0 && lonValue === 0) ? latValue : null,
+      lon: latValue != null && lonValue != null && !(latValue === 0 && lonValue === 0) ? lonValue : null,
+      lux: memberId === uid ? selfLux : finiteNumber(row?.lux_level),
+      motion: memberId === uid ? selfMotion : finiteNumber(row?.motion_variance),
+      azimuth: memberId === uid ? selfAz : finiteNumber(row?.compass_azimuth),
+      battery: memberId === uid ? selfBattery : finiteBatteryPct(row?.battery_level),
+      exactNoiseLevelDb: memberId === uid ? exactNoiseLevelDb : finiteNumber(payload.exact_noise_level_db),
+      noiseLevel: memberId === uid ? noiseLevel : nonEmptyPayloadString(payload.noise_level),
+      exactBarometricElevationM:
+        memberId === uid ? exactBarometricElevationM : finiteNumber(payload.exact_barometric_elevation_m),
+      heightCategory: memberId === uid ? clientHeightCategory : nonEmptyPayloadString(payload.height_category),
+      manualLocationName: memberId === uid ? manualLocationName : nonEmptyPayloadString(payload.location_name),
+      weatherSnapshot: memberId === uid ? clientWeatherSnapshot : nonEmptyPayloadString(payload.weather_snapshot),
+      contextTags: normalizeContextTagsArray(payload.context_tags),
+    };
+  }
+
+  const encounterMemberTemplateCache = new Map<
+    string,
+    { row: Record<string, unknown>; lat: number | null; lon: number | null }
+  >();
+
+  async function buildEncounterRowForMember(
+    connectionId: string,
     memberId: string,
-    bindingUserId: string,
-    bindingLat: number | null,
-    bindingLon: number | null,
-    latestByUserMap: Map<string, HandshakeRowLite>,
-  ): { lat: number | null; lon: number | null } {
-    if (memberId === bindingUserId) {
-      return { lat: bindingLat, lon: bindingLon };
+    encounteredAtIso: string,
+  ): Promise<{ row: Record<string, unknown>; lat: number | null; lon: number | null }> {
+    const cacheKey = `${memberId}|${encounteredAtIso}`;
+    const cached = encounterMemberTemplateCache.get(cacheKey);
+    if (cached) {
+      return {
+        row: { ...cached.row, connection_id: connectionId },
+        lat: cached.lat,
+        lon: cached.lon,
+      };
     }
-    const row = latestByUserMap.get(memberId);
-    return { lat: finiteNumber(row?.lat), lon: finiteNumber(row?.lon) };
+    const values = memberSensorValues(memberId);
+    const otherRows = memberIds
+      .filter((id) => id !== memberId)
+      .map((id) => memberSensorValues(id));
+    const avg = (nums: Array<number | null>) => {
+      const finite = nums.filter((v): v is number => v != null);
+      return finite.length ? finite.reduce((a, b) => a + b, 0) / finite.length : null;
+    };
+    const memberVibeTags = buildVibeContextTags({
+      lux: values.lux,
+      selfMotion: values.motion,
+      peerMotion: avg(otherRows.map((row) => row.motion)),
+      selfAz: values.azimuth,
+      peerAz: avg(otherRows.map((row) => row.azimuth)),
+      battery: values.battery,
+    });
+    const memberContextTags = mergeContextTagLists(
+      mergeContextTagLists(clientContextTags, values.contextTags),
+      memberVibeTags,
+    );
+
+    let memberRelativeAltitudeM: number | null = null;
+    let memberSemanticLocation: Record<string, unknown> | null = null;
+    let memberDisplayLocation = DISPLAY_LOCATION_FALLBACK;
+    let memberSpecificLocationName: string | null = null;
+
+    if (values.exactBarometricElevationM != null && values.lat != null && values.lon != null) {
+      const terrainM = await fetchTerrainElevationM(values.lat, values.lon);
+      if (terrainM != null) {
+        memberRelativeAltitudeM = values.exactBarometricElevationM - terrainM;
+      }
+    }
+
+    if (memberId === uid) {
+      memberRelativeAltitudeM = relativeAltitudeM;
+      memberSemanticLocation = semanticLocation;
+      memberDisplayLocation = displayLocation;
+      memberSpecificLocationName = specificLocationName;
+    } else if (values.lat != null && values.lon != null) {
+      const geocoded = await fetchNominatimReverseGeocode(values.lat, values.lon);
+      memberSemanticLocation = geocoded.semanticLocation;
+      memberDisplayLocation = geocoded.displayLocation;
+      memberSpecificLocationName = geocoded.specificLocationName;
+    }
+
+    const row: Record<string, unknown> = {
+      connection_id: connectionId,
+      encountered_at: encounteredAtIso,
+      context_tags: memberContextTags,
+      display_location: memberDisplayLocation,
+      reporting_user_id: memberId,
+    };
+    const locationName = values.manualLocationName ?? memberSpecificLocationName;
+    if (locationName) row.location_name = locationName;
+    if (values.lat != null && values.lon != null) {
+      row.gps_lat = values.lat;
+      row.gps_lon = values.lon;
+    }
+    if (memberSemanticLocation != null) row.semantic_location = memberSemanticLocation;
+    if (values.noiseLevel != null) row.noise_level = values.noiseLevel;
+    if (values.exactNoiseLevelDb != null) row.exact_noise_level_db = values.exactNoiseLevelDb;
+    if (values.exactBarometricElevationM != null) row.exact_barometric_elevation_m = values.exactBarometricElevationM;
+    if (values.heightCategory != null) row.elevation_category = values.heightCategory;
+    if (memberRelativeAltitudeM != null) row.relative_altitude_m = memberRelativeAltitudeM;
+    if (values.lux != null) row.lux_level = values.lux;
+    if (values.motion != null) row.motion_variance = values.motion;
+    if (values.azimuth != null) row.compass_azimuth = values.azimuth;
+    if (values.battery != null) row.battery_level = values.battery;
+
+    let resolvedWeather = values.weatherSnapshot;
+    if (resolvedWeather == null && values.lat != null && values.lon != null) {
+      resolvedWeather = await fetchOpenMeteoWeatherSnapshot(values.lat, values.lon);
+    }
+    if (resolvedWeather != null) row.weather_snapshot = resolvedWeather;
+
+    const templateRow = { ...row };
+    delete templateRow.connection_id;
+    encounterMemberTemplateCache.set(cacheKey, { row: templateRow, lat: values.lat, lon: values.lon });
+    return { row, lat: values.lat, lon: values.lon };
   }
 
   async function insertOrDebounceEncounter(
@@ -695,6 +832,7 @@ export async function bindProximityHandshake(
   };
   const peerEncounterLogged: PeerBindMeta[] = [];
   let handshakeCreatedNewConnection = false;
+  let aggregateConnectionId: string | null = null;
 
   const ensured = await ensureConnectionForMemberSet(memberIds);
   if (!ensured) {
@@ -710,75 +848,16 @@ export async function bindProximityHandshake(
     });
   } else {
     const { connectionId, isNewConnection } = ensured;
+    aggregateConnectionId = connectionId;
     handshakeCreatedNewConnection = isNewConnection;
-    const peerRows = ids
-      .map((peerId) => handshakeLites.find((r) => String(r.user_id) === peerId))
-      .filter((r): r is HandshakeRowLite => r != null);
-    const peerMotionValues = peerRows.map((r) => finiteNumber(r.motion_variance)).filter((v): v is number => v != null);
-    const peerAzValues = peerRows.map((r) => finiteNumber(r.compass_azimuth)).filter((v): v is number => v != null);
-    const avg = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
-    const vibeTags = buildVibeContextTags({
-      lux: selfLux,
-      selfMotion,
-      peerMotion: avg(peerMotionValues),
-      selfAz,
-      peerAz: avg(peerAzValues),
-      battery: selfBattery,
-    });
-    const mergedContextTags = mergeContextTagLists(clientContextTags, vibeTags);
     const encounteredAtIso = new Date().toISOString();
-    const bindingInsertRow: Record<string, unknown> = {
-      connection_id: connectionId,
-      encountered_at: encounteredAtIso,
-      context_tags: mergedContextTags,
-      display_location: displayLocation,
-      reporting_user_id: uid,
-    };
-    if (resolvedLocationName) bindingInsertRow.location_name = resolvedLocationName;
-    if (encLat != null && encLon != null) {
-      bindingInsertRow.gps_lat = encLat;
-      bindingInsertRow.gps_lon = encLon;
-    }
-    if (semanticLocation != null) bindingInsertRow.semantic_location = semanticLocation;
-    if (noiseLevel != null) bindingInsertRow.noise_level = noiseLevel;
-    if (exactNoiseLevelDb != null) bindingInsertRow.exact_noise_level_db = exactNoiseLevelDb;
-    if (exactBarometricElevationM != null) bindingInsertRow.exact_barometric_elevation_m = exactBarometricElevationM;
-    if (clientHeightCategory != null) bindingInsertRow.elevation_category = clientHeightCategory;
-    if (relativeAltitudeM != null) bindingInsertRow.relative_altitude_m = relativeAltitudeM;
-    if (selfLux != null) bindingInsertRow.lux_level = selfLux;
-    if (selfMotion != null) bindingInsertRow.motion_variance = selfMotion;
-    if (selfAz != null) bindingInsertRow.compass_azimuth = selfAz;
-    if (selfBattery != null) bindingInsertRow.battery_level = selfBattery;
-
-    let resolvedWeather = clientWeatherSnapshot;
-    if (resolvedWeather == null && encLat != null && encLon != null) {
-      resolvedWeather = await fetchOpenMeteoWeatherSnapshot(encLat, encLon);
-    }
-    if (resolvedWeather != null) bindingInsertRow.weather_snapshot = resolvedWeather;
-
     let outcome: EncounterMutationOutcome = 'inserted';
     for (const memberId of memberIds) {
-      const { lat: memberLat, lon: memberLon } = memberGpsFromHandshake(
+      const { row: memberRow, lat: memberLat, lon: memberLon } = await buildEncounterRowForMember(
+        connectionId,
         memberId,
-        uid,
-        encLat,
-        encLon,
-        latestByUser,
+        encounteredAtIso,
       );
-      const memberRow: Record<string, unknown> =
-        memberId === uid
-          ? { ...bindingInsertRow }
-          : {
-              connection_id: connectionId,
-              encountered_at: encounteredAtIso,
-              context_tags: mergedContextTags,
-              display_location: displayLocation,
-              reporting_user_id: memberId,
-            };
-      if (memberLat != null && memberLon != null && !(memberLat === 0 && memberLon === 0)) {
-        memberRow.gps_lat = memberLat;
-        memberRow.gps_lon = memberLon;
-      }
       const memberOutcome = await insertOrDebounceEncounter(
         connectionId,
         memberRow,
@@ -790,12 +869,44 @@ export async function bindProximityHandshake(
         outcome = memberOutcome;
       }
     }
+    const directPeerConnectionIds = new Map<string, string>();
+    if (memberIds.length > 2) {
+      for (let i = 0; i < memberIds.length; i += 1) {
+        for (let j = i + 1; j < memberIds.length; j += 1) {
+          const pair = [memberIds[i]!, memberIds[j]!].sort();
+          const pairEnsured = await ensureConnectionForMemberSet(pair);
+          if (!pairEnsured) {
+            console.warn('[proximity] pairwise clique connection unavailable:', pair.join(','));
+            continue;
+          }
+          if (pair.includes(uid)) {
+            const peerId = pair.find((id) => id !== uid);
+            if (peerId) directPeerConnectionIds.set(peerId, pairEnsured.connectionId);
+          }
+          for (const pairMemberId of pair) {
+            const { row: pairMemberRow, lat: pairMemberLat, lon: pairMemberLon } = await buildEncounterRowForMember(
+              pairEnsured.connectionId,
+              pairMemberId,
+              encounteredAtIso,
+            );
+            await insertOrDebounceEncounter(
+              pairEnsured.connectionId,
+              pairMemberRow,
+              pairMemberLat,
+              pairMemberLon,
+              pairMemberId,
+            );
+          }
+        }
+      }
+    }
     const persisted = outcome === 'inserted' || outcome === 'debounced';
     ids.forEach((peerId) => {
+      const responseConnectionId = directPeerConnectionIds.get(peerId) ?? connectionId;
       if (outcome === 'rate_limited') {
         peerEncounterLogged.push({
           peerId,
-          connectionId,
+          connectionId: responseConnectionId,
           encounterLogged: false,
           isNewConnection,
           encounterPersistedOnBind: false,
@@ -804,7 +915,7 @@ export async function bindProximityHandshake(
       } else {
         peerEncounterLogged.push({
           peerId,
-          connectionId,
+          connectionId: responseConnectionId,
           encounterLogged: true,
           isNewConnection,
           encounterPersistedOnBind: persisted,
@@ -860,7 +971,7 @@ export async function bindProximityHandshake(
     encounter_logged: aggregateEncounterLogged,
     matches,
   };
-  const sharedConnectionId = peerEncounterLogged.find((p) => p.connectionId != null)?.connectionId ?? null;
+  const sharedConnectionId = aggregateConnectionId ?? peerEncounterLogged.find((p) => p.connectionId != null)?.connectionId ?? null;
   if (sharedConnectionId != null) {
     responseBody.connection_id = sharedConnectionId;
     responseBody.is_new_connection = handshakeCreatedNewConnection;
