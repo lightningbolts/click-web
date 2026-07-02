@@ -67,6 +67,8 @@ Used by `proxy.ts` for `/admin/*` routes.
 
 Used by middleware and insights API routes.
 
+**Testing insights access and APIs:** see `lib/insights/README.md` § Real-world testing (dev email allowlist, Stripe webhook, pilot SQL seed, `curl` examples).
+
 ---
 
 ## E2EE / API constraints

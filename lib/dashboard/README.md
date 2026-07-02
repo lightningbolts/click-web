@@ -81,6 +81,36 @@ Derives display strings from encounter embed or legacy `memory_capsule`:
 
 ---
 
+## Cross-platform parity (web dashboard vs KMP mobile)
+
+This module **is** the consumer web dashboard. Most post-connection mobile features surface here after a handshake (mobile Tri-Factor/QR) or web QR redeem.
+
+| Feature | Mobile (`click`) | Web dashboard | Notes |
+|---------|------------------|---------------|-------|
+| Connection table / inbox | `ConnectionsScreen` | `ConnectionTable` | Full parity |
+| Connection map | `MapViewModel` | `ConnectionMap` | Full parity; beacons layer |
+| Timeline / Time Capsule | Home + profile | `TimeCapsule`, `/api/profile/timeline` | Display parity |
+| E2EE chat entry | `ChatView` | `ChatView` slide-over | Byte-compatible crypto |
+| Voice/video calls | LiveKit native | `CallOverlay` + LiveKit JS | Push payload must match mobile |
+| QR identity card | `QrCodeView` | `QRIdentityCard` | Web issues token via `/api/qr` |
+| Availability intents | Home + settings | `MyAvailabilityIntentsCard` | UI parity; match alerts push to mobile |
+| Post-connection vibe | Connection sheets | `PostConnectionVibePrompt` | Same `venue-vibe` API |
+| Stats / achievements | `HomeScreen` stats | `StatsOverview`, `AchievementBadge` | Partial — see gap below |
+| Home connection insights | `HomeViewModel` + `ReconnectHelper` | **Not implemented** | P0 roadmap item |
+| 48h archive | Archive tab | Archive tab in dashboard | Full parity |
+| Global search | Unified search sheet | Dashboard search input | Full parity |
+| Collaboration / disposable rolls | Native camera UI | Chat collab after bump | Backend parity; camera UX differs |
+| Community Hubs | Primary map entry | **No dashboard nav** | APIs exist in `lib/hub/`; mobile-first |
+| Ghost mode | Full settings toggle | Client proximity pending only | Partial |
+| Deep links | `click://`, App Clip | `/c/[userId]`, `/connect/[userId]` | Web universal links |
+| B2B insights | N/A (consumer) | Separate `/insights/*` app | Not part of this module |
+
+**Gaps to close (see `lib/insights/README.md` § Roadmap):** consumer connection insights panel, Community Hubs web UI entry.
+
+Connections are **created** on mobile (Tri-Factor) or via web/mobile QR; see `lib/connections/README.md` for handshake paths.
+
+---
+
 ## Related files
 
 | Path | Role |

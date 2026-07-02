@@ -13,6 +13,21 @@ Proximity **matching algorithms** live in `lib/server/proximity/` and `supabase/
 
 ---
 
+## Cross-platform parity (connection creation)
+
+| Path | Mobile | click-web | Achievable on web? |
+|------|--------|-----------|-------------------|
+| **Tri-Factor proximity** | `ConnectionViewModel` + BLE/ultrasonic/GPS | `POST /api/connections/proximity` (async 202) | **Initiation: mobile only.** Web route exists for bind/poll; browsers lack hardware mesh. |
+| **Multi-Tap cliques (3+)** | In-room simultaneous handshakes | BFS in `matching.ts` / Edge Function | **Initiation: mobile only.** Web can persist clique results. |
+| **QR connect** | Scans via `CLICK_WEB_BASE_URL` | `GET/POST /api/qr`, `QRIdentityCard` | **Full parity** — primary web-native connect path. |
+| **Simulator mock** | `MockProximityManager` | `simulator_mock: true`, tokens `1234`/`5678` | **Dev/test only** — `bindProximityHandshake.ts`; seeds connections without hardware. |
+| **Manual encounter** | Reconnect flows | `POST /api/connections/encounter` | Parity for logging encounters with sensor JSON. |
+| **Insights opt-in** | `includeInInsightsEnabled` setting | `include_in_business_insights` on bind | Mobile setting drives B2B aggregate eligibility. |
+
+Mobile calls web for QR issuance and redemption; Tri-Factor payloads typically hit the Edge Function from the app, with Next.js `bindProximityHandshake` as an alternate path. For local insights pilot testing without devices, use `simulator_mock` (documented in `lib/insights/README.md` § Real-world testing).
+
+---
+
 ## Architecture
 
 ```

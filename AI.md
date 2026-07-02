@@ -17,6 +17,7 @@ This file is for **human developers** and **AI assistants** working in the Click
 - **Payloads and enums must match the mobile app** for any shared contract: push notification bodies, call invite metadata, Edge Function JSON shapes, and naming (`snake_case` in payloads where the app already uses it).
 - Before changing call or notification code, **locate the KMP source of truth** (e.g. comments in `DashboardView.tsx` reference `CallPushNotifier.kt` for `send-push-notification` / `incoming_call`).
 - **Do not “simplify” web-only field names** if mobile or Edge Functions expect specific keys; extend both sides together if the contract changes.
+- **Feature parity reference:** `README.md` § Cross-platform consistency, `lib/dashboard/README.md` § Cross-platform parity, `lib/connections/README.md` § Cross-platform parity. Mobile cannot be replaced for Tri-Factor initiation; web owns dashboard + B2B insights.
 
 ---
 

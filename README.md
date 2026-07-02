@@ -137,7 +137,46 @@ npm test
 
 ## Cross-platform consistency
 
-Web actions that wake mobile or mirror app contracts—especially **incoming call** push payloads—must stay aligned with the KMP app. Example: `DashboardView.tsx` documents parity with `CallPushNotifier.kt` for the `send-push-notification` Edge Function and `incoming_call` data shape. When changing call or notification flows, update **both** clients and any Edge Function schema.
+click-web is the **browser companion** to the KMP mobile app (`click/`). Mobile owns in-room discovery (Tri-Factor, sensors, native push); web owns the authenticated dashboard, B2B Click Insights, and HTTP BFF routes mobile calls over `CLICK_WEB_BASE_URL`.
+
+### Can click-web deliver mobile user-facing features?
+
+**Yes** for most post-connection experiences: connections inbox, map, timeline, E2EE chat, LiveKit calls, QR identity, availability intents, stats, and collaboration hooks (`components/DashboardView.tsx`).
+
+**No** for hardware-native flows: BLE + ultrasonic + progressive GPS orchestration, Multi-Tap initiation in a physical room, sensor capture at handshake time, CallKit/PushKit/FCM wake, App Clip, and device calendar integration. Web can **display** Memory Capsule data captured on mobile but cannot produce the same sensor readings.
+
+### Monorepo data flow
+
+```
+click (KMP) ──Tri-Factor/QR──► Supabase Edge + Postgres
+     │                              ▲
+     │ CLICK_WEB_BASE_URL           │ aggregates
+     ▼                              │
+click-web ──dashboard/chat/insights──┘
+```
+
+Mobile is the primary **data producer** for B2B insights (connections, encounters, availability intents with `include_in_business_insights`). Web is the **operator surface** for `/insights/*` and the **consumer dashboard** for browser users.
+
+### Parity summary
+
+| Category | Mobile | click-web |
+|----------|--------|-----------|
+| Tri-Factor / Multi-Tap initiation | Primary | Not achievable (hardware) |
+| QR connect | Via web HTTP APIs | Full parity |
+| Dashboard (table, map, timeline) | Yes | Full parity — `lib/dashboard/README.md` |
+| E2EE chat | `MessageCrypto` | Full parity — `lib/chat/README.md` |
+| Voice/video | LiveKit native | Web parity — `/api/livekit/token` |
+| Availability intents | Yes | Partial (UI yes; match pushes mobile-first) |
+| Memory Capsules | Capture + display | Display only |
+| Community Hubs | Mobile-first UI | API-only — `lib/hub/README.md` |
+| Home connection insights | `ReconnectHelper` | Gap (not on web dashboard) |
+| B2B Click Insights | `widget-vibe` consumer | Web-only — `lib/insights/README.md` |
+
+Detailed matrices live in colocated module READMEs: `lib/dashboard/README.md`, `lib/connections/README.md`, `lib/insights/README.md`. Mobile companion context: `click/README.md` § Monorepo note.
+
+### Contract parity rules
+
+Web actions that wake mobile or mirror app contracts—especially **incoming call** push payloads—must stay aligned with the KMP app. Example: `DashboardView.tsx` documents parity with `CallPushNotifier.kt` for the `send-push-notification` Edge Function and `incoming_call` data shape. E2EE wire format must match KMP `MessageCrypto` (`lib/chat/README.md`). When changing call, notification, or crypto flows, update **both** clients and any Edge Function schema. See `AI.md` §2 for field-name rules.
 
 ---
 
