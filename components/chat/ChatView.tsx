@@ -1840,8 +1840,7 @@ export default function ChatView({
             {isGroupClique ? 'Verified clique' : 'Connected'}
           </div>
 
-          {!isGroupClique ? (
-            <div className="relative" ref={callMenuAnchorRef}>
+          <div className="relative" ref={callMenuAnchorRef}>
               <button
                 onClick={() => {
                   setShowCallMenu((prev) => !prev);
@@ -1876,7 +1875,7 @@ export default function ChatView({
                         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
                       >
                         <Phone className="h-4 w-4" />
-                        Voice call
+                        {isGroupClique ? 'Group voice call' : 'Voice call'}
                       </button>
                       <button
                         onClick={() => {
@@ -1886,14 +1885,13 @@ export default function ChatView({
                         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
                       >
                         <Video className="h-4 w-4" />
-                        Video call
+                        {isGroupClique ? 'Group video call' : 'Video call'}
                       </button>
                     </div>
                   </>,
                   document.body,
                 )}
             </div>
-          ) : null}
 
           <div className="relative" ref={headerMenuAnchorRef}>
             <button

@@ -478,21 +478,50 @@ async function executeActiveConnectionsQuery(
   supabase: UserScopedSupabase,
   userId: string,
   excludedIds: string[],
+  cursorLastMessageAt: number | null = null,
+  limit = 50,
 ) {
+  const cappedLimit = Math.min(200, Math.max(1, limit));
   let query = supabase
     .from('connections')
     .select('*, connection_encounters(*)')
     .contains('user_ids', [userId])
     .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
     .order('created', { ascending: false })
     .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
-    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' });
+    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' })
+    .limit(cappedLimit);
+
+  if (cursorLastMessageAt != null && Number.isFinite(cursorLastMessageAt)) {
+    query = query.or(
+      `last_message_at.lt.${cursorLastMessageAt},and(last_message_at.is.null,created.lt.${cursorLastMessageAt})`,
+    );
+  }
 
   if (excludedIds.length > 0) {
     query = query.not('id', 'in', `(${excludedIds.join(',')})`);
   }
 
   return await query;
+}
+
+function parseActiveConnectionsPagination(searchParams: URLSearchParams): {
+  cursor: number | null;
+  limit: number;
+} {
+  const limitRaw = searchParams.get('limit');
+  let limit = 50;
+  if (limitRaw != null) {
+    const parsed = Number.parseInt(limitRaw, 10);
+    if (Number.isFinite(parsed)) {
+      limit = Math.min(200, Math.max(1, parsed));
+    }
+  }
+  const cursorRaw = searchParams.get('cursor')?.trim();
+  const cursor =
+    cursorRaw != null && /^\d+$/.test(cursorRaw) ? Number.parseInt(cursorRaw, 10) : null;
+  return { cursor, limit };
 }
 
 async function executeArchivedConnectionsQuery(
@@ -671,11 +700,14 @@ export async function GET(request: NextRequest) {
 
     // ─── Active channel: visible lifecycle states, excluding archived ∪ hidden junction ids ───
     const excludedIds = dedupeIds([...archivedForUser, ...hiddenForUser]);
+    const { cursor, limit } = parseActiveConnectionsPagination(searchParams);
 
     const { data: connections, error } = await executeActiveConnectionsQuery(
       supabase,
       user.id,
       excludedIds,
+      cursor,
+      limit,
     );
 
     if (error) {

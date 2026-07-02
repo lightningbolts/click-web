@@ -5,8 +5,68 @@ import { isAdminUser } from '@/lib/server/adminRole';
 
 const CONNECTIONS_RATE_LIMIT = 10;
 const CONNECTIONS_RATE_WINDOW_MS = 60_000;
+const READ_HEAVY_RATE_LIMIT = 60;
+const READ_HEAVY_RATE_WINDOW_MS = 60_000;
 
 const connectionsRequestTimestampsByIp = new Map<string, number[]>();
+const readHeavyTimestampsByIp = new Map<string, number[]>();
+
+const READ_HEAVY_API_PREFIXES = [
+  '/api/beacons',
+  '/api/map/beacons',
+  '/api/hub/nearby',
+  '/api/livekit/token',
+] as const;
+
+function isReadHeavyApiPath(pathname: string): boolean {
+  return READ_HEAVY_API_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function slidingWindowRateLimitExceeded(
+  ip: string,
+  store: Map<string, number[]>,
+  limit: number,
+  windowMs: number,
+): boolean {
+  const now = Date.now();
+  const windowStart = now - windowMs;
+  let stamps = store.get(ip) ?? [];
+  stamps = stamps.filter((t) => t > windowStart);
+  if (stamps.length >= limit) {
+    store.set(ip, stamps);
+    return true;
+  }
+  stamps.push(now);
+  store.set(ip, stamps);
+  if (store.size > 50_000) {
+    for (const [key, ts] of store) {
+      const recent = ts.filter((t) => t > windowStart);
+      if (recent.length === 0) store.delete(key);
+      else store.set(key, recent);
+    }
+  }
+  return false;
+}
+
+function connectionsRateLimitExceeded(ip: string): boolean {
+  return slidingWindowRateLimitExceeded(
+    ip,
+    connectionsRequestTimestampsByIp,
+    CONNECTIONS_RATE_LIMIT,
+    CONNECTIONS_RATE_WINDOW_MS,
+  );
+}
+
+function readHeavyRateLimitExceeded(ip: string): boolean {
+  return slidingWindowRateLimitExceeded(
+    ip,
+    readHeavyTimestampsByIp,
+    READ_HEAVY_RATE_LIMIT,
+    READ_HEAVY_RATE_WINDOW_MS,
+  );
+}
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -21,27 +81,6 @@ function getClientIp(request: NextRequest): string {
 
 function isConnectionsApiPath(pathname: string): boolean {
   return pathname === '/api/connections' || pathname.startsWith('/api/connections/');
-}
-
-function connectionsRateLimitExceeded(ip: string): boolean {
-  const now = Date.now();
-  const windowStart = now - CONNECTIONS_RATE_WINDOW_MS;
-  let stamps = connectionsRequestTimestampsByIp.get(ip) ?? [];
-  stamps = stamps.filter((t) => t > windowStart);
-  if (stamps.length >= CONNECTIONS_RATE_LIMIT) {
-    connectionsRequestTimestampsByIp.set(ip, stamps);
-    return true;
-  }
-  stamps.push(now);
-  connectionsRequestTimestampsByIp.set(ip, stamps);
-  if (connectionsRequestTimestampsByIp.size > 50_000) {
-    for (const [key, ts] of connectionsRequestTimestampsByIp) {
-      const recent = ts.filter((t) => t > windowStart);
-      if (recent.length === 0) connectionsRequestTimestampsByIp.delete(key);
-      else connectionsRequestTimestampsByIp.set(key, recent);
-    }
-  }
-  return false;
 }
 
 export async function proxy(request: NextRequest) {
@@ -69,6 +108,17 @@ export async function proxy(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname;
+  const clientIp = getClientIp(request);
+  if (
+    pathname.startsWith('/api/') &&
+    isReadHeavyApiPath(pathname) &&
+    readHeavyRateLimitExceeded(clientIp)
+  ) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
   // API routes authenticate in each Route Handler (`getSupabaseFromRouteRequest`, etc.). Running
   // `getUser()` here duplicates a network round-trip to Supabase Auth on every `/api/*` request and
   // dominated dev timing (see Next `proxy.ts` segment). Page navigations still refresh the session below.

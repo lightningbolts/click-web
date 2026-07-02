@@ -514,22 +514,78 @@ export async function bindProximityHandshake(
   const encLat = lat != null && lon != null && !(lat === 0 && lon === 0) ? lat : null;
   const encLon = lat != null && lon != null && !(lat === 0 && lon === 0) ? lon : null;
 
-  let relativeAltitudeM: number | null = null;
-  let semanticLocation: Record<string, unknown> | null = null;
-  let displayLocation = DISPLAY_LOCATION_FALLBACK;
-  let specificLocationName: string | null = null;
+  async function scheduleEncounterGeoEnrichment(
+    connectionId: string,
+    reportingUserId: string,
+    memberLat: number | null,
+    memberLon: number | null,
+    memberExactBarometricElevationM: number | null,
+    manualLocationName: string | null,
+    clientWeatherSnapshot: string | null,
+  ): Promise<void> {
+    if (memberLat == null || memberLon == null) return;
 
-  if (exactBarometricElevationM != null && encLat != null && encLon != null) {
-    const terrainM = await fetchTerrainElevationM(encLat, encLon);
-    if (terrainM != null) {
-      relativeAltitudeM = exactBarometricElevationM - terrainM;
+    const { data: latestEnc, error: encLookupErr } = await admin
+      .from('connection_encounters')
+      .select('id')
+      .eq('connection_id', connectionId)
+      .eq('reporting_user_id', reportingUserId)
+      .order('encountered_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (encLookupErr || !latestEnc?.id) {
+      if (encLookupErr) console.warn('[proximity] encounter enrichment lookup:', encLookupErr.message);
+      return;
+    }
+
+    const updates: Record<string, unknown> = {};
+    const geocoded = await fetchNominatimReverseGeocode(memberLat, memberLon);
+    updates.display_location = geocoded.displayLocation;
+    if (geocoded.semanticLocation != null) updates.semantic_location = geocoded.semanticLocation;
+    const locationName = manualLocationName ?? geocoded.specificLocationName;
+    if (locationName) updates.location_name = locationName;
+
+    if (clientWeatherSnapshot == null) {
+      const weather = await fetchOpenMeteoWeatherSnapshot(memberLat, memberLon);
+      if (weather != null) updates.weather_snapshot = weather;
+    }
+
+    if (memberExactBarometricElevationM != null) {
+      const terrainM = await fetchTerrainElevationM(memberLat, memberLon);
+      if (terrainM != null) {
+        updates.relative_altitude_m = memberExactBarometricElevationM - terrainM;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) return;
+
+    const { error } = await admin.from('connection_encounters').update(updates).eq('id', latestEnc.id);
+    if (error) {
+      console.warn('[proximity] encounter enrichment update:', error.message);
     }
   }
-  if (encLat != null && encLon != null) {
-    const geocoded = await fetchNominatimReverseGeocode(encLat, encLon);
-    semanticLocation = geocoded.semanticLocation;
-    displayLocation = geocoded.displayLocation;
-    specificLocationName = geocoded.specificLocationName;
+
+  function fireEncounterGeoEnrichment(
+    connectionId: string,
+    memberId: string,
+    memberLat: number | null,
+    memberLon: number | null,
+    memberExactBarometricElevationM: number | null,
+    manualLocationName: string | null,
+    clientWeatherSnapshot: string | null,
+  ): void {
+    void scheduleEncounterGeoEnrichment(
+      connectionId,
+      memberId,
+      memberLat,
+      memberLon,
+      memberExactBarometricElevationM,
+      manualLocationName,
+      clientWeatherSnapshot,
+    ).catch((error) => {
+      console.warn('[proximity] encounter enrichment failed:', error);
+    });
   }
 
   async function ensureConnectionForMemberSet(
@@ -675,28 +731,9 @@ export async function bindProximityHandshake(
     );
 
     let memberRelativeAltitudeM: number | null = null;
-    let memberSemanticLocation: Record<string, unknown> | null = null;
-    let memberDisplayLocation = DISPLAY_LOCATION_FALLBACK;
-    let memberSpecificLocationName: string | null = null;
-
-    if (values.exactBarometricElevationM != null && values.lat != null && values.lon != null) {
-      const terrainM = await fetchTerrainElevationM(values.lat, values.lon);
-      if (terrainM != null) {
-        memberRelativeAltitudeM = values.exactBarometricElevationM - terrainM;
-      }
-    }
-
-    if (memberId === uid) {
-      memberRelativeAltitudeM = relativeAltitudeM;
-      memberSemanticLocation = semanticLocation;
-      memberDisplayLocation = displayLocation;
-      memberSpecificLocationName = specificLocationName;
-    } else if (values.lat != null && values.lon != null) {
-      const geocoded = await fetchNominatimReverseGeocode(values.lat, values.lon);
-      memberSemanticLocation = geocoded.semanticLocation;
-      memberDisplayLocation = geocoded.displayLocation;
-      memberSpecificLocationName = geocoded.specificLocationName;
-    }
+    const memberDisplayLocation = DISPLAY_LOCATION_FALLBACK;
+    const memberSpecificLocationName: string | null = null;
+    const memberSemanticLocation: Record<string, unknown> | null = null;
 
     const row: Record<string, unknown> = {
       connection_id: connectionId,
@@ -722,11 +759,7 @@ export async function bindProximityHandshake(
     if (values.azimuth != null) row.compass_azimuth = values.azimuth;
     if (values.battery != null) row.battery_level = values.battery;
 
-    let resolvedWeather = values.weatherSnapshot;
-    if (resolvedWeather == null && values.lat != null && values.lon != null) {
-      resolvedWeather = await fetchOpenMeteoWeatherSnapshot(values.lat, values.lon);
-    }
-    if (resolvedWeather != null) row.weather_snapshot = resolvedWeather;
+    if (values.weatherSnapshot != null) row.weather_snapshot = values.weatherSnapshot;
 
     const templateRow = { ...row };
     delete templateRow.connection_id;
@@ -865,6 +898,18 @@ export async function bindProximityHandshake(
         memberLon,
         memberId,
       );
+      if (memberOutcome === 'inserted' || memberOutcome === 'debounced') {
+        const values = memberSensorValues(memberId);
+        fireEncounterGeoEnrichment(
+          connectionId,
+          memberId,
+          memberLat,
+          memberLon,
+          values.exactBarometricElevationM,
+          values.manualLocationName,
+          values.weatherSnapshot,
+        );
+      }
       if (memberId === uid) {
         outcome = memberOutcome;
       }
@@ -895,6 +940,16 @@ export async function bindProximityHandshake(
               pairMemberLat,
               pairMemberLon,
               pairMemberId,
+            );
+            const pairValues = memberSensorValues(pairMemberId);
+            fireEncounterGeoEnrichment(
+              pairEnsured.connectionId,
+              pairMemberId,
+              pairMemberLat,
+              pairMemberLon,
+              pairValues.exactBarometricElevationM,
+              pairValues.manualLocationName,
+              pairValues.weatherSnapshot,
             );
           }
         }

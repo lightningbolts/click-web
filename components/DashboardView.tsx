@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { coerceMessageType, insertCallLogMessage } from '@/lib/chat/messages';
+import { fetchInboxPreviews } from '@/lib/chat/inboxPreviews';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Room, RoomEvent, Track } from 'livekit-client';
@@ -670,6 +671,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
           room_name: invite.roomName,
           participant_name:
             displayNameFromUserMetadata(user.user_metadata) || user.email?.split('@')[0] || 'Click User',
+          ...(invite.roomName.startsWith(`click-group-${invite.connectionId}-`)
+            ? { group_id: invite.connectionId }
+            : {}),
         }),
       });
 
@@ -761,7 +765,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [endWithReason, getAuthHeaders, sendSignal, user]);
 
   const startOutgoingCall = useCallback(async (connection: ConnectionRecord, videoEnabled: boolean) => {
-    if (!user?.id || !connection.otherUserId) {
+    if (!user?.id) {
       endWithReason(null, 'Unable to start a call for this connection');
       return;
     }
@@ -770,19 +774,34 @@ export default function DashboardView({ user }: DashboardViewProps) {
       return;
     }
 
+    const isGroupClique = connection.chatKind === 'group_clique';
+    const calleeIds = isGroupClique
+      ? (connection.userIds ?? []).filter((id) => id !== user.id)
+      : connection.otherUserId
+        ? [connection.otherUserId]
+        : [];
+
+    if (calleeIds.length === 0) {
+      endWithReason(null, 'Unable to start a call for this connection');
+      return;
+    }
+
     callConnectedAtRef.current = null;
     completedCallLoggedRef.current = false;
 
     const now = Date.now();
+    const roomName = isGroupClique
+      ? `click-group-${connection.id}-${now}`
+      : `click-${connection.id}-${now}`;
     const invite: WebCallInvite = {
       callId: `call-${now}-${Math.floor(Math.random() * 9000 + 1000)}`,
       connectionId: connection.id,
-      roomName: `click-${connection.id}-${now}`,
+      roomName,
       callerId: user.id,
       callerName:
         displayNameFromUserMetadata(user.user_metadata) || user.email?.split('@')[0] || 'Click User',
-      calleeId: connection.otherUserId,
-      calleeName: connection.name,
+      calleeId: calleeIds[0]!,
+      calleeName: isGroupClique ? 'Group call' : connection.name,
       videoEnabled,
       createdAt: now,
     };
@@ -791,9 +810,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setCallOverlayState({ mode: 'outgoing', invite });
     setActiveCallState({ ...IDLE_ACTIVE_CALL, invite });
     playRingtone('outgoing');
-    invokeIncomingCallPush(invite);
-    const delivered = await sendSignal(connection.otherUserId, 'invite', invite);
-    if (!delivered) {
+
+    let anyDelivered = false;
+    for (const calleeId of calleeIds) {
+      const memberInvite = { ...invite, calleeId, calleeName: isGroupClique ? 'Group call' : connection.name };
+      invokeIncomingCallPush(memberInvite);
+      const delivered = await sendSignal(calleeId, 'invite', memberInvite);
+      anyDelivered = anyDelivered || delivered;
+    }
+    if (!anyDelivered) {
       stopRingtone();
       endWithReason(invite, 'Unable to reach this connection right now');
       return;
@@ -801,12 +826,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     clearCallTimeout();
     callTimeoutRef.current = setTimeout(() => {
-      void sendSignal(connection.otherUserId!, 'cancel', {
-        callId: invite.callId,
-        connectionId: invite.connectionId,
-        senderId: invite.callerId,
-        reason: 'missed',
-      });
+      for (const calleeId of calleeIds) {
+        void sendSignal(calleeId, 'cancel', {
+          callId: invite.callId,
+          connectionId: invite.connectionId,
+          senderId: invite.callerId,
+          reason: 'missed',
+        });
+      }
       void insertMissedCallLog(invite);
       endWithReason(invite, 'No answer');
     }, 30_000);
@@ -1018,7 +1045,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [activeCallState.status, callOverlayState.mode, clearCallTimeout, connectionRecords, disconnectRoom, endWithReason, insertDeclinedCallLog, joinCall, playRingtone, sendSignal, showBrowserNotification, stopRingtone, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || (connectionRecords.length === 0 && groupCliqueRecords.length === 0)) {
+    if (!user?.id || connectionRecords.length === 0) {
       chatConnectionMapRef.current = new Map();
       return;
     }
@@ -1027,7 +1054,93 @@ export default function DashboardView({ user }: DashboardViewProps) {
     if (!supabase) return;
 
     let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const refreshInboxPreviews = async () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+      const connectionIds = connectionRecords
+        .filter(
+          (connection) =>
+            isActiveChatListStatus(connection.status) || connection.status === 'archived',
+        )
+        .map((connection) => connection.id);
+      if (connectionIds.length === 0) return;
+
+      try {
+        const previews = await fetchInboxPreviews(supabase);
+        if (cancelled) return;
+
+        const connectionIdSet = new Set(connectionIds);
+        const latestMessages = await Promise.all(
+          previews
+            .filter((row) => row.connection_id != null && connectionIdSet.has(row.connection_id))
+            .map(async (row) => {
+              const connectionId = row.connection_id as string;
+              if (!row.last_message_id) {
+                return {
+                  connectionId,
+                  preview: null as string | null,
+                  lastMessageAt: null as number | null,
+                  chatUpdatedAt: row.last_message_time_created,
+                };
+              }
+
+              let raw: string = typeof row.last_message_content === 'string' ? row.last_message_content : '';
+              const wasEncrypted = raw.length > 0 && isEncrypted(raw);
+              let decryptFailed = false;
+              if (wasEncrypted) {
+                try {
+                  const conn = connectionMapRef.current.get(connectionId);
+                  if (conn?.userIds && conn.userIds.length >= 2) {
+                    const keys = await deriveKeysForConnection(conn.id, conn.userIds);
+                    raw = await decryptContent(raw, keys);
+                  } else {
+                    decryptFailed = true;
+                    raw = '';
+                  }
+                } catch {
+                  decryptFailed = true;
+                  raw = '';
+                }
+              }
+
+              const messageType = coerceMessageType(row.last_message_type);
+              const preview =
+                decryptFailed && messageType === 'text'
+                  ? 'Tap to view message'
+                  : previewLabelForMessage({
+                      message_type: messageType,
+                      content: raw,
+                    });
+
+              return {
+                connectionId,
+                preview,
+                lastMessageAt:
+                  typeof row.last_message_time_created === 'number' ? row.last_message_time_created : null,
+                chatUpdatedAt:
+                  typeof row.last_message_time_created === 'number' ? row.last_message_time_created : null,
+              };
+            }),
+        );
+
+        setChatMetadataByConnectionId((prev) => {
+          const next = { ...prev };
+          for (const entry of latestMessages) {
+            next[entry.connectionId] = {
+              preview: entry.preview,
+              lastMessageAt: entry.lastMessageAt,
+              chatUpdatedAt: entry.chatUpdatedAt,
+            };
+          }
+          return next;
+        });
+      } catch (error) {
+        console.error('Inbox preview poll error:', error);
+      }
+    };
 
     const primeChatMap = async () => {
       const connectionIds = connectionRecords.map((connection) => connection.id);
@@ -1038,175 +1151,42 @@ export default function DashboardView({ user }: DashboardViewProps) {
           .in('connection_id', connectionIds);
 
         if (error) {
-          console.error('Error priming chat notification map:', error.message || error);
+          console.error('Error priming chat map:', error.message || error);
         } else if (!cancelled) {
           chatConnectionMapRef.current = new Map(
-            (data ?? []).map((chat: any) => [String(chat.id), String(chat.connection_id)]),
+            (data ?? []).map((chat: { id: string; connection_id: string }) => [
+              String(chat.id),
+              String(chat.connection_id),
+            ]),
           );
         }
       }
 
-      channel = supabase
-        .channel(`dashboard:messages:${user.id}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
-          void (async () => {
-            const message = payload.new as {
-              chat_id: string;
-              user_id: string;
-              content: string;
-              time_created: number;
-              message_type?: string;
-            };
-            if (!message || message.user_id === user.id) return;
-
-            const groupConn = groupRecordByChatIdRef.current.get(message.chat_id);
-            if (groupConn) {
-              let raw = typeof message.content === 'string' ? message.content : '';
-              let decryptFailed = false;
-              if (raw.length > 0 && isGroupMessageEncrypted(raw)) {
-                try {
-                  const master = await unwrapGroupMasterKeyBytes(supabase, {
-                    groupId: groupConn.id,
-                    viewerUserId: user.id,
-                  });
-                  if (master) {
-                    raw = await decryptGroupMessageContent(raw, master);
-                  } else {
-                    decryptFailed = true;
-                    raw = '';
-                  }
-                } catch {
-                  decryptFailed = true;
-                  raw = '';
-                }
-              }
-              const mt = coerceMessageType(message.message_type);
-              const listPreview =
-                decryptFailed && mt === 'text'
-                  ? 'Tap to view message'
-                  : previewLabelForMessage({
-                      message_type: mt,
-                      content: raw,
-                    });
-              setChatMetadataByConnectionId((current) => ({
-                ...current,
-                [groupConn.id]: {
-                  preview: listPreview,
-                  lastMessageAt: message.time_created,
-                  chatUpdatedAt: message.time_created,
-                },
-              }));
-              const isActiveVisibleChat =
-                activeTabRef.current === 'chat' &&
-                selectedConnectionRef.current?.id === groupConn.id &&
-                typeof document !== 'undefined' &&
-                document.visibilityState === 'visible';
-              if (!notificationPreferencesRef.current.messagePushEnabled || isActiveVisibleChat) {
-                return;
-              }
-              const preview =
-                listPreview.length > 140 ? `${listPreview.slice(0, 137)}...` : listPreview;
-              showBrowserNotification(
-                groupConn.name,
-                preview,
-                () => {
-                  setSelectedConnection(groupConn);
-                  setActiveTab('chat');
-                },
-              );
-              return;
-            }
-
-            let connectionId = chatConnectionMapRef.current.get(message.chat_id);
-            if (!connectionId) {
-              const { data: chatRow, error: chatError } = await supabase
-                .from('chats')
-                .select('connection_id')
-                .eq('id', message.chat_id)
-                .maybeSingle();
-
-              if (chatError || !chatRow?.connection_id) {
-                return;
-              }
-
-              connectionId = String(chatRow.connection_id);
-              chatConnectionMapRef.current.set(message.chat_id, connectionId);
-            }
-
-            const connection = connectionMapRef.current.get(connectionId);
-            if (!connection) return;
-
-            let decryptedPreview = typeof message.content === 'string' ? message.content : '';
-            const wasEncrypted = decryptedPreview.length > 0 && isEncrypted(decryptedPreview);
-            let decryptFailed = false;
-            if (wasEncrypted) {
-              try {
-                if (connection.userIds && connection.userIds.length >= 2) {
-                  const keys = await deriveKeysForConnection(connection.id, connection.userIds);
-                  decryptedPreview = await decryptContent(decryptedPreview, keys);
-                } else {
-                  decryptFailed = true;
-                  decryptedPreview = '';
-                }
-              } catch {
-                decryptFailed = true;
-                decryptedPreview = '';
-              }
-            }
-
-            const mt = coerceMessageType(message.message_type);
-            const listPreview =
-              decryptFailed && mt === 'text'
-                ? 'Tap to view message'
-                : previewLabelForMessage({
-                    message_type: mt,
-                    content: decryptedPreview,
-                  });
-
-            setChatMetadataByConnectionId((current) => ({
-              ...current,
-              [connection.id]: {
-                preview: listPreview,
-                lastMessageAt: message.time_created,
-                chatUpdatedAt: message.time_created,
-              },
-            }));
-
-            const isActiveVisibleChat =
-              activeTabRef.current === 'chat' &&
-              selectedConnectionRef.current?.id === connection.id &&
-              typeof document !== 'undefined' &&
-              document.visibilityState === 'visible';
-
-            if (!notificationPreferencesRef.current.messagePushEnabled || isActiveVisibleChat) {
-              return;
-            }
-
-            const preview =
-              listPreview.length > 140 ? `${listPreview.slice(0, 137)}...` : listPreview;
-
-            showBrowserNotification(
-              connection.name,
-              preview,
-              () => {
-                setSelectedConnection(connection);
-                setActiveTab('chat');
-              },
-            );
-          })();
-        })
-        .subscribe();
+      await refreshInboxPreviews();
     };
 
     void primeChatMap();
+    intervalId = setInterval(() => {
+      void refreshInboxPreviews();
+    }, 30_000);
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void refreshInboxPreviews();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
 
     return () => {
       cancelled = true;
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (intervalId) clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
       }
     };
-  }, [connectionRecords, groupCliqueRecords, showBrowserNotification, user?.id]);
+  }, [connectionRecords, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -1314,89 +1294,64 @@ export default function DashboardView({ user }: DashboardViewProps) {
       }
 
       try {
-        const { data: chats, error: chatError } = await supabase
-          .from('chats')
-          .select('id, connection_id, updated_at')
-          .in('connection_id', connectionIds);
+        const previews = await fetchInboxPreviews(supabase);
+        if (cancelled) return;
 
-        if (chatError) {
-          console.error('Error fetching chats for dashboard list:', chatError.message || chatError);
-          return;
-        }
-
-        if (!chats || chats.length === 0) {
-          return;
-        }
-
+        const connectionIdSet = new Set(connectionIds);
         const latestMessages = await Promise.all(
-          chats.map(async (chat: any) => {
-            const { data: message, error: messageError } = await supabase
-              .from('messages')
-              .select('content, time_created, message_type')
-              .eq('chat_id', chat.id)
-              .order('time_created', { ascending: false })
-              .limit(1)
-              .maybeSingle();
+          previews
+            .filter((row) => row.connection_id != null && connectionIdSet.has(row.connection_id))
+            .map(async (row) => {
+              const connectionId = row.connection_id as string;
+              if (!row.last_message_id) {
+                return {
+                  connectionId,
+                  preview: null as string | null,
+                  lastMessageAt: null as number | null,
+                  chatUpdatedAt: row.last_message_time_created,
+                };
+              }
 
-            if (messageError) {
-              console.error(`Error fetching latest message for chat ${chat.id}:`, messageError.message || messageError);
-              return {
-                connectionId: chat.connection_id as string,
-                preview: null,
-                lastMessageAt: null,
-                chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
-              };
-            }
-
-            if (!message) {
-              return {
-                connectionId: chat.connection_id as string,
-                preview: null,
-                lastMessageAt: null,
-                chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
-              };
-            }
-
-            let raw: string = typeof message.content === 'string' ? message.content : '';
-            const wasEncrypted = raw.length > 0 && isEncrypted(raw);
-            let decryptFailed = false;
-            if (wasEncrypted) {
-              try {
-                const conn = connectionMapRef.current.get(chat.connection_id as string);
-                if (conn?.userIds && conn.userIds.length >= 2) {
-                  const keys = await deriveKeysForConnection(conn.id, conn.userIds);
-                  raw = await decryptContent(raw, keys);
-                } else {
+              let raw: string = typeof row.last_message_content === 'string' ? row.last_message_content : '';
+              const wasEncrypted = raw.length > 0 && isEncrypted(raw);
+              let decryptFailed = false;
+              if (wasEncrypted) {
+                try {
+                  const conn = connectionMapRef.current.get(connectionId);
+                  if (conn?.userIds && conn.userIds.length >= 2) {
+                    const keys = await deriveKeysForConnection(conn.id, conn.userIds);
+                    raw = await decryptContent(raw, keys);
+                  } else {
+                    decryptFailed = true;
+                    raw = '';
+                  }
+                } catch {
                   decryptFailed = true;
                   raw = '';
                 }
-              } catch {
-                decryptFailed = true;
-                raw = '';
               }
-            }
 
-            const messageType = coerceMessageType(message.message_type);
-            let preview: string | null;
-            if (decryptFailed && messageType === 'text') {
-              preview = 'Tap to view message';
-            } else {
-              preview = previewLabelForMessage({
-                message_type: messageType,
-                content: raw,
-              });
-            }
+              const messageType = coerceMessageType(row.last_message_type);
+              let preview: string | null;
+              if (decryptFailed && messageType === 'text') {
+                preview = 'Tap to view message';
+              } else {
+                preview = previewLabelForMessage({
+                  message_type: messageType,
+                  content: raw,
+                });
+              }
 
-            return {
-              connectionId: chat.connection_id as string,
-              preview,
-              lastMessageAt: typeof message.time_created === 'number' ? message.time_created : null,
-              chatUpdatedAt: typeof chat.updated_at === 'number' ? chat.updated_at : null,
-            };
-          })
+              return {
+                connectionId,
+                preview,
+                lastMessageAt:
+                  typeof row.last_message_time_created === 'number' ? row.last_message_time_created : null,
+                chatUpdatedAt:
+                  typeof row.last_message_time_created === 'number' ? row.last_message_time_created : null,
+              };
+            }),
         );
-
-        if (cancelled) return;
 
         setChatMetadataByConnectionId((prev) => {
           const next = { ...prev };

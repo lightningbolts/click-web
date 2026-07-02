@@ -1,0 +1,38 @@
+# Click web Supabase project (link with `supabase link --project-ref <ref>`).
+# Migrations in ./migrations are applied in timestamp order via `supabase db push`.
+
+[project]
+# Set by `supabase link` in .supabase/ or SUPABASE_PROJECT_ID env at apply time.
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+
+[storage]
+enabled = true
