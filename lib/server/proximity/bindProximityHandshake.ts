@@ -465,7 +465,7 @@ export async function bindProximityHandshake(
     };
   }
 
-  if (memberIds.length > 2) {
+  if (memberIds.length >= 2) {
     const recentConnection = await lookupConnectionForMemberSet(memberIds, recentLockCutoffIso);
     if (recentConnection?.id) {
       const { data: recentUsers, error: recentUsersErr } = await admin
@@ -476,6 +476,7 @@ export async function bindProximityHandshake(
         console.error('[proximity] users:', recentUsersErr);
         return { kind: 'error', status: 500, body: { error: 'Failed to load user profiles' } };
       }
+      const isGroup = memberIds.length > 2;
       const matches: ProximityMatchUserProfile[] = (recentUsers ?? []).map((u: Record<string, unknown>) => ({
         id: String(u.id),
         name: (u.name as string | null | undefined) ?? null,
@@ -504,8 +505,8 @@ export async function bindProximityHandshake(
           matches,
           connection_id: String(recentConnection.id),
           is_new_connection: false,
-          is_group: true,
-          group_clique_candidate: { member_user_ids: memberIds },
+          is_group: isGroup,
+          ...(isGroup ? { group_clique_candidate: { member_user_ids: memberIds } } : {}),
         },
       };
     }
@@ -590,10 +591,22 @@ export async function bindProximityHandshake(
 
   async function ensureConnectionForMemberSet(
     memberUserIds: string[],
+    options?: { forceActive?: boolean },
   ): Promise<{ connectionId: string; isNewConnection: boolean; isGroup: boolean } | null> {
     const members = [...new Set(memberUserIds)].sort();
+    const forceActive = options?.forceActive === true || members.length > 2;
     const existing = await lookupConnectionForMemberSet(members);
     if (existing?.id) {
+      if (forceActive) {
+        const { error: promoteErr } = await admin
+          .from('connections')
+          .update({ status: 'active', expiry_state: 'active' })
+          .eq('id', existing.id)
+          .eq('status', 'pending');
+        if (promoteErr) {
+          console.warn('[proximity] ensureConnection promote active:', promoteErr.message);
+        }
+      }
       return { connectionId: String(existing.id), isNewConnection: false, isGroup: members.length > 2 };
     }
     const nowMs = Date.now();
@@ -606,8 +619,8 @@ export async function bindProximityHandshake(
       expiry: expiryMs,
       should_continue: members.map(() => false),
       has_begun: false,
-      expiry_state: members.length > 2 ? 'active' : 'pending',
-      status: members.length > 2 ? 'active' : 'pending',
+      expiry_state: forceActive ? 'active' : 'pending',
+      status: forceActive ? 'active' : 'pending',
       include_in_business_insights: true,
       initiator_id: uid,
       responder_id: uid,
@@ -628,6 +641,13 @@ export async function bindProximityHandshake(
       if (isDuplicateKeyError(connInsErr)) {
         const retry = await lookupConnectionForMemberSet(members);
         if (retry?.id) {
+          if (forceActive) {
+            await admin
+              .from('connections')
+              .update({ status: 'active', expiry_state: 'active' })
+              .eq('id', retry.id)
+              .eq('status', 'pending');
+          }
           return { connectionId: String(retry.id), isNewConnection: false, isGroup: members.length > 2 };
         }
       }
@@ -869,17 +889,19 @@ export async function bindProximityHandshake(
 
   const ensured = await ensureConnectionForMemberSet(memberIds);
   if (!ensured) {
-    ids.forEach((peerId) => {
-      peerEncounterLogged.push({
-        peerId,
-        connectionId: null,
-        encounterLogged: false,
-        isNewConnection: false,
-        encounterPersistedOnBind: false,
-        reason: 'connection_unavailable',
-      });
-    });
-  } else {
+    // Leave pending_handshakes unmatched so GET recovery can retry instead of 404.
+    return {
+      kind: 'error',
+      status: 503,
+      body: {
+        error: 'connection_unavailable',
+        pending_handshake_id: insertedRow.id,
+        expires_at: insertedRow.expires_at,
+      },
+    };
+  }
+
+  {
     const { connectionId, isNewConnection } = ensured;
     aggregateConnectionId = connectionId;
     handshakeCreatedNewConnection = isNewConnection;
@@ -919,10 +941,18 @@ export async function bindProximityHandshake(
       for (let i = 0; i < memberIds.length; i += 1) {
         for (let j = i + 1; j < memberIds.length; j += 1) {
           const pair = [memberIds[i]!, memberIds[j]!].sort();
-          const pairEnsured = await ensureConnectionForMemberSet(pair);
+          const pairEnsured = await ensureConnectionForMemberSet(pair, { forceActive: true });
           if (!pairEnsured) {
             console.warn('[proximity] pairwise clique connection unavailable:', pair.join(','));
-            continue;
+            return {
+              kind: 'error',
+              status: 503,
+              body: {
+                error: 'pairwise_connection_unavailable',
+                pending_handshake_id: insertedRow.id,
+                pair,
+              },
+            };
           }
           if (pair.includes(uid)) {
             const peerId = pair.find((id) => id !== uid);
