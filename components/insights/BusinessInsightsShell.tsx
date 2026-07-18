@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Radio,
   Radar,
+  CalendarDays,
   ChevronLeft,
   LogOut,
   Sparkles,
@@ -56,6 +57,12 @@ const navItems = [
     href: "/insights/live-metrics",
     label: "Live Metrics",
     icon: Radio,
+    exact: false,
+  },
+  {
+    href: "/insights/event-engagement",
+    label: "Event engagement",
+    icon: CalendarDays,
     exact: false,
   },
 ];

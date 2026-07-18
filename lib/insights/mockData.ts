@@ -469,3 +469,36 @@ export const mockAdvancedMetrics: AdvancedMetricsApiResponse = {
     wri: 58,
   },
 };
+
+/** Demo aggregates for /insights/event-engagement. */
+export const mockEventEngagement = {
+  venue_id: "demo",
+  funnel: {
+    impressions: 420,
+    unique_viewers: 180,
+    bookmarks: 96,
+    rsvps: 74,
+    check_ins: 51,
+    check_outs: 38,
+    interest_rate: 96 / 420,
+    rsvp_conversion: 74 / 420,
+    rsvp_to_check_in: 51 / 74,
+  },
+  arrival_histogram: [
+    { bucket: "early", count: 8 },
+    { bucket: "0_30", count: 22 },
+    { bucket: "30_60", count: 12 },
+    { bucket: "60_plus", count: 6 },
+    { bucket: "unknown", count: 3 },
+  ],
+  reject_reasons: [
+    { reason: "out_of_bounds", count: 14 },
+    { reason: "not_live", count: 9 },
+    { reason: "no_location", count: 5 },
+  ],
+  dwell: {
+    sample_size: 38,
+    p50_minutes: 42,
+    p90_minutes: 95,
+  },
+};

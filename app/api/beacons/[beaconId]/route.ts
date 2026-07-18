@@ -3,6 +3,7 @@ import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconType } from "@/lib/map/mapBeacons";
 import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
+import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -202,7 +203,8 @@ export async function PATCH(
           nextMeta.description = desc;
         }
       }
-      patch.metadata = nextMeta;
+      patch.metadata =
+        beaconType === "event" ? applyVenueScaleToMetadata(nextMeta) : nextMeta;
     }
 
     if (typeof body.expires_at === "string") {

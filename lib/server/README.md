@@ -51,6 +51,10 @@ Connection status normalization uses `lib/dashboard/connectionStatus.ts` (`isAct
 
 `assertHubGeofenceFromCoords(admin, hubId, lat, lng)` — haversine vs `hub_venues.radius_meters`, expired hub → 410.
 
+`assertEventCheckInGeofence(admin, beacon, lat, lng)` (`eventCheckInGeofence.ts`) — haversine vs event metadata `check_in_radius_meters` / `venue_scale` (intimate 75 · neighborhood 250 · venue 750 · campus 2500; clamp 25–5000). Missing/(0,0) → 400; outside → 403.
+
+Engagement helpers: `lib/server/eventEngagement.ts` (venue scale, live window + 15m early grace, append-only `event_engagement_events` inserts).
+
 ### `adminRole`
 
 `isAdminUser(user)` — reads `user.app_metadata.admin_role` (set via migration `20260612091000_admin_role_app_metadata.sql`).
@@ -85,6 +89,8 @@ Used by middleware and insights API routes.
 |------|------|
 | `lib/server/supabaseAuth.ts` | `getAuthenticatedSupabase` helper |
 | `lib/server/connectionWriteAuth.ts` | Connection participant checks |
+| `lib/server/eventEngagement.ts` | Venue scale, live window, engagement telemetry |
+| `lib/server/eventCheckInGeofence.ts` | Event check-in haversine fence |
 | `lib/server/admin/supabaseAdmin.ts` | Admin dashboard data |
 | `lib/server/insightsVenueAugmentation.ts` | Venue API enrichment |
 | `lib/server/terrainElevation.ts` | Open-Elevation for encounters |

@@ -19,6 +19,7 @@ Haversine implementations (equivalent Earth radius **6,371,000 m**):
 |----------|----------|-----------|
 | `lib/server/proximity/matching.ts` | `haversineMeters` | ≤ **15 m** proximity match |
 | `lib/server/hubGatekeeper.ts` | `haversineMeters` | ≤ `hub_venues.radius_meters` (default **50 m**) |
+| `lib/server/eventCheckInGeofence.ts` | `haversineMeters` | ≤ event `check_in_radius_meters` / `venue_scale` (75–2500 m presets) |
 | `lib/server/proximity/bindProximityHandshake.ts` | debounce check | ≤ **50 m** extended hangout |
 | `components/dashboard/ConnectionMap.tsx` | inline haversine | ≤ **10 ft** marker grouping |
 | `lib/enrichment/academicCalendar.ts` | `haversineKm` | Campus zone checks |
@@ -47,6 +48,12 @@ Used by dashboard connection cards and profile surfaces.
 2. Reject expired hubs (410)
 3. Return `OUT_OF_BOUNDS` + `distance_meters` when user outside radius
 
+**Event check-in geofence** (`assertEventCheckInGeofence`):
+
+1. Require finite lat/lon (reject `(0,0)`)
+2. Resolve radius from `metadata.check_in_radius_meters` or `venue_scale`
+3. Haversine vs beacon pin; outside → 403 with distance + radius
+
 **QR proximity** — enforced in `redeem_qr_token` RPC (scanner vs initiator coordinates), not in this folder.
 
 **Map** — no hard geofence; beacons filtered by PostGIS radius in `fetch_map_beacons_within` RPC.
@@ -72,6 +79,8 @@ Shared pattern (see `lib/insights/connectionEncounterClustering.ts` `isValidGpsC
 | Path | Role |
 |------|------|
 | `lib/server/hubGatekeeper.ts` | Hub geofence |
+| `lib/server/eventCheckInGeofence.ts` | Event check-in geofence |
+| `lib/server/eventEngagement.ts` | Venue scale + engagement telemetry helpers |
 | `lib/server/proximity/matching.ts` | Proximity haversine |
 | `lib/server/terrainElevation.ts` | Elevation at lat/lng |
 | `lib/map/mapBeacons.ts` | Beacon lat/lng parse |
@@ -113,4 +122,5 @@ Shared pattern (see `lib/insights/connectionEncounterClustering.ts` `isValidGpsC
 - **Web dashboard** — Map + formatted addresses.
 - **Business insights** — Aggregated hexbins, not precise user GPS.
 - **Event reminders** — Event beacon location on map.
+- **Event check-in** — Venue-scale geofence (`eventCheckInGeofence.ts`); location denied → no check-in.
 - **Achievements & stats** — Places visited counts.

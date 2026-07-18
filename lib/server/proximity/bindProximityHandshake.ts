@@ -56,7 +56,16 @@ type BindResult =
   | { kind: 'ok'; status: 200; body: ProximityBindOkResponse }
   | { kind: 'pending'; status: 202; body: ProximityBindPendingResponse }
   | { kind: 'ignored'; status: 200; body: ProximityBindIgnoredResponse }
-  | { kind: 'error'; status: number; body: { error: string } };
+  | {
+      kind: 'error';
+      status: number;
+      body: {
+        error: string;
+        pending_handshake_id?: string;
+        expires_at?: string;
+        pair?: string[];
+      };
+    };
 
 type EncounterMutationOutcome =
   | 'inserted'

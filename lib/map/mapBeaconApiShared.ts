@@ -107,7 +107,7 @@ export function filterBeaconRecords(
   return rows.filter((b) => allowed.has(b.beacon_type));
 }
 
-function parseLatLngFromLocationField(loc: unknown, fallbackLng: number, fallbackLat: number): { lat: number; lng: number } {
+export function parseLatLngFromLocationField(loc: unknown, fallbackLng: number, fallbackLat: number): { lat: number; lng: number } {
   if (typeof loc === "string") {
     const wktMatch = /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i.exec(loc);
     if (wktMatch != null) {

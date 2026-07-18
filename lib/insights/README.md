@@ -27,7 +27,9 @@ proxy.ts → userMayAccessBusinessInsights
     │
     ├─ /insights/heatmap          → connectionEncounterClustering
     ├─ /insights/vibe-stream      → Vibe Radar live
+    ├─ /insights/event-engagement → funnel / arrival / rejects / dwell
     ├─ app/api/insights/[venueId] → venue metrics + augmentation
+    ├─ app/api/insights/[venueId]/event-engagement → aggregates from event_engagement_events
     ├─ app/api/insights/widget-vibe → widgetVibePayload
     └─ app/api/webhooks/stripe    → subscription_status on venues
 ```
@@ -98,10 +100,13 @@ Advanced RPCs (types in `advancedMetrics.ts`):
 | `lib/server/stripe.ts`, `stripeVenueStatus.ts` | Stripe helpers |
 | `app/api/insights/[venueId]/route.ts` | Venue dashboard data |
 | `app/api/insights/[venueId]/advanced-metrics/route.ts` | ROI RPCs |
+| `app/api/insights/[venueId]/event-engagement/route.ts` | Event funnel / arrival / rejects |
 | `app/api/insights/intents/route.ts` | Intent analytics |
+| `lib/server/eventEngagement.ts` | Telemetry insert + venue scale helpers |
 | `components/insights/VibeRadarMap.tsx` | Hexbin map UI |
-| `components/insights/BusinessInsightsShell.tsx` | Shell layout |
+| `components/insights/BusinessInsightsShell.tsx` | Shell layout (includes Event engagement nav) |
 | `app/insights/heatmap/page.tsx` | Heatmap page |
+| `app/insights/event-engagement/page.tsx` | Event engagement charts |
 
 ---
 
@@ -135,9 +140,40 @@ Advanced RPCs (types in `advancedMetrics.ts`):
 - **Push notifications** — Consumer.
 - **Deep links & App Clip** — Consumer.
 - **Web dashboard** — Consumer connections UI.
-- **Business insights** — **Primary module**: heatmaps, vibe stream, tribes, live metrics, Stripe-gated.
+- **Business insights** — **Primary module**: heatmaps, vibe stream, tribes, live metrics, **event engagement**, Stripe-gated.
 - **Event reminders** — Event beacon analytics.
-- **Achievements & stats** — Consumer achievements; B2B uses ROI metrics instead.
+- **Event engagement telemetry** — `event_engagement_events` + `/api/insights/[venueId]/event-engagement` + `/insights/event-engagement` charts (website only).
+
+---
+
+## Event engagement (bookmarks, RSVP, check-ins, impressions)
+
+Raw capture (service-role inserts into `event_engagement_events` via `lib/server/eventEngagement.ts`). Current-state tables: `event_bookmarks`, `event_check_ins`. Migration: `supabase/migrations/20260718140000_event_engagement.sql`.
+
+| `event_type` | Meaning |
+|--------------|---------|
+| `event_view` | Impression (detail open; 2s debounce) |
+| `bookmark_set` / `bookmark_unset` | Saved interest |
+| `rsvp_set` / `rsvp_unset` | Attendance intent |
+| `check_in` / `check_out` | On-site presence |
+| `check_in_rejected` | Friction (`no_location`, `out_of_bounds`, `not_live`, …) |
+| `share` | Optional / future |
+
+### KPI catalog (operator charts)
+
+| KPI | Derivation |
+|-----|------------|
+| Impressions / unique viewers | Count / distinct `user_id` on `event_view` |
+| Interest rate | `bookmark_set` ÷ impressions |
+| RSVP conversion | `rsvp_set` ÷ impressions |
+| No-show vs walk-up | RSVP without `check_in` vs `check_in` with `had_rsvp=false` |
+| Arrival curve | Histogram of `minutes_after_start` on `check_in` |
+| Dwell | p50 / p90 from `checked_out_at − checked_in_at` |
+| Geofence / permission friction | `check_in_rejected` by `reject_reason` |
+
+**Website charts:** `/insights/event-engagement?venue_id=…` — funnel bars, arrival histogram, reject breakdown, dwell p50/p90. Aggregates only (no user ids / raw coords). Demo mocks: `mockEventEngagement` in `mockData.ts`. Nav: `BusinessInsightsShell`.
+
+**Mobile:** captures telemetry; does **not** show operator charts. Handoff: `click/docs/handoff/event-engagement-api.md`.
 
 ---
 
@@ -149,8 +185,8 @@ Layered playbook for validating the Click Insights dashboard and `/api/insights/
 
 | Layer | What it validates | How |
 |-------|-------------------|-----|
-| **0 — Unit** | Encounter clustering math | `npm test` → `__tests__/lib/insights/connectionEncounterClustering.test.ts` |
-| **1 — UI smoke** | Dashboard renders without DB | Open `/insights?demo=1` or toggle demo in shell; uses `lib/insights/mockData.ts` via `InsightsDemoContext` (`click_insights_demo_mode` in localStorage) |
+| **0 — Unit** | Encounter clustering + engagement helpers | `npm test` → `connectionEncounterClustering.test.ts`, `eventEngagement.test.ts`, `event-engagement.route.contract.test.ts` |
+| **1 — UI smoke** | Dashboard renders without DB | Open `/insights?demo=1` or toggle demo in shell; uses `lib/insights/mockData.ts` via `InsightsDemoContext` (`click_insights_demo_mode` in localStorage). Also `/insights/event-engagement` in demo mode. |
 | **2 — Dev access** | Auth gate without Stripe | Set `BUSINESS_INSIGHTS_DEV_EMAILS=you@example.com` in `.env.local`; or set `users.role = 'verified_business'` in Supabase |
 | **3 — Billing path** | Stripe → venue subscription | `/business/signup` → Stripe test checkout → webhook `app/api/webhooks/stripe/route.ts` sets `venues.subscription_status` |
 | **4 — Synthetic connections** | Encounter pipeline without hardware | `POST` proximity bind with `simulator_mock: true`, `my_token: "1234"`, `heard_tokens: ["5678"]` — see `lib/server/proximity/bindProximityHandshake.ts` |
@@ -208,8 +244,9 @@ VALUES (
 4. On pilot phones: enable **Include in business insights** in location settings.
 5. Create **5+ connections** at the venue (Tri-Factor or QR); submit post-connection vibe ratings.
 6. Broadcast **availability intents** within ~0.1 mi of venue for Vibe Radar.
-7. Sign in as manager → verify `/insights`, heatmap, tribes, vibe-radar, live-metrics, advanced-metrics.
-8. `curl` APIs with manager JWT; confirm responses contain **no** user IDs, emails, or message content.
+7. Sign in as manager → verify `/insights`, heatmap, tribes, vibe-radar, live-metrics, advanced-metrics, **event-engagement**.
+8. From mobile: open event detail (impression), bookmark, RSVP, check-in (or rejected far away) → confirm aggregates move on `/insights/event-engagement`.
+9. `curl` APIs with manager JWT; confirm responses contain **no** user IDs, emails, or message content.
 
 ### API smoke examples
 
@@ -229,6 +266,10 @@ curl -s -H "Authorization: Bearer $JWT" \
 # Vibe Radar intents
 curl -s -H "Authorization: Bearer $JWT" \
   "$BASE_URL/api/insights/intents?venueId=$VENUE_ID"
+
+# Event engagement aggregates
+curl -s -H "Authorization: Bearer $JWT" \
+  "$BASE_URL/api/insights/$VENUE_ID/event-engagement"
 ```
 
 ### Stripe webhook (local)
@@ -244,9 +285,8 @@ The KMP app calls `GET /api/insights/widget-vibe` with JWT (`ApiClient.kt`) for 
 
 ### Known testing gaps
 
-- No `/api/insights/*` contract tests yet (chat/connections have `*.contract.test.ts` patterns).
+- Most `/api/insights/*` routes still lack contract tests (event-engagement beacon routes are covered under `__tests__/app/api/beacons/`).
 - No checked-in venue seed script (SQL template above; P0 roadmap).
-- Only one insights unit test (`connectionEncounterClustering.test.ts`).
 
 ---
 

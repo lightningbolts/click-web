@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import {
+  haversineMeters,
+  insertEngagementEvent,
+  loadEventBeaconOrResponse,
+  minutesBeforeStart,
+  parseEngagementTelemetryBody,
+  resolveBeaconCoordinates,
+} from "@/lib/server/eventEngagement";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -14,29 +22,6 @@ type UserProfileRow = {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
-/** Parses an optional finite latitude/longitude pair from a request body. */
-function parseRsvpLatLon(body: unknown): { latitude: number | null; longitude: number | null } {
-  if (!isRecord(body)) return { latitude: null, longitude: null };
-  const lat =
-    typeof body.latitude === "number"
-      ? body.latitude
-      : typeof body.lat === "number"
-        ? body.lat
-        : Number(body.latitude ?? body.lat);
-  const lon =
-    typeof body.longitude === "number"
-      ? body.longitude
-      : typeof body.lng === "number"
-        ? body.lng
-        : typeof body.lon === "number"
-          ? body.lon
-          : Number(body.longitude ?? body.lng ?? body.lon);
-  return {
-    latitude: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
-    longitude: Number.isFinite(lon) && lon >= -180 && lon <= 180 ? lon : null,
-  };
 }
 
 /** PostgREST may return an embedded FK row as an object or a one-element array. */
@@ -128,28 +113,8 @@ export async function GET(
     }
 
     const admin = createAdminSupabaseClient();
-    const { data: beacon, error: beaconError } = await admin
-      .from("map_beacons")
-      .select("id, beacon_type, expires_at")
-      .eq("id", beaconId)
-      .maybeSingle();
-
-    if (beaconError) {
-      console.error("GET /api/beacons/[beaconId]/rsvp beacon:", beaconError.message);
-      return NextResponse.json({ error: "Failed to load beacon" }, { status: 500 });
-    }
-    if (beacon == null) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (beacon.beacon_type !== "event") {
-      return NextResponse.json({ error: "RSVP is only available for event beacons" }, { status: 400 });
-    }
-
-    const expRaw = beacon.expires_at;
-    const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
-    if (!Number.isFinite(exp) || exp <= Date.now()) {
-      return NextResponse.json({ error: "Expired" }, { status: 404 });
-    }
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    if ("response" in loaded) return loaded.response;
 
     const { data, error } = await admin
       .from("beacon_attendees")
@@ -204,47 +169,50 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Body is optional; when present we persist the attendee's RSVP location.
     let body: unknown = null;
     try {
       body = await request.json();
     } catch {
       body = null;
     }
-    const { latitude, longitude } = parseRsvpLatLon(body);
+    const telemetry = parseEngagementTelemetryBody(body);
 
     const admin = createAdminSupabaseClient();
-    const { data: beacon, error: beaconError } = await admin
-      .from("map_beacons")
-      .select("id, beacon_type, expires_at")
-      .eq("id", beaconId)
-      .maybeSingle();
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    if ("response" in loaded) return loaded.response;
+    const { beacon } = loaded;
 
-    if (beaconError) {
-      console.error("POST /api/beacons/[beaconId]/rsvp beacon:", beaconError.message);
-      return NextResponse.json({ error: "Failed to load beacon" }, { status: 500 });
-    }
-    if (beacon == null) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (beacon.beacon_type !== "event") {
-      return NextResponse.json({ error: "RSVP is only available for event beacons" }, { status: 400 });
-    }
-
-    const expRaw = beacon.expires_at;
-    const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
-    if (!Number.isFinite(exp) || exp <= Date.now()) {
-      return NextResponse.json({ error: "Expired" }, { status: 404 });
+    let distanceMeters: number | null = null;
+    if (telemetry.latitude != null && telemetry.longitude != null) {
+      const coords = await resolveBeaconCoordinates(admin, beaconId, {
+        lat: beacon.lat,
+        lng: beacon.lng,
+      });
+      if (coords.lat != null && coords.lng != null) {
+        distanceMeters = haversineMeters(
+          telemetry.latitude,
+          telemetry.longitude,
+          coords.lat,
+          coords.lng,
+        );
+      }
     }
 
-    // Upsert via service role: PostgREST upsert requires UPDATE table privilege and an UPDATE
-    // RLS policy; the authenticated role only had INSERT/DELETE grants. Auth is enforced above.
+    const mins = minutesBeforeStart(beacon.metadata);
+
     const { error: insertError } = await admin.from("beacon_attendees").upsert(
       {
         beacon_id: beaconId,
         user_id: user.id,
-        latitude,
-        longitude,
+        latitude: telemetry.latitude,
+        longitude: telemetry.longitude,
+        accuracy_meters: telemetry.accuracy_meters,
+        source: telemetry.source,
+        platform: telemetry.platform,
+        app_version: telemetry.app_version,
+        client_occurred_at: telemetry.client_occurred_at,
+        minutes_before_start: mins,
+        distance_meters: distanceMeters,
         rsvpd_at: new Date().toISOString(),
       },
       { onConflict: "beacon_id,user_id" },
@@ -254,6 +222,22 @@ export async function POST(
       console.error("POST /api/beacons/[beaconId]/rsvp:", insertError.message);
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
+
+    await insertEngagementEvent(admin, {
+      beacon_id: beaconId,
+      user_id: user.id,
+      venue_id: beacon.venue_id,
+      event_type: "rsvp_set",
+      latitude: telemetry.latitude,
+      longitude: telemetry.longitude,
+      accuracy_meters: telemetry.accuracy_meters,
+      distance_meters: distanceMeters,
+      minutes_before_start: mins,
+      client_occurred_at: telemetry.client_occurred_at,
+      source: telemetry.source,
+      platform: telemetry.platform,
+      app_version: telemetry.app_version,
+    });
 
     const profile = (await loadAttendeeProfiles(admin, [user.id])).get(user.id) ?? null;
 
@@ -290,7 +274,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // RLS policy `beacon_attendees_delete_own` scopes this to the caller's own row.
+    const admin = createAdminSupabaseClient();
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    const venueId = "beacon" in loaded ? loaded.beacon.venue_id : null;
+
     const { error: deleteError } = await supabase
       .from("beacon_attendees")
       .delete()
@@ -301,6 +288,13 @@ export async function DELETE(
       console.error("DELETE /api/beacons/[beaconId]/rsvp:", deleteError.message);
       return NextResponse.json({ error: deleteError.message }, { status: 400 });
     }
+
+    await insertEngagementEvent(admin, {
+      beacon_id: beaconId,
+      user_id: user.id,
+      venue_id: venueId,
+      event_type: "rsvp_unset",
+    });
 
     return NextResponse.json({ ok: true, user_id: user.id });
   } catch (e) {

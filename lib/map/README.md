@@ -65,6 +65,10 @@ ConnectionMap.tsx (MapLibre)
 
 `BeaconVisibilityAudience`: `everyone` | `connections` | `core_connections` — filtered in `beaconVisibility.ts` and API routes before map fetch.
 
+### Event engagement (related APIs)
+
+Event beacons support server-backed bookmarks / check-ins / impressions (not MapLibre layers). Routes under `app/api/beacons/[beaconId]/{bookmark,check-in,engagement,impressions}` plus `GET /api/me/event-bookmarks`. Create/edit may set `metadata.venue_scale` + `check_in_radius_meters`. See `lib/server/eventEngagement.ts` and `click/docs/handoff/event-engagement-api.md`.
+
 ---
 
 ## E2EE / API constraints
@@ -83,7 +87,11 @@ ConnectionMap.tsx (MapLibre)
 | `app/api/map/beacons/route.ts` | List beacons |
 | `app/api/map/beacons/[beaconId]/route.ts` | Single beacon |
 | `app/api/map/drop/route.ts` | Create beacon |
-| `app/api/beacons/route.ts` | Alternate list endpoint |
+| `app/api/beacons/route.ts` | Alternate list endpoint (+ venue scale on event create) |
+| `app/api/beacons/[beaconId]/bookmark/route.ts` | Event bookmark |
+| `app/api/beacons/[beaconId]/check-in/route.ts` | Event check-in (geofenced) |
+| `app/api/beacons/[beaconId]/engagement/route.ts` | Bookmark + check-in state |
+| `app/api/me/event-bookmarks/route.ts` | Caller’s saved events |
 | `lib/map/beaconVisibility.ts` | Audience filtering |
 | `lib/map/mapBeaconApiShared.ts` | Shared route logic |
 | `lib/map/beaconPopupHtml.ts` | Popup templates |

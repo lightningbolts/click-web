@@ -25,6 +25,7 @@ import {
   COLLABORATION_MAP_DROP_WINDOW_MS,
   SQUAD_PIN_MULTIPLIER,
 } from "@/lib/collaboration/collaborationTtl";
+import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -254,6 +255,10 @@ export async function POST(request: NextRequest) {
         title,
         ...(desc.length > 0 ? { description: desc } : {}),
       };
+    }
+
+    if (beacon_type === "event") {
+      metadata = applyVenueScaleToMetadata(metadata);
     }
 
     let expiresAtIso: string;
