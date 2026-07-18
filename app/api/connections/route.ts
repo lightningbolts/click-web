@@ -13,6 +13,10 @@ import {
 } from '@/lib/server/connectionEncounterContextTag';
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
+import {
+  applyLiveEventBeaconToEncounterRow,
+  resolveLiveEventBeaconAt,
+} from '@/lib/server/resolveLiveEventBeaconAt';
 
 /**
  * Connections API
@@ -1226,6 +1230,21 @@ export async function POST(request: NextRequest) {
     if (encElev != null) {
       encounterInsert.exact_barometric_elevation_m = encElev;
     }
+
+    const liveEventAttachment = await resolveLiveEventBeaconAt(
+      adminClient,
+      Number.isFinite(geoLocation.lat) && !(geoLocation.lat === 0 && geoLocation.lon === 0)
+        ? geoLocation.lat
+        : null,
+      Number.isFinite(geoLocation.lon) && !(geoLocation.lat === 0 && geoLocation.lon === 0)
+        ? geoLocation.lon
+        : null,
+      [userId1, userId2],
+    );
+    Object.assign(
+      encounterInsert,
+      applyLiveEventBeaconToEncounterRow(encounterInsert, liveEventAttachment),
+    );
 
     const { data: insertedEnc, error: encounterErr } = await adminClient
       .from('connection_encounters')

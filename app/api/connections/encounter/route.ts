@@ -10,6 +10,10 @@ import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import { buildEncounterInsertFromSensor } from '@/lib/connections/encounterSensorPayload';
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
+import {
+  applyLiveEventBeaconToEncounterRow,
+  resolveLiveEventBeaconAt,
+} from '@/lib/server/resolveLiveEventBeaconAt';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -157,6 +161,17 @@ export async function POST(request: NextRequest) {
       ...buildEncounterInsertFromSensor(connectionId, sensorData),
       reporting_user_id: userId,
     };
+
+    const gpsLatPre = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
+    const gpsLonPre = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
+    const admin = createAdminClient();
+    const liveEventAttachment = await resolveLiveEventBeaconAt(
+      admin,
+      gpsLatPre,
+      gpsLonPre,
+      [userId, peerId],
+    );
+    Object.assign(insertRow, applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment));
 
     const { data: inserted, error: insErr } = await supabase
       .from('connection_encounters')

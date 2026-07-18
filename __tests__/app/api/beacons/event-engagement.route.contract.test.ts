@@ -14,6 +14,7 @@ import {
 } from "@/app/api/beacons/[beaconId]/check-in/route";
 import { GET as getEngagement } from "@/app/api/beacons/[beaconId]/engagement/route";
 import { POST as postImpression } from "@/app/api/beacons/[beaconId]/impressions/route";
+import { POST as postShare } from "@/app/api/beacons/[beaconId]/share/route";
 import { POST as postRsvp, DELETE as deleteRsvp } from "@/app/api/beacons/[beaconId]/rsvp/route";
 
 const mockGetSupabaseFromRouteRequest = jest.fn();
@@ -371,6 +372,56 @@ describe("event engagement API contracts", () => {
     );
     expect(res.status).toBe(200);
     expect((inserts[0] as { event_type: string }).event_type).toBe("event_view");
+  });
+
+  it("share POST writes share event", async () => {
+    const inserts: unknown[] = [];
+    mockGetSupabaseFromRouteRequest.mockResolvedValue({
+      supabase: {},
+      user: { id: USER_ID },
+      authError: null,
+    });
+    mockCreateAdminSupabaseClient.mockReturnValue(
+      makeAdmin({
+        map_beacons: {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                  id: BEACON_ID,
+                  beacon_type: "event",
+                  expires_at: futureIso(),
+                  venue_id: null,
+                  metadata: liveEventMeta(),
+                  location: { type: "Point", coordinates: [-122.3, 47.65] },
+                },
+                error: null,
+              }),
+            }),
+          }),
+        },
+        event_engagement_events: {
+          insert: jest.fn((row: unknown) => {
+            inserts.push(row);
+            return Promise.resolve({ error: null });
+          }),
+        },
+      }),
+    );
+
+    const res = await postShare(
+      new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/share`, {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "detail",
+          platform: "ios",
+          share_url: `https://click-us.vercel.app/e/${BEACON_ID}`,
+        }),
+      }),
+      { params: Promise.resolve({ beaconId: BEACON_ID }) },
+    );
+    expect(res.status).toBe(200);
+    expect((inserts[0] as { event_type: string }).event_type).toBe("share");
   });
 
   it("RSVP POST/DELETE emit rsvp_set / rsvp_unset", async () => {

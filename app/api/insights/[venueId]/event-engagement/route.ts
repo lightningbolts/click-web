@@ -67,6 +67,7 @@ export async function GET(
     const events = Array.isArray(rows) ? rows : [];
     let impressions = 0;
     let bookmarks = 0;
+    let shares = 0;
     let rsvps = 0;
     let checkIns = 0;
     let checkOuts = 0;
@@ -95,6 +96,8 @@ export async function GET(
         if (userId) uniqueViewers.add(userId);
       } else if (type === "bookmark_set") {
         bookmarks += 1;
+      } else if (type === "share") {
+        shares += 1;
       } else if (type === "rsvp_set") {
         rsvps += 1;
       } else if (type === "check_in") {
@@ -131,6 +134,7 @@ export async function GET(
     dwellMinutes.sort((a, b) => a - b);
 
     const interestRate = impressions > 0 ? bookmarks / impressions : null;
+    const shareRate = impressions > 0 ? shares / impressions : null;
     const rsvpConversion = impressions > 0 ? rsvps / impressions : null;
     const checkInConversion = rsvps > 0 ? checkIns / rsvps : null;
 
@@ -140,10 +144,12 @@ export async function GET(
         impressions,
         unique_viewers: uniqueViewers.size,
         bookmarks,
+        shares,
         rsvps,
         check_ins: checkIns,
         check_outs: checkOuts,
         interest_rate: interestRate,
+        share_rate: shareRate,
         rsvp_conversion: rsvpConversion,
         rsvp_to_check_in: checkInConversion,
       },

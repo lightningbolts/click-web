@@ -11,6 +11,10 @@ import {
 } from '@/lib/server/connectionEncounterContextTag';
 import { computeCollaborationTtl } from '@/lib/collaboration/collaborationTtl';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
+import {
+  applyLiveEventBeaconToEncounterRow,
+  resolveLiveEventBeaconAt,
+} from '@/lib/server/resolveLiveEventBeaconAt';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -628,6 +632,21 @@ export async function POST(request: NextRequest) {
         }
 
         encounterInsert.context_tags = mergedEncounterContextTags;
+
+        const liveEventAttachment = await resolveLiveEventBeaconAt(
+          adminClient,
+          gpsPair.lat != null && gpsPair.lon != null && !(gpsPair.lat === 0 && gpsPair.lon === 0)
+            ? gpsPair.lat
+            : null,
+          gpsPair.lat != null && gpsPair.lon != null && !(gpsPair.lat === 0 && gpsPair.lon === 0)
+            ? gpsPair.lon
+            : null,
+          [user.id, targetUserId],
+        );
+        Object.assign(
+          encounterInsert,
+          applyLiveEventBeaconToEncounterRow(encounterInsert, liveEventAttachment),
+        );
 
         const { error: encounterErr } = await adminClient
           .from('connection_encounters')

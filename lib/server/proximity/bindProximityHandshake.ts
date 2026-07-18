@@ -3,6 +3,11 @@ import { createCollaborationSessionForConnection } from '@/lib/collaboration/cre
 import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
 import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterContextTag';
 import {
+  AT_EVENT_CONTEXT_TAG,
+  applyLiveEventBeaconToEncounterRow,
+  resolveLiveEventBeaconAt,
+} from '@/lib/server/resolveLiveEventBeaconAt';
+import {
   bfsComponent,
   buildUserAdjacency,
   buildVibeContextTags,
@@ -802,10 +807,23 @@ export async function bindProximityHandshake(
     encounterLat: number | null,
     encounterLon: number | null,
     reportingUserId?: string | null,
+    participantUserIds: string[] = [],
   ): Promise<EncounterMutationOutcome> {
     if (reportingUserId) {
       insertRow.reporting_user_id = reportingUserId;
     }
+
+    const liveEventAttachment = await resolveLiveEventBeaconAt(
+      admin,
+      encounterLat,
+      encounterLon,
+      participantUserIds,
+    ).catch((err) => {
+      console.warn('[proximity] live event resolve:', err);
+      return null;
+    });
+    insertRow = applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment);
+
     const encounteredAtIso = String(insertRow.encountered_at ?? '');
     const newBlock = twelveHourUtcBlockId(encounteredAtIso);
     if (encounterLat == null || encounterLon == null || newBlock == null) {
@@ -823,7 +841,7 @@ export async function bindProximityHandshake(
 
     let lastEncounterQuery = admin
       .from('connection_encounters')
-      .select('id, gps_lat, gps_lon, encountered_at, context_tags')
+      .select('id, gps_lat, gps_lon, encountered_at, context_tags, event_beacon_id')
       .eq('connection_id', connectionId);
     if (reportingUserId) {
       lastEncounterQuery = lastEncounterQuery.eq('reporting_user_id', reportingUserId);
@@ -843,6 +861,7 @@ export async function bindProximityHandshake(
       gps_lon?: number | null;
       encountered_at?: string;
       context_tags?: string[] | null;
+      event_beacon_id?: string | null;
     } | null;
 
     const lastLat = last?.gps_lat != null && Number.isFinite(Number(last.gps_lat)) ? Number(last.gps_lat) : null;
@@ -860,10 +879,23 @@ export async function bindProximityHandshake(
 
     if (canDebounce && last.id) {
       const prevTags = Array.isArray(last.context_tags) ? [...last.context_tags] : [];
-      const merged = [...new Set([...prevTags, EXTENDED_HANGOUT_TAG])];
+      const merged = [
+        ...new Set([
+          ...prevTags,
+          EXTENDED_HANGOUT_TAG,
+          ...(liveEventAttachment ? [AT_EVENT_CONTEXT_TAG] : []),
+        ]),
+      ];
+      const updatePayload: Record<string, unknown> = { context_tags: merged };
+      if (liveEventAttachment && !last.event_beacon_id) {
+        updatePayload.event_beacon_id = liveEventAttachment.event_beacon_id;
+        updatePayload.event_beacon_title = liveEventAttachment.event_beacon_title;
+        updatePayload.event_beacon_start_at = liveEventAttachment.event_beacon_start_at;
+        updatePayload.event_beacon_end_at = liveEventAttachment.event_beacon_end_at;
+      }
       const { error: upErr } = await admin
         .from('connection_encounters')
-        .update({ context_tags: merged })
+        .update(updatePayload)
         .eq('id', last.id);
       if (upErr) {
         console.warn('[proximity] encounter debounce update:', upErr.message);
@@ -928,6 +960,7 @@ export async function bindProximityHandshake(
         memberLat,
         memberLon,
         memberId,
+        memberIds,
       );
       if (memberOutcome === 'inserted' || memberOutcome === 'debounced') {
         const values = memberSensorValues(memberId);
@@ -979,6 +1012,7 @@ export async function bindProximityHandshake(
               pairMemberLat,
               pairMemberLon,
               pairMemberId,
+              pair,
             );
             const pairValues = memberSensorValues(pairMemberId);
             fireEncounterGeoEnrichment(

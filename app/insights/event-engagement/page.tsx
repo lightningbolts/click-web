@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { CalendarDays, Bookmark, UserCheck, MapPin, Eye } from 'lucide-react';
+import { CalendarDays, Bookmark, UserCheck, MapPin, Eye, Share2 } from 'lucide-react';
 import useSWR from 'swr';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
@@ -64,6 +64,7 @@ export default function EventEngagementPage() {
     ? [
         { name: 'Views', value: payload.funnel.impressions, color: '#94a3b8' },
         { name: 'Bookmarks', value: payload.funnel.bookmarks, color: '#a78bfa' },
+        { name: 'Shares', value: payload.funnel.shares ?? 0, color: '#f472b6' },
         { name: 'RSVPs', value: payload.funnel.rsvps, color: '#38bdf8' },
         { name: 'Check-ins', value: payload.funnel.check_ins, color: '#34d399' },
       ]
@@ -89,7 +90,7 @@ export default function EventEngagementPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">Event engagement</h1>
           <p className="text-sm text-white/60">
-            Impression → bookmark → RSVP → check-in funnel for venue-linked events
+            Impression → bookmark → share → RSVP → check-in funnel for venue-linked events
           </p>
         </div>
       </motion.div>
@@ -108,7 +109,7 @@ export default function EventEngagementPage() {
         <>
           <motion.div
             variants={itemVariants}
-            className="grid grid-cols-2 gap-3 md:grid-cols-4"
+            className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5"
           >
             <GlassPanel className="p-4">
               <div className="flex items-center gap-2 text-white/60 text-xs">
@@ -130,6 +131,17 @@ export default function EventEngagementPage() {
               </div>
               <div className="text-xs text-white/50">
                 {payload.funnel.bookmarks} bookmarks
+              </div>
+            </GlassPanel>
+            <GlassPanel className="p-4">
+              <div className="flex items-center gap-2 text-white/60 text-xs">
+                <Share2 className="h-3.5 w-3.5" /> Share rate
+              </div>
+              <div className="mt-1 text-2xl font-semibold text-white">
+                {pct(payload.funnel.share_rate)}
+              </div>
+              <div className="text-xs text-white/50">
+                {payload.funnel.shares ?? 0} shares
               </div>
             </GlassPanel>
             <GlassPanel className="p-4">
