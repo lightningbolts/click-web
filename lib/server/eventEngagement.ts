@@ -16,8 +16,11 @@ export const VENUE_SCALE_RADIUS_METERS: Record<VenueScale, number> = {
 export const DEFAULT_VENUE_SCALE: VenueScale = "neighborhood";
 export const CHECK_IN_RADIUS_MIN_M = 25;
 export const CHECK_IN_RADIUS_MAX_M = 5000;
-/** Early grace before event_start_at for check-in (ms). */
-export const CHECK_IN_EARLY_GRACE_MS = 15 * 60 * 1000;
+/**
+ * Early window before event_start_at for check-in (ms).
+ * Geofence still required — early arrivals at the venue can check in.
+ */
+export const CHECK_IN_EARLY_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export type EventEngagementEventType =
   | "event_view"

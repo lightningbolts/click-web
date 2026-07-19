@@ -35,15 +35,20 @@ describe('eventEngagement helpers', () => {
     expect(isValidCheckInCoordinate(47.6, -122.3)).toBe(true);
   });
 
-  it('live window includes early grace', () => {
+  it('live window includes 24h early grace', () => {
     const start = new Date(Date.now() + 10 * 60_000).toISOString();
     const end = new Date(Date.now() + 2 * 3600_000).toISOString();
     expect(
       isEventLiveForCheckIn({ event_start_at: start, event_end_at: end }),
     ).toBe(true);
-    const farStart = new Date(Date.now() + 60 * 60_000).toISOString();
+    const withinDay = new Date(Date.now() + 12 * 3600_000).toISOString();
     expect(
-      isEventLiveForCheckIn({ event_start_at: farStart, event_end_at: end }),
+      isEventLiveForCheckIn({ event_start_at: withinDay, event_end_at: end }),
+    ).toBe(true);
+    const farStart = new Date(Date.now() + 48 * 3600_000).toISOString();
+    const farEnd = new Date(Date.now() + 50 * 3600_000).toISOString();
+    expect(
+      isEventLiveForCheckIn({ event_start_at: farStart, event_end_at: farEnd }),
     ).toBe(false);
   });
 });
