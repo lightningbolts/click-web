@@ -108,8 +108,8 @@ export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: A
   }, [envelope, getAuthHeaders, state.kind]);
 
   const bubbleClass = isMine
-    ? 'border border-white/15 bg-white/10 text-white'
-    : 'glass-panel text-zinc-100';
+    ? 'border-2 border-border-hard bg-primary text-on-primary'
+    : 'border-2 border-border-hard bg-surface-container text-on-surface';
 
   const busy = state.kind === 'downloading' || state.kind === 'verifying';
   const error = state.kind === 'error' ? state.message : null;
@@ -123,25 +123,25 @@ export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: A
     >
       <div
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-          isMine ? 'bg-white/15 text-white' : 'bg-[#8338EC]/20 text-[#b892ff]'
+          isMine ? 'bg-black/15 text-on-primary' : 'bg-on-primary-container text-primary'
         }`}
       >
         <Icon className="h-5 w-5" aria-hidden />
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <span className="truncate text-sm font-medium leading-tight">{envelope.name}</span>
-        <span className={`truncate text-[11px] leading-tight ${isMine ? 'text-white/70' : 'text-zinc-400'}`}>
+        <span className={`truncate text-[11px] leading-tight ${isMine ? 'text-on-primary/80' : 'text-on-surface-variant'}`}>
           {formatBytes(envelope.size)}
           {envelope.mime ? ` · ${envelope.mime}` : ''}
         </span>
         {error && (
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-red-300">
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-red-700 dark:text-red-300">
             <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
             {error}
           </span>
         )}
         {done && (
-          <span className={`mt-0.5 flex items-center gap-1 text-[11px] ${isMine ? 'text-emerald-200' : 'text-emerald-400'}`}>
+          <span className={`mt-0.5 flex items-center gap-1 text-[11px] ${isMine ? 'text-emerald-100' : 'text-emerald-700 dark:text-emerald-400'}`}>
             <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
             Decrypted · integrity verified
           </span>
@@ -153,10 +153,10 @@ export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: A
         disabled={busy}
         className={`flex shrink-0 items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
           busy
-            ? 'cursor-wait opacity-70 ' + (isMine ? 'bg-white/15 text-white' : 'bg-zinc-800 text-zinc-300')
+            ? 'cursor-wait opacity-70 ' + (isMine ? 'bg-black/15 text-on-primary' : 'bg-surface text-on-surface-variant')
             : isMine
-              ? 'bg-white/15 text-white hover:bg-white/25'
-              : 'bg-[#8338EC]/25 text-[#b892ff] hover:bg-[#8338EC]/40'
+              ? 'bg-black/15 text-on-primary hover:bg-black/25'
+              : 'bg-primary/15 text-primary hover:bg-primary/25'
         }`}
         aria-label={`Download ${envelope.name}`}
       >

@@ -1746,16 +1746,16 @@ export default function ChatView({
         </div>
       )}
       {/* ── Header (safe-area only; IME resizes the message column in the parent layout) ── */}
-      <div className="glass relative z-50 rounded-2xl mb-4 shrink-0 overflow-visible pt-[env(safe-area-inset-top,0px)]">
+      <div className="relative z-50 mb-4 shrink-0 overflow-visible rounded-[16px] border-2 border-border-hard bg-surface pt-[env(safe-area-inset-top,0px)]">
         {isGroupClique && groupKeyError ? (
-          <div className="mx-4 mt-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
+          <div className="mx-4 mt-3 rounded-[8px] border-2 border-amber-600/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-100">
             {groupKeyError}
           </div>
         ) : null}
         <div className="flex items-center gap-4 px-5 py-4">
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+            className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -1795,7 +1795,7 @@ export default function ChatView({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <p className="font-semibold text-white truncate text-lg min-w-0">{headerTitle}</p>
+              <p className="min-w-0 truncate text-lg font-semibold text-on-surface">{headerTitle}</p>
               {isGroupClique ? (
                 <button
                   type="button"
@@ -1803,7 +1803,7 @@ export default function ChatView({
                     setRenameGroupInput(headerTitle);
                     setShowRenameGroupModal(true);
                   }}
-                  className="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5"
+                  className="shrink-0 rounded-[8px] p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                   aria-label="Rename group"
                 >
                   <Pencil className="w-4 h-4" />
@@ -1811,14 +1811,14 @@ export default function ChatView({
               ) : null}
             </div>
             {isGroupClique && groupHeaderSubtitle ? (
-              <p className="text-xs text-zinc-400 mt-1 leading-snug line-clamp-2">{groupHeaderSubtitle}</p>
+              <p className="mt-1 line-clamp-2 text-xs leading-snug text-on-surface-variant">{groupHeaderSubtitle}</p>
             ) : (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
                 <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3 shrink-0 text-zinc-500" /> {connection.location}
+                  <MapPin className="h-3 w-3 shrink-0" /> {connection.location}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3 shrink-0 text-zinc-500" /> {metDate}
+                  <Calendar className="h-3 w-3 shrink-0" /> {metDate}
                 </span>
               </div>
             )}
@@ -1826,10 +1826,10 @@ export default function ChatView({
 
           {/* Connection / clique status badge */}
           <div
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+            className={`hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium sm:flex ${
               isGroupClique
-                ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200'
-                : 'bg-[#8338EC]/10 border-[#8338EC]/20 text-[#8338EC]'
+                ? 'border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
+                : 'border-primary/25 bg-on-primary-container text-primary'
             }`}
           >
             <span
@@ -1846,7 +1846,7 @@ export default function ChatView({
                   setShowCallMenu((prev) => !prev);
                   setShowHeaderMenu(false);
                 }}
-                className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+                className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                 aria-label="Call options"
               >
                 <Phone className="w-5 h-5" />
@@ -1900,7 +1900,7 @@ export default function ChatView({
                 setShowHeaderMenu((prev) => !prev);
                 setShowCallMenu(false);
               }}
-              className="p-2 rounded-xl hover:bg-white/5 transition-colors text-zinc-400 hover:text-white"
+              className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
               aria-label="Chat actions"
             >
               <MoreHorizontal className="w-5 h-5" />
@@ -2151,13 +2151,13 @@ export default function ChatView({
               damping: 32,
               mass: 0.85,
             }}
-            className="glass mb-3 shrink-0 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3 overflow-hidden"
+            className="mb-3 shrink-0 overflow-hidden rounded-[16px] border-2 border-emerald-700/25 bg-emerald-500/10 px-4 py-3"
           >
             <motion.div
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.05, duration: 0.25 }}
-              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200/90"
+              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
             >
               <motion.span
                 initial={{ rotate: -12, scale: 0.8 }}
@@ -2172,7 +2172,7 @@ export default function ChatView({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.12, duration: 0.2 }}
-              className="mt-1 text-[11px] text-zinc-500"
+              className="mt-1 text-[11px] text-on-surface-variant"
             >
               Shared interests — try weaving one into your next message
             </motion.p>
@@ -2188,7 +2188,7 @@ export default function ChatView({
                     damping: 28,
                     delay: 0.14 + i * 0.045,
                   }}
-                  className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-100"
+                  className="rounded-full border-2 border-border-hard bg-surface px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
                 >
                   {t}
                 </motion.span>
@@ -2201,7 +2201,7 @@ export default function ChatView({
       {/* ── Messages area ── */}
       <div
         ref={messagesPanelRef}
-        className="glass rounded-2xl flex-1 flex flex-col min-h-0 min-w-0 relative"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-[16px] border-2 border-border-hard bg-surface"
       >
         {/* Subtle gradient glow behind messages */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -2251,18 +2251,18 @@ export default function ChatView({
                 👋
               </div>
               <div>
-                <p className="font-semibold text-white text-lg">
+                <p className="text-lg font-semibold text-on-surface">
                   {isGroupClique ? `Welcome to ${otherUserName}` : `Say hello to ${otherUserName}!`}
                 </p>
-                <p className="text-sm text-zinc-500 max-w-xs mt-1">
+                <p className="mt-1 max-w-xs text-sm text-on-surface-variant">
                   {isGroupClique ? (
                     <>
-                      Everyone here is part of a <span className="text-emerald-400/95">mathematically verified</span>{' '}
+                      Everyone here is part of a <span className="font-medium text-emerald-700 dark:text-emerald-300">mathematically verified</span>{' '}
                       clique — start the thread.
                     </>
                   ) : (
                     <>
-                      You met at <span className="text-[#8338EC]">{connection.location}</span>. Start the conversation!
+                      You met at <span className="font-medium text-primary">{connection.location}</span>. Start the conversation!
                     </>
                   )}
                 </p>
@@ -2292,18 +2292,17 @@ export default function ChatView({
                         if (e.key === 'Enter') submitEdit();
                         if (e.key === 'Escape') { setEditingId(null); setEditText(''); }
                       }}
-                      className="flex-1 bg-zinc-900/80 border border-[#8338EC] rounded-xl px-3 py-2 
-                        text-sm focus:outline-none focus:ring-1 focus:ring-[#8338EC]/50 text-white"
+                      className="flex-1 rounded-[8px] border-2 border-primary bg-surface-container px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <button
                       onClick={submitEdit}
-                      className="px-3 py-2 bg-gradient-to-r from-[#8338EC] to-[#6520c0] rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                      className="fc-btn-primary px-3 py-2 text-sm"
                     >
                       Save
                     </button>
                     <button
                       onClick={() => { setEditingId(null); setEditText(''); }}
-                      className="px-3 py-2 glass rounded-xl text-sm hover:bg-white/10 transition-colors"
+                      className="fc-btn-secondary px-3 py-2 text-sm"
                     >
                       Cancel
                     </button>
@@ -2365,12 +2364,12 @@ export default function ChatView({
                     />
                   )}
                 </div>
-                <div className="glass-panel rounded-2xl rounded-bl-sm px-4 py-2.5">
+                <div className="rounded-2xl rounded-bl-sm border-2 border-border-hard bg-surface-container px-4 py-2.5">
                   <span className="inline-flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <span
                         key={i}
-                        className="w-1.5 h-1.5 bg-[#8338EC] rounded-full animate-bounce"
+                        className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary"
                         style={{ animationDelay: `${i * 150}ms` }}
                       />
                     ))}
@@ -2401,22 +2400,22 @@ export default function ChatView({
       </div>
 
       {/* ── Input area (overflow visible so portaled pickers align; chrome stacks above messages) ── */}
-      <div className="glass rounded-2xl mt-2 px-4 py-2 shrink-0 relative z-40 overflow-visible">
+      <div className="relative z-40 mt-2 shrink-0 overflow-visible rounded-[16px] border-2 border-border-hard bg-surface px-4 py-2">
         {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
-          <div className="mb-2 flex w-full items-start gap-2 rounded-2xl border border-zinc-700/60 bg-zinc-900/50 px-3 py-2.5 text-xs">
-            <span className="text-[#8338EC] font-medium shrink-0">Replying</span>
-            <p className="text-zinc-400 line-clamp-2 flex-1 min-w-0">{replyBannerText}</p>
+          <div className="mb-2 flex w-full items-start gap-2 rounded-[8px] border-2 border-border-hard bg-surface-container px-3 py-2.5 text-xs">
+            <span className="shrink-0 font-medium text-primary">Replying</span>
+            <p className="min-w-0 flex-1 line-clamp-2 text-on-surface-variant">{replyBannerText}</p>
             <button
               type="button"
               onClick={() => setReplyingTo(null)}
-              className="text-zinc-500 hover:text-white shrink-0"
+              className="shrink-0 text-on-surface-variant hover:text-on-surface"
               aria-label="Cancel reply"
             >
               ✕
             </button>
           </div>
         )}
-        <div className="flex w-full items-end gap-2 sm:gap-3 min-w-0">
+        <div className="flex w-full min-w-0 items-end gap-2 sm:gap-3">
           <input
             ref={photoInputRef}
             type="file"
@@ -2436,7 +2435,7 @@ export default function ChatView({
               type="button"
               onClick={() => photoInputRef.current?.click()}
               disabled={!chatId || mediaBusy || isRecording}
-              className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="rounded-[8px] border-2 border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
               title="Attach photo"
             >
               {mediaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
@@ -2445,7 +2444,7 @@ export default function ChatView({
               type="button"
               onClick={() => attachmentInputRef.current?.click()}
               disabled={!chatId || mediaBusy || isRecording}
-              className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="rounded-[8px] border-2 border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
               title="Attach file (2 MB max)"
               aria-label="Attach file"
             >
@@ -2456,20 +2455,20 @@ export default function ChatView({
                 type="button"
                 onClick={() => void beginVoiceRecording()}
                 disabled={!chatId || mediaBusy}
-                className="p-2.5 rounded-xl border border-zinc-700/60 bg-zinc-900/60 text-zinc-400 hover:text-[#8338EC] hover:border-[#8338EC]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="rounded-[8px] border-2 border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
                 title="Record voice message"
               >
                 <Mic className="w-4 h-4" />
               </button>
             ) : (
               <>
-                <span className="text-[10px] font-mono text-red-400 tabular-nums min-w-[2.5rem] text-center">
+                <span className="min-w-[2.5rem] text-center font-mono text-[10px] tabular-nums text-red-700 dark:text-red-400">
                   {`${Math.floor(recordingMs / 60000)}:${String(Math.floor((recordingMs % 60000) / 1000)).padStart(2, '0')}`}
                 </span>
                 <button
                   type="button"
                   onClick={stopVoiceRecording}
-                  className="p-2.5 rounded-xl bg-[#8338EC]/25 text-[#8338EC] border border-[#8338EC]/40"
+                  className="rounded-[8px] border-2 border-primary/40 bg-on-primary-container p-2.5 text-primary"
                   title="Stop and send"
                 >
                   <Square className="w-4 h-4 fill-current" />
@@ -2477,7 +2476,7 @@ export default function ChatView({
                 <button
                   type="button"
                   onClick={cancelVoiceRecording}
-                  className="p-2.5 rounded-xl border border-zinc-700/60 text-zinc-500 hover:text-white hover:bg-zinc-800"
+                  className="rounded-[8px] border-2 border-border-hard p-2.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                   title="Cancel"
                 >
                   <X className="w-4 h-4" />
@@ -2485,8 +2484,7 @@ export default function ChatView({
               </>
             )}
           </div>
-          <div className="flex-1 flex items-center bg-zinc-900/60 border border-zinc-700/50 
-            rounded-xl px-4 py-[7px] focus-within:border-[#8338EC]/50 transition-colors min-w-0">
+          <div className="flex min-w-0 flex-1 items-center rounded-[8px] border-2 border-border-hard bg-surface-container px-4 py-[7px] transition-colors focus-within:border-primary">
             <textarea
               ref={inputRef}
               value={inputText}
@@ -2506,8 +2504,7 @@ export default function ChatView({
                     : `Message ${otherUserName}…`
               }
               rows={1}
-              className="w-full resize-none bg-transparent text-sm text-white placeholder-zinc-600 
-                focus:outline-none leading-relaxed"
+              className="w-full resize-none bg-transparent text-sm leading-relaxed text-on-surface placeholder:text-outline focus:outline-none"
               style={{ minHeight: '24px', maxHeight: '120px' }}
             />
           </div>

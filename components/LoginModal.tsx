@@ -206,51 +206,57 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop + modal share one layer so outside clicks reach onClose */}
+          {/* Backdrop — outside click dismisses; modal scrolls on short viewports */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center sm:p-6"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.98, y: 24 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fc-card relative w-full max-w-md p-8 text-on-surface"
+              exit={{ opacity: 0, scale: 0.98, y: 16 }}
+              className="fc-card relative flex w-full max-w-md max-h-[min(88dvh,720px)] flex-col overflow-hidden text-on-surface"
               style={{ backgroundColor: "var(--color-surface)" }}
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
+              aria-labelledby="login-modal-title"
             >
-              {/* Close button */}
-              <button
-                onClick={onClose}
-                className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              {/* Sticky chrome */}
+              <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b-2 border-border-hard bg-surface px-4 py-3 sm:px-6 sm:py-4">
+                <div className="min-w-0 pr-2">
+                  <h2 id="login-modal-title" className="text-xl font-bold text-on-surface sm:text-2xl">
+                    {isForgotPassword
+                      ? 'Reset Password'
+                      : isSignup
+                        ? 'Create Account'
+                        : 'Welcome Back'}
+                  </h2>
+                  <p className="mt-1 text-sm font-medium text-on-surface-variant">
+                    {isForgotPassword
+                      ? 'Enter your email to receive a reset link'
+                      : isSignup
+                        ? 'Join Click and start building real connections'
+                        : 'Sign in to your Click account'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="shrink-0 rounded-[8px] border-2 border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
 
-              {/* Header */}
-              <h2 className="mb-2 text-3xl font-bold text-on-surface">
-                {isForgotPassword
-                  ? 'Reset Password'
-                  : isSignup
-                    ? 'Create Account'
-                    : 'Welcome Back'}
-              </h2>
-              <p className="mb-8 font-medium text-on-surface-variant">
-                {isForgotPassword
-                  ? 'Enter your email to receive a reset link'
-                  : isSignup
-                    ? 'Join Click and start building real connections'
-                    : 'Sign in to your Click account'}
-              </p>
-
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
               {/* OAuth sign-in buttons — hidden on the forgot-password pane. */}
               {!isForgotPassword && (
-                <div className="space-y-3 mb-5">
+                <div className="mb-5 space-y-3">
                   <motion.button
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
@@ -451,6 +457,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
               {/* Toggle */}
               <div className="mt-6 text-center">
                 <button
+                  type="button"
                   onClick={() => {
                     if (isForgotPassword) {
                       setIsForgotPassword(false);
@@ -468,6 +475,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                       ? 'Already have an account? Sign in'
                       : "Don't have an account? Sign up"}
                 </button>
+              </div>
               </div>
             </motion.div>
           </motion.div>

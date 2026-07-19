@@ -23,8 +23,8 @@ export interface LinkifiedTextProps {
 export function LinkifiedText({ text, className = '', variant }: LinkifiedTextProps): ReactNode {
   const linkClass =
     variant === 'mine'
-      ? 'text-white underline decoration-white/60 underline-offset-2 hover:decoration-white'
-      : 'text-[#7cc3ff] underline decoration-[#7cc3ff]/60 underline-offset-2 hover:text-[#9dd4ff] hover:decoration-[#9dd4ff]';
+      ? 'text-on-primary underline decoration-white/60 underline-offset-2 hover:decoration-white'
+      : 'text-primary underline decoration-primary/50 underline-offset-2 hover:decoration-primary';
 
   const parts: ReactNode[] = [];
   let last = 0;

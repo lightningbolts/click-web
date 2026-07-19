@@ -368,8 +368,8 @@ export default function MessageBubble({
       : null;
   const isAttachment = attachmentEnvelope !== null;
   const textBubbleClass = isMine
-    ? 'bg-gradient-to-br from-[#8338EC] to-[#6520c0] text-white rounded-br-sm shadow-[0_2px_16px_rgba(131,56,236,0.25)]'
-    : 'glass-panel text-zinc-100 rounded-bl-sm';
+    ? 'bg-primary text-on-primary rounded-br-sm'
+    : 'border-2 border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
 
   const pickerToolbarDock = useMemo(() => {
     if (!showActions || !actionBarGeom) return null;
@@ -393,7 +393,7 @@ export default function MessageBubble({
         <div className="relative w-8 h-8 shrink-0 mb-1">
           <div
             className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
-            text-xs font-bold shadow-[0_0_12px_rgba(131,56,236,0.3)]"
+            text-xs font-bold text-on-primary"
           >
             {senderLabel ?? senderInitial}
           </div>
@@ -438,10 +438,10 @@ export default function MessageBubble({
           >
             {replyMeta && (
               <div
-                className={`max-w-full rounded-2xl px-3 py-2 text-xs leading-snug border ${
+                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
                   isMine
-                    ? 'border-white/15 bg-white/10 text-white/90 shadow-[0_2px_12px_rgba(0,0,0,0.12)]'
-                    : 'border-zinc-600/50 bg-zinc-950/50 text-zinc-300'
+                    ? 'border-white/20 bg-black/15 text-on-primary'
+                    : 'border-border-hard bg-surface text-on-surface-variant'
                 }`}
               >
                 <span className="flex items-center gap-1 font-medium opacity-90">
@@ -467,10 +467,10 @@ export default function MessageBubble({
           >
             {replyMeta && (
               <div
-                className={`max-w-full rounded-2xl px-3 py-2 text-xs leading-snug border ${
+                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
                   isMine
-                    ? 'border-white/15 bg-white/10 text-white/90 shadow-[0_2px_12px_rgba(0,0,0,0.12)]'
-                    : 'border-zinc-600/50 bg-zinc-950/50 text-zinc-300'
+                    ? 'border-white/20 bg-black/15 text-on-primary'
+                    : 'border-border-hard bg-surface text-on-surface-variant'
                 }`}
               >
                 <span className="flex items-center gap-1 font-medium opacity-90">
@@ -562,10 +562,10 @@ export default function MessageBubble({
           >
             {replyMeta && (
               <div
-                className={`mb-2 rounded-lg px-2.5 py-1.5 text-xs leading-snug border ${
+                className={`mb-2 rounded-lg border px-2.5 py-1.5 text-xs leading-snug ${
                   isMine
-                    ? 'bg-black/15 border-white/10 text-white/85'
-                    : 'bg-zinc-950/40 border-zinc-600/40 text-zinc-400'
+                    ? 'border-white/15 bg-black/15 text-on-primary/90'
+                    : 'border-border-hard bg-surface text-on-surface-variant'
                 }`}
               >
                 <span className="flex items-center gap-1 font-medium opacity-80">
@@ -681,10 +681,10 @@ export default function MessageBubble({
 
         {/* Timestamp & delivery ticks (outgoing) */}
         <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
-          <span className="text-[10px] text-zinc-600">
+          <span className="text-[10px] text-on-surface-variant">
             {timeLabel}
             {message.time_edited ? (
-              <span className="ml-1 italic text-zinc-500 opacity-80">· edited</span>
+              <span className="ml-1 italic text-outline opacity-90">· edited</span>
             ) : null}
           </span>
           {isMine && <MineDeliveryTicks message={message} />}
