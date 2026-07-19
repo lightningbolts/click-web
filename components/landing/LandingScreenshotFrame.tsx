@@ -40,7 +40,7 @@ export default function LandingScreenshotFrame({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px', amount: 0.2 }}
       transition={{ duration: 0.45 }}
-      className={`overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-xl shadow-black/40 backdrop-blur-md ${className}`}
+      className={`overflow-hidden rounded-2xl border border-border-hard bg-background   ${className}`}
     >
       <div className={`relative w-full min-h-0 min-w-0 ${aspectClassName}`}>
         <Image

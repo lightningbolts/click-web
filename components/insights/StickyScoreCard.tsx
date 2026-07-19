@@ -28,7 +28,7 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
   // Score color based on value
   const getScoreColor = (s: number) => {
     if (s >= 80) return '#22c55e'; // green
-    if (s >= 60) return '#8338EC'; // purple
+    if (s >= 60) return '#630ed4'; // purple
     if (s >= 40) return '#f59e0b'; // amber
     return '#ef4444'; // red
   };
@@ -36,16 +36,16 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
   const scoreColor = getScoreColor(score);
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-zinc-500';
+  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-on-surface-variant';
 
   return (
     <GlassPanel className="p-6" glow="purple">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-[#8338EC]/20 rounded-lg">
-            <Sparkles className="w-4 h-4 text-[#8338EC]" />
+          <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+            <Sparkles className="w-4 h-4 text-[#630ed4]" />
           </div>
-          <span className="text-sm font-medium text-zinc-400">Social Sticky Score</span>
+          <span className="text-sm font-medium text-on-surface-variant">Social Sticky Score</span>
         </div>
         <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
           <TrendIcon className="w-3 h-3" />
@@ -95,24 +95,24 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
             >
               {score}
             </motion.span>
-            <span className="text-xs text-zinc-500">/ 100</span>
+            <span className="text-xs text-on-surface-variant">/ 100</span>
           </div>
         </div>
       </div>
       
       {/* Breakdown stats */}
-      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/10">
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border-hard">
         <div className="text-center">
-          <p className="text-lg font-semibold text-white">{breakdown.repeatVisitors}%</p>
-          <p className="text-[10px] text-zinc-500">Repeat</p>
+          <p className="text-lg font-semibold text-on-surface">{breakdown.repeatVisitors}%</p>
+          <p className="text-[10px] text-on-surface-variant">Repeat</p>
         </div>
-        <div className="text-center border-x border-white/10">
-          <p className="text-lg font-semibold text-white">{breakdown.avgConnectionsPerVisit}</p>
-          <p className="text-[10px] text-zinc-500">Avg/Visit</p>
+        <div className="text-center border-x border-border-hard">
+          <p className="text-lg font-semibold text-on-surface">{breakdown.avgConnectionsPerVisit}</p>
+          <p className="text-[10px] text-on-surface-variant">Avg/Visit</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-semibold text-white">{breakdown.communityEngagement}%</p>
-          <p className="text-[10px] text-zinc-500">Engaged</p>
+          <p className="text-lg font-semibold text-on-surface">{breakdown.communityEngagement}%</p>
+          <p className="text-[10px] text-on-surface-variant">Engaged</p>
         </div>
       </div>
       {score > 0 ? (
@@ -134,7 +134,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
   const { value, totalArea, activeZones, trend } = data;
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-zinc-500';
+  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-on-surface-variant';
   
   // Visual density indicator
   const densityLevel = Math.min(Math.floor(value / 2), 10);
@@ -143,10 +143,10 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
     <GlassPanel className="p-6" glow="blue">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-[#3A86FF]/20 rounded-lg">
-            <Link2 className="w-4 h-4 text-[#3A86FF]" />
+          <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+            <Link2 className="w-4 h-4 text-[#630ed4]" />
           </div>
-          <span className="text-sm font-medium text-zinc-400">Connection Density</span>
+          <span className="text-sm font-medium text-on-surface-variant">Connection Density</span>
         </div>
         <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
           <TrendIcon className="w-3 h-3" />
@@ -157,11 +157,11 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
         <motion.span
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-4xl font-bold text-white"
+          className="text-4xl font-bold text-on-surface"
         >
           {value}
         </motion.span>
-        <span className="text-sm text-zinc-500">per 100 sq ft</span>
+        <span className="text-sm text-on-surface-variant">per 100 sq ft</span>
       </div>
       
       {/* Density bar visualization */}
@@ -174,7 +174,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
             transition={{ delay: i * 0.05, duration: 0.3 }}
             className={`flex-1 h-8 rounded-sm origin-bottom ${
               i < densityLevel 
-                ? 'bg-gradient-to-t from-[#3A86FF] to-[#3A86FF]/50' 
+                ? 'bg-gradient-to-t from-[#630ed4] to-[#630ed4]/50' 
                 : 'bg-white/10'
             }`}
             style={{
@@ -184,7 +184,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
         ))}
       </div>
       
-      <div className="flex justify-between text-xs text-zinc-500 mt-4 pt-4 border-t border-white/10">
+      <div className="flex justify-between text-xs text-on-surface-variant mt-4 pt-4 border-t border-border-hard">
         <span>Total Area: {totalArea.toLocaleString()} sq ft</span>
         <span>{activeZones} active zones</span>
       </div>
@@ -209,7 +209,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
     if (pct >= 90) return '#ef4444'; // red - near capacity
     if (pct >= 70) return '#f59e0b'; // amber - getting busy
     if (pct >= 40) return '#22c55e'; // green - good
-    return '#3A86FF'; // blue - light
+    return '#630ed4'; // blue - light
   };
   
   const capacityColor = getCapacityColor(fillPercentage);
@@ -221,7 +221,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
           <div className="p-2 bg-green-500/20 rounded-lg">
             <Users className="w-4 h-4 text-green-500" />
           </div>
-          <span className="text-sm font-medium text-zinc-400">Live Count</span>
+          <span className="text-sm font-medium text-on-surface-variant">Live Count</span>
         </div>
         <div className="flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
@@ -239,7 +239,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
         >
           {current}
         </motion.span>
-        <span className="text-sm text-zinc-500">/ {capacity}</span>
+        <span className="text-sm text-on-surface-variant">/ {capacity}</span>
       </div>
       
       {/* Capacity bar */}
@@ -276,7 +276,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
         })}
       </div>
       
-      <div className="flex justify-between text-xs text-zinc-500 pt-4 border-t border-white/10">
+      <div className="flex justify-between text-xs text-on-surface-variant pt-4 border-t border-border-hard">
         <span>Peak: {peak}</span>
         <span>@ {peakTime}</span>
       </div>

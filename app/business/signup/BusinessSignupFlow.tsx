@@ -155,14 +155,14 @@ export function BusinessSignupFlow() {
             ✓
           </span>
         </div>
-        <h1 className="text-2xl font-semibold text-white">You&apos;re subscribed</h1>
-        <p className="text-zinc-400 text-sm">
+        <h1 className="text-2xl font-semibold text-on-surface">You&apos;re subscribed</h1>
+        <p className="text-on-surface-variant text-sm">
           Stripe is updating your account. If the dashboard does not open immediately, wait a few seconds
           and try again.
         </p>
         <Link
           href="/insights"
-          className="inline-flex items-center justify-center rounded-xl bg-[#8338EC] px-6 py-3 text-sm font-medium text-white hover:bg-[#8338EC]/90 transition-colors"
+          className="inline-flex items-center justify-center rounded-xl bg-[#630ed4] px-6 py-3 text-sm font-medium text-on-surface hover:bg-[#630ed4]/90 transition-colors"
         >
           Go to Click Insights
         </Link>
@@ -180,12 +180,12 @@ export function BusinessSignupFlow() {
   if (checkout === 'canceled') {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4 px-6 text-center max-w-md mx-auto">
-        <h1 className="text-xl font-semibold text-white">Checkout canceled</h1>
-        <p className="text-zinc-400 text-sm">You can return when you&apos;re ready to subscribe.</p>
+        <h1 className="text-xl font-semibold text-on-surface">Checkout canceled</h1>
+        <p className="text-on-surface-variant text-sm">You can return when you&apos;re ready to subscribe.</p>
         <button
           type="button"
           onClick={() => router.replace('/business/signup')}
-          className="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-white hover:bg-white/15"
+          className="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-on-surface hover:bg-white/15"
         >
           Continue setup
         </button>
@@ -197,27 +197,27 @@ export function BusinessSignupFlow() {
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-semibold text-white">Business onboarding</h1>
-          <p className="text-zinc-400 text-sm">
+          <h1 className="text-2xl font-semibold text-on-surface">Business onboarding</h1>
+          <p className="text-on-surface-variant text-sm">
             Create an account, add your venue, then subscribe to unlock Click Insights with micro-community analytics, Vibe Radar
             demand signals, and Pop-Up Beacon tools where your plan includes them.
           </p>
         </div>
 
         <div className="flex gap-2 justify-center text-xs text-zinc-500">
-          <span className={step === 'account' ? 'text-[#8338EC]' : ''}>1. Account</span>
+          <span className={step === 'account' ? 'text-[#630ed4]' : ''}>1. Account</span>
           <span>→</span>
-          <span className={step === 'venue' ? 'text-[#8338EC]' : ''}>2. Venue &amp; pay</span>
+          <span className={step === 'venue' ? 'text-[#630ed4]' : ''}>2. Venue &amp; pay</span>
         </div>
 
         {step === 'account' && (
           <form onSubmit={handleAuth} className="space-y-4">
-            <div className="flex gap-2 rounded-xl bg-white/5 p-1 border border-white/10">
+            <div className="flex gap-2 rounded-xl bg-surface p-1 border border-border-hard">
               <button
                 type="button"
                 onClick={() => setIsSignupMode(true)}
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  isSignupMode ? 'bg-[#8338EC] text-white' : 'text-zinc-400'
+                  isSignupMode ? 'bg-[#630ed4] text-on-surface' : 'text-on-surface-variant'
                 }`}
               >
                 Create account
@@ -226,7 +226,7 @@ export function BusinessSignupFlow() {
                 type="button"
                 onClick={() => setIsSignupMode(false)}
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  !isSignupMode ? 'bg-[#8338EC] text-white' : 'text-zinc-400'
+                  !isSignupMode ? 'bg-[#630ed4] text-on-surface' : 'text-on-surface-variant'
                 }`}
               >
                 Sign in
@@ -243,7 +243,7 @@ export function BusinessSignupFlow() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#8338EC]/50"
+                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
                 placeholder="you@venue.com"
               />
             </div>
@@ -258,7 +258,7 @@ export function BusinessSignupFlow() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#8338EC]/50"
+                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
               />
             </div>
             {isSignupMode && (
@@ -273,15 +273,15 @@ export function BusinessSignupFlow() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#8338EC]/50"
+                  className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
                 />
               </div>
             )}
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-[#8338EC] py-3 text-sm font-medium text-white hover:bg-[#8338EC]/90 disabled:opacity-50"
+              className="w-full rounded-xl bg-[#630ed4] py-3 text-sm font-medium text-on-surface hover:bg-[#630ed4]/90 disabled:opacity-50"
             >
               {loading ? 'Please wait…' : isSignupMode ? 'Continue' : 'Sign in'}
             </button>
@@ -300,7 +300,7 @@ export function BusinessSignupFlow() {
                 required
                 value={venueName}
                 onChange={(e) => setVenueName(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#8338EC]/50"
+                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
                 placeholder="e.g. The Rooftop"
               />
             </div>
@@ -313,11 +313,11 @@ export function BusinessSignupFlow() {
                 rows={3}
                 value={venueLocation}
                 onChange={(e) => setVenueLocation(e.target.value)}
-                className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#8338EC]/50"
+                className="w-full resize-none rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
                 placeholder="City, neighborhood, or address"
               />
             </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
             <p className="text-xs text-zinc-500">
               Next, you&apos;ll complete payment on Stripe. Your subscription activates Click Insights for
               this venue.
@@ -326,14 +326,14 @@ export function BusinessSignupFlow() {
               <button
                 type="button"
                 onClick={() => setStep('account')}
-                className="flex-1 rounded-xl border border-white/15 py-3 text-sm text-zinc-300 hover:bg-white/5"
+                className="flex-1 rounded-xl border border-white/15 py-3 text-sm text-zinc-300 hover:bg-surface"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-[2] rounded-xl bg-[#8338EC] py-3 text-sm font-medium text-white hover:bg-[#8338EC]/90 disabled:opacity-50"
+                className="flex-[2] rounded-xl bg-[#630ed4] py-3 text-sm font-medium text-on-surface hover:bg-[#630ed4]/90 disabled:opacity-50"
               >
                 {loading ? 'Redirecting…' : 'Continue to Stripe'}
               </button>

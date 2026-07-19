@@ -6,36 +6,39 @@ import { useAuth } from '@/lib/AuthContext';
 export default function Footer() {
   const { user } = useAuth();
 
-  // Hide footer on authenticated dashboard — it has its own nav
   if (user) return null;
 
   return (
-    <footer className="relative z-50 px-6 md:px-12 py-12 border-t border-zinc-800 bg-zinc-950">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col items-center justify-center gap-6 mb-8">
-          <div className="text-2xl md:text-3xl font-bold">
-            <span className="text-[#8338EC]">C</span>lick
+    <footer
+      className="relative z-50 border-t-2 border-border-hard bg-surface px-6 py-12 text-on-surface md:px-12"
+      style={{ backgroundColor: "var(--color-surface)" }}
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8 flex flex-col items-center justify-center gap-6">
+          <div className="text-2xl font-bold md:text-3xl">
+            <span className="text-primary">C</span>
+            <span className="text-on-surface">lick</span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm md:text-base">
-            <Link href="/privacy" className="text-white hover:text-[#8338EC] transition-colors">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-semibold md:gap-6 md:text-base">
+            <Link href="/privacy" className="text-on-surface hover:text-primary">
               Privacy
             </Link>
-            <span className="text-zinc-600">•</span>
-            <Link href="/terms" className="text-white hover:text-[#8338EC] transition-colors">
+            <span className="text-outline">•</span>
+            <Link href="/terms" className="text-on-surface hover:text-primary">
               Terms
             </Link>
-            <span className="text-zinc-600">•</span>
-            <Link href="/about" className="text-white hover:text-[#8338EC] transition-colors">
+            <span className="text-outline">•</span>
+            <Link href="/about" className="text-on-surface hover:text-primary">
               About
             </Link>
-            <span className="text-zinc-600">•</span>
-            <Link href="/enterprise" className="text-white hover:text-[#8338EC] transition-colors">
+            <span className="text-outline">•</span>
+            <Link href="/enterprise" className="text-on-surface hover:text-primary">
               Enterprise
             </Link>
           </div>
         </div>
-        <div className="text-center text-xs md:text-sm text-zinc-400 space-y-2">
-          <p>Made with 💜 at UW</p>
+        <div className="space-y-2 text-center text-xs font-medium text-on-surface-variant md:text-sm">
+          <p>Made at UW</p>
           <p>© 2025 Click. All rights reserved.</p>
         </div>
       </div>

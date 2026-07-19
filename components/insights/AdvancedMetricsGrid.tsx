@@ -108,8 +108,8 @@ export default function AdvancedMetricsGrid({
         >
           <GlassPanel className="p-6 h-full" hover glow="purple">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-[#8338EC]/20 rounded-lg">
-                <HeartHandshake className="w-4 h-4 text-[#8338EC]" />
+              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+                <HeartHandshake className="w-4 h-4 text-[#630ed4]" />
               </div>
               <span className="text-sm font-medium text-zinc-400">
                 Venue Loyalty Coefficient
@@ -140,8 +140,8 @@ export default function AdvancedMetricsGrid({
         >
           <GlassPanel className="p-6 h-full" hover glow="blue">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-[#3A86FF]/20 rounded-lg">
-                <Anchor className="w-4 h-4 text-[#3A86FF]" />
+              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+                <Anchor className="w-4 h-4 text-[#630ed4]" />
               </div>
               <span className="text-sm font-medium text-zinc-400">Anchor Magnetism</span>
             </div>
@@ -154,7 +154,7 @@ export default function AdvancedMetricsGrid({
                 {topAnchors.map((a, i) => (
                   <li key={a.nfc_anchor_id} className="space-y-1.5">
                     <div className="flex justify-between text-xs text-zinc-400">
-                      <span className="text-zinc-200 truncate pr-2">
+                      <span className="text-on-surface truncate pr-2">
                         {i + 1}. {a.name}
                       </span>
                       <span className="tabular-nums shrink-0 text-zinc-500">
@@ -163,7 +163,7 @@ export default function AdvancedMetricsGrid({
                     </div>
                     <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-[#3A86FF]/80 to-[#8338EC]/90"
+                        className="h-full rounded-full bg-primary"
                         style={{ width: `${(a.ams_score / maxAms) * 100}%` }}
                       />
                     </div>
@@ -182,13 +182,13 @@ export default function AdvancedMetricsGrid({
           <GlassPanel className="p-6 h-full" hover>
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-emerald-500/20 rounded-lg">
-                <AudioLines className="w-4 h-4 text-emerald-400" />
+                <AudioLines className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
               </div>
               <span className="text-sm font-medium text-zinc-400">Acoustic Conversion</span>
             </div>
             <p className="text-lg text-white font-medium">
               Optimal social noise level:{" "}
-              <span className="text-emerald-400">{acr?.label}</span>
+              <span className="text-emerald-700 dark:text-emerald-300">{acr?.label}</span>
             </p>
             <p className="text-xs text-zinc-500 mt-3 leading-relaxed">{acr?.detail}</p>
           </GlassPanel>
@@ -202,7 +202,7 @@ export default function AdvancedMetricsGrid({
           <GlassPanel className="p-6 h-full" hover glow="green">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-green-500/20 rounded-lg">
-                <GitBranch className="w-4 h-4 text-green-400" />
+                <GitBranch className="w-4 h-4 text-green-700 dark:text-green-400" />
               </div>
               <span className="text-sm font-medium text-zinc-400">Cross-Pollination</span>
               <span

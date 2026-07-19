@@ -28,11 +28,11 @@ export default function BentoScreenshotShowcase() {
         >
           <h2
             id="landing-showcase-heading"
-            className="text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl"
+            className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl md:text-5xl"
           >
-            See <span className="text-[#8338EC]">Click</span> in the wild
+            See <span className="text-[#630ed4]">Click</span> in the wild
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-zinc-400 sm:text-lg">
+          <p className="mx-auto mt-4 max-w-2xl text-base text-on-surface-variant sm:text-lg">
             Web and mobile in one shot—stacked the way you actually use them, right after the walkthrough above.
           </p>
         </motion.div>
@@ -62,7 +62,7 @@ export default function BentoScreenshotShowcase() {
                   : { rotateX: 6, rotateY: -10, z: -60, scale: 0.94, transition: springHover }
               }
               transition={springHover}
-              className="absolute left-1/2 top-6 hidden w-[min(100%,520px)] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/40 shadow-[0_40px_120px_-20px_rgba(131,56,236,0.35)] backdrop-blur-sm md:block md:w-[min(92%,560px)]"
+              className="absolute left-1/2 top-6 hidden w-[min(100%,520px)] -translate-x-1/2 overflow-hidden rounded-2xl border border-border-hard bg-surface-container/40 shadow-[0_40px_120px_-20px_rgba(131,56,236,0.35)] md:block md:w-[min(92%,560px)]"
               style={{ transformStyle: 'preserve-3d' }}
             >
               <div className="relative aspect-[1024/706] w-full">
@@ -76,9 +76,9 @@ export default function BentoScreenshotShowcase() {
                   loading="eager"
                 />
               </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 border-t border-white/10 bg-black/45 px-4 py-2.5 backdrop-blur-md">
-                <LayoutDashboard className="h-4 w-4 text-[#8338EC]" aria-hidden />
-                <span className="text-xs font-medium text-zinc-200">Consumer · Click web</span>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 border-t border-border-hard bg-black/45 px-4 py-2.5">
+                <LayoutDashboard className="h-4 w-4 text-[#630ed4]" aria-hidden />
+                <span className="text-xs font-medium text-on-surface">Consumer · Click web</span>
               </div>
             </motion.div>
 
@@ -112,7 +112,7 @@ export default function BentoScreenshotShowcase() {
               className="absolute left-[calc(50%-200px)] top-8 w-[200px] sm:left-[calc(50%-220px)] sm:w-[220px] md:left-[calc(50%-240px)] md:w-[240px]"
               style={{ transformStyle: 'preserve-3d' }}
             >
-              <div className="relative overflow-hidden rounded-[1.75rem] border border-white/15 bg-zinc-950 shadow-2xl shadow-[#8338EC]/25 ring-1 ring-white/10">
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-border-hard bg-background shadow-[#630ed4]/25 ring-1 ring-white/10">
                 <div className="relative aspect-[754/1024] w-full">
                   <Image
                     src={LANDING_IMG.profileMobile}
@@ -155,7 +155,7 @@ export default function BentoScreenshotShowcase() {
               className="absolute left-[calc(50%+24px)] top-4 w-[168px] sm:left-[calc(50%+32px)] sm:w-[184px] md:left-[calc(50%+40px)] md:w-[200px]"
               style={{ transformStyle: 'preserve-3d' }}
             >
-              <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-zinc-950 p-[2px] shadow-2xl shadow-[#3A86FF]/30 ring-1 ring-[#8338EC]/20">
+              <div className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-background p-[2px] shadow-[#630ed4]/30 ring-1 ring-[#630ed4]/20">
                 <div className="relative aspect-[472/1024] w-full overflow-hidden rounded-[1.85rem]">
                   <Image
                     src={LANDING_IMG.homeMobile}
@@ -167,8 +167,8 @@ export default function BentoScreenshotShowcase() {
                   />
                 </div>
               </div>
-              <div className="pointer-events-none absolute -bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-[10px] font-medium text-zinc-300 backdrop-blur-md md:text-xs">
-                <Smartphone className="h-3.5 w-3.5 text-[#8338EC]" aria-hidden />
+              <div className="pointer-events-none absolute -bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border-hard bg-black/50 px-3 py-1 text-[10px] font-medium text-on-surface-variant md:text-xs">
+                <Smartphone className="h-3.5 w-3.5 text-[#630ed4]" aria-hidden />
                 Consumer app
               </div>
             </motion.div>
@@ -178,7 +178,7 @@ export default function BentoScreenshotShowcase() {
             id="landing-3d-fallback-stack"
             className="mx-auto flex w-full max-w-md flex-col gap-6 md:hidden"
           >
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-xl backdrop-blur-xl">
+            <div className="overflow-hidden rounded-2xl border border-border-hard bg-white/[0.03] shadow-xl">
               <div className="relative aspect-[1024/706] w-full">
                 <Image
                   src={LANDING_IMG.memoryDashboard}
@@ -190,12 +190,12 @@ export default function BentoScreenshotShowcase() {
                   loading="eager"
                 />
               </div>
-              <p className="border-t border-white/10 px-4 py-3 text-center text-xs text-zinc-400">
+              <p className="border-t border-border-hard px-4 py-3 text-center text-xs text-on-surface-variant">
                 Consumer · Click web
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="overflow-hidden rounded-2xl border border-white/10 shadow-lg">
+              <div className="overflow-hidden rounded-2xl border border-border-hard shadow-lg">
                 <div className="relative aspect-[754/1024] w-full">
                   <Image
                     src={LANDING_IMG.profileMobile}
@@ -206,7 +206,7 @@ export default function BentoScreenshotShowcase() {
                   />
                 </div>
               </div>
-              <div className="overflow-hidden rounded-2xl border border-white/10 shadow-lg">
+              <div className="overflow-hidden rounded-2xl border border-border-hard shadow-lg">
                 <div className="relative aspect-[472/1024] w-full">
                   <Image
                     src={LANDING_IMG.homeMobile}
@@ -223,19 +223,19 @@ export default function BentoScreenshotShowcase() {
 
         <div
           id="landing-bento-enterprise-cta"
-          className="relative z-30 mx-auto mt-4 max-w-2xl rounded-2xl border border-white/5 bg-zinc-950/90 px-4 py-4 text-center shadow-lg shadow-black/40 backdrop-blur-md md:mt-6 md:px-6"
+          className="relative z-30 mx-auto mt-4 max-w-2xl rounded-2xl border border-white/5 bg-background/90 px-4 py-4 text-center shadow-lg shadow-black/40 md:mt-6 md:px-6"
         >
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
-            className="text-sm text-zinc-500"
+            className="text-sm text-on-surface-variant"
           >
             Running a venue or campus program?{' '}
             <Link
               href="/enterprise"
-              className="font-medium text-[#8338EC] underline-offset-4 hover:underline"
+              className="font-medium text-[#630ed4] underline-offset-4 hover:underline"
             >
               Explore Click for enterprise
             </Link>

@@ -75,10 +75,10 @@ function encounterTelemetryPills(enc: NonNullable<ConnectionRecord['encounters']
 
   return [
     db != null
-      ? { key: 'db', icon: <Volume2 className="h-2.5 w-2.5 shrink-0 text-violet-300" aria-hidden />, label: `${Math.round(db)} dB` }
+      ? { key: 'db', icon: <Volume2 className="h-2.5 w-2.5 shrink-0 text-primary" aria-hidden />, label: `${Math.round(db)} dB` }
       : null,
     elevation != null
-      ? { key: 'el', icon: <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-300" aria-hidden />, label: `${Math.round(elevation)} m` }
+      ? { key: 'el', icon: <Mountain className="h-2.5 w-2.5 shrink-0 text-sky-700 dark:text-sky-300" aria-hidden />, label: `${Math.round(elevation)} m` }
       : null,
     lux != null
       ? {
@@ -87,23 +87,23 @@ function encounterTelemetryPills(enc: NonNullable<ConnectionRecord['encounters']
             lux < 15 ? (
               <Moon className="h-2.5 w-2.5 shrink-0 text-sky-200" aria-hidden />
             ) : (
-              <Sun className="h-2.5 w-2.5 shrink-0 text-amber-200" aria-hidden />
+              <Sun className="h-2.5 w-2.5 shrink-0 text-amber-800 dark:text-amber-300" aria-hidden />
             ),
           label: `${Math.round(lux)} lx`,
         }
       : null,
     battery != null
-      ? { key: 'bat', icon: <Battery className="h-2.5 w-2.5 shrink-0 text-emerald-300" aria-hidden />, label: `${Math.round(battery)}%` }
+      ? { key: 'bat', icon: <Battery className="h-2.5 w-2.5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />, label: `${Math.round(battery)}%` }
       : null,
     azimuth != null
       ? {
           key: 'az',
-          icon: <Compass className="h-2.5 w-2.5 shrink-0 text-violet-200" aria-hidden />,
+          icon: <Compass className="h-2.5 w-2.5 shrink-0 text-primary" aria-hidden />,
           label: `${Math.round(((azimuth % 360) + 360) % 360)}°`,
         }
       : null,
     motion != null
-      ? { key: 'mv', icon: <Activity className="h-2.5 w-2.5 shrink-0 text-orange-200" aria-hidden />, label: motion.toFixed(2) }
+      ? { key: 'mv', icon: <Activity className="h-2.5 w-2.5 shrink-0 text-orange-700 dark:text-orange-300" aria-hidden />, label: motion.toFixed(2) }
       : null,
   ].filter((pill): pill is { key: string; icon: ReactElement; label: string } => pill != null);
 }
@@ -160,12 +160,12 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
   const getChapterColor = (index: number, customColor?: string) => {
     if (customColor) return customColor;
     const colors = [
-      'from-[#8338EC] to-[#3A86FF]',
+      'from-[#630ed4] to-[#630ed4]',
       'from-[#FF6B6B] to-[#FFE66D]',
       'from-[#06D6A0] to-[#118AB2]',
-      'from-[#EF476F] to-[#8338EC]',
+      'from-[#EF476F] to-[#630ed4]',
       'from-[#FFD93D] to-[#FF6B6B]',
-      'from-[#3A86FF] to-[#06D6A0]',
+      'from-[#630ed4] to-[#06D6A0]',
     ];
     return colors[index % colors.length];
   };
@@ -175,12 +175,12 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-[#8338EC]/20 rounded-lg">
-            <Clock className="w-4 h-4 text-[#8338EC]" />
+          <div className="rounded-[8px] bg-on-primary-container p-2">
+            <Clock className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-white">Time Capsule</h3>
-            <p className="text-xs text-zinc-500">{chapters.length} chapters in your journey</p>
+            <h3 className="font-semibold text-on-surface">Time Capsule</h3>
+            <p className="text-xs text-on-surface-variant">{chapters.length} chapters in your journey</p>
           </div>
         </div>
         
@@ -191,8 +191,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
             disabled={!canScrollLeft}
             className={`p-2 rounded-lg border transition-all ${
               canScrollLeft 
-                ? 'border-zinc-700 hover:border-[#8338EC] text-zinc-400 hover:text-white' 
-                : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
+                ? 'border-border-hard text-on-surface-variant hover:border-primary hover:text-on-surface' 
+                : 'border-border-hard text-outline cursor-not-allowed'
             }`}
           >
             <ChevronLeft className="w-4 h-4" />
@@ -202,8 +202,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
             disabled={!canScrollRight}
             className={`p-2 rounded-lg border transition-all ${
               canScrollRight 
-                ? 'border-zinc-700 hover:border-[#8338EC] text-zinc-400 hover:text-white' 
-                : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
+                ? 'border-border-hard text-on-surface-variant hover:border-primary hover:text-on-surface' 
+                : 'border-border-hard text-outline cursor-not-allowed'
             }`}
           >
             <ChevronRight className="w-4 h-4" />
@@ -214,7 +214,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
       {/* Timeline */}
       <div className="relative">
         {/* Timeline line */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-zinc-700 to-transparent -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 left-0 right-0 z-0 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-outline to-transparent" />
         
         {/* Chapters */}
         <div 
@@ -226,8 +226,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
           {chapters.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-12">
               <div className="text-center">
-                <Calendar className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                <p className="text-zinc-500">Your chapters will appear here as you make memories</p>
+                <Calendar className="w-12 h-12 text-outline mx-auto mb-3" />
+                <p className="text-on-surface-variant">Your chapters will appear here as you make memories</p>
               </div>
             </div>
           ) : (
@@ -258,49 +258,49 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                   className={`
                     relative overflow-hidden rounded-2xl border cursor-pointer transition-all
                     ${selectedChapter?.id === chapter.id 
-                      ? 'border-[#8338EC] shadow-[0_0_20px_rgba(131,56,236,0.3)]' 
-                      : 'border-zinc-800 hover:border-zinc-700'}
+                      ? 'border-primary shadow-none' 
+                      : 'border-border-hard hover:border-border-hard'}
                   `}
                 >
-                  {/* Gradient header */}
-                  <div className={`h-24 bg-gradient-to-br ${getChapterColor(index, chapter.color)} p-4 relative`}>
-                    <div className="absolute inset-0 bg-black/30" />
+                  {/* Gradient header — always light text on colored wash */}
+                  <div className={`relative h-24 bg-gradient-to-br p-4 ${getChapterColor(index, chapter.color)}`}>
+                    <div className="absolute inset-0 bg-black/35" />
                     <div className="relative z-10">
-                      <p className="text-xs text-white/70 mb-1">
+                      <p className="mb-1 text-xs font-medium text-white/85">
                         {formatDateRange(chapter.dateRange.start, chapter.dateRange.end)}
                       </p>
-                      <h4 className="font-bold text-white text-lg leading-tight line-clamp-2">
+                      <h4 className="line-clamp-2 text-lg font-bold leading-tight text-white">
                         {chapter.title}
                       </h4>
                     </div>
                     
                     {/* Star badge for special chapters */}
                     {chapter.connectionCount >= 5 && (
-                      <div className="absolute top-3 right-3">
-                        <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                      <div className="absolute top-3 right-3 z-10">
+                        <Star className="h-4 w-4 fill-yellow-300 text-yellow-300" />
                       </div>
                     )}
                   </div>
 
                   {/* Content */}
-                  <div className="bg-zinc-900/80 backdrop-blur-sm p-4 space-y-3">
+                  <div className="space-y-3 bg-surface p-4">
                     {/* Stats */}
                     <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-1 text-zinc-400">
-                        <Users className="w-4 h-4" />
+                      <div className="flex items-center gap-1 text-on-surface-variant">
+                        <Users className="h-4 w-4" />
                         <span>{chapter.connectionCount} connections</span>
                       </div>
                       {chapter.location && (
-                        <div className="flex items-center gap-1 text-zinc-400">
-                          <MapPin className="w-4 h-4" />
-                          <span className="truncate max-w-[100px]">{chapter.location}</span>
+                        <div className="flex items-center gap-1 text-on-surface-variant">
+                          <MapPin className="h-4 w-4" />
+                          <span className="max-w-[100px] truncate">{chapter.location}</span>
                         </div>
                       )}
                     </div>
 
                     {/* Description */}
                     {chapter.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-2">
+                      <p className="line-clamp-2 text-xs text-on-surface-variant">
                         {chapter.description}
                       </p>
                     )}
@@ -311,13 +311,13 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                         {chapter.highlights.slice(0, 3).map((highlight, i) => (
                           <span 
                             key={i}
-                            className="px-2 py-0.5 bg-zinc-800 rounded-full text-[10px] text-zinc-400"
+                            className="rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] font-medium text-on-surface"
                           >
                             {highlight}
                           </span>
                         ))}
                         {chapter.highlights.length > 3 && (
-                          <span className="px-2 py-0.5 text-[10px] text-zinc-500">
+                          <span className="px-2 py-0.5 text-[10px] text-on-surface-variant">
                             +{chapter.highlights.length - 3} more
                           </span>
                         )}
@@ -359,16 +359,16 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="glass p-5 rounded-2xl border border-zinc-800 space-y-5">
+              <div className="fc-card p-5 rounded-2xl border border-border-hard space-y-5">
                 {/* Panel header — label only, no duplicate title */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-[#8338EC]" />
-                    <span className="text-sm font-semibold text-zinc-300">Chapter Breakdown</span>
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold text-on-surface-variant">Chapter Breakdown</span>
                   </div>
                   <button
                     onClick={() => setSelectedChapter(null)}
-                    className="text-zinc-500 hover:text-white transition-colors text-lg leading-none"
+                    className="text-on-surface-variant hover:text-on-surface transition-colors text-lg leading-none"
                   >
                     ✕
                   </button>
@@ -377,29 +377,29 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                 {/* Activity stats — kept / pending / expired / active days */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {[
-                    { label: 'Kept', value: kept, color: 'text-green-400', bg: 'bg-green-500/10' },
-                    { label: 'Active', value: active, color: 'text-sky-300', bg: 'bg-sky-500/10' },
-                    { label: 'Pending', value: pending, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-                    { label: 'Archived', value: archived, color: 'text-zinc-400', bg: 'bg-zinc-700/30' },
-                    { label: 'Expired', value: expired, color: 'text-zinc-500', bg: 'bg-zinc-800/40' },
-                    { label: 'Active days', value: activeDays, color: 'text-[#8338EC]', bg: 'bg-[#8338EC]/10' },
+                    { label: 'Kept', value: kept, color: 'text-green-700 dark:text-green-400', bg: 'bg-green-500/10' },
+                    { label: 'Active', value: active, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-500/10' },
+                    { label: 'Pending', value: pending, color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-500/10' },
+                    { label: 'Archived', value: archived, color: 'text-on-surface-variant', bg: 'bg-surface-container' },
+                    { label: 'Expired', value: expired, color: 'text-on-surface-variant', bg: 'bg-surface-container' },
+                    { label: 'Active days', value: activeDays, color: 'text-primary', bg: 'bg-on-primary-container' },
                   ].map(({ label, value, color, bg }) => (
                     <div key={label} className={`${bg} rounded-xl p-3 text-center`}>
                       <p className={`text-xl font-bold ${color}`}>{value}</p>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">{label}</p>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">{label}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* Most active location */}
                 {topLocation && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/40 rounded-lg">
-                    <MapPin className="w-3.5 h-3.5 text-[#8338EC] shrink-0" />
-                    <p className="text-xs text-zinc-400">
+                  <div className="flex items-center gap-2 rounded-[8px] border border-border-hard bg-surface-container px-3 py-2">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <p className="text-xs text-on-surface-variant">
                       Most active at{' '}
-                      <span className="text-white font-medium">{topLocation}</span>
+                      <span className="font-medium text-on-surface">{topLocation}</span>
                       {Object.keys(locationCounts).length > 1 && (
-                        <span className="text-zinc-600">
+                        <span className="text-outline">
                           {' '}· {Object.keys(locationCounts).length} locations total
                         </span>
                       )}
@@ -410,25 +410,25 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                 {/* People list */}
                 {conns.length > 0 ? (
                   <div>
-                    <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+                    <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
                       People met during this chapter
                     </p>
                     <div className="space-y-1.5 max-h-52 overflow-y-auto scrollbar-thin pr-1">
                       {conns.map((conn) => (
                         <div
                           key={conn.id}
-                          className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors group"
+                          className="group flex items-center gap-3 rounded-[8px] px-2 py-2 transition-colors hover:bg-surface-container"
                         >
                           {/* Avatar */}
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] flex items-center justify-center text-[10px] font-bold shrink-0">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-on-primary">
                             {conn.name.charAt(0).toUpperCase()}
                           </div>
                           {/* Name + location */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white font-medium truncate">{conn.name}</p>
-                            <p className="text-[10px] text-zinc-400 truncate">{conn.location}</p>
+                            <p className="text-sm text-on-surface font-medium truncate">{conn.name}</p>
+                            <p className="text-[10px] text-on-surface-variant truncate">{conn.location}</p>
                             {(conn.context || conn.weatherSummary || conn.noiseSummary) && (
-                              <div className="mt-1.5 border-t border-zinc-800/70 pt-1.5">
+                              <div className="mt-1.5 border-t border-border-hard/70 pt-1.5">
                                 <MomentBlock
                                   compact
                                   context={conn.context}
@@ -439,8 +439,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                               </div>
                             )}
                             {conn.encounters && conn.encounters.length > 1 ? (
-                              <div className="mt-2 space-y-1.5 border-t border-zinc-800/60 pt-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                              <div className="mt-2 space-y-1.5 border-t border-border-hard/60 pt-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
                                   You&apos;ve crossed paths {conn.encounters.length} times
                                 </p>
                                 <ul className="scrollbar-thin max-h-36 space-y-1 overflow-y-auto pr-1">
@@ -450,9 +450,9 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                       return (
                                         <li
                                           key={enc.id}
-                                          className="flex flex-col rounded-md bg-zinc-950/60 px-2 py-1.5 text-[10px] text-zinc-400"
+                                          className="flex flex-col rounded-md bg-background/60 px-2 py-1.5 text-[10px] text-on-surface-variant"
                                         >
-                                          <span className="font-medium text-zinc-200">
+                                          <span className="font-medium text-on-surface">
                                             {enc.encounteredAt.toLocaleDateString('en-US', {
                                               month: 'short',
                                               day: 'numeric',
@@ -467,7 +467,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                             }) ?? enc.locationName ?? enc.displayLocation ?? 'A new location'}
                                           </span>
                                           {enc.contextTags.length > 0 ? (
-                                            <span className="truncate text-[#C4B5FD]">
+                                            <span className="truncate text-primary">
                                               {enc.contextTags.join(' · ')}
                                             </span>
                                           ) : null}
@@ -476,7 +476,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                                               {telemetryPills.map((pill) => (
                                                 <span
                                                   key={pill.key}
-                                                  className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-200"
+                                                  className="inline-flex items-center gap-0.5 rounded-full border border-border-hard/80 bg-surface-container/90 px-1.5 py-0.5 text-[9px] font-medium text-on-surface"
                                                 >
                                                   {pill.icon}
                                                   {pill.label}
@@ -494,22 +494,22 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                           </div>
                           {/* Context tag */}
                           {conn.context && (
-                            <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC]/10 text-[#8338EC] border border-[#8338EC]/20 shrink-0">
+                            <span className="hidden shrink-0 rounded-full border border-primary/20 bg-on-primary-container px-2 py-0.5 text-[10px] font-medium text-primary sm:inline">
                               {conn.context}
                             </span>
                           )}
                           {/* Status */}
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${
                               conn.status === 'kept'
-                                ? 'bg-green-500/10 text-green-400'
+                                ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                                 : conn.status === 'active'
-                                  ? 'bg-sky-500/10 text-sky-300'
+                                  ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
                                   : conn.status === 'pending'
-                                    ? 'bg-amber-500/10 text-amber-400'
+                                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
                                     : conn.status === 'archived' || conn.status === 'removed'
-                                      ? 'bg-zinc-700/50 text-zinc-400'
-                                      : 'bg-zinc-700/40 text-zinc-500'
+                                      ? 'bg-surface-container text-on-surface-variant'
+                                      : 'bg-surface-container text-on-surface-variant'
                             }`}
                           >
                             {conn.status}
@@ -521,7 +521,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                             conn.status !== 'removed' && (
                             <button
                               onClick={() => onConnectionClick(conn)}
-                              className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-[#8338EC] text-white shrink-0 transition-opacity"
+                              className="flex shrink-0 items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-on-primary opacity-0 transition-opacity group-hover:opacity-100"
                             >
                               <MessageCircle className="w-3 h-3" /> Chat
                             </button>
@@ -531,7 +531,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-zinc-500 text-center py-2">
+                  <p className="text-sm text-on-surface-variant text-center py-2">
                     No detailed records for this chapter yet.
                   </p>
                 )}

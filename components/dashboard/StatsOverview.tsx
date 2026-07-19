@@ -61,8 +61,8 @@ export default function StatsOverview({
           ? { percent: totalNetworkGrowthPercent }
           : undefined,
       icon: Users,
-      color: 'text-[#8338EC]',
-      bgColor: 'bg-[#8338EC]/20',
+      color: 'text-[#630ed4]',
+      bgColor: 'bg-[#630ed4]/20',
     },
     {
       label: 'This Month',
@@ -70,8 +70,8 @@ export default function StatsOverview({
       trend:
         thisMonthTrendPercent !== null ? { percent: thisMonthTrendPercent } : undefined,
       icon: Calendar,
-      color: 'text-[#3A86FF]',
-      bgColor: 'bg-[#3A86FF]/20',
+      color: 'text-[#630ed4]',
+      bgColor: 'bg-[#630ed4]/20',
     },
     {
       label: 'Connection Streak',
@@ -117,7 +117,7 @@ export default function StatsOverview({
           <motion.div
             key={stat.label}
             variants={itemVariants}
-            className="glass p-4 rounded-2xl border border-zinc-800 hover:border-zinc-700 transition-colors group"
+            className="fc-card p-4 rounded-2xl border border-border-hard hover:border-border-hard transition-colors group"
           >
             <div className="flex items-start justify-between mb-3">
               <div className={`p-2 ${stat.bgColor} rounded-xl`}>
@@ -126,7 +126,7 @@ export default function StatsOverview({
               {stat.trend && stat.trend.percent !== null && (
                 <div
                   className={`flex items-center gap-1 text-xs ${
-                    stat.trend.percent >= 0 ? 'text-green-400' : 'text-red-400'
+                    stat.trend.percent >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
                   }`}
                   title={
                     stat.label === 'Total Connections'
@@ -144,10 +144,10 @@ export default function StatsOverview({
                 </div>
               )}
             </div>
-            <div className="text-2xl font-bold text-white mb-1 group-hover:text-[#8338EC] transition-colors">
+            <div className="text-2xl font-bold text-on-surface mb-1 group-hover:text-[#630ed4] transition-colors">
               {stat.value}
             </div>
-            <div className="text-xs text-zinc-500">{stat.label}</div>
+            <div className="text-xs text-on-surface-variant">{stat.label}</div>
           </motion.div>
         );
       })}
@@ -173,17 +173,17 @@ export function AchievementBadge({
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex items-center gap-3 p-3 glass rounded-xl border border-zinc-800 relative overflow-hidden group"
+      className="flex items-center gap-3 p-3 fc-card rounded-xl border border-border-hard relative overflow-hidden group"
     >
       <div className="p-2 bg-gradient-to-br from-[#FFD93D]/20 to-[#FF6B6B]/20 rounded-lg">
         <Icon className="w-5 h-5 text-[#FFD93D]" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-white text-sm truncate">{title}</div>
-        <div className="text-xs text-zinc-500 truncate">{description}</div>
+        <div className="font-semibold text-on-surface text-sm truncate">{title}</div>
+        <div className="text-xs text-on-surface-variant truncate">{description}</div>
       </div>
       {isNew && (
-        <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-[#8338EC] text-[10px] font-bold rounded-full">
+        <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-[#630ed4] text-[10px] font-bold rounded-full">
           NEW
         </span>
       )}
@@ -209,13 +209,13 @@ export function MilestoneProgress({
   const progress = Math.min((current / target) * 100, 100);
   
   return (
-    <div className="p-4 glass rounded-xl border border-zinc-800">
+    <div className="p-4 fc-card rounded-xl border border-border-hard">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-[#8338EC]" />
-          <span className="text-sm font-medium text-white">{label}</span>
+          <Target className="w-4 h-4 text-[#630ed4]" />
+          <span className="text-sm font-medium text-on-surface">{label}</span>
         </div>
-        <span className="text-xs text-zinc-500">{current}/{target}</span>
+        <span className="text-xs text-on-surface-variant">{current}/{target}</span>
       </div>
       
       {/* Progress bar */}
@@ -224,12 +224,12 @@ export function MilestoneProgress({
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 1, ease: 'easeOut' }}
-          className="h-full bg-gradient-to-r from-[#8338EC] to-[#3A86FF] rounded-full"
+          className="h-full bg-gradient-to-r from-[#630ed4] to-[#630ed4] rounded-full"
         />
       </div>
       
       {/* Reward hint */}
-      <div className="flex items-center gap-1 text-xs text-zinc-500">
+      <div className="flex items-center gap-1 text-xs text-on-surface-variant">
         <Zap className="w-3 h-3 text-[#FFD93D]" />
         <span>Reward: {reward}</span>
       </div>

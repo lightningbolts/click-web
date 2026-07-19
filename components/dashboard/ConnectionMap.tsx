@@ -16,6 +16,8 @@ import {
   rawBeaconRowsFromApiPayload,
 } from '@/lib/map/mapBeacons';
 import { beaconPopupErrorHtml, formatBeaconPopupHtml } from '@/lib/map/beaconPopupHtml';
+import { useTheme } from '@/lib/theme/ThemeProvider';
+import { mapStyleForTheme } from '@/lib/theme/mapStyles';
 
 function atmosphereHtml(conn: ConnectionRecord): string {
   const bits = [conn.weatherSummary, conn.noiseSummary].filter((b): b is string => typeof b === 'string' && b.length > 0);
@@ -158,6 +160,7 @@ function buildConnectionFeatures(positioned: PositionedConnection[]): GeoJSON.Fe
  * **Data contract:** pass rows from `GET /api/connections?statusScope=map` or the `map` array from `?bundle=dashboard`.
  */
 export default function ConnectionMap({ connections, onConnectionClick }: ConnectionMapProps) {
+  const { theme } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -317,15 +320,15 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       .map((conn) => {
         const date = conn.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
         const ctx = conn.context
-          ? `<span style="color:#8338EC; font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(131,56,236,0.2); border-radius:9999px;">${escapeHtml(conn.context)}</span>`
+          ? `<span style="color:#630ed4; font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(131,56,236,0.2); border-radius:9999px;">${escapeHtml(conn.context)}</span>`
           : '';
         const atm = atmosphereHtml(conn);
         return `<div style="padding:8px 0; border-bottom:1px solid rgba(63,63,70,0.35);">
-          <strong style="color:#8338EC; font-size:13px; display:block; margin-bottom:2px;">${escapeHtml(conn.name)}</strong>
+          <strong style="color:#630ed4; font-size:13px; display:block; margin-bottom:2px;">${escapeHtml(conn.name)}</strong>
           <span style="color:#a1a1aa; font-size:11px; display:block;">${escapeHtml(conn.location)}</span>
           <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${escapeHtml(date)}</span>
           ${ctx}${atm}
-          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:linear-gradient(135deg, #8338EC, #6520c0); color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
+          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:linear-gradient(135deg, #630ed4, #6520c0); color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
             Chat →
           </button>
         </div>`;
@@ -335,17 +338,17 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     const single = groupedConnections.length === 1;
     const singleDate = connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const singleCtx = connection.context
-      ? `<span style="color: #8338EC; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${escapeHtml(connection.context)}</span>`
+      ? `<span style="color: #630ed4; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${escapeHtml(connection.context)}</span>`
       : '';
     const singleAtm = atmosphereHtml(connection);
 
     return `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-height: 260px; overflow-y: auto;">
-      ${single ? `<strong style="color: #8338EC; font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(connection.name)}</strong>
+      ${single ? `<strong style="color: #630ed4; font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(connection.name)}</strong>
       <span style="color: #a1a1aa; font-size: 12px; display: block;">${escapeHtml(connection.location)}</span>
       <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${escapeHtml(singleDate)}</span>
       ${singleCtx}${singleAtm}
-      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #8338EC, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
-      : `<strong style="color:#8338EC; font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connections at this location</strong>${groupedRows}`}
+      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #630ed4, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
+      : `<strong style="color:#630ed4; font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connections at this location</strong>${groupedRows}`}
     </div>`;
   }, []);
 
@@ -460,7 +463,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     try {
       const mapInstance = new maplibregl.Map({
         container: mapContainer.current,
-        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        style: mapStyleForTheme(theme),
         center: mapInitCenterRef.current ?? mapCenter,
         zoom: 12,
         attributionControl: false,
@@ -508,7 +511,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
           source: SRC_CONNECTIONS,
           filter: ['!', ['has', 'point_count']],
           paint: {
-            'circle-color': '#8338EC',
+            'circle-color': '#630ed4',
             'circle-radius': 14,
             'circle-opacity': 0.95,
             'circle-stroke-width': 3,
@@ -689,7 +692,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       setMapInitialized(false);
       setMapPresentationReady(false);
     };
-  }, [attachMapInteractions]);
+  }, [attachMapInteractions, theme]);
 
   useEffect(() => {
     const m = map.current;
@@ -770,10 +773,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
 
   if (!hasGeoConnections) {
     return (
-      <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
-        <MapPin className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+      <div className="fc-card p-12 rounded-[16px] border border-border-hard text-center">
+        <MapPin className="w-16 h-16 text-outline mx-auto mb-4" />
         <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>
-        <p className="text-zinc-400">
+        <p className="text-on-surface-variant">
           Your Click map will appear here once you start making clicks!
         </p>
       </div>
@@ -782,25 +785,25 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
 
   if (mapError) {
     return (
-      <div className="glass p-12 rounded-3xl border border-zinc-800 text-center">
+      <div className="fc-card p-12 rounded-[16px] border border-border-hard text-center">
         <MapPin className="w-16 h-16 text-red-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold mb-2">Map Error</h3>
-        <p className="text-zinc-400">{mapError}</p>
+        <p className="text-on-surface-variant">{mapError}</p>
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-3xl border border-zinc-800 overflow-hidden bg-zinc-900 h-[600px]">
+    <div className="relative rounded-[16px] border border-border-hard overflow-hidden bg-surface-container h-[600px]">
       <div
-        className={`absolute inset-0 z-10 flex items-center justify-center bg-zinc-900 transition-opacity duration-500 ease-out ${
+        className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
           mapPresentationReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}
         aria-hidden={mapPresentationReady}
       >
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin mx-auto mb-2" />
-          <p className="text-sm text-zinc-400">Loading map...</p>
+          <Loader2 className="w-8 h-8 text-[#630ed4] animate-spin mx-auto mb-2" />
+          <p className="text-sm text-on-surface-variant">Loading map...</p>
         </div>
       </div>
 
@@ -812,34 +815,34 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       />
 
       {mapPresentationReady && (
-        <div className="absolute top-4 left-4 z-[6] max-w-[220px] rounded-2xl border border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-lg shadow-black/40 p-3 text-xs text-zinc-200">
-          <div className="flex items-center gap-2 mb-2 font-semibold text-white">
-            <Layers className="w-3.5 h-3.5 text-[#8338EC]" />
+        <div className="absolute top-4 left-4 z-[6] max-w-[220px] rounded-[16px] border-2 border-border-hard bg-surface p-3 text-xs text-on-surface shadow-lg">
+          <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
+            <Layers className="w-3.5 h-3.5 text-[#630ed4]" />
             Map layers
           </div>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#8338EC]" checked={layers.myNetwork} onChange={() => toggle('myNetwork')} />
+            <input type="checkbox" className="accent-[#630ed4]" checked={layers.myNetwork} onChange={() => toggle('myNetwork')} />
             My Network
           </label>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#8338EC]" checked={layers.officialSoundtracks} onChange={() => toggle('officialSoundtracks')} />
+            <input type="checkbox" className="accent-[#630ed4]" checked={layers.officialSoundtracks} onChange={() => toggle('officialSoundtracks')} />
             Official Soundtracks
           </label>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#8338EC]" checked={layers.communityBeacons} onChange={() => toggle('communityBeacons')} />
+            <input type="checkbox" className="accent-[#630ed4]" checked={layers.communityBeacons} onChange={() => toggle('communityBeacons')} />
             Community Beacons
           </label>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#8338EC]" checked={layers.hazards} onChange={() => toggle('hazards')} />
+            <input type="checkbox" className="accent-[#630ed4]" checked={layers.hazards} onChange={() => toggle('hazards')} />
             Hazards
           </label>
         </div>
       )}
 
       {mapPresentationReady && (
-        <div className="absolute bottom-4 left-4 bg-zinc-900/90 backdrop-blur-sm px-4 py-2 rounded-xl border border-zinc-700">
-          <span className="text-sm text-zinc-400">
-            <span className="text-[#8338EC] font-bold">{geoConnections.length}</span> locations mapped
+        <div className="absolute bottom-4 left-4 bg-surface-container/90 px-4 py-2 rounded-xl border border-border-hard">
+          <span className="text-sm text-on-surface-variant">
+            <span className="text-[#630ed4] font-bold">{geoConnections.length}</span> locations mapped
           </span>
         </div>
       )}

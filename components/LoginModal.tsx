@@ -46,6 +46,16 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
     }
   }, [isOpen, initialIsSignup]);
 
+  // Esc to dismiss
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   const handleOAuth = async (provider: OAuthProvider) => {
     setError('');
     setSuccess('');
@@ -196,40 +206,41 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop + modal share one layer so outside clicks reach onClose */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           >
-            <div className="glass max-w-md w-full p-8 rounded-3xl border border-zinc-800 relative">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fc-card relative w-full max-w-md p-8 text-on-surface"
+              style={{ backgroundColor: "var(--color-surface)" }}
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+            >
               {/* Close button */}
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
               >
                 <X className="w-6 h-6" />
               </button>
 
               {/* Header */}
-              <h2 className="text-3xl font-bold mb-2">
+              <h2 className="mb-2 text-3xl font-bold text-on-surface">
                 {isForgotPassword
                   ? 'Reset Password'
                   : isSignup
                     ? 'Create Account'
                     : 'Welcome Back'}
               </h2>
-              <p className="text-zinc-400 mb-8">
+              <p className="mb-8 font-medium text-on-surface-variant">
                 {isForgotPassword
                   ? 'Enter your email to receive a reset link'
                   : isSignup
@@ -247,7 +258,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     onClick={() => handleOAuth('google')}
                     disabled={isLoading}
                     aria-label={isSignup ? 'Continue with Google' : 'Sign in with Google'}
-                    className="w-full flex items-center justify-center gap-3 py-3 bg-white text-zinc-900 hover:bg-zinc-100 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="fc-btn-secondary flex w-full items-center justify-center gap-3 py-3 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
                       <path
@@ -276,7 +287,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     onClick={() => handleOAuth('apple')}
                     disabled={isLoading}
                     aria-label={isSignup ? 'Continue with Apple' : 'Sign in with Apple'}
-                    className="w-full flex items-center justify-center gap-3 py-3 bg-black text-white border border-zinc-700 hover:bg-zinc-900 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex w-full items-center justify-center gap-3 rounded-[8px] border-2 border-border-hard bg-on-surface py-3 font-bold text-surface disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <svg aria-hidden="true" width="16" height="18" viewBox="0 0 16 18" fill="currentColor">
                       <path d="M13.35 9.58c-.02-2.02 1.65-2.99 1.73-3.04-.95-1.38-2.42-1.57-2.94-1.59-1.25-.13-2.44.74-3.07.74-.64 0-1.61-.72-2.65-.7-1.36.02-2.63.8-3.33 2.02-1.42 2.46-.36 6.1 1.02 8.09.67.97 1.47 2.06 2.52 2.02 1.02-.04 1.4-.66 2.63-.66s1.57.66 2.65.64c1.1-.02 1.79-.99 2.46-1.97.78-1.12 1.09-2.22 1.11-2.28-.02-.01-2.13-.82-2.15-3.27zM11.4 3.64c.56-.68.94-1.62.83-2.56-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.56-.85 2.48.9.07 1.83-.46 2.39-1.14z" />
@@ -284,9 +295,9 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     Continue with Apple
                   </motion.button>
                   <div className="flex items-center gap-3 pt-1">
-                    <div className="h-px bg-zinc-800 flex-1" />
-                    <span className="text-xs uppercase tracking-wider text-zinc-500">or</span>
-                    <div className="h-px bg-zinc-800 flex-1" />
+                    <div className="h-px flex-1 bg-border-hard" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">or</span>
+                    <div className="h-px flex-1 bg-border-hard" />
                   </div>
                 </div>
               )}
@@ -307,7 +318,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                           onChange={(e) => setFirstName(e.target.value)}
                           required
                           autoComplete="given-name"
-                          className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                          className="fc-input w-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="John"
                         />
                       </div>
@@ -322,7 +333,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                           onChange={(e) => setLastName(e.target.value)}
                           required
                           autoComplete="family-name"
-                          className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                          className="fc-input w-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Doe"
                         />
                       </div>
@@ -337,7 +348,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                         value={birthday}
                         onChange={(e) => setBirthday(e.target.value)}
                         required
-                        className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                        className="fc-input w-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </div>
                   </>
@@ -353,7 +364,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                    className="fc-input w-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -372,7 +383,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                             setError('');
                             setSuccess('');
                           }}
-                          className="text-xs text-zinc-400 hover:text-[#8338EC] transition-colors"
+                          className="text-xs font-semibold text-on-surface-variant hover:text-primary"
                         >
                           Forgot password?
                         </button>
@@ -385,7 +396,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                      className="fc-input w-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="••••••••"
                     />
                   </div>
@@ -403,30 +414,29 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                      className="fc-input w-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="••••••••"
                     />
                   </div>
                 )}
 
                 {error && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                  <div className="rounded-[8px] border-2 border-error bg-surface-container p-3 text-sm font-medium text-error">
                     {error}
                   </div>
                 )}
 
                 {success && (
-                  <div className="p-3 bg-[#8338EC]/10 border border-[#8338EC]/20 rounded-xl text-[#8338EC] text-sm">
+                  <div className="rounded-[8px] border-2 border-border-hard bg-on-primary-container p-3 text-sm font-medium text-primary">
                     {success}
                   </div>
                 )}
 
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="fc-btn-primary w-full py-3 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isLoading
                     ? 'Loading...'
@@ -450,7 +460,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     setError('');
                     setSuccess('');
                   }}
-                  className="text-zinc-400 hover:text-[#8338EC] transition-colors text-sm"
+                  className="text-sm font-semibold text-on-surface-variant hover:text-primary"
                 >
                   {isForgotPassword
                     ? 'Back to Sign In'
@@ -459,7 +469,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                       : "Don't have an account? Sign up"}
                 </button>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </>
       )}

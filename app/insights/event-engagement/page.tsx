@@ -86,7 +86,7 @@ export default function EventEngagementPage() {
       animate="visible"
     >
       <motion.div variants={itemVariants} className="flex items-center gap-3">
-        <CalendarDays className="h-6 w-6 text-violet-300" />
+        <CalendarDays className="h-6 w-6 text-primary" />
         <div>
           <h1 className="text-xl font-semibold text-white">Event engagement</h1>
           <p className="text-sm text-white/60">
@@ -100,7 +100,7 @@ export default function EventEngagementPage() {
       )}
 
       {!payload && !isLoading && (
-        <GlassPanel className="p-6 text-white/70">
+        <GlassPanel className="p-6 text-on-surface-variant">
           Select a venue or enable demo mode to see event engagement metrics.
         </GlassPanel>
       )}

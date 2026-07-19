@@ -1196,7 +1196,7 @@ export default function UserProfileModal({
             <div className="p-5">
               {blockingBirthday && (
                 <div className="mb-5 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4">
-                  <p className="text-sm text-amber-100/95 mb-3">
+                  <p className="text-sm text-amber-900 dark:text-amber-100 mb-3">
                     To keep Click age-appropriate, please confirm your date of birth. This modal stays open until you save.
                   </p>
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5" htmlFor="profile-gate-birthday">
@@ -1212,7 +1212,7 @@ export default function UserProfileModal({
                     max={new Date().toISOString().slice(0, 10)}
                   />
                   {birthdaySaveError ? (
-                    <p className="mt-2 text-xs text-red-400">{birthdaySaveError}</p>
+                    <p className="mt-2 text-xs text-red-700 dark:text-red-400">{birthdaySaveError}</p>
                   ) : null}
                   <button
                     type="button"
@@ -1228,7 +1228,7 @@ export default function UserProfileModal({
               )}
               {loading && <ProfileLoadingSkeleton />}
               {errorMessage && !loading && (
-                <p className="text-sm text-red-400 text-center py-6">{errorMessage}</p>
+                <p className="text-sm text-red-700 dark:text-red-400 text-center py-6">{errorMessage}</p>
               )}
               {profileData && !loading && (
                 <motion.div
@@ -1287,7 +1287,7 @@ export default function UserProfileModal({
                         disabled={rollBusy}
                         className="flex w-full items-center gap-3 rounded-2xl border border-violet-300/25 bg-white/10 px-4 py-3 text-left shadow-lg shadow-violet-500/10 backdrop-blur-md transition-colors hover:border-violet-300/45 hover:bg-white/[0.14] disabled:cursor-wait disabled:opacity-70"
                       >
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-violet-200">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-primary">
                           {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
                         </span>
                         <span className="min-w-0 flex-1">
@@ -1302,7 +1302,7 @@ export default function UserProfileModal({
                         </span>
                       </motion.button>
                       {rollStatus === 'error' && (
-                        <p className="text-xs text-red-400">Couldn&apos;t open Click Drop — try again.</p>
+                        <p className="text-xs text-red-700 dark:text-red-400">Couldn&apos;t open Click Drop — try again.</p>
                       )}
                     </section>
                   )}
@@ -1336,7 +1336,7 @@ export default function UserProfileModal({
                           className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors ${
                             selected
                               ? 'bg-[#8338EC]/20 text-[#c4b5fd] ring-1 ring-[#8338EC]/40'
-                              : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                              : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-on-surface'
                           }`}
                         >
                           <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -1389,7 +1389,7 @@ export default function UserProfileModal({
                                         <button
                                           type="button"
                                           onClick={() => openMediaItem(m)}
-                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-zinc-100 hover:bg-black/80"
+                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-on-surface hover:bg-black/80"
                                           aria-label="Open image"
                                         >
                                           <Maximize2 className="h-3.5 w-3.5" />
@@ -1397,7 +1397,7 @@ export default function UserProfileModal({
                                         <button
                                           type="button"
                                           onClick={() => downloadMediaItem(m)}
-                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-zinc-100 hover:bg-black/80"
+                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-on-surface hover:bg-black/80"
                                           aria-label="Download image"
                                         >
                                           <Download className="h-3.5 w-3.5" />
@@ -1484,7 +1484,7 @@ export default function UserProfileModal({
                                 href={l.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-200 hover:border-[#8338EC]/50 hover:bg-zinc-900/80"
+                                className="flex items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-sm text-on-surface hover:border-[#8338EC]/50 hover:bg-zinc-900/80"
                               >
                                 <LinkIcon className="h-4 w-4 shrink-0 text-[#8338EC]/80 mt-0.5" aria-hidden />
                                 <div className="min-w-0 flex-1">
@@ -1564,7 +1564,7 @@ export default function UserProfileModal({
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
                         When you connected
                       </h3>
-                      <div className="space-y-3 text-sm text-zinc-200">
+                      <div className="space-y-3 text-sm text-on-surface">
                         {momentLines.context && (
                           <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
                             <Sparkles className="h-4 w-4 shrink-0 text-[#8338EC]/80 mt-0.5" aria-hidden />
@@ -1587,7 +1587,7 @@ export default function UserProfileModal({
                         )}
                         {momentLines.when && (
                           <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Clock className="h-4 w-4 shrink-0 text-amber-300/90 mt-0.5" aria-hidden />
+                            <Clock className="h-4 w-4 shrink-0 text-amber-800 dark:text-amber-300/90 mt-0.5" aria-hidden />
                             <div className="min-w-0">
                               <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Time</p>
                               <p className="mt-0.5 leading-snug">{momentLines.when}</p>
@@ -1605,7 +1605,7 @@ export default function UserProfileModal({
                         )}
                         {momentLines.noise && (
                           <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Volume2 className="h-4 w-4 shrink-0 text-emerald-400/85 mt-0.5" aria-hidden />
+                            <Volume2 className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300/85 mt-0.5" aria-hidden />
                             <div className="min-w-0">
                               <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Ambience</p>
                               <p className="mt-0.5 leading-snug">{momentLines.noise}</p>
@@ -1789,7 +1789,7 @@ function EmptyTabState({
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-800/90 bg-zinc-900/30 px-6 py-12 text-center">
       <Icon className="h-10 w-10 text-zinc-600" aria-hidden />
-      <p className="mt-3 text-sm font-semibold text-zinc-200">{title}</p>
+      <p className="mt-3 text-sm font-semibold text-on-surface">{title}</p>
       <p className="mt-1 text-xs text-zinc-500">{body}</p>
     </div>
   );

@@ -1,22 +1,20 @@
 import type { Metadata } from "next";
-import { Manrope, Space_Grotesk } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { Analytics } from "@vercel/analytics/next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AppToaster from "@/components/AppToaster";
+import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/lib/theme/ThemeProvider";
 
 const manrope = Manrope({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-manrope",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-space-grotesk",
+  // Apply className on <body> so font-family is set directly — variable alone
+  // can fall through to the browser/system sans (often Inter-like) if theme
+  // resolution of var(--font-manrope) fails.
 });
 
 export const metadata: Metadata = {
@@ -31,6 +29,9 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/site.webmanifest",
+  other: {
+    "theme-color": "#f9f9f9",
+  },
 };
 
 export default function RootLayout({
@@ -39,18 +40,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <meta name="theme-color" content="#f9f9f9" />
+      </head>
       <body
-        className={`${manrope.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[#121212] text-white flex flex-col min-h-screen`}
+        className={`${manrope.variable} ${manrope.className} font-sans antialiased bg-background text-on-surface flex flex-col min-h-screen`}
       >
-        <AuthProvider>
-          <Navbar />
-          <main className="flex-1 flex flex-col">
-            {children}
-          </main>
-          <Footer />
-          <AppToaster />
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-1 flex flex-col">{children}</main>
+            <Footer />
+            <AppToaster />
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

@@ -143,7 +143,7 @@ export default function ResetPassword() {
           className="glass max-w-md w-full p-8 rounded-3xl border border-zinc-800 text-center"
         >
           <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-6">
-            <Lock className="w-6 h-6 text-red-400" />
+            <Lock className="w-6 h-6 text-red-700 dark:text-red-400" />
           </div>
           <h2 className="text-3xl font-bold mb-2">Link Expired</h2>
           <p className="text-zinc-400 mb-6">
@@ -173,7 +173,7 @@ export default function ResetPassword() {
           className="glass max-w-md w-full p-8 rounded-3xl border border-zinc-800 text-center"
         >
           <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto mb-6">
-            <Lock className="w-6 h-6 text-green-400" />
+            <Lock className="w-6 h-6 text-green-700 dark:text-green-400" />
           </div>
           <h2 className="text-3xl font-bold mb-2">Password Updated</h2>
           <p className="text-zinc-400">Redirecting you to your dashboard…</p>
@@ -235,7 +235,7 @@ export default function ResetPassword() {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-700 dark:text-red-400 text-sm">
               {error}
             </div>
           )}

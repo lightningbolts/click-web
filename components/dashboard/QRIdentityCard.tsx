@@ -218,23 +218,23 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-3xl"
+      className="relative overflow-hidden rounded-[16px]"
     >
       {/* Card background with gradient border */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC] via-[#3A86FF] to-[#8338EC] opacity-20" />
-      <div className="absolute inset-[1px] bg-zinc-900 rounded-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4] via-[#630ed4] to-[#630ed4] opacity-20" />
+      <div className="absolute inset-[1px] bg-surface-container rounded-[16px]" />
 
       {/* Content */}
       <div className="relative p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#8338EC]/20 rounded-xl">
-              <QrCode className="w-5 h-5 text-[#8338EC]" />
+            <div className="p-2 bg-[#630ed4]/20 rounded-xl">
+              <QrCode className="w-5 h-5 text-[#630ed4]" />
             </div>
             <div>
-              <h3 className="font-bold text-white">Your Click ID</h3>
-              <p className="text-xs text-zinc-500">Single-use · expires in 90s</p>
+              <h3 className="font-bold text-on-surface">Your Click ID</h3>
+              <p className="text-xs text-on-surface-variant">Single-use · expires in 90s</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -243,14 +243,14 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
               className="p-2 hover:bg-white/5 rounded-lg transition-colors"
               title="Share"
             >
-              <Share2 className="w-4 h-4 text-zinc-400" />
+              <Share2 className="w-4 h-4 text-on-surface-variant" />
             </button>
             <button
               onClick={handleDownload}
               className="p-2 hover:bg-white/5 rounded-lg transition-colors"
               title="Download QR"
             >
-              <Download className="w-4 h-4 text-zinc-400" />
+              <Download className="w-4 h-4 text-on-surface-variant" />
             </button>
             <button
               onClick={() => fetchToken(true)}
@@ -258,7 +258,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
               className="p-2 hover:bg-white/5 rounded-lg transition-colors disabled:opacity-40"
               title="Refresh token"
             >
-              <RefreshCw className={`w-4 h-4 text-zinc-400 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 text-on-surface-variant ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -267,10 +267,10 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         <div className="flex justify-center">
           <div className="relative">
             {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/30 to-[#3A86FF]/30 blur-xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4]/30 to-[#630ed4]/30 blur-xl" />
 
             {/* QR Container */}
-            <div ref={qrRef} className="relative bg-[#121212] p-4 rounded-2xl border border-white/10">
+            <div ref={qrRef} className="relative bg-background p-4 rounded-2xl border border-border-hard">
               <AnimatePresence mode="wait">
                 {(loading || refreshing) ? (
                   <motion.div
@@ -280,8 +280,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                     exit={{ opacity: 0 }}
                     className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-3"
                   >
-                    <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin" />
-                    <p className="text-xs text-zinc-500">Generating secure token…</p>
+                    <Loader2 className="w-8 h-8 text-[#630ed4] animate-spin" />
+                    <p className="text-xs text-on-surface-variant">Generating secure token…</p>
                   </motion.div>
                 ) : error ? (
                   <motion.div
@@ -290,10 +290,10 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                     animate={{ opacity: 1 }}
                     className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-center"
                   >
-                    <p className="text-xs text-red-400">{error}</p>
+                    <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
                     <button
                       onClick={() => fetchToken()}
-                      className="text-xs text-[#8338EC] hover:underline"
+                      className="text-xs text-[#630ed4] hover:underline"
                     >
                       Try again
                     </button>
@@ -310,7 +310,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                       size={200}
                       level="M"
                       bgColor="#121212"
-                      fgColor="#8338EC"
+                      fgColor="#630ed4"
                       marginSize={0}
                       title={`Click QR Code for ${userName || userEmail || userId}`}
                     />
@@ -321,8 +321,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
               {/* Center logo overlay */}
               {!loading && !refreshing && qrContent && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-[#121212] px-2 py-1 rounded-lg">
-                    <span className="text-lg font-bold text-white tracking-wide">Click</span>
+                  <div className="bg-background px-2 py-1 rounded-lg">
+                    <span className="text-lg font-bold text-on-surface tracking-wide">Click</span>
                   </div>
                 </div>
               )}
@@ -340,14 +340,14 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             >
               {secondsLeft > 0 ? `${secondsLeft}s` : 'Refreshing…'}
             </span>
-            <span className="text-xs text-zinc-600">· refreshes automatically</span>
+            <span className="text-xs text-outline">· refreshes automatically</span>
           </div>
         )}
 
         {/* Click ID Display */}
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-3">
-            <code className="px-4 py-2 bg-zinc-800 rounded-xl text-[#8338EC] font-mono text-lg tracking-wider">
+            <code className="rounded-[8px] border-2 border-border-hard bg-surface-container px-4 py-2 font-mono text-lg tracking-wider text-primary">
               {clickId}
             </code>
             <motion.button
@@ -359,37 +359,37 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
               {copied ? (
                 <Check className="w-5 h-5 text-green-500" />
               ) : (
-                <Copy className="w-5 h-5 text-zinc-400" />
+                <Copy className="w-5 h-5 text-on-surface-variant" />
               )}
             </motion.button>
           </div>
-          <p className="text-xs text-zinc-500 text-center">
+          <p className="text-xs text-on-surface-variant text-center">
             {copied ? 'Copied to clipboard!' : 'Share this ID or scan the QR code'}
           </p>
         </div>
 
         {/* User info */}
         {(userName || userEmail) && (
-          <div className="pt-4 border-t border-zinc-800 text-center">
-            {userName && <p className="text-white font-medium">{userName}</p>}
-            {userEmail && <p className="text-xs text-zinc-500">{userEmail}</p>}
+          <div className="pt-4 border-t border-border-hard text-center">
+            {userName && <p className="text-on-surface font-medium">{userName}</p>}
+            {userEmail && <p className="text-xs text-on-surface-variant">{userEmail}</p>}
           </div>
         )}
 
         {/* Usage instructions */}
         <div className="bg-zinc-800/50 rounded-xl p-4 space-y-2">
-          <p className="text-xs font-medium text-zinc-300">How to use:</p>
-          <ul className="text-xs text-zinc-500 space-y-1">
+          <p className="text-xs font-medium text-on-surface-variant">How to use:</p>
+          <ul className="text-xs text-on-surface-variant space-y-1">
             <li className="flex items-start gap-2">
-              <span className="text-[#8338EC]">1.</span>
+              <span className="text-[#630ed4]">1.</span>
               <span>Show this QR code when meeting someone new</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#8338EC]">2.</span>
+              <span className="text-[#630ed4]">2.</span>
               <span>They scan it with the Click app; it expires in 90s</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#8338EC]">3.</span>
+              <span className="text-[#630ed4]">3.</span>
               <span>Important: each code is single-use!</span>
             </li>
           </ul>

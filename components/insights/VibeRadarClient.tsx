@@ -122,12 +122,12 @@ export default function VibeRadarClient({
 
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-[#3A86FF]/20 rounded-xl border border-[#3A86FF]/35">
-            <Radar className="w-5 h-5 text-[#3A86FF]" />
+          <div className="p-2.5 bg-[#630ed4]/20 rounded-xl border border-[#630ed4]/35">
+            <Radar className="w-5 h-5 text-[#630ed4]" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Vibe Radar</h2>
-            <p className="text-sm text-zinc-500">
+            <h2 className="text-xl font-bold text-on-surface">Vibe Radar</h2>
+            <p className="text-sm text-on-surface-variant">
               Availability intents near your venue — anonymized cells only
             </p>
           </div>
@@ -135,15 +135,15 @@ export default function VibeRadarClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white bg-white/10 border border-white/15 hover:bg-white/[0.14] hover:border-[#8338EC]/35 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-surface bg-white/10 border border-border-hard hover:bg-white/[0.14] hover:border-[#630ed4]/35 transition-colors"
         >
-          <Crosshair className="w-4 h-4 text-[#8338EC]" />
+          <Crosshair className="w-4 h-4 text-[#630ed4]" />
           Deploy beacon
         </button>
       </motion.div>
 
       {view?.status === "venue_coordinates_required" ? (
-        <motion.p variants={itemVariants} className="text-sm text-amber-200/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
+        <motion.p variants={itemVariants} className="text-sm text-amber-800 dark:text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
           Add latitude and longitude on your venue record to anchor the map and proximity window for
           this report.
         </motion.p>
@@ -151,8 +151,8 @@ export default function VibeRadarClient({
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6">
         <GlassPanel className="p-5 xl:col-span-3" hover={false} glow="purple">
-          <h3 className="text-sm font-semibold text-white mb-1">Signal strength</h3>
-          <p className="text-xs text-zinc-500 mb-4">
+          <h3 className="text-sm font-semibold text-on-surface mb-1">Signal strength</h3>
+          <p className="text-xs text-on-surface-variant mb-4">
             Volume drives blob size; hue reflects intent category.
           </p>
           {showSkeleton ? (
@@ -160,15 +160,15 @@ export default function VibeRadarClient({
           ) : (
             <ul className="space-y-2">
               {categoryTotals.length === 0 ? (
-                <li className="text-sm text-zinc-500">No totals above the privacy floor yet.</li>
+                <li className="text-sm text-on-surface-variant">No totals above the privacy floor yet.</li>
               ) : (
                 categoryTotals.map((t) => (
                   <li
                     key={t.category}
                     className="flex justify-between text-sm border-b border-white/5 pb-2 last:border-0"
                   >
-                    <span className="text-zinc-200">{t.category}</span>
-                    <span className="text-zinc-500 tabular-nums">{t.count}</span>
+                    <span className="text-on-surface">{t.category}</span>
+                    <span className="text-on-surface-variant tabular-nums">{t.count}</span>
                   </li>
                 ))
               )}
@@ -178,7 +178,7 @@ export default function VibeRadarClient({
 
         <div className="xl:col-span-6 min-h-[420px] order-3 xl:order-none">
           {showSkeleton ? (
-            <div className="h-[min(56vh,620px)] rounded-2xl border border-white/10 bg-white/5 animate-pulse" />
+            <div className="h-[min(56vh,620px)] rounded-2xl border border-border-hard bg-white/5 animate-pulse" />
           ) : (
             <VibeRadarMap
               clusters={clusters}
@@ -190,14 +190,14 @@ export default function VibeRadarClient({
         </div>
 
         <GlassPanel className="p-5 xl:col-span-3 order-2 xl:order-none" hover={false} glow="blue">
-          <h3 className="text-sm font-semibold text-white mb-1">Trending vibes around you</h3>
-          <p className="text-xs text-zinc-500 mb-4">
+          <h3 className="text-sm font-semibold text-on-surface mb-1">Trending vibes around you</h3>
+          <p className="text-xs text-on-surface-variant mb-4">
             Beacon density by type within the same radius as intent clusters.
           </p>
           {showSkeleton ? (
             <div className="h-28 rounded-xl bg-white/5 animate-pulse" />
           ) : trendingVibes.length === 0 ? (
-            <p className="text-sm text-zinc-500">No active community map pins in range yet.</p>
+            <p className="text-sm text-on-surface-variant">No active community map pins in range yet.</p>
           ) : (
             <ul className="space-y-2">
               {trendingVibes.map((t) => (
@@ -205,7 +205,7 @@ export default function VibeRadarClient({
                   key={t.beacon_type}
                   className="flex justify-between text-sm border-b border-white/5 pb-2 last:border-0"
                 >
-                  <span className="text-zinc-200 capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
+                  <span className="text-on-surface capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
                   <span className="text-cyan-400/90 tabular-nums font-medium">{t.count}</span>
                 </li>
               ))}

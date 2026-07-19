@@ -5,11 +5,12 @@ import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import * as Switch from '@radix-ui/react-switch';
-import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone, MapPin, Map, Shield, Camera, Loader2 } from 'lucide-react';
+import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone, MapPin, Map, Shield, Camera, Loader2, Moon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
 import { displayNameFromUserMetadata, firstLastFromUserMetadata } from '@/lib/userDisplayName';
+import { useTheme } from '@/lib/theme/ThemeProvider';
 
 interface SettingsViewProps {
   notificationPreferences: NotificationPreferences;
@@ -21,6 +22,7 @@ export default function SettingsView({
   onSaveNotificationPreferences,
 }: SettingsViewProps) {
   const { user, signOut, refreshUser, profileImageUrl, setProfileImageUrl } = useAuth();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -478,17 +480,47 @@ export default function SettingsView({
       transition={{ duration: 0.3 }}
       className="max-w-2xl mx-auto space-y-8"
     >
-      <h2 className="text-3xl font-bold mb-6">Settings</h2>
+      <h2 className="mb-6 text-3xl font-bold text-on-surface">Settings</h2>
+
+      {/* Appearance */}
+      <div className="fc-card space-y-4 border-2 border-border-hard p-8">
+        <div className="mb-2 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border-2 border-border-hard bg-on-primary-container">
+            <Moon className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-on-surface">Appearance</h3>
+            <p className="text-sm font-medium text-on-surface-variant">
+              Match the Click app light and dark themes
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 rounded-[16px] border-2 border-border-hard bg-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold text-on-surface">Dark mode</p>
+            <p className="text-sm font-medium text-on-surface-variant">
+              Use the Functional Clarity dark palette
+            </p>
+          </div>
+          <Switch.Root
+            checked={theme === 'dark'}
+            onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-border-hard bg-surface outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary data-[state=checked]:bg-primary"
+          >
+            <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-on-surface transition-transform data-[state=checked]:translate-x-[22px] data-[state=checked]:bg-on-primary" />
+          </Switch.Root>
+        </div>
+      </div>
 
       {/* Profile Settings */}
-      <div className="glass p-8 rounded-3xl border border-zinc-800">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
-            <User className="w-6 h-6 text-[#8338EC]" />
+      <div className="fc-card border-2 border-border-hard p-8">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border-2 border-border-hard bg-on-primary-container">
+            <User className="h-6 w-6 text-primary" />
           </div>
           <div>
             <h3 className="text-xl font-bold">Profile Settings</h3>
-            <p className="text-zinc-400 text-sm">Update your personal information</p>
+            <p className="text-on-surface-variant text-sm">Update your personal information</p>
           </div>
         </div>
 
@@ -508,13 +540,13 @@ export default function SettingsView({
                 type="button"
                 disabled={avatarUploading}
                 onClick={() => avatarFileInputRef.current?.click()}
-                className="relative h-20 w-20 rounded-2xl border border-zinc-700 bg-zinc-900/50 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC] disabled:opacity-50"
+                className="relative h-20 w-20 rounded-2xl border border-border-hard bg-surface overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                 aria-label="Change profile photo"
               >
                 {profileImageUrl ? (
                   <img src={profileImageUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#8338EC] to-purple-600 text-lg font-bold text-white">
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#630ed4] to-purple-600 text-lg font-bold text-on-surface">
                     {(accountDisplayName || user?.email || 'U').trim().slice(0, 2).toUpperCase() || 'U'}
                   </div>
                 )}
@@ -524,16 +556,16 @@ export default function SettingsView({
                   }`}
                 >
                   {avatarUploading ? (
-                    <Loader2 className="h-7 w-7 text-white animate-spin" aria-hidden />
+                    <Loader2 className="h-7 w-7 text-on-surface animate-spin" aria-hidden />
                   ) : (
-                    <Camera className="h-7 w-7 text-white" aria-hidden />
+                    <Camera className="h-7 w-7 text-on-surface" aria-hidden />
                   )}
                 </span>
               </button>
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-white">Profile photo</p>
-              <p className="text-xs text-zinc-500 mt-1">JPG or PNG, max 2 MB. Opens your photo library.</p>
+              <p className="text-sm font-medium text-on-surface">Profile photo</p>
+              <p className="text-xs text-on-surface-variant mt-1">JPG or PNG, max 2 MB. Opens your photo library.</p>
             </div>
           </div>
 
@@ -549,7 +581,7 @@ export default function SettingsView({
                 onChange={(e) => setFirstName(e.target.value)}
                 autoComplete="given-name"
                 required
-                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors"
                 placeholder="First name"
               />
             </div>
@@ -563,7 +595,7 @@ export default function SettingsView({
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 autoComplete="family-name"
-                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors"
                 placeholder="Last name"
               />
             </div>
@@ -571,8 +603,8 @@ export default function SettingsView({
 
           {profileMessage.text && (
             <div className={`p-3 rounded-xl text-sm ${profileMessage.type === 'error'
-                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                ? 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+                : 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
               }`}>
               {profileMessage.text}
             </div>
@@ -581,7 +613,7 @@ export default function SettingsView({
           <button
             type="submit"
             disabled={profileLoading}
-            className="flex items-center gap-2 px-6 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
           >
             {profileLoading ? (
               'Saving...'
@@ -596,14 +628,14 @@ export default function SettingsView({
       </div>
 
       {/* My Interests */}
-      <div className="glass p-8 rounded-3xl border border-zinc-800">
+      <div className="fc-card p-8 rounded-[16px] border border-border-hard">
         <div className="flex items-center gap-4 mb-2">
-          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
-            <Tag className="w-6 h-6 text-[#8338EC]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
+            <Tag className="w-6 h-6 text-[#630ed4]" />
           </div>
           <div>
             <h3 className="text-xl font-bold">My Interests</h3>
-            <p className="text-zinc-400 text-sm">
+            <p className="text-on-surface-variant text-sm">
               Select categories/subcategories and add your own custom interests.
             </p>
           </div>
@@ -615,7 +647,7 @@ export default function SettingsView({
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[#8338EC]/15 border border-[#8338EC]/30 text-[#8338EC]"
+                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[#630ed4]/15 border border-[#630ed4]/30 text-[#630ed4]"
               >
                 {tag}
               </span>
@@ -632,7 +664,7 @@ export default function SettingsView({
         />
 
         <div className="mt-5 space-y-2">
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Custom interests</p>
+          <p className="text-xs uppercase tracking-wide text-on-surface-variant">Custom interests</p>
           <div className="flex gap-2">
             <input
               value={customInterestInput}
@@ -644,12 +676,12 @@ export default function SettingsView({
                 }
               }}
               placeholder="Add your own interest"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#8338EC]"
+              className="flex-1 rounded-lg border border-border-hard bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary"
             />
             <button
               onClick={addCustomInterest}
               disabled={customInterestInput.trim().length === 0}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#8338EC]/40 px-3 py-2 text-sm text-[#caa8ff] hover:bg-[#8338EC]/15 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#630ed4]/40 px-3 py-2 text-sm text-primary hover:bg-[#630ed4]/15 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" /> Add
             </button>
@@ -660,12 +692,12 @@ export default function SettingsView({
               {customSelectedTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2 py-1 text-xs text-[#9bc8ff]"
+                  className="inline-flex items-center gap-1 rounded-lg border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2 py-1 text-xs text-primary"
                 >
                   {tag}
                   <button
                     onClick={() => removeCustomInterest(tag)}
-                    className="rounded p-0.5 hover:bg-white/10"
+                    className="rounded p-0.5 hover:bg-surface-container"
                     aria-label={`Remove ${tag}`}
                   >
                     <X className="w-3 h-3" />
@@ -678,8 +710,8 @@ export default function SettingsView({
 
         {tagsMessage.text && (
           <div className={`mt-4 p-3 rounded-xl text-sm ${tagsMessage.type === 'error'
-              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-              : 'bg-green-500/10 text-green-400 border border-green-500/20'
+              ? 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+              : 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
             }`}>
             {tagsMessage.text}
           </div>
@@ -688,7 +720,7 @@ export default function SettingsView({
         <button
           onClick={handleSaveTags}
           disabled={tagsLoading || !tagsDirty}
-          className="mt-4 flex items-center gap-2 px-6 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors disabled:opacity-50"
+          className="mt-4 flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
         >
           {tagsLoading ? (
             'Saving...'
@@ -701,37 +733,37 @@ export default function SettingsView({
         </button>
       </div>
 
-      <div className="glass p-8 rounded-3xl border border-zinc-800">
+      <div className="fc-card p-8 rounded-[16px] border border-border-hard">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
-            <Bell className="w-6 h-6 text-[#8338EC]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
+            <Bell className="w-6 h-6 text-[#630ed4]" />
           </div>
           <div>
             <h3 className="text-xl font-bold">Notifications</h3>
-            <p className="text-zinc-400 text-sm">Control browser alerts for messages and incoming calls.</p>
+            <p className="text-on-surface-variant text-sm">Control browser alerts for messages and incoming calls.</p>
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border-hard bg-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white">Browser permission</p>
-              <p className="mt-1 text-xs text-zinc-500">Current status for system notifications in this browser.</p>
+              <p className="text-sm font-semibold text-on-surface">Browser permission</p>
+              <p className="mt-1 text-xs text-on-surface-variant">Current status for system notifications in this browser.</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${
                 browserPermission === 'granted'
-                  ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
                   : browserPermission === 'denied'
-                    ? 'bg-red-500/10 text-red-300 border border-red-500/20'
-                    : 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+                    ? 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+                    : 'bg-surface-container text-on-surface-variant border border-border-hard'
               }`}>
                 {permissionLabel}
               </span>
               {browserNotificationsSupported && browserPermission !== 'granted' ? (
                 <button
                   onClick={() => { void requestBrowserPermission(); }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border-hard px-3 py-2 text-xs text-on-surface hover:bg-surface-container"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Request
@@ -741,7 +773,7 @@ export default function SettingsView({
           </div>
 
           <NotificationToggleRow
-            icon={<MessageCircle className="w-4 h-4 text-[#8338EC]" />}
+            icon={<MessageCircle className="w-4 h-4 text-[#630ed4]" />}
             title="Chat push notifications"
             description="Show browser alerts for new messages when you are outside that conversation or the tab is in the background."
             checked={notificationPreferences.messagePushEnabled}
@@ -761,35 +793,35 @@ export default function SettingsView({
 
         {notificationMessage.text && (
           <div className={`mt-4 p-3 rounded-xl text-sm ${notificationMessage.type === 'error'
-              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+              ? 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
               : notificationMessage.type === 'warning'
-                ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
-                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20'
+                : 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
             }`}>
             {notificationMessage.text}
           </div>
         )}
 
-        <p className="mt-4 text-xs text-zinc-500">
+        <p className="mt-4 text-xs text-on-surface-variant">
           Browser alerts work while this dashboard is open in the browser. Closed-tab web push is not configured here.
         </p>
       </div>
 
       {/* Your Data: location privacy */}
-      <div className="glass p-8 rounded-3xl border border-zinc-800">
+      <div className="fc-card p-8 rounded-[16px] border border-border-hard">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
-            <Shield className="w-6 h-6 text-[#8338EC]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
+            <Shield className="w-6 h-6 text-[#630ed4]" />
           </div>
           <div>
             <h3 className="text-xl font-bold">Your Data</h3>
-            <p className="text-zinc-400 text-sm">Location is enabled by default so your map and anonymous trends work right away. Turn off anything you do not want. Ghost mode (on mobile) overrides these when active.</p>
+            <p className="text-on-surface-variant text-sm">Location is enabled by default so your map and anonymous trends work right away. Turn off anything you do not want. Ghost mode (on mobile) overrides these when active.</p>
           </div>
         </div>
 
         <div className="space-y-4">
           <LocationPrefToggleRow
-            icon={<MapPin className="w-4 h-4 text-[#8338EC]" />}
+            icon={<MapPin className="w-4 h-4 text-[#630ed4]" />}
             title="Connection location snap"
             description="Records GPS at the moment you tap (not continuous tracking)"
             checked={locationPrefs.location_connection_snap_enabled}
@@ -809,7 +841,7 @@ export default function SettingsView({
             }}
           />
           <LocationPrefToggleRow
-            icon={<Map className="w-4 h-4 text-[#8338EC]" />}
+            icon={<Map className="w-4 h-4 text-[#630ed4]" />}
             title="Show on my Memory Map"
             description="Personal only, never shared with others"
             checked={locationPrefs.location_show_on_map_enabled}
@@ -829,7 +861,7 @@ export default function SettingsView({
             }}
           />
           <LocationPrefToggleRow
-            icon={<Shield className="w-4 h-4 text-[#8338EC]" />}
+            icon={<Shield className="w-4 h-4 text-[#630ed4]" />}
             title="Include in business insights"
             description="Anonymous venue/campus trends are on by default. Turn this off if you do not want to be included."
             checked={locationPrefs.location_include_in_insights_enabled}
@@ -852,8 +884,8 @@ export default function SettingsView({
 
         {locationPrefsMessage.text && (
           <div className={`mt-4 p-3 rounded-xl text-sm ${locationPrefsMessage.type === 'error'
-            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-            : 'bg-green-500/10 text-green-400 border border-green-500/20'
+            ? 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+            : 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
           }`}>
             {locationPrefsMessage.text}
           </div>
@@ -861,14 +893,14 @@ export default function SettingsView({
       </div>
 
       {/* Security Settings */}
-      <div className="glass p-8 rounded-3xl border border-zinc-800">
+      <div className="fc-card p-8 rounded-[16px] border border-border-hard">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center">
-            <Lock className="w-6 h-6 text-[#8338EC]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
+            <Lock className="w-6 h-6 text-[#630ed4]" />
           </div>
           <div>
             <h3 className="text-xl font-bold">Security</h3>
-            <p className="text-zinc-400 text-sm">Update your password</p>
+            <p className="text-on-surface-variant text-sm">Update your password</p>
           </div>
         </div>
 
@@ -879,7 +911,7 @@ export default function SettingsView({
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors"
               placeholder="••••••••"
               minLength={6}
             />
@@ -890,7 +922,7 @@ export default function SettingsView({
               type="password"
               value={confirmNewPassword}
               onChange={(e) => setConfirmNewPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors"
+              className="w-full px-4 py-3 bg-surface border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors"
               placeholder="••••••••"
               minLength={6}
             />
@@ -898,8 +930,8 @@ export default function SettingsView({
 
           {passwordMessage.text && (
             <div className={`p-3 rounded-xl text-sm ${passwordMessage.type === 'error'
-                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                ? 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+                : 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
               }`}>
               {passwordMessage.text}
             </div>
@@ -908,7 +940,7 @@ export default function SettingsView({
           <button
             type="submit"
             disabled={passwordLoading}
-            className="flex items-center gap-2 px-6 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
           >
             {passwordLoading ? (
               'Updating...'
@@ -923,14 +955,14 @@ export default function SettingsView({
       </div>
 
       {/* Danger Zone */}
-      <div className="glass p-8 rounded-3xl border border-red-900/30">
+      <div className="fc-card p-8 rounded-[16px] border border-red-900/30">
         <div className="flex items-center gap-4 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-red-500" />
           </div>
           <div>
             <h3 className="text-xl font-bold text-red-500">Danger Zone</h3>
-            <p className="text-zinc-400 text-sm">Irreversible account actions</p>
+            <p className="text-on-surface-variant text-sm">Irreversible account actions</p>
           </div>
         </div>
 
@@ -949,12 +981,12 @@ export default function SettingsView({
         ) : (
           <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
             <h4 className="font-bold text-red-500 mb-2">Are you absolutely sure?</h4>
-            <p className="text-zinc-400 text-sm mb-4">
+            <p className="text-on-surface-variant text-sm mb-4">
               This action cannot be undone. This will permanently delete your account and remove your data from our servers.
             </p>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2 text-zinc-200">
+              <label className="block text-sm font-medium mb-2 text-on-surface">
                 Type your name to confirm
               </label>
               <input
@@ -965,18 +997,18 @@ export default function SettingsView({
                   if (deleteError) setDeleteError('');
                 }}
                 placeholder={profileFormDisplayName.trim() || 'Set your name in Profile Settings first'}
-                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-red-500/70 transition-colors"
+                className="w-full px-4 py-3 bg-surface border border-border-hard rounded-xl focus:outline-none focus:border-red-500/70 transition-colors"
                 disabled={deleteLoading}
               />
               {profileFormDisplayName.trim() && (
-                <p className="text-xs text-zinc-500 mt-2">
+                <p className="text-xs text-on-surface-variant mt-2">
                   Must match exactly: {profileFormDisplayName.trim()}
                 </p>
               )}
             </div>
 
             {deleteError && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-700 dark:text-red-400 text-sm">
                 {deleteError}
               </div>
             )}
@@ -989,14 +1021,14 @@ export default function SettingsView({
                   !profileFormDisplayName.trim() ||
                   deleteConfirmName.trim() !== profileFormDisplayName.trim()
                 }
-                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-red-500 hover:bg-red-600 text-on-surface rounded-xl font-semibold transition-colors disabled:opacity-50"
               >
                 {deleteLoading ? 'Deleting...' : 'Yes, Delete My Account'}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleteLoading}
-                className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold transition-colors"
+                className="px-6 py-3 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-semibold transition-colors"
               >
                 Cancel
               </button>
@@ -1024,22 +1056,22 @@ function LocationPrefToggleRow({
   onChange: (checked: boolean) => void | Promise<void>;
 }) {
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border-hard bg-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-sm font-semibold text-white">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 border border-white/5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-surface border border-white/5">
             {icon}
           </span>
           <span>{title}</span>
         </div>
-        <p className="mt-2 text-sm text-zinc-500">{description}</p>
+        <p className="mt-2 text-sm text-on-surface-variant">{description}</p>
       </div>
       <div className="flex shrink-0 justify-end">
         <Switch.Root
           checked={checked}
           onCheckedChange={(c) => { void onChange(c); }}
           disabled={disabled}
-          className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-zinc-700 bg-zinc-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#8338EC] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 data-[state=checked]:border-[#8338EC]/50 data-[state=checked]:bg-[#8338EC] disabled:cursor-not-allowed disabled:opacity-60"
+          className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border-hard bg-surface-container outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:border-primary data-[state=checked]:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Switch.Thumb
             className="absolute left-0.5 top-1/2 h-5 w-5 shrink-0 rounded-full bg-white shadow block transition-[transform] duration-200 ease-out"
@@ -1067,15 +1099,15 @@ function NotificationToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border-hard bg-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-sm font-semibold text-white">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 border border-white/5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-surface border border-white/5">
             {icon}
           </span>
           <span>{title}</span>
         </div>
-        <p className="mt-2 text-sm text-zinc-500">{description}</p>
+        <p className="mt-2 text-sm text-on-surface-variant">{description}</p>
       </div>
 
       <div className="flex shrink-0 justify-end">
@@ -1083,7 +1115,7 @@ function NotificationToggleRow({
           checked={checked}
           onCheckedChange={onChange}
           disabled={disabled}
-          className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-zinc-700 bg-zinc-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#8338EC] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 data-[state=checked]:border-[#8338EC]/50 data-[state=checked]:bg-[#8338EC] disabled:cursor-not-allowed disabled:opacity-60"
+          className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border-hard bg-surface-container outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:border-primary data-[state=checked]:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Switch.Thumb
             className="absolute left-0.5 top-1/2 h-5 w-5 shrink-0 rounded-full bg-white shadow block transition-[transform] duration-200 ease-out"

@@ -425,9 +425,9 @@ export default function LiveConnectionTicker() {
       aria-live="polite"
       aria-label="Live connection activity"
     >
-      <div className="rounded-3xl border border-zinc-700/50 bg-zinc-950/40 p-5 shadow-xl shadow-black/30 backdrop-blur-xl sm:p-6">
-        <div className="mb-4 flex flex-col gap-2 border-b border-zinc-800/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Live network</span>
+      <div className="rounded-[16px] border border-border-hard/50 bg-background/40 p-5 shadow-xl shadow-black/30 sm:p-6">
+        <div className="mb-4 flex flex-col gap-2 border-b border-border-hard/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-on-surface-variant">Live network</span>
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={
@@ -438,34 +438,34 @@ export default function LiveConnectionTicker() {
               aria-hidden
             />
             {live && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-400/90">Live</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300/90">Live</span>
             )}
-            <span className="text-xs font-medium text-zinc-400">
+            <span className="text-xs font-medium text-on-surface-variant">
               {totalCount === null ? '—' : totalCount.toLocaleString()}{' '}
-              <span className="text-zinc-500">clicks</span>
+              <span className="text-on-surface-variant">clicks</span>
             </span>
           </div>
         </div>
 
         {!recentFeedOk && rows.length === 0 && !pageLoading ? (
-          <p className="text-sm leading-relaxed text-zinc-500">
+          <p className="text-sm leading-relaxed text-on-surface-variant">
             Recent activity could not be loaded. The list RPC failed or returned rows we could not parse; the
             click total above may still be correct. Open the browser console for the error, and ensure
             `get_recent_sanitized_connections` plus a non-throwing `build_sanitized_connection_payload` are deployed
             (corrupt `weather_snapshot` values must not abort the whole batch).
           </p>
         ) : totalCount === 0 && rows.length === 0 && !pageLoading ? (
-          <p className="text-sm text-zinc-500">Waiting for the next connection…</p>
+          <p className="text-sm text-on-surface-variant">Waiting for the next connection…</p>
         ) : rows.length === 0 && pageLoading ? (
-          <p className="py-8 text-center text-sm text-zinc-500">Loading…</p>
+          <p className="py-8 text-center text-sm text-on-surface-variant">Loading…</p>
         ) : (
           <>
             <div className="mb-3 flex flex-col items-center justify-between gap-3 sm:flex-row">
-              <p className="text-center text-[11px] text-zinc-500 sm:text-left">
+              <p className="text-center text-[11px] text-on-surface-variant sm:text-left">
                 {rows.length > 0 && (
                   <>
                     Showing{' '}
-                    <span className="text-zinc-400">
+                    <span className="text-on-surface-variant">
                       {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()}
                     </span>
                     {totalCount !== null ? (
@@ -473,14 +473,14 @@ export default function LiveConnectionTicker() {
                         {' '}
                         of {total.toLocaleString()}
                         {totalPages > 1 && (
-                          <span className="text-zinc-600">
+                          <span className="text-outline">
                             {' '}
                             · Page {Math.min(pageIndex + 1, Math.max(1, totalPages))} of {totalPages}
                           </span>
                         )}
                       </>
                     ) : (
-                      <span className="text-zinc-600"> · loading total…</span>
+                      <span className="text-outline"> · loading total…</span>
                     )}
                   </>
                 )}
@@ -491,7 +491,7 @@ export default function LiveConnectionTicker() {
                     type="button"
                     onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
                     disabled={!canPrev || pageLoading}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700/80 text-zinc-400 transition hover:border-[#8338EC]/50 hover:text-white disabled:pointer-events-none disabled:opacity-30"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border-hard/80 text-on-surface-variant transition hover:border-[#630ed4]/50 hover:text-on-surface disabled:pointer-events-none disabled:opacity-30"
                     aria-label="Previous page"
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -500,7 +500,7 @@ export default function LiveConnectionTicker() {
                     type="button"
                     onClick={() => setPageIndex((p) => p + 1)}
                     disabled={!canNext || pageLoading}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700/80 text-zinc-400 transition hover:border-[#8338EC]/50 hover:text-white disabled:pointer-events-none disabled:opacity-30"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border-hard/80 text-on-surface-variant transition hover:border-[#630ed4]/50 hover:text-on-surface disabled:pointer-events-none disabled:opacity-30"
                     aria-label="Next page"
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -514,7 +514,7 @@ export default function LiveConnectionTicker() {
               className="relative max-h-[min(28rem,55vh)] space-y-3 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]"
             >
               {pageLoading && rows.length === 0 ? (
-                <p className="py-8 text-center text-sm text-zinc-500">Loading…</p>
+                <p className="py-8 text-center text-sm text-on-surface-variant">Loading…</p>
               ) : (
                 <AnimatePresence initial={false} mode="popLayout">
                   {rows.map((c) => (
@@ -525,10 +525,10 @@ export default function LiveConnectionTicker() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 8 }}
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                      className="glass rounded-2xl border border-zinc-700/70 bg-zinc-900/40 px-4 py-3.5 shadow-inner shadow-black/20"
+                      className="fc-card rounded-2xl border border-border-hard/70 bg-surface-container/40 px-4 py-3.5 shadow-inner shadow-black/20"
                     >
-                      <p className="text-sm leading-relaxed text-zinc-200 sm:text-[15px]">
-                        <span className="text-[#8338EC]" aria-hidden>
+                      <p className="text-sm leading-relaxed text-on-surface sm:text-[15px]">
+                        <span className="text-[#630ed4]" aria-hidden>
                           ⚡{' '}
                         </span>
                         {formatTickerLine(c)}
@@ -538,7 +538,7 @@ export default function LiveConnectionTicker() {
                 </AnimatePresence>
               )}
               {pageLoading && rows.length > 0 && (
-                <p className="py-2 text-center text-xs text-zinc-600">Updating…</p>
+                <p className="py-2 text-center text-xs text-outline">Updating…</p>
               )}
             </div>
           </>

@@ -99,7 +99,7 @@ export default function LiveMetricsPage() {
       {data?.status === 'no_venue' && data.message ? (
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95"
+          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
         >
           {data.message}
         </motion.div>
@@ -108,7 +108,7 @@ export default function LiveMetricsPage() {
       {data?.status === 'insufficient_data' && data.message ? (
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-zinc-500/30 bg-zinc-500/10 px-4 py-3 text-sm text-zinc-200"
+          className="rounded-2xl border border-zinc-500/30 bg-zinc-500/10 px-4 py-3 text-sm text-on-surface"
         >
           {data.message}
         </motion.div>
@@ -117,7 +117,7 @@ export default function LiveMetricsPage() {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-3 mb-2">
         <div className="p-2.5 bg-green-500/20 rounded-xl border border-green-500/30">
-          <Radio className="w-5 h-5 text-green-400" />
+          <Radio className="w-5 h-5 text-green-700 dark:text-green-400" />
         </div>
         <div>
           <h2 className="text-xl font-bold text-white">Live Metrics</h2>
@@ -133,7 +133,7 @@ export default function LiveMetricsPage() {
         <GlassPanel className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-2 bg-green-500/20 rounded-lg">
-              <Users className="w-4 h-4 text-green-400" />
+              <Users className="w-4 h-4 text-green-700 dark:text-green-400" />
             </div>
             <span className="text-sm font-medium text-zinc-400">Capacity Usage</span>
           </div>
@@ -206,7 +206,7 @@ export default function LiveMetricsPage() {
               <h3 className="text-base font-semibold text-white">Last-Hour Occupancy Trend</h3>
               <p className="text-xs text-zinc-500 mt-0.5">5-minute buckets over the last hour</p>
             </div>
-            <span className="flex items-center gap-1.5 text-xs text-green-400">
+            <span className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               Live
             </span>

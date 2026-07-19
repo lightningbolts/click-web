@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
+import { useTheme } from "@/lib/theme/ThemeProvider";
 import {
   LineChart,
   Line,
@@ -118,11 +119,23 @@ function InsightsSkeleton() {
  */
 function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }) {
   const { user, loading: authLoading } = useAuth();
+  const { theme } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { demoMode } = useInsightsDemo();
   const venueIdFromQuery = searchParams.get("venue_id") ?? undefined;
   const venueId = venueIdProp ?? venueIdFromQuery ?? undefined;
+
+  const isDark = theme === "dark";
+  const chartMuted = isDark ? "rgba(240,241,241,0.45)" : "rgba(26,28,28,0.45)";
+  const chartAxis = isDark ? "rgba(240,241,241,0.2)" : "rgba(26,28,28,0.2)";
+  const chartGrid = isDark ? "rgba(240,241,241,0.08)" : "rgba(26,28,28,0.08)";
+  const chartTooltipBg = isDark ? "#1c1526" : "#ffffff";
+  const chartTooltipBorder = isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)";
+  const chartTooltipText = isDark ? "#f0f1f1" : "#1a1c1c";
+  const chartTooltipLabel = isDark ? "rgba(240,241,241,0.65)" : "rgba(74,68,85,0.9)";
+  const chartCursor = isDark ? "rgba(255,255,255,0.05)" : "rgba(99,14,212,0.08)";
+  const chartDotStroke = isDark ? "#ffffff" : "#ffffff";
 
   const insightsUrl = venueId ? `/api/insights/${venueId}` : "/api/insights/venue";
   const { data: apiData, error, isLoading } = useSWR<InsightsResponse>(
@@ -209,18 +222,18 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl max-w-md text-center"
+            className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
           >
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="text-2xl font-bold text-on-surface mb-2">
               Access Denied
             </h1>
-            <p className="text-zinc-400 mb-6">
+            <p className="text-on-surface-variant mb-6">
               This dashboard is only available to verified business partners.
             </p>
             <button
               onClick={() => router.push("/")}
-              className="bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
+              className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
             >
               Go to your dashboard
             </button>
@@ -234,19 +247,19 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl max-w-md text-center"
+          className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-on-surface mb-2">
             Could not load insights
           </h1>
-          <p className="text-zinc-400 mb-6">
+          <p className="text-on-surface-variant mb-6">
             Something went wrong. Please refresh or try again later.
           </p>
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
+            className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
           >
             Retry
           </button>
@@ -261,19 +274,19 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl max-w-md text-center"
+          className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
-          <Users className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <Users className="w-16 h-16 text-outline mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-on-surface mb-2">
             Insufficient Data
           </h1>
-          <p className="text-zinc-400 mb-6">
+          <p className="text-on-surface-variant mb-6">
             {data.message ||
               "We need at least 5 connections to generate insights to protect user privacy."}
           </p>
           <button
             onClick={() => router.push("/")}
-            className="bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
+            className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
           >
             Back to your dashboard
           </button>
@@ -319,7 +332,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       ) : data?.status === "no_venue" && data.message ? (
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95"
+          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
         >
           {data.message}
         </motion.div>
@@ -375,14 +388,14 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <GlassPanel className="lg:col-span-2 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-[#8338EC]/20 rounded-lg">
-                <Activity className="w-4 h-4 text-[#8338EC]" />
+              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+                <Activity className="w-4 h-4 text-[#630ed4]" />
               </div>
-              <span className="text-sm font-medium text-zinc-400">
+              <span className="text-sm font-medium text-on-surface-variant">
                 Social Activity
               </span>
             </div>
-            <span className="text-xs text-zinc-500">Last 30 days</span>
+            <span className="text-xs text-on-surface-variant">Last 30 days</span>
           </div>
           <div className="w-full min-w-0 overflow-hidden">
             <ResponsiveContainer
@@ -400,19 +413,19 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#8338EC" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8338EC" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#630ed4" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#630ed4" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.05)"
+                  stroke={chartGrid}
                   vertical={false}
                 />
                 <XAxis
                   dataKey="date"
-                  stroke="rgba(255,255,255,0.2)"
-                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
+                  stroke={chartAxis}
+                  tick={{ fill: chartMuted, fontSize: 11 }}
                   tickFormatter={(value) => {
                     try {
                       const [y, m, d] = (value as string)
@@ -427,33 +440,33 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                     }
                   }}
                   interval={5}
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                  axisLine={{ stroke: chartGrid }}
                 />
                 <YAxis
-                  stroke="rgba(255,255,255,0.2)"
-                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                  stroke={chartAxis}
+                  tick={{ fill: chartMuted, fontSize: 11 }}
+                  axisLine={{ stroke: chartGrid }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "rgba(0,0,0,0.9)",
-                    borderColor: "rgba(255,255,255,0.1)",
+                    backgroundColor: chartTooltipBg,
+                    borderColor: chartTooltipBorder,
                     borderRadius: "12px",
                     boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
                   }}
-                  itemStyle={{ color: "#fff" }}
-                  labelStyle={{ color: "rgba(255,255,255,0.6)" }}
+                  itemStyle={{ color: chartTooltipText }}
+                  labelStyle={{ color: chartTooltipLabel }}
                 />
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="#8338EC"
+                  stroke="#630ed4"
                   strokeWidth={2}
                   dot={false}
                   activeDot={{
                     r: 6,
-                    fill: "#8338EC",
-                    stroke: "#fff",
+                    fill: "#630ed4",
+                    stroke: chartDotStroke,
                     strokeWidth: 2,
                     style: {
                       filter: "drop-shadow(0 0 8px rgba(131, 56, 236, 0.8))",
@@ -479,17 +492,17 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       >
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-[#8338EC]/20 rounded-lg">
-              <Users className="w-4 h-4 text-[#8338EC]" />
+            <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+              <Users className="w-4 h-4 text-[#630ed4]" />
             </div>
-            <span className="text-sm font-medium text-zinc-400">
+            <span className="text-sm font-medium text-on-surface-variant">
               Total Connections
             </span>
           </div>
-          <div className="text-3xl font-bold text-white">
+          <div className="text-3xl font-bold text-on-surface">
             {displayInsights?.totalConnections || 0}
           </div>
-          <div className="text-xs text-zinc-500 mt-2">Last 30 days</div>
+          <div className="text-xs text-on-surface-variant mt-2">Last 30 days</div>
         </GlassPanel>
 
         <GlassPanel className="p-6">
@@ -497,14 +510,14 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             <div className="p-2 bg-green-500/20 rounded-lg">
               <TrendingUp className="w-4 h-4 text-green-500" />
             </div>
-            <span className="text-sm font-medium text-zinc-400">
+            <span className="text-sm font-medium text-on-surface-variant">
               Retention Rate
             </span>
           </div>
-          <div className="text-3xl font-bold text-white">
+          <div className="text-3xl font-bold text-on-surface">
             {displayInsights?.retentionRate || "N/A"}
           </div>
-          <div className="text-xs text-zinc-500 mt-2">Returning visitors</div>
+          <div className="text-xs text-on-surface-variant mt-2">Returning visitors</div>
         </GlassPanel>
 
         <GlassPanel className="p-6">
@@ -512,27 +525,27 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
             <div className="p-2 bg-orange-500/20 rounded-lg">
               <Calendar className="w-4 h-4 text-orange-500" />
             </div>
-            <span className="text-sm font-medium text-zinc-400">
+            <span className="text-sm font-medium text-on-surface-variant">
               Busiest Day
             </span>
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-2xl font-bold text-on-surface">
             {displayInsights?.busiestDay || "N/A"}
           </div>
-          <div className="text-xs text-zinc-500 mt-2">Highest activity</div>
+          <div className="text-xs text-on-surface-variant mt-2">Highest activity</div>
         </GlassPanel>
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-[#3A86FF]/20 rounded-lg">
-              <Clock className="w-4 h-4 text-[#3A86FF]" />
+            <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+              <Clock className="w-4 h-4 text-[#630ed4]" />
             </div>
-            <span className="text-sm font-medium text-zinc-400">Peak Hour</span>
+            <span className="text-sm font-medium text-on-surface-variant">Peak Hour</span>
           </div>
-          <div className="text-3xl font-bold text-white">
+          <div className="text-3xl font-bold text-on-surface">
             {displayInsights?.peakHour ?? "N/A"}:00
           </div>
-          <div className="text-xs text-zinc-500 mt-2">Most active time</div>
+          <div className="text-xs text-on-surface-variant mt-2">Most active time</div>
         </GlassPanel>
       </motion.div>
 
@@ -541,14 +554,14 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-[#3A86FF]/20 rounded-lg">
-                <BarChart3 className="w-4 h-4 text-[#3A86FF]" />
+              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
+                <BarChart3 className="w-4 h-4 text-[#630ed4]" />
               </div>
-              <span className="text-sm font-medium text-zinc-400">
+              <span className="text-sm font-medium text-on-surface-variant">
                 Popular Times
               </span>
             </div>
-            <span className="text-xs text-zinc-500">Hourly distribution</span>
+            <span className="text-xs text-on-surface-variant">Hourly distribution</span>
           </div>
           <div className="w-full min-w-0 overflow-hidden">
             <ResponsiveContainer
@@ -560,19 +573,19 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
               <BarChart data={hourlyData}>
                 <XAxis
                   dataKey="hour"
-                  stroke="rgba(255,255,255,0.2)"
-                  tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }}
+                  stroke={chartAxis}
+                  tick={{ fill: chartMuted, fontSize: 10 }}
                   interval={2}
-                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                  axisLine={{ stroke: chartGrid }}
                 />
                 <Tooltip
-                  cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                  cursor={{ fill: chartCursor }}
                   contentStyle={{
-                    backgroundColor: "rgba(0,0,0,0.9)",
-                    borderColor: "rgba(255,255,255,0.1)",
+                    backgroundColor: chartTooltipBg,
+                    borderColor: chartTooltipBorder,
                     borderRadius: "12px",
                   }}
-                  itemStyle={{ color: "#fff" }}
+                  itemStyle={{ color: chartTooltipText }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {hourlyData.map((entry: any, index: number) => (
@@ -580,7 +593,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                       key={`cell-${index}`}
                       fill={
                         index === displayInsights?.peakHour
-                          ? "#8338EC"
+                          ? "#630ed4"
                           : "rgba(255,255,255,0.15)"
                       }
                       style={
@@ -597,9 +610,9 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 text-center text-xs text-zinc-400">
+          <div className="mt-4 text-center text-xs text-on-surface-variant">
             Peak activity is around{" "}
-            <span className="text-[#8338EC] font-bold">
+            <span className="text-[#630ed4] font-bold">
               {displayInsights?.peakHour}:00
             </span>
           </div>

@@ -119,7 +119,7 @@ export default function SocialActivityPage() {
   }
 
   const TrendIcon = wowChange > 0 ? ArrowUpRight : wowChange < 0 ? ArrowDownRight : Minus;
-  const trendColor = wowChange > 0 ? 'text-green-400' : wowChange < 0 ? 'text-red-400' : 'text-zinc-400';
+  const trendColor = wowChange > 0 ? 'text-green-700 dark:text-green-400' : wowChange < 0 ? 'text-red-700 dark:text-red-400' : 'text-zinc-400';
 
   return (
     <motion.div
@@ -166,7 +166,7 @@ export default function SocialActivityPage() {
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Zap className="w-4 h-4 text-amber-400" />
+            <Zap className="w-4 h-4 text-amber-700 dark:text-amber-300" />
             <span className="text-xs text-zinc-400">Peak Day</span>
           </div>
           <div className="text-3xl font-bold text-white">{peakDayCount}</div>

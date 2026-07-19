@@ -19,7 +19,7 @@ const TEAM: TeamMember[] = [
     subtitle: 'Paul Allen School of Computer Science, UW 2029',
     text: 'Frustrated by adding people on Instagram and never talking again, I led product development for both the Click mobile app and website. Kairui has experience in developing full stack applications, utilized by journalists, advocacy groups, and lawyers from across the nation.',
     email: 'kcheng29@uw.edu',
-    gradient: 'from-[#8338EC] to-purple-600',
+    gradient: 'from-[#630ed4] to-purple-600',
   },
   {
     name: 'Matthew Epshtein',
@@ -57,10 +57,10 @@ const TEAM: TeamMember[] = [
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-on-surface">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-1/4 top-0 h-96 w-96 rounded-full bg-[#8338EC] opacity-15 blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-[#8338EC] opacity-15 blur-[120px]" />
+        <div className="absolute left-1/4 top-0 h-96 w-96 rounded-full bg-[#630ed4] opacity-15 blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-[#630ed4] opacity-15 blur-[120px]" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-20 md:px-12">
@@ -70,16 +70,16 @@ export default function About() {
           transition={{ duration: 0.8 }}
         >
           <h1 className="mb-6 text-center text-5xl font-bold md:text-6xl">
-            About <span className="text-[#8338EC]">Click</span>
+            About <span className="text-[#630ed4]">Click</span>
           </h1>
-          <p className="mx-auto mb-6 max-w-2xl text-center text-lg leading-relaxed text-zinc-400">
+          <p className="mx-auto mb-6 max-w-2xl text-center text-lg leading-relaxed text-on-surface-variant">
             We&apos;re a team of Computer Science students at the{' '}
-            <span className="text-zinc-300">University of Washington</span> building tools for real-world connection, not
+            <span className="text-on-surface-variant">University of Washington</span> building tools for real-world connection, not
             another endless feed.
           </p>
-          <p className="mx-auto mb-16 max-w-xl text-center text-sm leading-relaxed text-zinc-500">
+          <p className="mx-auto mb-16 max-w-xl text-center text-sm leading-relaxed text-on-surface-variant">
             For what Click does, why it exists, and how to join the waitlist or create an account, see the{' '}
-            <Link href="/" className="font-medium text-[#8338EC] underline-offset-4 hover:underline">
+            <Link href="/" className="font-medium text-[#630ed4] underline-offset-4 hover:underline">
               homepage
             </Link>
             .
@@ -87,9 +87,9 @@ export default function About() {
 
           <section className="mb-20">
             <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">
-              What we&apos;re <span className="text-[#8338EC]">building</span>
+              What we&apos;re <span className="text-[#630ed4]">building</span>
             </h2>
-            <p className="mx-auto mb-10 max-w-2xl text-center text-zinc-400">
+            <p className="mx-auto mb-10 max-w-2xl text-center text-on-surface-variant">
               Stop scrolling. Start living. Click is a people-first social utility for the seconds when someone in front of you
               actually matters, backed by room-real tech and math you never have to think about.
             </p>
@@ -99,10 +99,10 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.65 }}
                 viewport={{ once: true }}
-                className="glass rounded-3xl border border-zinc-800 p-6 text-left"
+                className="fc-card rounded-[16px] border border-border-hard p-6 text-left"
               >
-                <h3 className="mb-2 text-lg font-bold text-white">Proximity Tap</h3>
-                <p className="text-sm leading-relaxed text-zinc-500">
+                <h3 className="mb-2 text-lg font-bold text-on-surface">Proximity Tap</h3>
+                <p className="text-sm leading-relaxed text-on-surface-variant">
                   Tri-Factor Handshake: secure Bluetooth and inaudible sound prove you are in the same room before anything
                   exchanges. No hardware rabbit holes, no awkward phone pass. If you can see them, you can connect.
                 </p>
@@ -112,10 +112,10 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.65, delay: 0.06 }}
                 viewport={{ once: true }}
-                className="glass rounded-3xl border border-zinc-800 p-6 text-left"
+                className="fc-card rounded-[16px] border border-border-hard p-6 text-left"
               >
-                <h3 className="mb-2 text-lg font-bold text-white">Multi-Tap and organic cliques</h3>
-                <p className="text-sm leading-relaxed text-zinc-500">
+                <h3 className="mb-2 text-lg font-bold text-on-surface">Multi-Tap and organic cliques</h3>
+                <p className="text-sm leading-relaxed text-on-surface-variant">
                   Whole crew at once? Everyone connects on the same beat. We validate the full set in the background, then open a
                   verified group chat so the night keeps going in one thread instead of seven stray DMs.
                 </p>
@@ -125,10 +125,10 @@ export default function About() {
                 whileInView={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.65, delay: 0.12 }}
                 viewport={{ once: true }}
-                className="glass rounded-3xl border border-zinc-800 p-6 text-left"
+                className="fc-card rounded-[16px] border border-border-hard p-6 text-left"
               >
-                <h3 className="mb-2 text-lg font-bold text-white">Availability intents</h3>
-                <p className="text-sm leading-relaxed text-zinc-500">
+                <h3 className="mb-2 text-lg font-bold text-on-surface">Availability intents</h3>
+                <p className="text-sm leading-relaxed text-on-surface-variant">
                   Broadcast what you are up for for up to twenty-four hours, from coffee runs to study blocks to live music.
                   When your friends&apos; intents overlap, we let you know. Less guessing, more showing up.
                 </p>
@@ -138,9 +138,9 @@ export default function About() {
 
           <section>
             <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">
-              Meet the <span className="text-[#8338EC]">team</span>
+              Meet the <span className="text-[#630ed4]">team</span>
             </h2>
-            <p className="mx-auto mb-12 max-w-2xl text-center text-zinc-400">
+            <p className="mx-auto mb-12 max-w-2xl text-center text-on-surface-variant">
               Five of us are working on product, mobile, and web, with a focus on campus life and making big transitions
               (new school, new city, new semester) a little less lonely.
             </p>
@@ -153,7 +153,7 @@ export default function About() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.65, delay: i * 0.06 }}
                   viewport={{ once: true }}
-                  className="glass rounded-3xl border border-zinc-800 p-8 text-center transition-colors hover:border-[#8338EC]/50"
+                  className="fc-card rounded-[16px] border border-border-hard p-8 text-center transition-colors hover:border-[#630ed4]/50"
                 >
                   <div
                     className={`mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br text-4xl font-bold ${member.gradient}`}
@@ -161,14 +161,14 @@ export default function About() {
                     {member.initials}
                   </div>
                   <h3 className="mb-2 text-2xl font-bold">{member.name}</h3>
-                  <p className="text-zinc-400">{member.subtitle}</p>
+                  <p className="text-on-surface-variant">{member.subtitle}</p>
                   {member.text && (
-                    <p className="mt-4 text-left text-sm leading-relaxed text-zinc-500">{member.text}</p>
+                    <p className="mt-4 text-left text-sm leading-relaxed text-on-surface-variant">{member.text}</p>
                   )}
                   {member.email && (
                     <a
                       href={`mailto:${member.email}`}
-                      className="mt-4 inline-block text-sm text-[#8338EC] hover:underline"
+                      className="mt-4 inline-block text-sm text-[#630ed4] hover:underline"
                     >
                       {member.email}
                     </a>

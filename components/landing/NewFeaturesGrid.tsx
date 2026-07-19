@@ -24,11 +24,11 @@ export default function NewFeaturesGrid() {
         <motion.div {...fadeUp} className="mb-12 text-center md:mb-16">
           <h2
             id="landing-new-features-heading"
-            className="text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl"
+            className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl md:text-5xl"
           >
-            What&apos;s <span className="text-[#8338EC]">shipping</span> now
+            What&apos;s <span className="text-[#630ed4]">shipping</span> now
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-zinc-400 md:text-lg">
+          <p className="mx-auto mt-4 max-w-2xl text-base text-on-surface-variant md:text-lg">
             New capabilities on Click—built for real rooms, real maps, and real follow-up.
           </p>
         </motion.div>
@@ -38,9 +38,9 @@ export default function NewFeaturesGrid() {
           <motion.article
             {...fadeUp}
             transition={{ duration: 0.5, delay: 0.05 }}
-            className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-xl backdrop-blur-xl"
+            className="flex flex-col overflow-hidden rounded-2xl border border-border-hard bg-white/[0.03] shadow-xl"
           >
-            <div className="relative min-h-[320px] w-full flex-1 bg-zinc-950 p-2 sm:min-h-[360px] lg:min-h-[400px]">
+            <div className="relative min-h-[320px] w-full flex-1 bg-background p-2 sm:min-h-[360px] lg:min-h-[400px]">
               <Image
                 src={LANDING_IMG.mapMobileSoundtracks}
                 alt="Click mobile map with local soundtracks and memory pins"
@@ -49,11 +49,11 @@ export default function NewFeaturesGrid() {
                 className="object-contain object-top"
               />
             </div>
-            <div className="flex flex-1 flex-col gap-2 border-t border-white/10 p-5">
-              <h3 className="text-lg font-semibold text-white md:text-xl">
+            <div className="flex flex-1 flex-col gap-2 border-t border-border-hard p-5">
+              <h3 className="text-lg font-semibold text-on-surface md:text-xl">
                 Drop your beats. Find your tribe.
               </h3>
-              <p className="text-sm leading-relaxed text-zinc-400">
+              <p className="text-sm leading-relaxed text-on-surface-variant">
                 Explore a live, rolling 7-day soundtrack of your city. Drop songs from Spotify or Apple Music at the exact
                 location you&apos;re standing. Discover pop-up jams, micro-bounties, flash mobs, and hidden node scavenger
                 hunts right on your map.
@@ -65,9 +65,9 @@ export default function NewFeaturesGrid() {
           <motion.article
             {...fadeUp}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-xl backdrop-blur-xl"
+            className="flex flex-col overflow-hidden rounded-2xl border border-border-hard bg-white/[0.03] shadow-xl"
           >
-            <div className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden bg-zinc-950 p-6 lg:min-h-[320px]">
+            <div className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden bg-background p-6 lg:min-h-[320px]">
               <div
                 className="pointer-events-none absolute inset-0 opacity-40"
                 style={{
@@ -76,21 +76,21 @@ export default function NewFeaturesGrid() {
                 }}
               />
               <div
-                className={`relative h-48 w-48 rounded-full border border-[#8338EC]/40 bg-[#8338EC]/5 shadow-[0_0_60px_-10px_rgba(131,56,236,0.7)] ${
+                className={`relative h-48 w-48 rounded-full border border-[#630ed4]/40 bg-[#630ed4]/5 shadow-[0_0_60px_-10px_rgba(131,56,236,0.7)] ${
                   reduceMotion ? '' : 'animate-pulse'
                 }`}
               >
-                <div className="absolute inset-4 rounded-full border border-dashed border-[#8338EC]/30" />
-                <div className="absolute inset-[22%] rounded-full border border-[#3A86FF]/25" />
-                <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8338EC] shadow-lg shadow-[#8338EC]/80" />
+                <div className="absolute inset-4 rounded-full border border-dashed border-[#630ed4]/30" />
+                <div className="absolute inset-[22%] rounded-full border border-[#630ed4]/25" />
+                <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#630ed4] shadow-lg shadow-[#630ed4]/80" />
               </div>
               <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_2px,rgba(255,255,255,0.03)_2px,rgba(255,255,255,0.03)_4px)] opacity-30 mix-blend-overlay" />
             </div>
-            <div className="border-t border-white/10 p-5">
-              <h3 className="text-lg font-semibold text-white md:text-xl">
+            <div className="border-t border-border-hard p-5">
+              <h3 className="text-lg font-semibold text-on-surface md:text-xl">
                 Broadcast your intent. No ads attached.
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                 Set your real-world availability intent (e.g., &apos;Looking for Coffee&apos; or &apos;Live Music&apos;).
                 Venues see aggregated, anonymized heatmaps and can drop temporary &apos;Pop-Up Beacons&apos; with perks
                 directly to you.

@@ -205,12 +205,7 @@ export default function EnterprisePage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-1/3 top-0 h-[28rem] w-[28rem] rounded-full bg-[#8338EC] opacity-[0.12] blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-violet-600 opacity-10 blur-[100px]" />
-      </div>
-
+    <div className="min-h-screen bg-background text-on-surface">
       <div className="relative z-10">
         {/* Hero */}
         <section className="mx-auto max-w-6xl px-6 pb-16 pt-12 md:px-12 md:pb-24 md:pt-16">
@@ -220,16 +215,16 @@ export default function EnterprisePage() {
             transition={{ duration: 0.75 }}
             className="text-center"
           >
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-4 py-2 text-sm text-zinc-400 backdrop-blur">
-              <GraduationCap className="h-4 w-4 text-[#8338EC]" />
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border-hard bg-surface-container/60 px-4 py-2 text-sm text-on-surface-variant">
+              <GraduationCap className="h-4 w-4 text-primary" />
               <span>Higher ed &amp; Student Affairs</span>
             </div>
-            <h1 className="font-heading mb-6 max-w-5xl mx-auto text-3xl font-bold tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
-              <span className="text-zinc-50">
+            <h1 className="mb-6 max-w-5xl mx-auto text-3xl font-bold tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
+              <span className="text-on-surface">
                 A university can&apos;t measure student loneliness from their contact lists. They can from ours.
               </span>
             </h1>
-            <p className="mx-auto mb-10 max-w-3xl text-lg leading-relaxed text-zinc-300 md:text-xl">
+            <p className="mx-auto mb-10 max-w-3xl text-lg leading-relaxed text-on-surface-variant md:text-xl">
               Click gives Student Affairs offices a real-time connection velocity dashboard: the leading indicator for freshman
               retention that no other platform produces.
             </p>
@@ -238,7 +233,7 @@ export default function EnterprisePage() {
                 href="mailto:mepsht@uw.edu?subject=Click%20Enterprise%20%2F%20Institution%20inquiry"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#8338EC] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-[#8338EC]/25 transition-colors hover:bg-[#9d4eff] sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-[8px] bg-primary px-8 py-4 text-base font-bold text-on-primary  transition-colors hover:brightness-90 sm:w-auto"
               >
                 Talk to us
                 <ArrowRight className="h-4 w-4" />
@@ -252,18 +247,18 @@ export default function EnterprisePage() {
                   setStatus('idle');
                   setMessage('');
                 }}
-                className="inline-flex w-full items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-900/50 px-8 py-4 text-base font-semibold text-white backdrop-blur transition-colors hover:border-[#8338EC]/50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-border-hard bg-surface-container/50 px-8 py-4 text-base font-semibold text-on-surface transition-colors hover:border-primary/50 sm:w-auto"
               >
                 Join the waitlist
               </motion.button>
             </div>
-            <p className="mt-6 text-center text-sm text-zinc-600">
+            <p className="mt-6 text-center text-sm text-outline">
               New to the product?{' '}
-              <Link href="/" className="text-[#8338EC] underline-offset-4 hover:underline">
+              <Link href="/" className="text-primary underline-offset-4 hover:underline">
                 See the consumer story
               </Link>{' '}
               or{' '}
-              <Link href="/about" className="text-[#8338EC] underline-offset-4 hover:underline">
+              <Link href="/about" className="text-primary underline-offset-4 hover:underline">
                 meet the team
               </Link>
               .
@@ -279,17 +274,17 @@ export default function EnterprisePage() {
             {OUTCOME_VERTICALS.map((v) => (
               <article
                 key={v.title}
-                className="glass flex flex-col rounded-3xl border border-zinc-800 bg-zinc-900/30 p-6 text-left transition-colors hover:border-[#8338EC]/35"
+                className="fc-card flex flex-col rounded-[16px] border border-border-hard bg-surface-container/30 p-6 text-left transition-colors hover:border-primary/35"
               >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
-                  <v.icon className="h-6 w-6 text-[#8338EC]" />
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
+                  <v.icon className="h-6 w-6 text-primary" />
                 </div>
-                <h2 className="font-heading mb-3 text-lg font-bold text-zinc-100">{v.title}</h2>
-                <p className="mb-4 flex-1 text-sm leading-relaxed text-zinc-400">{v.outcome}</p>
-                <p className="border-t border-zinc-800/80 pt-4 text-xs font-medium uppercase tracking-wide text-[#c4a3ff]">
+                <h2 className="mb-3 text-lg font-bold text-on-surface">{v.title}</h2>
+                <p className="mb-4 flex-1 text-sm leading-relaxed text-on-surface-variant">{v.outcome}</p>
+                <p className="border-t border-border-hard/80 pt-4 text-xs font-medium uppercase tracking-wide text-primary">
                   Metric highlighted
                 </p>
-                <p className="mt-1 text-sm leading-snug text-zinc-300">{v.metric}</p>
+                <p className="mt-1 text-sm leading-snug text-on-surface-variant">{v.metric}</p>
               </article>
             ))}
           </motion.div>
@@ -307,12 +302,12 @@ export default function EnterprisePage() {
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.25 }}
-            className="mx-auto mt-12 max-w-3xl rounded-2xl border border-[#8338EC]/25 bg-gradient-to-br from-[#8338EC]/10 via-zinc-900/40 to-zinc-950/80 px-6 py-8 text-center md:px-10"
+            className="mx-auto mt-12 max-w-3xl rounded-2xl border border-primary/25 bg-gradient-to-br from-on-primary-container via-surface to-surface px-6 py-8 text-center md:px-10"
           >
-            <p className="text-sm font-semibold uppercase tracking-wider text-[#c4a3ff]">University ROI snapshot</p>
-            <p className="mt-4 text-base leading-relaxed text-zinc-200 md:text-lg">
+            <p className="text-sm font-semibold uppercase tracking-wider text-primary">University ROI snapshot</p>
+            <p className="mt-4 text-base leading-relaxed text-on-surface md:text-lg">
               If Click is deployed at a university of 30,000 students and improves freshman retention by 1%: 300 students retained
-              × ~$30,000 avg tuition = <span className="font-semibold text-white">$9,000,000</span> in tuition revenue preserved.
+              × ~$30,000 avg tuition = <span className="font-semibold text-on-surface">$9,000,000</span> in tuition revenue preserved.
               One pilot. One semester.
             </p>
           </motion.div>
@@ -337,10 +332,10 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 text-center md:mb-16"
             >
-              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
-                Who <span className="text-[#8338EC]">it&apos;s for</span>
+              <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+                Who <span className="text-primary">it&apos;s for</span>
               </h2>
-              <p className="mx-auto max-w-2xl text-zinc-400">
+              <p className="mx-auto max-w-2xl text-on-surface-variant">
                 One product surface, three common scales: from a single location to a distributed institution.
               </p>
             </motion.div>
@@ -352,17 +347,17 @@ export default function EnterprisePage() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.65, delay: i * 0.08 }}
                   viewport={{ once: true }}
-                  className="glass flex flex-col rounded-3xl border border-zinc-800 p-8 transition-colors hover:border-[#8338EC]/40"
+                  className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/40"
                 >
-                  <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#8338EC]/15">
-                    <block.icon className="h-7 w-7 text-[#8338EC]" />
+                  <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15">
+                    <block.icon className="h-7 w-7 text-primary" />
                   </div>
-                  <h3 className="font-heading mb-3 text-xl font-bold md:text-2xl">{block.title}</h3>
-                  <p className="mb-6 flex-1 text-sm leading-relaxed text-zinc-400 md:text-base">{block.body}</p>
-                  <ul className="space-y-2 border-t border-zinc-800/80 pt-6 text-sm text-zinc-500">
+                  <h3 className="mb-3 text-xl font-bold md:text-2xl">{block.title}</h3>
+                  <p className="mb-6 flex-1 text-sm leading-relaxed text-on-surface-variant md:text-base">{block.body}</p>
+                  <ul className="space-y-2 border-t border-border-hard/80 pt-6 text-sm text-on-surface-variant">
                     {block.bullets.map((b) => (
                       <li key={b} className="flex gap-2">
-                        <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                        <span className="mt-0.5 shrink-0 text-primary">✓</span>
                         <span>{b}</span>
                       </li>
                     ))}
@@ -374,7 +369,7 @@ export default function EnterprisePage() {
         </section>
 
         {/* Use cases */}
-        <section className="border-t border-zinc-900 bg-zinc-950/80 py-16 md:py-24">
+        <section className="border-t border-zinc-900 bg-background/80 py-16 md:py-24">
           <div className="mx-auto max-w-6xl px-6 md:px-12">
             <motion.div
               initial={{ y: 28, opacity: 0 }}
@@ -383,10 +378,10 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 md:mb-16"
             >
-              <h2 className="font-heading mb-4 text-center text-3xl font-bold md:text-4xl lg:text-5xl">
-                Programs we <span className="text-[#8338EC]">hear about</span> first
+              <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl lg:text-5xl">
+                Programs we <span className="text-primary">hear about</span> first
               </h2>
-              <p className="mx-auto max-w-2xl text-center text-zinc-400">
+              <p className="mx-auto max-w-2xl text-center text-on-surface-variant">
                 Examples of where Proximity Tap, Multi-Tap groups, and contextual memory matter most. Your rollout may combine several of these.
               </p>
             </motion.div>
@@ -398,17 +393,17 @@ export default function EnterprisePage() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.55, delay: (i % 3) * 0.05 }}
                   viewport={{ once: true }}
-                  className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 transition-colors hover:border-zinc-700"
+                  className="rounded-2xl border border-border-hard bg-surface-container/40 p-6 transition-colors hover:border-border-hard"
                 >
-                  <h3 className="font-heading mb-2 text-lg font-semibold text-zinc-100">{u.title}</h3>
-                  <p className="text-sm leading-relaxed text-zinc-500">{u.desc}</p>
+                  <h3 className="mb-2 text-lg font-semibold text-on-surface">{u.title}</h3>
+                  <p className="text-sm leading-relaxed text-on-surface-variant">{u.desc}</p>
                 </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        <div className="border-t border-zinc-900 bg-zinc-950/50 py-10 md:py-14">
+        <div className="border-t border-zinc-900 bg-background/50 py-10 md:py-14">
           <div className="mx-auto max-w-6xl px-6 md:px-12">
             <EnterpriseProductShot
               id="enterprise-shot-heatmap-tribes"
@@ -419,7 +414,7 @@ export default function EnterprisePage() {
           </div>
         </div>
 
-        {/* <div className="border-t border-zinc-900/80 bg-zinc-950/30 py-10 md:py-12">
+        {/* <div className="border-t border-zinc-900/80 bg-background/30 py-10 md:py-12">
           <div className="mx-auto max-w-6xl px-6 md:px-12">
             <EnterpriseProductShot
               id="enterprise-shot-insights-map-view"
@@ -440,14 +435,14 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 text-center md:mb-14"
             >
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#8338EC]/30 bg-[#8338EC]/10 px-4 py-1.5 text-sm font-medium text-[#c4a3ff]">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
                 <BarChart3 className="h-4 w-4" />
                 Business Insights
               </div>
-              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
-                Analytics for <span className="text-[#8338EC]">social patterns</span> and your team
+              <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+                Analytics for <span className="text-primary">social patterns</span> and your team
               </h2>
-              <p className="mx-auto max-w-2xl text-zinc-400 md:text-lg">
+              <p className="mx-auto max-w-2xl text-on-surface-variant md:text-lg">
                 Verified businesses get a web workspace to watch how connection shows up in the wild: where it clusters, how it
                 moves through time, and how staff and ambassadors who use Click compare across shifts or sites.
               </p>
@@ -461,17 +456,17 @@ export default function EnterprisePage() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.65, delay: i * 0.07 }}
                   viewport={{ once: true }}
-                  className="glass flex flex-col rounded-3xl border border-zinc-800 p-8 transition-colors hover:border-[#8338EC]/35"
+                  className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/35"
                 >
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
-                    <pillar.icon className="h-6 w-6 text-[#8338EC]" />
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
+                    <pillar.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-heading mb-3 text-xl font-bold leading-snug">{pillar.title}</h3>
-                  <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">{pillar.lead}</p>
-                  <ul className="mt-auto space-y-3 border-t border-zinc-800/80 pt-6">
+                  <h3 className="mb-3 text-xl font-bold leading-snug">{pillar.title}</h3>
+                  <p className="mb-6 text-sm leading-relaxed text-on-surface-variant md:text-base">{pillar.lead}</p>
+                  <ul className="mt-auto space-y-3 border-t border-border-hard/80 pt-6">
                     {pillar.bullets.map((b) => (
-                      <li key={b.text} className="flex gap-3 text-sm text-zinc-500">
-                        <b.icon className="mt-0.5 h-4 w-4 shrink-0 text-[#8338EC]/80" />
+                      <li key={b.text} className="flex gap-3 text-sm text-on-surface-variant">
+                        <b.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary/80" />
                         <span>{b.text}</span>
                       </li>
                     ))}
@@ -496,44 +491,44 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mt-12 grid gap-8 lg:grid-cols-2"
             >
-              <article className="glass flex flex-col rounded-3xl border border-zinc-800 p-8 transition-colors hover:border-[#8338EC]/35">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
-                  <Users2 className="h-6 w-6 text-[#8338EC]" />
+              <article className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/35">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
+                  <Users2 className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-heading mb-3 text-xl font-bold leading-snug">Micro-Community Analytics</h3>
-                <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">
+                <h3 className="mb-3 text-xl font-bold leading-snug">Micro-Community Analytics</h3>
+                <p className="mb-6 text-sm leading-relaxed text-on-surface-variant md:text-base">
                   Go beyond basic foot traffic. Click mathematically verifies when groups of friends arrive together, not only
                   isolated visits. See whether your venue behaves like a passive pass-through or a sticky hub for micro-communities,
                   then package sponsorships that align with real social graphs instead of anonymous impressions.
                 </p>
-                <ul className="mt-auto space-y-2 border-t border-zinc-800/80 pt-6 text-sm text-zinc-500">
+                <ul className="mt-auto space-y-2 border-t border-border-hard/80 pt-6 text-sm text-on-surface-variant">
                   <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
                     <span>Group-level arrival signals where Multi-Tap and graph checks succeed</span>
                   </li>
                   <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
                     <span>Compare repeat micro-communities against one-off walkthrough traffic</span>
                   </li>
                 </ul>
               </article>
-              <article className="glass flex flex-col rounded-3xl border border-zinc-800 p-8 transition-colors hover:border-[#8338EC]/35">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#8338EC]/15">
-                  <Radar className="h-6 w-6 text-[#8338EC]" />
+              <article className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/35">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
+                  <Radar className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-heading mb-3 text-xl font-bold leading-snug">Vibe Radar and Pop-Up Beacons</h3>
-                <p className="mb-6 text-sm leading-relaxed text-zinc-400 md:text-base">
+                <h3 className="mb-3 text-xl font-bold leading-snug">Vibe Radar and Pop-Up Beacons</h3>
+                <p className="mb-6 text-sm leading-relaxed text-on-surface-variant md:text-base">
                   Stop paying for spammy local ads. Vibe Radar surfaces anonymized availability intents on a geographic hexbin so
                   you can see what people nearby want to do right now. Spot fifty &quot;coffee&quot; intents within a mile? Drop a
                   temporary Pop-Up Beacon on the Click map with a ten percent perk and pull that demand through your door on purpose.
                 </p>
-                <ul className="mt-auto space-y-2 border-t border-zinc-800/80 pt-6 text-sm text-zinc-500">
+                <ul className="mt-auto space-y-2 border-t border-border-hard/80 pt-6 text-sm text-on-surface-variant">
                   <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
                     <span>Live heatmaps of intent categories, bounded by privacy and policy controls</span>
                   </li>
                   <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-[#8338EC]">✓</span>
+                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
                     <span>Time-boxed beacons that turn curiosity into measurable visits</span>
                   </li>
                 </ul>
@@ -548,12 +543,12 @@ export default function EnterprisePage() {
             >
               <Link
                 href="/insights"
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#8338EC] px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#9d4eff]"
+                className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-semibold text-on-primary transition-colors hover:brightness-90"
               >
                 Open Business Insights
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <p className="max-w-md text-center text-sm text-zinc-500 sm:text-left">
+              <p className="max-w-md text-center text-sm text-on-surface-variant sm:text-left">
                 Sign in with a verified business account to explore Overview, Social Activity, Heatmap, Tribe and micro-community
                 views, Vibe Stream, Vibe Radar, Pop-Up Beacons, and Live Metrics.
               </p>
@@ -562,7 +557,7 @@ export default function EnterprisePage() {
         </section>
 
         {/* Capabilities */}
-        <section className="border-t border-zinc-900 bg-zinc-950/80 py-16 md:py-24">
+        <section className="border-t border-zinc-900 bg-background/80 py-16 md:py-24">
           <div className="mx-auto max-w-6xl px-6 md:px-12">
             <motion.div
               initial={{ y: 28, opacity: 0 }}
@@ -571,10 +566,10 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mb-12 text-center md:mb-16"
             >
-              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
-                What <span className="text-[#8338EC]">you get</span>
+              <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+                What <span className="text-primary">you get</span>
               </h2>
-              <p className="mx-auto max-w-2xl text-zinc-400">
+              <p className="mx-auto max-w-2xl text-on-surface-variant">
                 Capabilities map to how teams actually operate on the ground, not only as a checklist on a slide deck.
               </p>
             </motion.div>
@@ -586,14 +581,14 @@ export default function EnterprisePage() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.6, delay: i * 0.06 }}
                   viewport={{ once: true }}
-                  className="glass flex gap-5 rounded-3xl border border-zinc-800 p-8"
+                  className="fc-card flex gap-5 rounded-[16px] border border-border-hard p-8"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#8338EC]/15">
-                    <c.icon className="h-6 w-6 text-[#8338EC]" />
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                    <c.icon className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-heading mb-2 text-xl font-bold">{c.title}</h3>
-                    <p className="text-sm leading-relaxed text-zinc-400 md:text-base">{c.text}</p>
+                    <h3 className="mb-2 text-xl font-bold">{c.title}</h3>
+                    <p className="text-sm leading-relaxed text-on-surface-variant md:text-base">{c.text}</p>
                   </div>
                 </motion.div>
               ))}
@@ -611,10 +606,10 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mx-auto max-w-3xl text-center"
             >
-              <h2 className="font-heading mb-4 text-3xl font-bold md:text-4xl">
-                Rollout, <span className="text-[#8338EC]">without the big-bang risk</span>
+              <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+                Rollout, <span className="text-primary">without the big-bang risk</span>
               </h2>
-              <p className="mb-10 text-zinc-400">
+              <p className="mb-10 text-on-surface-variant">
                 We recommend a phased path: align on privacy and success metrics, run a contained pilot with one audience or
                 venue, then iterate on messaging and staff training before wider launch.
               </p>
@@ -631,13 +626,13 @@ export default function EnterprisePage() {
                   whileInView={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.55, delay: i * 0.1 }}
                   viewport={{ once: true }}
-                  className="glass relative rounded-2xl border border-zinc-800 p-6 text-center"
+                  className="fc-card relative rounded-2xl border border-border-hard p-6 text-center"
                 >
-                  <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#8338EC]/20 text-lg font-bold text-[#8338EC]">
+                  <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-lg font-bold text-primary">
                     {item.step}
                   </span>
-                  <h3 className="font-heading mb-2 font-bold text-zinc-100">{item.title}</h3>
-                  <p className="text-sm text-zinc-500">{item.desc}</p>
+                  <h3 className="mb-2 font-bold text-on-surface">{item.title}</h3>
+                  <p className="text-sm text-on-surface-variant">{item.desc}</p>
                 </motion.li>
               ))}
             </ol>
@@ -651,9 +646,9 @@ export default function EnterprisePage() {
               initial={{ y: 20, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: true }}
-              className="font-heading mb-10 text-center text-3xl font-bold md:text-4xl"
+              className="mb-10 text-center text-3xl font-bold md:text-4xl"
             >
-              Questions <span className="text-[#8338EC]">we expect</span>
+              Questions <span className="text-primary">we expect</span>
             </motion.h2>
             <div className="space-y-4">
               {FAQ.map((item, i) => (
@@ -664,14 +659,14 @@ export default function EnterprisePage() {
                   transition={{ delay: i * 0.04 }}
                   viewport={{ once: true }}
                 >
-                  <details className="group glass rounded-2xl border border-zinc-800 px-5 py-4 open:border-[#8338EC]/30">
-                    <summary className="cursor-pointer list-none font-semibold text-zinc-100 [&::-webkit-details-marker]:hidden">
+                  <details className="group fc-card rounded-2xl border border-border-hard px-5 py-4 open:border-primary/30">
+                    <summary className="cursor-pointer list-none font-semibold text-on-surface [&::-webkit-details-marker]:hidden">
                       <span className="flex items-center justify-between gap-3">
                         {item.q}
-                        <span className="text-zinc-500 transition group-open:rotate-45">+</span>
+                        <span className="text-on-surface-variant transition group-open:rotate-45">+</span>
                       </span>
                     </summary>
-                    <p className="mt-3 border-t border-zinc-800/80 pt-3 text-sm leading-relaxed text-zinc-400">{item.a}</p>
+                    <p className="mt-3 border-t border-border-hard/80 pt-3 text-sm leading-relaxed text-on-surface-variant">{item.a}</p>
                   </details>
                 </motion.div>
               ))}
@@ -686,16 +681,16 @@ export default function EnterprisePage() {
               initial={{ y: 24, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: true }}
-              className="glass rounded-3xl border border-[#8338EC]/25 bg-gradient-to-b from-[#8338EC]/10 to-transparent px-8 py-12 md:px-12"
+              className="fc-card rounded-[16px] border border-primary/25 bg-gradient-to-b from-primary/10 to-transparent px-8 py-12 md:px-12"
             >
-              <h2 className="font-heading mb-4 text-2xl font-bold md:text-3xl">Bring Click to your organization</h2>
-              <p className="mx-auto mb-8 max-w-xl text-zinc-400">
+              <h2 className="mb-4 text-2xl font-bold md:text-3xl">Bring Click to your organization</h2>
+              <p className="mx-auto mb-8 max-w-xl text-on-surface-variant">
                 Tell us about your audience, timeline, and any compliance constraints. We&apos;ll follow up with next steps.
               </p>
               <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                 <a
                   href="mailto:mepsht@uw.edu?subject=Click%20Enterprise%20%2F%20Institution%20inquiry"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#8338EC] px-8 py-4 font-semibold text-white transition-colors hover:bg-[#9d4eff]"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-4 font-semibold text-on-primary transition-colors hover:brightness-90"
                 >
                   Email the team
                   <ArrowRight className="h-4 w-4" />
@@ -707,7 +702,7 @@ export default function EnterprisePage() {
                     setStatus('idle');
                     setMessage('');
                   }}
-                  className="rounded-2xl border border-zinc-600 px-8 py-4 font-semibold text-white transition-colors hover:border-[#8338EC]/50"
+                  className="rounded-2xl border border-zinc-600 px-8 py-4 font-semibold text-on-surface transition-colors hover:border-primary/50"
                 >
                   Join the waitlist
                 </button>
@@ -722,19 +717,19 @@ export default function EnterprisePage() {
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950/95 p-6 shadow-2xl backdrop-blur-xl"
+            className="w-full max-w-md rounded-[16px] border border-border-hard bg-background/95 p-6"
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-heading text-2xl font-bold text-white">Enterprise waitlist</h2>
-                <p className="mt-2 text-sm text-zinc-400">
+                <h2 className="text-2xl font-bold text-on-surface">Enterprise waitlist</h2>
+                <p className="mt-2 text-sm text-on-surface-variant">
                   We&apos;ll note your interest for org-wide pilots and institution programs.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowWaitlist(false)}
-                className="rounded-full border border-zinc-800 p-2 text-zinc-400 transition hover:border-zinc-700 hover:text-white"
+                className="rounded-full border border-border-hard p-2 text-on-surface-variant transition hover:border-border-hard hover:text-on-surface"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -742,9 +737,9 @@ export default function EnterprisePage() {
             </div>
             {status === 'success' ? (
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center">
-                <CheckCircle className="mx-auto mb-3 h-10 w-10 text-emerald-400" />
-                <p className="font-medium text-emerald-300">You&apos;re on the list.</p>
-                <p className="mt-2 text-sm text-zinc-400">{message}</p>
+                <CheckCircle className="mx-auto mb-3 h-10 w-10 text-emerald-700 dark:text-emerald-300" />
+                <p className="font-medium text-emerald-700 dark:text-emerald-300">You&apos;re on the list.</p>
+                <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -759,14 +754,14 @@ export default function EnterprisePage() {
                     }
                   }}
                   placeholder="you@organization.edu"
-                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-white outline-none transition focus:border-[#8338EC]"
+                  className="w-full rounded-2xl border border-border-hard bg-surface-container px-4 py-3 text-on-surface outline-none transition focus:border-primary"
                 />
-                {status === 'error' && <p className="text-sm text-red-400">{message}</p>}
+                {status === 'error' && <p className="text-sm text-red-700 dark:text-red-400">{message}</p>}
                 <button
                   type="button"
                   onClick={submitWaitlist}
                   disabled={status === 'loading'}
-                  className="w-full rounded-2xl bg-[#8338EC] px-4 py-3 font-semibold text-white transition hover:bg-[#9d4eff] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-2xl bg-primary px-4 py-3 font-semibold text-on-primary transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {status === 'loading' ? 'Submitting…' : 'Submit'}
                 </button>

@@ -68,17 +68,17 @@ export default function TribeChart({ tribes }: TribeChartProps) {
           <div className="p-2 bg-[#C77DFF]/20 rounded-lg">
             <Users2 className="w-4 h-4 text-[#C77DFF]" />
           </div>
-          <span className="text-sm font-medium text-zinc-400">Tribe Analysis</span>
+          <span className="text-sm font-medium text-on-surface-variant">Tribe Analysis</span>
         </div>
         <button className="p-2 hover:bg-white/10 rounded-lg transition-colors group">
-          <Info className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300" />
+          <Info className="w-4 h-4 text-on-surface-variant group-hover:text-on-surface-variant" />
         </button>
       </div>
 
       {/* Bubble Chart */}
       <div className="relative h-[320px] bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#8338EC]/5 via-transparent to-[#3A86FF]/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4]/5 via-transparent to-[#630ed4]/5" />
         
         <svg 
           viewBox="0 0 100 100" 
@@ -201,7 +201,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-3 left-3 right-3 bg-black/90 backdrop-blur-md p-3 rounded-xl border border-white/20 z-10"
+              className="absolute bottom-3 left-3 right-3 bg-black/90 p-3 rounded-xl border border-white/20 z-10"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -209,19 +209,19 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: hoveredTribe.color }}
                   />
-                  <span className="font-semibold text-white text-sm">{hoveredTribe.name}</span>
+                  <span className="font-semibold text-on-surface text-sm">{hoveredTribe.name}</span>
                 </div>
-                <span className="text-xs text-zinc-400">{hoveredTribe.size} members</span>
+                <span className="text-xs text-on-surface-variant">{hoveredTribe.size} members</span>
               </div>
               <div className="flex items-center gap-4 text-xs">
-                <span className="text-zinc-300">
+                <span className="text-on-surface-variant">
                   {hoveredTribe.isMicroCommunity ? (
                     <>
-                      <span className="font-bold text-white">{hoveredTribe.connections}</span> checked in
+                      <span className="font-bold text-on-surface">{hoveredTribe.connections}</span> checked in
                     </>
                   ) : (
                     <>
-                      <span className="font-bold text-white">{hoveredTribe.connections}</span> connections
+                      <span className="font-bold text-on-surface">{hoveredTribe.connections}</span> connections
                     </>
                   )}
                 </span>
@@ -231,7 +231,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                   </span>
                 ) : null}
                 {!hoveredTribe.isMicroCommunity && hoveredTribe.overlap && hoveredTribe.overlap.length > 0 && (
-                  <span className="text-zinc-400">
+                  <span className="text-on-surface-variant">
                     Overlaps with: {hoveredTribe.overlap.map(id => 
                       tribes.find(t => t.id === id)?.name
                     ).filter(Boolean).join(', ')}
@@ -245,10 +245,10 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                     {hoveredTribe.interestTags.slice(0, 10).map((t) => (
                       <span
                         key={`${hoveredTribe.id}-${t.tag}`}
-                        className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-zinc-200"
+                        className="rounded-full border border-border-hard bg-white/5 px-2 py-0.5 text-[10px] text-on-surface"
                       >
                         {t.tag}
-                        <span className="ml-1 text-zinc-500">×{t.count}</span>
+                        <span className="ml-1 text-on-surface-variant">×{t.count}</span>
                       </span>
                     ))}
                   </div>
@@ -259,12 +259,12 @@ export default function TribeChart({ tribes }: TribeChartProps) {
       </div>
 
       {/* Stats row */}
-      <div className="flex justify-between items-center mt-4 pt-4 border-t border-white/10">
-        <div className="text-xs text-zinc-400">
-          <span className="text-white font-semibold">{tribes.length}</span> active tribes
+      <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-hard">
+        <div className="text-xs text-on-surface-variant">
+          <span className="text-on-surface font-semibold">{tribes.length}</span> active tribes
         </div>
-        <div className="text-xs text-zinc-400">
-          <span className="text-white font-semibold">
+        <div className="text-xs text-on-surface-variant">
+          <span className="text-on-surface font-semibold">
             {tribes.reduce((acc, t) => acc + t.connections, 0)}
           </span> total connections
         </div>

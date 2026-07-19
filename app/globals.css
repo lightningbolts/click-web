@@ -1,54 +1,172 @@
 @import "tailwindcss";
 
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --accent-purple: #8338EC;
-  --accent-blue: #3A86FF;
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+/*
+ * Use @theme (NOT @theme inline) so utilities reference var(--color-*),
+ * which .dark can override at runtime. @theme inline bakes light hexes
+ * into utilities and breaks the theme toggle.
+ */
+@theme {
+  --color-background: #f9f9f9;
+  --color-foreground: #1a1c1c;
+  --color-primary: #630ed4;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #7c3aed;
+  --color-on-primary-container: #ede0ff;
+  --color-surface: #ffffff;
+  --color-surface-container-low: #f3f3f4;
+  --color-surface-container: #eeeeee;
+  --color-surface-container-high: #e8e8e8;
+  --color-surface-container-highest: #e2e2e2;
+  --color-surface-variant: #e2e2e2;
+  --color-on-surface: #1a1c1c;
+  --color-on-surface-variant: #4a4455;
+  --color-outline: #7b7487;
+  --color-outline-variant: #ccc3d8;
+  --color-border-hard: #000000;
+  --color-error: #ba1a1a;
+  --color-surface-tint: #732ee4;
+  --color-inverse-primary: #d2bbff;
   --font-sans:
     var(--font-manrope), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-heading:
-    var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
-@layer utilities {
-  .font-heading {
-    font-family: var(--font-heading);
+@layer theme {
+  .dark {
+    /* Purple-tinted dark (brand), still opaque Functional Clarity */
+    --color-background: #120e18;
+    --color-foreground: #f0f1f1;
+    --color-surface: #1c1526;
+    --color-surface-container-low: #221a2e;
+    --color-surface-container: #2a2138;
+    --color-surface-container-high: #322844;
+    --color-surface-container-highest: #3a2f4f;
+    --color-surface-variant: #2a2138;
+    --color-on-surface: #f0f1f1;
+    --color-on-surface-variant: #cfc4e0;
+    --color-outline: #9b8fb0;
+    --color-outline-variant: #4a3d5c;
+    --color-border-hard: #ffffff;
+    --color-on-primary-container: #ede0ff;
+    --color-inverse-primary: #d2bbff;
+    /* primary / on-primary / primary-container stay brand purple */
   }
 }
 
+/* Aliases for non-Tailwind CSS (fc-* utilities, MapLibre, etc.) */
+:root {
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
+  --surface: var(--color-surface);
+  --surface-container-low: var(--color-surface-container-low);
+  --surface-container: var(--color-surface-container);
+  --surface-container-high: var(--color-surface-container-high);
+  --surface-container-highest: var(--color-surface-container-highest);
+  --surface-variant: var(--color-surface-variant);
+  --on-surface: var(--color-on-surface);
+  --on-surface-variant: var(--color-on-surface-variant);
+  --outline: var(--color-outline);
+  --outline-variant: var(--color-outline-variant);
+  --border-hard: var(--color-border-hard);
+  --primary: var(--color-primary);
+  --on-primary: var(--color-on-primary);
+  --primary-container: var(--color-primary-container);
+  --on-primary-container: var(--color-on-primary-container);
+  --surface-tint: var(--color-surface-tint);
+  --inverse-primary: var(--color-inverse-primary);
+  --error: var(--color-error);
+  --radius-btn: 8px;
+  --radius-card: 16px;
+  --border-width: 2px;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Custom glassmorphism utilities */
-.glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+/* Functional Clarity utilities — always opaque */
+.fc-card {
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-hard);
+  border-radius: var(--radius-card);
 }
 
-/* Enhanced glass panel for insights dashboard */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.3s ease;
+.fc-btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 20px;
+  border-radius: var(--radius-btn);
+  border: none;
+  transition: none;
 }
 
-/* Maplibre GL container fix - ensure WebGL renders properly */
+.fc-btn-primary:hover {
+  filter: brightness(0.92);
+}
+
+.fc-btn-primary:active {
+  filter: brightness(0.9);
+  transform: translate(2px, 2px);
+}
+
+.fc-btn-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 20px;
+  border-radius: var(--radius-btn);
+  border: var(--border-width) solid var(--color-border-hard);
+  transition: none;
+}
+
+.fc-btn-secondary:hover {
+  background-color: var(--color-surface-container-low);
+}
+
+.fc-btn-secondary:active {
+  transform: translate(2px, 2px);
+}
+
+.fc-input {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  border: var(--border-width) solid var(--color-border-hard);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fc-input::placeholder {
+  color: var(--color-on-surface-variant);
+}
+
+.fc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: var(--color-on-primary-container);
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 20px;
+  border-radius: 9999px;
+  border: var(--border-width) solid var(--color-border-hard);
+  padding: 0.25rem 0.75rem;
+}
+
+.dark .fc-chip {
+  background-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-surface));
+  color: var(--color-inverse-primary);
+}
+
+/* Maplibre */
 .maplibregl-map {
   position: absolute !important;
   top: 0;
@@ -66,10 +184,11 @@ body {
   height: 100% !important;
 }
 
-/* Ensure map controls are visible */
 .maplibregl-ctrl-group {
-  background: rgba(24, 24, 27, 0.9) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: var(--color-surface) !important;
+  border: 2px solid var(--color-border-hard) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
 }
 
 .maplibregl-ctrl-group button {
@@ -77,10 +196,9 @@ body {
 }
 
 .maplibregl-ctrl-group button:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: var(--color-surface-container) !important;
 }
 
-/* Popup styling */
 .maplibregl-popup-content {
   background: transparent !important;
   padding: 0 !important;
@@ -91,40 +209,6 @@ body {
   display: none !important;
 }
 
-.glass-panel:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-/* Gradient glow effect */
-.glow-violet {
-  box-shadow: 0 0 60px -12px rgba(131, 56, 236, 0.5);
-}
-
-.glow-blue {
-  box-shadow: 0 0 60px -12px rgba(58, 134, 255, 0.5);
-}
-
-/* Text gradient */
-.text-gradient {
-  background: linear-gradient(135deg, #fafafa 0%, #a1a1aa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Cyberpunk neon text effects */
-.text-neon-purple {
-  color: #8338EC;
-  text-shadow: 0 0 10px rgba(131, 56, 236, 0.5), 0 0 20px rgba(131, 56, 236, 0.3);
-}
-
-.text-neon-blue {
-  color: #3A86FF;
-  text-shadow: 0 0 10px rgba(58, 134, 255, 0.5), 0 0 20px rgba(58, 134, 255, 0.3);
-}
-
-/* Custom scrollbar for insights dashboard */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }
@@ -134,66 +218,27 @@ body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-outline);
   border-radius: 3px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-on-surface-variant);
 }
 
 .scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-outline);
 }
 
 .scrollbar-track-transparent::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* Firefox scrollbar */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: var(--color-outline) transparent;
 }
 
-/* Animation utilities for insights */
-@keyframes pulse-glow {
-  0%, 100% {
-    opacity: 0.5;
-    box-shadow: 0 0 20px rgba(131, 56, 236, 0.3);
-  }
-  50% {
-    opacity: 1;
-    box-shadow: 0 0 40px rgba(131, 56, 236, 0.6);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* Gradient border effect */
-.gradient-border {
-  position: relative;
-}
-
-.gradient-border::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(131, 56, 236, 0.5), rgba(58, 134, 255, 0.5));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-}
-
-/*
- * emoji-mart (em-emoji-picker) uses shadow DOM; these custom properties inherit from the host wrapper
- * into :host and tighten search / grid chrome vs defaults (12px padding, 15px font).
- */
 .chat-emoji-mart-host {
   display: flex;
   flex-direction: column;
@@ -202,7 +247,6 @@ body {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: contain;
-  /* emoji-mart #root uses --padding for internal spacing (grid + category rail) */
   --padding: 10px;
   --font-size: 13px;
   --border-radius: 8px;
@@ -212,7 +256,6 @@ body {
   --preview-subtitle-size: 0.78em;
 }
 
-/* @emoji-mart/react wraps the custom element in a bare div — give it a real flex height chain */
 .chat-emoji-mart-host > div {
   display: flex;
   flex: 1 1 0%;
@@ -221,7 +264,6 @@ body {
   width: 100%;
 }
 
-/* Shadow :host defaults include width:min-content — fill the panel so dynamicWidth / grid math work */
 .chat-emoji-mart-host em-emoji-picker {
   display: block;
   flex: 1 1 0%;
@@ -235,4 +277,3 @@ body {
   touch-action: pan-y;
   box-shadow: none !important;
 }
-

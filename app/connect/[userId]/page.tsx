@@ -155,7 +155,7 @@ export default function ConnectPage() {
                   className="bg-green-500/10 border border-green-500/30 rounded-xl p-4"
                 >
                   <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-green-400 font-medium">{waitlistMessage}</p>
+                  <p className="text-green-700 dark:text-green-400 font-medium">{waitlistMessage}</p>
                   <p className="text-zinc-500 text-sm mt-1">
                     We&apos;ll notify you when Click launches.
                   </p>
@@ -178,7 +178,7 @@ export default function ConnectPage() {
                     {waitlistStatus === 'loading' ? 'Joining...' : 'Join the Waitlist'}
                   </button>
                   {waitlistStatus === 'error' && (
-                    <p className="text-red-400 text-sm">{waitlistMessage}</p>
+                    <p className="text-red-700 dark:text-red-400 text-sm">{waitlistMessage}</p>
                   )}
                 </form>
               )}

@@ -65,7 +65,7 @@ export default function EnvironmentalMetrics({
   if (isLoading && !error && !staticData) {
     return (
       <div className="space-y-3">
-        <h2 className="text-sm font-medium text-zinc-500 tracking-wide">Environment &amp; flow</h2>
+        <h2 className="text-sm font-medium text-on-surface-variant tracking-wide">Environment &amp; flow</h2>
         <EnvironmentalSkeleton />
       </div>
     );
@@ -82,7 +82,7 @@ export default function EnvironmentalMetrics({
 
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-medium text-zinc-500 tracking-wide">Environment &amp; flow</h2>
+      <h2 className="text-sm font-medium text-on-surface-variant tracking-wide">Environment &amp; flow</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <GlassPanel className="p-6 h-full" hover glow="none">
@@ -90,9 +90,9 @@ export default function EnvironmentalMetrics({
               <div className="p-2 rounded-lg bg-teal-500/15 border border-teal-500/25">
                 <Sun className="w-4 h-4" style={{ color: TEAL }} />
               </div>
-              <span className="text-sm font-medium text-zinc-400">Weather Resilience</span>
+              <span className="text-sm font-medium text-on-surface-variant">Weather Resilience</span>
             </div>
-            <p className="text-xs text-zinc-500 mb-4 leading-relaxed">
+            <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
               How weather impacts your social foot traffic.
             </p>
             <div className="flex items-stretch justify-between gap-3">
@@ -101,30 +101,30 @@ export default function EnvironmentalMetrics({
                 title="Average daily connections on fair-weather (clear / sunny) majority days"
               >
                 <Sun className="w-5 h-5 mb-1" style={{ color: TEAL }} />
-                <span className="text-[10px] uppercase tracking-wider text-zinc-500">Fair days</span>
-                <span className="text-lg font-semibold text-white tabular-nums">
+                <span className="text-[10px] uppercase tracking-wider text-on-surface-variant">Fair days</span>
+                <span className="text-lg font-semibold text-on-surface tabular-nums">
                   {wri.avgDailyFair.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-zinc-600">{wri.fairDays} days</span>
+                <span className="text-[10px] text-outline">{wri.fairDays} days</span>
               </div>
               <div
                 className="flex-1 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3 py-3 flex flex-col items-center gap-1"
                 title="Average daily connections on rain / snow majority days"
               >
                 <CloudRain className="w-5 h-5 mb-1" style={{ color: AMBER }} />
-                <span className="text-[10px] uppercase tracking-wider text-zinc-500">Rain / snow</span>
-                <span className="text-lg font-semibold text-white tabular-nums">
+                <span className="text-[10px] uppercase tracking-wider text-on-surface-variant">Rain / snow</span>
+                <span className="text-lg font-semibold text-on-surface tabular-nums">
                   {wri.avgDailyAdverse.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-zinc-600">{wri.adverseDays} days</span>
+                <span className="text-[10px] text-outline">{wri.adverseDays} days</span>
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-white/10 text-center">
-              <span className="text-xs text-zinc-500">Resilience index </span>
+            <div className="mt-4 pt-3 border-t border-border-hard text-center">
+              <span className="text-xs text-on-surface-variant">Resilience index </span>
               <span className="text-sm font-semibold tabular-nums" style={{ color: TEAL }}>
                 {wri.index === null ? "—" : wri.index.toFixed(2)}
               </span>
-              <span className="text-[10px] text-zinc-600 block mt-1">
+              <span className="text-[10px] text-outline block mt-1">
                 Adverse ÷ fair daily averages (above 1 means stronger traffic on rough-weather days)
               </span>
             </div>
@@ -151,13 +151,13 @@ export default function EnvironmentalMetrics({
               <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/25">
                 <Zap className="w-4 h-4" style={{ color: AMBER }} />
               </div>
-              <span className="text-sm font-medium text-zinc-400">Peak Social Velocity</span>
+              <span className="text-sm font-medium text-on-surface-variant">Peak Social Velocity</span>
             </div>
             <div className="mb-2">
-              <span className="text-xs text-zinc-500">Vibe hour </span>
-              <span className="text-xl font-semibold text-white">{formatVibeHour(peakHour)}</span>
+              <span className="text-xs text-on-surface-variant">Vibe hour </span>
+              <span className="text-xl font-semibold text-on-surface">{formatVibeHour(peakHour)}</span>
             </div>
-            <p className="text-xs text-zinc-500 mb-3">
+            <p className="text-xs text-on-surface-variant mb-3">
               Velocity {(psv.velocity ?? 0).toFixed(2)}× vs average hour · {psv.numDistinctDays} active days
             </p>
             <div className="w-full min-w-0 overflow-hidden">
@@ -218,9 +218,9 @@ export default function EnvironmentalMetrics({
               <div className="p-2 rounded-lg bg-teal-500/15 border border-teal-500/25">
                 <UsersRound className="w-4 h-4" style={{ color: TEAL }} />
               </div>
-              <span className="text-sm font-medium text-zinc-400">Social Flow (GCR)</span>
+              <span className="text-sm font-medium text-on-surface-variant">Social Flow (GCR)</span>
             </div>
-            <p className="text-xs text-zinc-500 mb-4 leading-relaxed">
+            <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
               Share of connections where someone quickly met again at your venue — group mingling vs
               intimate 1:1 pace.
             </p>
@@ -243,7 +243,7 @@ export default function EnvironmentalMetrics({
                   title="Intimate 1:1 (lower GCR)"
                 />
               </div>
-              <div className="flex justify-between text-[11px] text-zinc-500">
+              <div className="flex justify-between text-[11px] text-on-surface-variant">
                 <span style={{ color: TEAL }}>Group mingling {gcr.toFixed(1)}%</span>
                 <span style={{ color: AMBER }}>
                   Intimate 1:1 {(100 - gcr).toFixed(1)}%
@@ -259,9 +259,9 @@ export default function EnvironmentalMetrics({
                   boxShadow: "0 0 24px rgba(45,212,191,0.15)",
                 }}
               >
-                <div className="absolute inset-2 rounded-full bg-[#121212]/95 flex flex-col items-center justify-center border border-white/10">
-                  <span className="text-lg font-bold text-white tabular-nums">{gcr.toFixed(0)}%</span>
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-wide">GCR</span>
+                <div className="absolute inset-2 rounded-full bg-background/95 flex flex-col items-center justify-center border border-border-hard">
+                  <span className="text-lg font-bold text-on-surface tabular-nums">{gcr.toFixed(0)}%</span>
+                  <span className="text-[9px] text-on-surface-variant uppercase tracking-wide">GCR</span>
                 </div>
               </div>
             </div>

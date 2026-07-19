@@ -137,21 +137,21 @@ export function InsightCallout({
           togglePin();
         }
       }}
-      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(131,56,236,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-[#8338EC]/40"
+      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(131,56,236,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-[#630ed4]/40"
       aria-expanded={expanded}
     >
       <Lightbulb
-        className="mt-0.5 h-4 w-4 shrink-0 text-amber-400/90"
+        className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300"
         aria-hidden
       />
       <div className="min-w-0 flex-1">
-        <p className="text-xs italic leading-relaxed text-zinc-300 md:text-sm">
+        <p className="text-xs italic leading-relaxed text-on-surface-variant md:text-sm">
           {expanded ? full : collapsed}
         </p>
         {showPeer && (
-          <p className="mt-2 text-[11px] not-italic leading-relaxed text-zinc-500">
+          <p className="mt-2 text-[11px] not-italic leading-relaxed text-on-surface-variant">
             Compared with similar venues in our network, you&apos;re near the{" "}
-            <span className="tabular-nums text-zinc-400">
+            <span className="tabular-nums text-on-surface-variant">
               {formatOrdinal(peerPercentile)}
             </span>{" "}
             percentile for this metric.
@@ -159,13 +159,13 @@ export function InsightCallout({
               <>
                 {" "}
                 Cohort:{" "}
-                <span className="tabular-nums text-zinc-400">{peerCohortSize}</span> venues with
+                <span className="tabular-nums text-on-surface-variant">{peerCohortSize}</span> venues with
                 enough traffic to compare.
               </>
             ) : null}
           </p>
         )}
-        <p className="mt-1 text-[10px] not-italic text-zinc-600 md:hidden">
+        <p className="mt-1 text-[10px] not-italic text-outline md:hidden">
           Tap to {pinned ? "collapse" : "expand"}
         </p>
       </div>

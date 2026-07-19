@@ -142,7 +142,7 @@ export default function TribesPage() {
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-green-400" />
+            <TrendingUp className="w-4 h-4 text-green-700 dark:text-green-400" />
             <span className="text-xs text-zinc-400">Avg / Tribe</span>
           </div>
           <div className="text-3xl font-bold text-white">{avgConnections}</div>
@@ -151,7 +151,7 @@ export default function TribesPage() {
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Info className="w-4 h-4 text-amber-400" />
+            <Info className="w-4 h-4 text-amber-700 dark:text-amber-300" />
             <span className="text-xs text-zinc-400">Most Overlap</span>
           </div>
           <div className="text-xl font-bold text-white">{mostOverlapping?.name ?? '—'}</div>

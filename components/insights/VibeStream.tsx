@@ -43,7 +43,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
         return {
           bg: 'bg-green-500/10',
           border: 'border-green-500/30',
-          text: 'text-green-400',
+          text: 'text-green-700 dark:text-green-400',
           icon: ThumbsUp,
           glow: 'hover:shadow-[0_0_15px_rgba(34,197,94,0.2)]',
         };
@@ -51,7 +51,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
         return {
           bg: 'bg-red-500/10',
           border: 'border-red-500/30',
-          text: 'text-red-400',
+          text: 'text-red-700 dark:text-red-400',
           icon: ThumbsDown,
           glow: 'hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]',
         };
@@ -59,7 +59,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
         return {
           bg: 'bg-amber-500/10',
           border: 'border-amber-500/30',
-          text: 'text-amber-400',
+          text: 'text-amber-700 dark:text-amber-300',
           icon: Minus,
           glow: 'hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]',
         };
@@ -110,21 +110,21 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
           <div className="p-2 bg-[#FFD93D]/20 rounded-lg">
             <MessageSquare className="w-4 h-4 text-[#FFD93D]" />
           </div>
-          <span className="text-sm font-medium text-zinc-400">Vibe Stream</span>
+          <span className="text-sm font-medium text-on-surface-variant">Vibe Stream</span>
         </div>
         
         {/* Filter dropdown */}
         <div className="relative group">
           <button className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1">
-            <Filter className="w-4 h-4 text-zinc-500" />
+            <Filter className="w-4 h-4 text-on-surface-variant" />
           </button>
-          <div className="absolute right-0 top-full mt-1 bg-zinc-900 border border-white/10 rounded-lg p-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[120px]">
+          <div className="absolute right-0 top-full mt-1 bg-surface-container border border-border-hard rounded-lg p-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[120px]">
             {(['all', 'positive', 'negative', 'neutral'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`w-full text-left px-3 py-1.5 text-xs rounded-md transition-colors capitalize ${
-                  filter === f ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                  filter === f ? 'bg-white/10 text-on-surface' : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5'
                 }`}
               >
                 {f}
@@ -156,10 +156,10 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
             transition={{ duration: 0.5, delay: 0.2 }}
           />
         </div>
-        <div className="flex justify-between text-[10px] text-zinc-500 mt-1">
-          <span className="text-green-400">{stats.positive} positive</span>
-          <span className="text-amber-400">{stats.neutral} neutral</span>
-          <span className="text-red-400">{stats.negative} negative</span>
+        <div className="flex justify-between text-[10px] text-on-surface-variant mt-1">
+          <span className="text-green-700 dark:text-green-400">{stats.positive} positive</span>
+          <span className="text-amber-700 dark:text-amber-300">{stats.neutral} neutral</span>
+          <span className="text-red-700 dark:text-red-400">{stats.negative} negative</span>
         </div>
       </div>
 
@@ -201,15 +201,15 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
                   
                   {/* Message content */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white leading-relaxed">
+                    <p className="text-sm text-on-surface leading-relaxed">
                       {message.message}
                     </p>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[10px] text-zinc-500 capitalize">
+                      <span className="text-[10px] text-on-surface-variant capitalize">
                         {message.category}
                       </span>
-                      <span className="text-[10px] text-zinc-600">•</span>
-                      <span className="text-[10px] text-zinc-500">
+                      <span className="text-[10px] text-outline">•</span>
+                      <span className="text-[10px] text-on-surface-variant">
                         {formatTime(message.timestamp)}
                       </span>
                     </div>
@@ -227,18 +227,18 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
       </div>
 
       {/* Footer stats */}
-      <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-        <div className="text-xs text-zinc-400">
-          <span className="text-white font-semibold">{filteredMessages.length}</span> messages
+      <div className="mt-4 pt-4 border-t border-border-hard flex items-center justify-between">
+        <div className="text-xs text-on-surface-variant">
+          <span className="text-on-surface font-semibold">{filteredMessages.length}</span> messages
           {filter !== 'all' && (
             <span className="ml-1">({filter})</span>
           )}
         </div>
         <div className="flex items-center gap-1 text-xs">
-          <span className={positiveRatio >= 50 ? 'text-green-400' : 'text-amber-400'}>
+          <span className={positiveRatio >= 50 ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-300'}>
             {positiveRatio.toFixed(0)}%
           </span>
-          <span className="text-zinc-500">positive vibes</span>
+          <span className="text-on-surface-variant">positive vibes</span>
         </div>
       </div>
     </GlassPanel>

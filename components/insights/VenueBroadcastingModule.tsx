@@ -56,8 +56,8 @@ export default function VenueBroadcastingModule({ venueId }: Props) {
         </div>
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h3 className="text-sm font-semibold text-white">Venue broadcasting</h3>
-            <p className="text-xs text-zinc-500 mt-1">
+            <h3 className="text-sm font-semibold text-on-surface">Venue broadcasting</h3>
+            <p className="text-xs text-on-surface-variant mt-1">
               Verified venues only: place an official soundtrack on your venue coordinates for the local map.
             </p>
           </div>
@@ -66,7 +66,7 @@ export default function VenueBroadcastingModule({ venueId }: Props) {
             value={uri}
             onChange={(e) => setUri(e.target.value)}
             placeholder="spotify:playlist:…"
-            className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+            className="w-full rounded-xl border border-border-hard bg-black/30 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
             disabled={busy}
             autoComplete="off"
           />
@@ -74,12 +74,12 @@ export default function VenueBroadcastingModule({ venueId }: Props) {
             type="button"
             onClick={() => void onSubmit()}
             disabled={busy}
-            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white bg-cyan-600/80 hover:bg-cyan-600 border border-cyan-400/30 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-surface bg-cyan-600/80 hover:bg-cyan-600 border border-cyan-400/30 disabled:opacity-50"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Publish official soundtrack
           </button>
-          {message ? <p className="text-xs text-zinc-400">{message}</p> : null}
+          {message ? <p className="text-xs text-on-surface-variant">{message}</p> : null}
         </div>
       </div>
     </GlassPanel>

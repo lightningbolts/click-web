@@ -100,7 +100,7 @@ export default function LandingWebScreensCarousel() {
       {slides.map((p, i) => (
         <div
           key={p.src}
-          className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/80 shadow-xl shadow-black/40"
+          className="overflow-hidden rounded-2xl border border-border-hard bg-background/80"
           style={{
             transform: `perspective(1200px) rotateY(${Y_TILT_DEG[i]}deg)`,
             transformStyle: 'preserve-3d',
@@ -127,7 +127,7 @@ export default function LandingWebScreensCarousel() {
   return (
     <div className="relative mt-8 w-full min-w-0">
       <div
-        className={`relative w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${carouselHeightClassName}`}
+        className={`relative w-full overflow-hidden rounded-2xl border border-border-hard bg-background/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${carouselHeightClassName}`}
       >
         <div
           ref={scrollRef}
@@ -140,7 +140,7 @@ export default function LandingWebScreensCarousel() {
             >
               <div className="w-full max-w-[min(100%,1120px)] origin-center [perspective:1400px]">
                 <div
-                  className="overflow-hidden rounded-xl border border-white/12 bg-zinc-900/60 shadow-[0_32px_90px_-24px_rgba(131,56,236,0.35)]"
+                  className="overflow-hidden rounded-xl border border-white/12 bg-surface-container/60 shadow-[0_32px_90px_-24px_rgba(131,56,236,0.35)]"
                   style={{
                     transform: `rotateY(${Y_TILT_DEG[i]}deg)`,
                     transformStyle: 'preserve-3d',
@@ -165,7 +165,7 @@ export default function LandingWebScreensCarousel() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between gap-2 bg-gradient-to-t from-zinc-950/95 via-zinc-950/70 to-transparent pb-3 pt-12 pl-3 pr-3 md:pl-5 md:pr-5">
           <div className="pointer-events-auto flex w-full items-end justify-between gap-3">
             <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">
                 Web dashboard
               </span>
               <div className="flex gap-1.5">
@@ -183,7 +183,7 @@ export default function LandingWebScreensCarousel() {
                       });
                     }}
                     className={`h-2 rounded-full transition-all ${
-                      active === i ? 'w-8 bg-[#8338EC]' : 'w-2 bg-zinc-600 hover:bg-zinc-500'
+                      active === i ? 'w-8 bg-[#630ed4]' : 'w-2 bg-zinc-600 hover:bg-zinc-500'
                     }`}
                   />
                 ))}
@@ -195,7 +195,7 @@ export default function LandingWebScreensCarousel() {
                 aria-label="Previous slide"
                 disabled={active === 0}
                 onClick={() => scrollBySlide(-1)}
-                className="rounded-xl border border-white/10 bg-zinc-900/90 p-2 text-zinc-200 shadow-lg backdrop-blur-sm transition hover:border-[#8338EC]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                className="rounded-xl border border-border-hard bg-surface-container/90 p-2 text-on-surface shadow-lg transition hover:border-[#630ed4]/40 hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <ChevronUp className="h-5 w-5" aria-hidden />
               </button>
@@ -204,7 +204,7 @@ export default function LandingWebScreensCarousel() {
                 aria-label="Next slide"
                 disabled={active === slides.length - 1}
                 onClick={() => scrollBySlide(1)}
-                className="rounded-xl border border-white/10 bg-zinc-900/90 p-2 text-zinc-200 shadow-lg backdrop-blur-sm transition hover:border-[#8338EC]/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                className="rounded-xl border border-border-hard bg-surface-container/90 p-2 text-on-surface shadow-lg transition hover:border-[#630ed4]/40 hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <ChevronDown className="h-5 w-5" aria-hidden />
               </button>
@@ -212,7 +212,7 @@ export default function LandingWebScreensCarousel() {
           </div>
         </div>
       </div>
-      <p className="mt-3 text-center text-xs text-zinc-500">
+      <p className="mt-3 text-center text-xs text-on-surface-variant">
         Scroll or use arrows to browse · {active + 1} / {slides.length}
       </p>
     </div>

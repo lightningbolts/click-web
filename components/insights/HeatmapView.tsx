@@ -67,7 +67,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
           <div className="p-2 bg-[#FF6B6B]/20 rounded-lg">
             <MapPin className="w-4 h-4 text-[#FF6B6B]" />
           </div>
-          <span className="text-sm font-medium text-zinc-400">Spatial Heatmap</span>
+          <span className="text-sm font-medium text-on-surface-variant">Spatial Heatmap</span>
         </div>
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -75,13 +75,13 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-2 hover:bg-white/10 rounded-lg transition-colors"
         >
-          <Maximize2 className="w-4 h-4 text-zinc-500" />
+          <Maximize2 className="w-4 h-4 text-on-surface-variant" />
         </motion.button>
       </div>
 
       {/* Floor Plan Container */}
       <div 
-        className={`relative bg-[#0a0a0a] rounded-xl border border-white/10 overflow-hidden transition-all duration-300 ${
+        className={`relative bg-[#0a0a0a] rounded-xl border border-border-hard overflow-hidden transition-all duration-300 ${
           isExpanded ? 'h-[500px]' : 'h-[300px]'
         }`}
         style={{ isolation: 'isolate' }}
@@ -101,7 +101,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
         {/* Zones */}
         {zones.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center p-6">
-            <p className="text-sm text-zinc-500 text-center max-w-sm">
+            <p className="text-sm text-on-surface-variant text-center max-w-sm">
               No zone data yet. When your venue records spatial check-ins, heat zones will appear here.
             </p>
           </div>
@@ -154,7 +154,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
             </div>
             
             {/* Connection count badge */}
-            <div className="absolute -top-2 -right-2 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px] font-medium border border-white/20">
+            <div className="absolute -top-2 -right-2 bg-white/10 px-2 py-0.5 rounded-full text-[10px] font-medium border border-white/20">
               {zone.connections}
             </div>
           </motion.div>
@@ -167,14 +167,14 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-4 left-4 right-4 bg-black/80 backdrop-blur-md p-4 rounded-xl border border-white/20 z-20"
+              className="absolute bottom-4 left-4 right-4 bg-black/80 p-4 rounded-xl border border-white/20 z-20"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{getZoneIcon(hoveredZone.type)}</span>
-                  <span className="font-semibold text-white">{hoveredZone.name}</span>
+                  <span className="font-semibold text-on-surface">{hoveredZone.name}</span>
                 </div>
-                <span className="text-sm text-zinc-400 capitalize">{hoveredZone.type} area</span>
+                <span className="text-sm text-on-surface-variant capitalize">{hoveredZone.type} area</span>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -182,11 +182,11 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: getZoneColor(1, hoveredZone.type) }}
                   />
-                  <span className="text-sm text-zinc-300">
-                    <span className="font-bold text-white">{hoveredZone.connections}</span> connections
+                  <span className="text-sm text-on-surface-variant">
+                    <span className="font-bold text-on-surface">{hoveredZone.connections}</span> connections
                   </span>
                 </div>
-                <div className="text-sm text-zinc-400">
+                <div className="text-sm text-on-surface-variant">
                   Heat: {Math.round(hoveredZone.intensity * 100)}%
                 </div>
               </div>
@@ -196,14 +196,14 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-white/10">
+      <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-border-hard">
         {[
-          { type: 'bar', label: 'Bar', color: '#8338EC' },
+          { type: 'bar', label: 'Bar', color: '#630ed4' },
           { type: 'dance', label: 'Dance', color: '#FF3864' },
-          { type: 'lounge', label: 'Lounge', color: '#3A86FF' },
+          { type: 'lounge', label: 'Lounge', color: '#630ed4' },
           { type: 'vip', label: 'VIP', color: '#FF6B6B' },
         ].map((item) => (
-          <div key={item.type} className="flex items-center gap-1.5 text-xs text-zinc-400">
+          <div key={item.type} className="flex items-center gap-1.5 text-xs text-on-surface-variant">
             <div 
               className="w-2 h-2 rounded-full"
               style={{ backgroundColor: item.color }}

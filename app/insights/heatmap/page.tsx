@@ -58,9 +58,9 @@ function IntensityBadge({ intensity }: { intensity: number }) {
   const pct = Math.round(intensity * 100);
   const color =
     pct >= 80
-      ? 'text-red-400 bg-red-500/10 border-red-500/20'
+      ? 'text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/20'
       : pct >= 50
-      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+      ? 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20'
       : 'text-blue-400 bg-blue-500/10 border-blue-500/20';
   return (
     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${color}`}>
@@ -147,7 +147,7 @@ export default function HeatmapPage() {
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Flame className="w-4 h-4 text-red-400" />
+            <Flame className="w-4 h-4 text-red-700 dark:text-red-400" />
             <span className="text-xs text-zinc-400">Hottest Zone</span>
           </div>
           <div className="text-2xl font-bold text-white">
@@ -176,7 +176,7 @@ export default function HeatmapPage() {
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-4 h-4 text-green-400" />
+            <TrendingUp className="w-4 h-4 text-green-700 dark:text-green-400" />
             <span className="text-xs text-zinc-400">Avg / Zone</span>
           </div>
           <div className="text-2xl font-bold text-white">

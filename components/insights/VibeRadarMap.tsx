@@ -14,6 +14,8 @@ import {
   beaconGeoJsonFeatures,
   isSafeBeaconUri,
 } from "@/lib/map/mapBeacons";
+import { useTheme } from "@/lib/theme/ThemeProvider";
+import { mapStyleForTheme, FC_PRIMARY } from "@/lib/theme/mapStyles";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
 
@@ -71,6 +73,7 @@ export default function VibeRadarMap({
   showBeaconPulse = false,
   venueBeacons = [],
 }: VibeRadarMapProps) {
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const beaconMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -162,7 +165,7 @@ export default function VibeRadarMap({
     try {
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+        style: mapStyleForTheme(theme),
         center: initCenterRef.current ?? DEFAULT_CENTER,
         zoom: 12.2,
         attributionControl: false,
@@ -185,7 +188,7 @@ export default function VibeRadarMap({
           source: SRC_INTENTS,
           filter: ["has", "point_count"],
           paint: {
-            "circle-color": "#6520c0",
+            "circle-color": FC_PRIMARY,
             "circle-radius": ["step", ["get", "point_count"], 18, 8, 22, 20, 28],
             "circle-opacity": 0.88,
             "circle-stroke-width": 2,
@@ -301,7 +304,7 @@ export default function VibeRadarMap({
       mapRef.current = null;
       setMapLoaded(false);
     };
-  }, [attachInteractions]);
+  }, [attachInteractions, theme]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -392,7 +395,7 @@ export default function VibeRadarMap({
     const core = document.createElement("div");
     core.style.cssText = `
       width:16px;height:16px;border-radius:9999px;
-      background:linear-gradient(135deg,#8338EC,#3A86FF);
+      background:linear-gradient(135deg,#630ed4,#630ed4);
       border:2px solid rgba(255,255,255,0.9);
       box-shadow:0 0 24px rgba(131,56,236,0.85);
     `;
@@ -427,16 +430,16 @@ export default function VibeRadarMap({
 
   if (mapError) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-12 text-center">
-        <MapPin className="w-14 h-14 text-red-400/90 mx-auto mb-3" />
-        <p className="text-white font-medium">Map unavailable</p>
-        <p className="text-sm text-zinc-500 mt-1">{mapError}</p>
+      <div className="rounded-2xl border border-border-hard bg-white/5 p-12 text-center">
+        <MapPin className="w-14 h-14 text-red-700 dark:text-red-400/90 mx-auto mb-3" />
+        <p className="text-on-surface font-medium">Map unavailable</p>
+        <p className="text-sm text-on-surface-variant mt-1">{mapError}</p>
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-2xl border border-white/10 overflow-hidden bg-zinc-950 min-h-[420px] h-[min(56vh,620px)]">
+    <div className="relative rounded-2xl border border-border-hard overflow-hidden bg-background min-h-[420px] h-[min(56vh,620px)]">
       <AnimatePresence>
         {!mapLoaded && (
           <motion.div
@@ -445,10 +448,10 @@ export default function VibeRadarMap({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm"
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90"
           >
-            <Loader2 className="w-9 h-9 text-[#8338EC] animate-spin mb-2" />
-            <p className="text-sm text-zinc-400">Loading map…</p>
+            <Loader2 className="w-9 h-9 text-[#630ed4] animate-spin mb-2" />
+            <p className="text-sm text-on-surface-variant">Loading map…</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -456,19 +459,19 @@ export default function VibeRadarMap({
       <div ref={containerRef} className="absolute inset-0" />
 
       {mapLoaded && (
-        <div className="absolute top-3 left-3 z-[6] max-w-[220px] rounded-2xl border border-white/10 bg-zinc-950/70 backdrop-blur-xl shadow-lg shadow-black/40 p-3 text-xs text-zinc-200">
-          <div className="flex items-center gap-2 mb-2 font-semibold text-white">
-            <Layers className="w-3.5 h-3.5 text-[#8338EC]" />
+        <div className="absolute top-3 left-3 z-[6] max-w-[220px] rounded-2xl border border-border-hard bg-background/70 shadow-lg shadow-black/40 p-3 text-xs text-on-surface">
+          <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
+            <Layers className="w-3.5 h-3.5 text-[#630ed4]" />
             Map layers
           </div>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#8338EC]" checked={layers.myNetwork} onChange={() => toggle("myNetwork")} />
+            <input type="checkbox" className="accent-[#630ed4]" checked={layers.myNetwork} onChange={() => toggle("myNetwork")} />
             Availability intents
           </label>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
             <input
               type="checkbox"
-              className="accent-[#8338EC]"
+              className="accent-[#630ed4]"
               checked={layers.officialSoundtracks}
               onChange={() => toggle("officialSoundtracks")}
             />
@@ -477,14 +480,14 @@ export default function VibeRadarMap({
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
             <input
               type="checkbox"
-              className="accent-[#8338EC]"
+              className="accent-[#630ed4]"
               checked={layers.communityBeacons}
               onChange={() => toggle("communityBeacons")}
             />
             Community Beacons
           </label>
           <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#8338EC]" checked={layers.hazards} onChange={() => toggle("hazards")} />
+            <input type="checkbox" className="accent-[#630ed4]" checked={layers.hazards} onChange={() => toggle("hazards")} />
             Hazards
           </label>
         </div>
@@ -494,7 +497,7 @@ export default function VibeRadarMap({
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-4 left-4 right-4 sm:right-auto max-w-md z-[5] rounded-xl border border-white/10 bg-zinc-950/85 backdrop-blur-md px-4 py-3 text-sm text-zinc-400"
+          className="absolute bottom-4 left-4 right-4 sm:right-auto max-w-md z-[5] rounded-xl border border-border-hard bg-background/85 px-4 py-3 text-sm text-on-surface-variant"
         >
           No aggregated cells in range yet. When guests share coarse area buckets with active intents,
           clusters appear here — never individual identities.

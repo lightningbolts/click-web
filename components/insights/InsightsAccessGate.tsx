@@ -11,30 +11,27 @@ import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-[#121212] text-white flex items-center justify-center">
-      <div className="h-10 w-10 rounded-full border-2 border-[#8338EC]/30 border-t-[#8338EC] animate-spin" />
+    <div className="flex min-h-screen items-center justify-center bg-background text-on-surface">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
     </div>
   );
 }
 
 function AccessDenied() {
   return (
-    <div className="min-h-screen bg-[#121212] text-white flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-on-surface">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl max-w-md text-center"
+        className="fc-card max-w-md border-2 border-border-hard p-8 text-center"
       >
-        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-        <p className="text-zinc-400 mb-6">
+        <AlertCircle className="mx-auto mb-4 h-16 w-16 text-error" />
+        <h1 className="mb-2 text-2xl font-bold text-on-surface">Access Denied</h1>
+        <p className="mb-6 font-medium text-on-surface-variant">
           Business insights are only available to verified business partners. Use your personal
           dashboard to manage connections and settings.
         </p>
-        <Link
-          href="/"
-          className="inline-block bg-[#8338EC] hover:bg-[#8338EC]/80 text-white px-6 py-3 rounded-xl transition-colors"
-        >
+        <Link href="/" className="fc-btn-primary inline-block px-6 py-3">
           Go to your dashboard
         </Link>
       </motion.div>

@@ -5,6 +5,8 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, MapPin, Users } from "lucide-react";
 import type { VerifiedConnectionMapNode } from "@/lib/insights/connectionEncounterClustering";
+import { useTheme } from "@/lib/theme/ThemeProvider";
+import { mapStyleForTheme } from "@/lib/theme/mapStyles";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
 const SRC_VERIFIED = "insights-verified-connections";
@@ -55,6 +57,7 @@ function buildPopupHtml(node: VerifiedConnectionMapNode): string {
  * centroid clustering of raw `connection_encounters` grouped by `connection_id`.
  */
 export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -88,7 +91,7 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
     try {
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+        style: mapStyleForTheme(theme),
         center: initCenterRef.current ?? mapCenter,
         zoom: 13,
         attributionControl: false,
@@ -111,7 +114,7 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
               "case",
               ["get", "isVerifiedHandshake"],
               "#22d3ee",
-              "#8338EC",
+              "#630ed4",
             ],
             "circle-radius": [
               "case",
@@ -176,7 +179,7 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
       mapRef.current = null;
       setMapLoaded(false);
     };
-  }, [mapCenter]);
+  }, [mapCenter, theme]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -196,35 +199,35 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
 
   if (nodes.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-zinc-900/80 p-10 text-center">
-        <MapPin className="mx-auto mb-3 h-10 w-10 text-zinc-600" />
-        <p className="text-sm text-zinc-400">No verified connection coordinates yet for this venue.</p>
+      <div className="rounded-2xl border border-border-hard bg-surface p-10 text-center">
+        <MapPin className="mx-auto mb-3 h-10 w-10 text-outline" />
+        <p className="text-sm text-on-surface-variant">No verified connection coordinates yet for this venue.</p>
       </div>
     );
   }
 
   if (mapError) {
     return (
-      <div className="rounded-2xl border border-red-500/20 bg-zinc-900/80 p-10 text-center">
-        <p className="text-sm text-red-400">{mapError}</p>
+      <div className="rounded-2xl border border-red-500/20 bg-surface p-10 text-center">
+        <p className="text-sm text-red-700 dark:text-red-400">{mapError}</p>
       </div>
     );
   }
 
   return (
-    <div className="relative h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900">
+    <div className="relative h-[420px] overflow-hidden rounded-2xl border border-border-hard bg-surface-container">
       {!mapLoaded && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-900">
-          <Loader2 className="h-7 w-7 animate-spin text-[#8338EC]" />
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-container">
+          <Loader2 className="h-7 w-7 animate-spin text-[#630ed4]" />
         </div>
       )}
       <div ref={containerRef} className="absolute inset-0" />
       {mapLoaded && (
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-950/80 px-3 py-2 text-xs text-zinc-300 backdrop-blur-md">
+        <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl border border-border-hard bg-background/80 px-3 py-2 text-xs text-on-surface-variant">
           <Users className="h-3.5 w-3.5 text-cyan-400" />
           <span>
             <span className="font-semibold text-cyan-300">{verifiedCount}</span> verified ·{" "}
-            <span className="font-semibold text-[#8338EC]">{nodes.length}</span> nodes
+            <span className="font-semibold text-[#630ed4]">{nodes.length}</span> nodes
           </span>
         </div>
       )}

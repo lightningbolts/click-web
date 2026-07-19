@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import UserProfile from "@/components/UserProfile";
 import { useState } from "react";
 import LoginModal from "@/components/LoginModal";
+import ThemeToggle from "@/components/ThemeToggle";
 import { usePathname, useRouter } from "next/navigation";
 import { User, LogOut, BarChart2 } from "lucide-react";
 import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
@@ -27,10 +28,8 @@ export default function Navbar() {
     insightsAccessFetcher,
   );
 
-  // Hide on /insights — BusinessInsightsShell has its own sticky nav there
   if (pathname.startsWith("/insights")) return null;
 
-  // User is viewing their dashboard when logged in at root or /dashboard
   const isLoggedInView =
     user && (pathname === "/" || pathname === "/dashboard");
 
@@ -49,35 +48,37 @@ export default function Navbar() {
     <>
       <nav
         data-navbar-root="true"
-        className={`relative z-[99999] flex items-center justify-between px-4 md:px-12 py-6 gap-2 ${isLoggedInView ? "border-b border-zinc-800" : ""}`}
+        className="relative z-[99999] flex items-center justify-between gap-2 border-b-2 border-border-hard bg-surface px-4 py-4 text-on-surface md:px-12 md:py-5"
+        style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <Link href="/" className="text-xl md:text-2xl font-bold flex-shrink-0">
-          <span className="text-[#8338EC]">C</span>
-          <span className="text-white">lick</span>
+        <Link href="/" className="shrink-0 text-xl font-bold md:text-2xl">
+          <span className="text-primary">C</span>
+          <span className="text-on-surface">lick</span>
         </Link>
-        <div className="flex items-center gap-2 md:gap-6">
+        <div className="flex items-center gap-2 md:gap-4">
+          <ThemeToggle />
           {isLoggedInView ? (
             <>
               {insightsAccess?.insightsAllowed ? (
                 <Link
                   href="/insights"
-                  className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] hover:text-[#8338EC] transition-colors whitespace-nowrap"
+                  className="fc-btn-secondary flex items-center gap-1 whitespace-nowrap px-2 py-2 text-xs md:gap-2 md:px-4 md:text-sm"
                 >
-                  <BarChart2 className="w-3 h-3 md:w-4 md:h-4" />
+                  <BarChart2 className="h-3 w-3 md:h-4 md:w-4" />
                   <span className="hidden sm:inline">Insights</span>
                 </Link>
               ) : null}
-              <div className="flex items-center gap-1 md:gap-2 text-xs md:text-sm text-zinc-400">
-                <User className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
-                <span className="truncate max-w-[100px] md:max-w-[200px]">
+              <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant md:gap-2 md:text-sm">
+                <User className="h-3 w-3 shrink-0 md:h-4 md:w-4" />
+                <span className="max-w-[100px] truncate md:max-w-[200px]">
                   {displayNameFromUserMetadata(user?.user_metadata) || user?.email}
                 </span>
               </div>
               <button
                 onClick={handleSignOut}
-                className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-red-500 hover:text-red-500 transition-colors whitespace-nowrap"
+                className="fc-btn-secondary flex items-center gap-1 whitespace-nowrap px-2 py-2 text-xs hover:border-error hover:text-error md:gap-2 md:px-4 md:text-sm"
               >
-                <LogOut className="w-3 h-3 md:w-4 md:h-4" />
+                <LogOut className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Sign Out</span>
               </button>
             </>
@@ -92,19 +93,19 @@ export default function Navbar() {
                     window.location.href = "/#mission";
                   }
                 }}
-                className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
+                className="text-xs font-semibold text-on-surface hover:text-primary md:text-sm"
               >
                 Mission
               </button>
               <Link
                 href="/enterprise"
-                className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
+                className="text-xs font-semibold text-on-surface hover:text-primary md:text-sm"
               >
                 Enterprise
               </Link>
               <Link
                 href="/about"
-                className="text-xs md:text-sm hover:text-[#8338EC] transition-colors"
+                className="text-xs font-semibold text-on-surface hover:text-primary md:text-sm"
               >
                 About
               </Link>
@@ -113,7 +114,7 @@ export default function Navbar() {
               ) : (
                 <button
                   onClick={() => setIsLoginOpen(true)}
-                  className="text-xs md:text-sm px-3 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
+                  className="fc-btn-secondary px-3 py-2 text-xs md:px-4 md:text-sm"
                 >
                   Login
                 </button>

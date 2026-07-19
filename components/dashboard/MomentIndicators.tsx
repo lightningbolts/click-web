@@ -74,15 +74,15 @@ export function MomentBlock({
 
   const gap = compact ? 'gap-1.5' : 'gap-2';
   const textMain = compact
-    ? 'text-xs text-zinc-200 leading-snug'
-    : 'text-sm text-zinc-100 leading-snug';
+    ? 'text-xs text-on-surface leading-snug'
+    : 'text-sm text-on-surface leading-snug';
 
   return (
     <div className={`flex flex-col ${gap}`}>
       {context && (
         <div className="flex gap-2 items-start min-w-0">
           <Sparkles
-            className={`shrink-0 text-amber-300/95 mt-0.5 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+            className={`shrink-0 text-amber-800 dark:text-amber-300/95 mt-0.5 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
           />
           <span className={`min-w-0 ${textMain}`}>{context}</span>
         </div>
@@ -101,7 +101,7 @@ export function MomentBlock({
             <NoiseVolumeBarsForCategory category={noiseCategory} compact={compact} />
           ) : (
             <Volume2
-              className={`shrink-0 text-violet-300/90 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+              className={`shrink-0 text-primary ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
             />
           )}
           <span className={textMain}>{noiseSummary}</span>

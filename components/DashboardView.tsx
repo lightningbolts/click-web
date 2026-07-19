@@ -2644,7 +2644,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-on-surface">
       {/* Interest tagging onboarding overlay */}
       {needsTagging === true && (
         <InterestTagging
@@ -2667,12 +2667,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         />
       ) : null}
 
-      {/* Background effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[150px] opacity-10" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#3A86FF] rounded-full blur-[150px] opacity-10" />
-      </div>
-
       {/* Main content */}
       <div className="relative z-10">
         {/* Welcome header */}
@@ -2682,18 +2676,21 @@ export default function DashboardView({ user }: DashboardViewProps) {
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center gap-3"
           >
-            <Sparkles className="w-5 h-5 text-[#8338EC]" />
+            <Sparkles className="w-5 h-5 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">
-                Welcome back, <span className="text-[#8338EC]">{userName}</span>
+                Welcome back, <span className="text-primary">{userName}</span>
               </h1>
-              <p className="text-sm text-zinc-500">Your digital memory box</p>
+              <p className="text-sm text-on-surface-variant">Your digital memory box</p>
             </div>
           </motion.div>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-zinc-800 sticky top-0 bg-zinc-950/80 backdrop-blur-sm z-20">
+        <div
+          className="sticky top-0 z-20 border-b-2 border-border-hard bg-surface"
+          style={{ backgroundColor: "var(--color-surface)" }}
+        >
           <div className="px-6 md:px-12 flex gap-1 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -2702,8 +2699,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`relative py-4 px-4 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
-                    ? 'text-[#8338EC]'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -2711,7 +2708,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   {activeTab === tab.id && (
                     <motion.div
                       layoutId="activeTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#8338EC]"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
                     />
                   )}
                 </button>
@@ -2752,7 +2749,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     {homeAvailabilityOverlapLines.map((line, i) => (
                       <p
                         key={`${line}-${i}`}
-                        className="text-sm font-medium text-amber-100/95"
+                        className="text-sm font-medium text-amber-900 dark:text-amber-100"
                       >
                         {line}
                       </p>
@@ -2763,9 +2760,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 {/* Achievements & Milestones Row */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-zinc-400 mb-2">Recent Achievements</h3>
+                    <h3 className="text-sm font-medium text-on-surface-variant mb-2">Recent Achievements</h3>
                     {unlockedAchievements.length === 0 ? (
-                      <div className="p-4 glass rounded-xl border border-zinc-800 text-sm text-zinc-500">
+                      <div className="p-4 fc-card rounded-xl border border-border-hard text-sm text-on-surface-variant">
                         No achievements yet. Connect with people to unlock your first badge.
                       </div>
                     ) : (
@@ -2780,7 +2777,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     )}
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-zinc-400 mb-2">Next Milestone</h3>
+                    <h3 className="text-sm font-medium text-on-surface-variant mb-2">Next Milestone</h3>
                     <MilestoneProgress
                       current={dashboardMetrics.totalConnections}
                       target={nextMilestone.target}
@@ -2791,19 +2788,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 </section>
 
                 {/* Time Capsule Section */}
-                <section className="glass p-6 rounded-3xl border border-zinc-800">
+                <section className="fc-card p-6 rounded-[16px] border border-border-hard">
                   <TimeCapsule chapters={chapters} onConnectionClick={handleOpenChat} />
                 </section>
 
                 {/* Connection Table Section */}
-                <section className="glass p-6 rounded-3xl border border-zinc-800">
+                <section className="fc-card p-6 rounded-[16px] border border-border-hard">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-[#8338EC]/20 rounded-xl">
-                      <Users className="w-5 h-5 text-[#8338EC]" />
+                    <div className="p-2 bg-primary/20 rounded-xl">
+                      <Users className="w-5 h-5 text-primary" />
                     </div>
                     <div>
                       <h2 className="text-xl font-bold">People I've Met</h2>
-                      <p className="text-sm text-zinc-500">Your connection history</p>
+                      <p className="text-sm text-on-surface-variant">Your connection history</p>
                     </div>
                   </div>
                   <ConnectionTable
@@ -2816,7 +2813,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
                 {/* Data sovereignty notice */}
                 <div className="text-center py-4">
-                  <p className="text-xs text-zinc-600">
+                  <p className="text-xs text-outline">
                     🔒 Your data belongs to you. Export anytime, delete anytime.
                   </p>
                 </div>
@@ -2833,12 +2830,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 transition={{ duration: 0.3 }}
               >
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-[#8338EC]/20 rounded-xl">
-                    <MapPin className="w-5 h-5 text-[#8338EC]" />
+                  <div className="p-2 bg-primary/20 rounded-xl">
+                    <MapPin className="w-5 h-5 text-primary" />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold">Click Map</h2>
-                    <p className="text-sm text-zinc-500">Where your memories were made</p>
+                    <p className="text-sm text-on-surface-variant">Where your memories were made</p>
                   </div>
                 </div>
 
@@ -2904,44 +2901,44 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     >
                     <div className="flex w-full items-center gap-3">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <div className="p-2 bg-[#8338EC]/20 rounded-xl">
-                          <MessageCircle className="w-5 h-5 text-[#8338EC]" />
+                        <div className="p-2 bg-primary/20 rounded-xl">
+                          <MessageCircle className="w-5 h-5 text-primary" />
                         </div>
                         <div className="min-w-0">
                           <h2 className="text-xl font-bold">Messages</h2>
-                          <p className="text-sm text-zinc-500">Chat with your Clicks</p>
+                          <p className="text-sm text-on-surface-variant">Chat with your Clicks</p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setCreateClickOpen(true)}
-                        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800/80"
+                        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-border-hard bg-surface-container/70 px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container/80"
                       >
                         <Users className="h-4 w-4" />
                         New click
                       </button>
                     </div>
 
-                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-border-hard/80 bg-surface-container/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                       <motion.button
                         onClick={() => setChatListTab('active')}
                         whileTap={{ scale: 0.985 }}
                         className={`relative px-4 py-2 rounded-xl text-sm transition-colors duration-200 ${
                           chatListTab === 'active'
-                            ? 'text-white'
-                            : 'text-zinc-400 hover:text-white'
+                            ? 'text-on-surface'
+                            : 'text-on-surface-variant hover:text-on-surface'
                         }`}
                       >
                         {chatListTab === 'active' ? (
                           <motion.span
                             layoutId="chatListTabPill"
-                            className="absolute inset-0 rounded-xl border border-[#8338EC]/35 bg-[linear-gradient(135deg,rgba(131,56,236,0.28),rgba(58,134,255,0.18))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(131,56,236,0.16)]"
+                            className="absolute inset-0 rounded-xl border border-primary/35 bg-[linear-gradient(135deg,rgba(131,56,236,0.28),rgba(58,134,255,0.18))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(131,56,236,0.16)]"
                             transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                           />
                         ) : null}
                         <span className="relative z-10 flex items-center gap-2">
                           <span>Active</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${chatListTab === 'active' ? 'bg-white/12 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${chatListTab === 'active' ? 'bg-white/12 text-on-surface' : 'bg-surface-container text-on-surface-variant'}`}>
                             {activeConnections.length}
                           </span>
                         </span>
@@ -2951,8 +2948,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         whileTap={{ scale: 0.985 }}
                         className={`relative px-4 py-2 rounded-xl text-sm transition-colors duration-200 ${
                           chatListTab === 'archived'
-                            ? 'text-white'
-                            : 'text-zinc-400 hover:text-white'
+                            ? 'text-on-surface'
+                            : 'text-on-surface-variant hover:text-on-surface'
                         }`}
                       >
                         {chatListTab === 'archived' ? (
@@ -2964,7 +2961,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         ) : null}
                         <span className="relative z-10 flex items-center gap-2">
                           <span>Archived</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${chatListTab === 'archived' ? 'bg-white/10 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${chatListTab === 'archived' ? 'bg-surface-container text-on-surface' : 'bg-surface-container text-on-surface-variant'}`}>
                             {archivedConnections.length}
                           </span>
                         </span>
@@ -2980,19 +2977,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                       >
                         {visibleChatConnections.length === 0 ? (
-                          <div className="glass rounded-3xl border border-zinc-800 p-12 text-center">
-                            <MessageCircle className="mx-auto mb-4 h-16 w-16 text-zinc-600" />
+                          <div className="fc-card rounded-[16px] border border-border-hard p-12 text-center">
+                            <MessageCircle className="mx-auto mb-4 h-16 w-16 text-outline" />
                             <h3 className="mb-2 text-xl font-semibold">
                               {chatListTab === 'active' ? 'No Active Conversations' : 'No Archived Conversations'}
                             </h3>
-                            <p className="text-zinc-400">
+                            <p className="text-on-surface-variant">
                               {chatListTab === 'active'
                                 ? 'Start meeting people and your chats will appear here!'
                                 : 'Auto-archived chats and conversations you moved to Archived appear here. Tap Restore to move them back to Active.'}
                             </p>
                           </div>
                         ) : (
-                          <div className="glass overflow-visible rounded-3xl border border-zinc-800 divide-y divide-zinc-800/50">
+                          <div className="fc-card overflow-visible rounded-[16px] border border-border-hard divide-y divide-zinc-800/50">
                             {visibleChatConnections.map((conn: ConnectionRecord, index) => {
                               const isUserArchived = archivedConnectionIds.has(conn.id);
                               const isServerArchived = conn.status === 'archived';
@@ -3042,7 +3039,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     onTouchStart={() => startLongPress(conn.id)}
                                     onTouchEnd={endLongPress}
                                     onTouchCancel={endLongPress}
-                                    className="w-full flex cursor-pointer items-start gap-4 px-5 py-4 pr-16 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]/50"
+                                    className="w-full flex cursor-pointer items-start gap-4 px-5 py-4 pr-16 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                                   >
                                     {isGroupCliqueRow ? (
                                       <button
@@ -3052,7 +3049,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                           e.stopPropagation();
                                           void openVerifiedCliqueMemberPicker(groupMemberIds);
                                         }}
-                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC] disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-on-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-40"
                                         aria-label="View verified clique members"
                                       >
                                         <Users className="h-5 w-5" aria-hidden />
@@ -3064,7 +3061,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                           e.stopPropagation();
                                           setProfileUserId(listPeerId);
                                         }}
-                                        className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
+                                        className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                         aria-label={`View ${conn.name}'s profile`}
                                       >
                                         <ConnectionPeerAvatar
@@ -3088,20 +3085,20 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     )}
                                     <div className="min-w-0 flex-1">
                                       <div className="flex min-w-0 items-center gap-2 pr-2">
-                                        <p className="truncate font-semibold text-white">{conn.name}</p>
+                                        <p className="truncate font-semibold text-on-surface">{conn.name}</p>
                                         {!isGroupCliqueRow && conn.intentOverlapLabel ? (
                                           <span
-                                            className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
+                                            className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
                                             title={`Vibes match: ${conn.intentOverlapLabel}`}
                                           >
                                             <Zap className="h-3 w-3" aria-hidden />
                                           </span>
                                         ) : null}
                                       </div>
-                                      <p className="mt-0.5 truncate pr-2 text-sm text-zinc-300">
+                                      <p className="mt-0.5 truncate pr-2 text-sm text-on-surface-variant">
                                         {previewText}
                                       </p>
-                                      <p className="mt-1 truncate pr-2 text-xs text-zinc-400">
+                                      <p className="mt-1 truncate pr-2 text-xs text-on-surface-variant">
                                         {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
                                       {(() => {
@@ -3125,13 +3122,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         return (
                                           <div className="mt-1.5 flex flex-wrap gap-1 pr-2">
                                             {db !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200">
-                                                <Volume2 className="h-3 w-3 shrink-0 text-violet-300" aria-hidden />
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-border-hard/80 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-on-surface">
+                                                <Volume2 className="h-3 w-3 shrink-0 text-primary" aria-hidden />
                                                 {Math.round(db)} dB
                                               </span>
                                             ) : null}
                                             {el !== null ? (
-                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-200">
+                                              <span className="inline-flex items-center gap-0.5 rounded-full border border-border-hard/80 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-on-surface">
                                                 <Mountain className="h-3 w-3 shrink-0 text-sky-300" aria-hidden />
                                                 {Math.round(el)} m
                                               </span>
@@ -3142,7 +3139,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       {archiveWarning && !isGroupCliqueRow && !isServerArchived && !isUserArchived ? (
                                         <p
                                           className={`mt-1.5 flex items-center gap-1 truncate pr-2 text-[11px] ${
-                                            archiveInfo?.isUrgent ? 'text-amber-300' : 'text-zinc-500'
+                                            archiveInfo?.isUrgent ? 'text-amber-800 dark:text-amber-300' : 'text-on-surface-variant'
                                           }`}
                                         >
                                           <Clock className="h-3 w-3 shrink-0" aria-hidden />
@@ -3153,13 +3150,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                     <div className="flex shrink-0 items-center self-start pt-0.5 pl-2">
                                       <div className="flex min-w-0 items-center justify-end gap-2">
                                         {activityLabel ? (
-                                          <span className="shrink-0 rounded-full border border-zinc-700/80 bg-zinc-900/80 px-2 py-0.5 text-[11px] text-zinc-300">
+                                          <span className="shrink-0 rounded-full border border-border-hard/80 bg-surface px-2 py-0.5 text-[11px] text-on-surface-variant">
                                             {activityLabel}
                                           </span>
                                         ) : null}
                                         <div className="flex flex-wrap items-center justify-end gap-2">
                                           {isArchived ? (
-                                            <span className="shrink-0 rounded-full border border-zinc-600/40 bg-zinc-700/30 px-2 py-0.5 text-[10px] text-zinc-300">
+                                            <span className="shrink-0 rounded-full border border-zinc-600/40 bg-zinc-700/30 px-2 py-0.5 text-[10px] text-on-surface-variant">
                                               {isServerArchived ? 'Auto-archived' : 'Archived'}
                                             </span>
                                           ) : null}
@@ -3175,7 +3172,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                       openActionMenu(conn.id);
                                     }}
                                     data-connection-menu-trigger
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800/70 hover:text-white"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
                                     aria-label={`Open actions for ${conn.name}`}
                                   >
                                     <MoreHorizontal className="h-4 w-4" />
@@ -3184,7 +3181,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                   {menuConnectionId === conn.id && (
                                     <div
                                       data-connection-menu
-                                      className={`absolute right-4 z-50 min-w-[160px] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
+                                      className={`absolute right-4 z-50 min-w-[160px] overflow-hidden rounded-xl border border-border-hard bg-surface-container shadow-xl ${menuOpensUpward ? 'bottom-[calc(50%+1.8rem)]' : 'top-[calc(50%+1.8rem)]'}`}
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <button
@@ -3193,7 +3190,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                           setSelectedConnection(conn);
                                           setMenuConnectionId(null);
                                         }}
-                                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-zinc-800"
+                                        className="w-full text-left px-3 py-2 text-sm text-on-surface hover:bg-surface-container"
                                       >
                                         Open chat
                                       </button>
@@ -3206,7 +3203,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                               setChatListGroupRenameInput(conn.name);
                                               setMenuConnectionId(null);
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+                                            className="w-full text-left px-3 py-2 text-sm text-on-surface hover:bg-surface-container"
                                           >
                                             Edit group name
                                           </button>
@@ -3242,7 +3239,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                                 setChatListGroupActionBusyId(null);
                                               }
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                                            className="w-full text-left px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container disabled:opacity-40"
                                           >
                                             Leave group
                                           </button>
@@ -3279,7 +3276,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                                   setChatListGroupActionBusyId(null);
                                                 }
                                               }}
-                                              className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 disabled:opacity-40"
+                                              className="w-full text-left px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-surface-container disabled:opacity-40"
                                             >
                                               Delete group
                                             </button>
@@ -3291,7 +3288,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                             <button
                                               type="button"
                                               onClick={() => removeConnectionFromCore(conn.id)}
-                                              className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                              className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container"
                                             >
                                               Remove from Core
                                             </button>
@@ -3299,7 +3296,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                             <button
                                               type="button"
                                               onClick={() => addConnectionToCore(conn.id)}
-                                              className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                              className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container"
                                             >
                                               Add to Core
                                             </button>
@@ -3308,7 +3305,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                             <button
                                               type="button"
                                               onClick={() => unarchiveConnection(conn.id)}
-                                              className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                                              className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container"
                                             >
                                               {isServerArchived ? 'Restore' : 'Unarchive'}
                                             </button>
@@ -3316,7 +3313,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                             <button
                                               type="button"
                                               onClick={() => archiveConnection(conn.id)}
-                                              className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                                              className="w-full text-left px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container"
                                             >
                                               Archive
                                             </button>
@@ -3330,7 +3327,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                               await reportConnection(conn.id, reason);
                                               setMenuConnectionId(null);
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800"
+                                            className="w-full text-left px-3 py-2 text-sm text-amber-800 dark:text-amber-300 hover:bg-surface-container"
                                           >
                                             Report
                                           </button>
@@ -3341,7 +3338,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                                 await unblockUser(conn);
                                                 setMenuConnectionId(null);
                                               }}
-                                              className="w-full text-left px-3 py-2 text-sm text-emerald-300 hover:bg-zinc-800"
+                                              className="w-full text-left px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 hover:bg-surface-container"
                                             >
                                               Unblock
                                             </button>
@@ -3353,7 +3350,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                                 await blockUser(conn);
                                                 setMenuConnectionId(null);
                                               }}
-                                              className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-zinc-800"
+                                              className="w-full text-left px-3 py-2 text-sm text-orange-700 dark:text-orange-300 hover:bg-surface-container"
                                             >
                                               Block
                                             </button>
@@ -3365,7 +3362,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                               await removeConnection(conn.id);
                                               setMenuConnectionId(null);
                                             }}
-                                            className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800"
+                                            className="w-full text-left px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-surface-container"
                                           >
                                             Remove connection
                                           </button>
@@ -3442,7 +3439,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
             onClick={() => setShowGroupMemberPicker(false)}
             role="presentation"
           >
@@ -3450,18 +3447,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+              className="w-full max-w-sm rounded-2xl border border-border-hard bg-surface-container p-5 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-white">Members</h3>
-                  <p className="mt-1 text-xs text-zinc-400">Choose someone to view their profile.</p>
+                  <h3 className="text-base font-semibold text-on-surface">Members</h3>
+                  <p className="mt-1 text-xs text-on-surface-variant">Choose someone to view their profile.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowGroupMemberPicker(false)}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"
+                  className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface hover:text-on-surface"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
@@ -3472,7 +3469,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   <li key={row.userId}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface"
                       onClick={() => {
                         setProfileUserId(row.userId);
                         setShowGroupMemberPicker(false);
@@ -3494,7 +3491,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
             onClick={() => {
               if (chatListGroupRenameBusy) return;
               setChatListGroupRenameGroupId(null);
@@ -3505,15 +3502,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+              className="w-full max-w-sm rounded-2xl border border-border-hard bg-surface-container p-5 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-base font-semibold text-white">Edit group name</h3>
+              <h3 className="text-base font-semibold text-on-surface">Edit group name</h3>
               <textarea
                 value={chatListGroupRenameInput}
                 onChange={(e) => setChatListGroupRenameInput(e.target.value)}
                 rows={2}
-                className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-[#630ed4]"
                 placeholder="Group name"
               />
               <div className="mt-5 flex justify-end gap-2">
@@ -3524,7 +3521,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     if (chatListGroupRenameBusy) return;
                     setChatListGroupRenameGroupId(null);
                   }}
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface-variant hover:bg-surface-container disabled:opacity-40"
                 >
                   Cancel
                 </button>
@@ -3555,7 +3552,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       setChatListGroupRenameBusy(false);
                     }
                   }}
-                  className="px-3 py-2 rounded-xl bg-[#8338EC] text-white hover:opacity-90 disabled:opacity-40"
+                  className="px-3 py-2 rounded-xl bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
                 >
                   Save
                 </button>

@@ -1,28 +1,29 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
-import { useInsightsDemo } from "./InsightsDemoContext";
+import { FcCard } from "@/components/fc";
 
-export function DemoBanner() {
-  const { setDemoMode } = useInsightsDemo();
-
+/**
+ * Demo mode notice — opaque bordered plate (Functional Clarity).
+ */
+export function DemoBanner({ onTurnOff }: { onTurnOff?: () => void }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/30 bg-gradient-to-r from-violet-500/15 to-amber-500/10 px-4 py-3 text-sm text-zinc-200 sm:flex-row sm:items-start">
-      <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" aria-hidden />
+    <FcCard className="flex flex-col gap-3 border-2 border-border-hard bg-surface px-4 py-3 text-sm text-on-surface sm:flex-row sm:items-start">
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-white">Demo data</p>
-        <p className="mt-1 text-zinc-400 leading-relaxed">
-          Sample Business Insights so you can explore heatmaps, tribes, and metrics before your venue has enough real traffic.
-          Turn this off anytime to see only live data (or when your venue is linked and over the privacy threshold).
+        <p className="font-bold text-primary">Demo data is on</p>
+        <p className="mt-1 font-medium leading-relaxed text-on-surface-variant">
+          Empty insights are filled with sample numbers so you can explore the
+          dashboard. Turn this off to see live venue data only.
         </p>
       </div>
-      <button
-        type="button"
-        onClick={() => setDemoMode(false)}
-        className="shrink-0 self-start rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:border-violet-400/40 hover:bg-violet-500/10"
-      >
-        Use live data
-      </button>
-    </div>
+      {onTurnOff ? (
+        <button
+          type="button"
+          onClick={onTurnOff}
+          className="fc-btn-secondary shrink-0 self-start px-3 py-2 text-xs"
+        >
+          Turn off demo
+        </button>
+      ) : null}
+    </FcCard>
   );
 }

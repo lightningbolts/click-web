@@ -161,28 +161,28 @@ export default function VibeStreamPage() {
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <GlassPanel className="p-5" glow="green">
           <div className="flex items-center gap-2 mb-3">
-            <ThumbsUp className="w-4 h-4 text-green-400" />
+            <ThumbsUp className="w-4 h-4 text-green-700 dark:text-green-400" />
             <span className="text-xs text-zinc-400">Positive</span>
           </div>
-          <div className="text-3xl font-bold text-green-400">{sentiment.positive}</div>
+          <div className="text-3xl font-bold text-green-700 dark:text-green-400">{sentiment.positive}</div>
           <div className="text-xs text-zinc-500 mt-1">{Math.round((sentiment.positive / total) * 100)}% of messages</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <ThumbsDown className="w-4 h-4 text-red-400" />
+            <ThumbsDown className="w-4 h-4 text-red-700 dark:text-red-400" />
             <span className="text-xs text-zinc-400">Negative</span>
           </div>
-          <div className="text-3xl font-bold text-red-400">{sentiment.negative}</div>
+          <div className="text-3xl font-bold text-red-700 dark:text-red-400">{sentiment.negative}</div>
           <div className="text-xs text-zinc-500 mt-1">{Math.round((sentiment.negative / total) * 100)}% of messages</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Minus className="w-4 h-4 text-amber-400" />
+            <Minus className="w-4 h-4 text-amber-700 dark:text-amber-300" />
             <span className="text-xs text-zinc-400">Neutral</span>
           </div>
-          <div className="text-3xl font-bold text-amber-400">{sentiment.neutral}</div>
+          <div className="text-3xl font-bold text-amber-700 dark:text-amber-300">{sentiment.neutral}</div>
           <div className="text-xs text-zinc-500 mt-1">{Math.round((sentiment.neutral / total) * 100)}% of messages</div>
         </GlassPanel>
 

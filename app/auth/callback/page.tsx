@@ -103,7 +103,7 @@ export default function AuthCallbackPage() {
     return pageShell(
       <div className="glass max-w-md w-full p-10 rounded-3xl border border-zinc-800 ring-1 ring-white/5 text-center">
         <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-5 border border-red-500/20">
-          <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <svg className="w-7 h-7 text-red-700 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

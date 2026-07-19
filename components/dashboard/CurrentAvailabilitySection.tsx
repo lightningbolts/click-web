@@ -48,11 +48,11 @@ export default function CurrentAvailabilitySection({
       !!legacy.custom_status?.trim());
 
   if (intents.length === 0 && !hasLegacySchedule) {
-    return <p className="text-sm text-zinc-500">No availability shared yet</p>;
+    return <p className="text-sm text-on-surface-variant">No availability shared yet</p>;
   }
 
   return (
-    <div className="space-y-4 text-sm text-zinc-300">
+    <div className="space-y-4 text-sm text-on-surface-variant">
       {intents.length > 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -60,7 +60,7 @@ export default function CurrentAvailabilitySection({
           transition={{ duration: 0.3, ease: easeOut }}
         >
           <motion.p
-            className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2"
+            className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant mb-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.25, delay: 0.04, ease: easeOut }}
@@ -74,12 +74,12 @@ export default function CurrentAvailabilitySection({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.28, delay: 0.06 + i * 0.05, ease: easeOut }}
-                className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2"
+                className="flex flex-wrap items-center gap-2 rounded-xl border border-border-hard/90 bg-surface-container/40 px-3 py-2"
               >
-                <span className="rounded-full border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2.5 py-0.5 text-xs text-sky-200">
+                <span className="rounded-full border border-[#630ed4]/35 bg-[#630ed4]/10 px-2.5 py-0.5 text-xs text-sky-200">
                   {row.intent_tag.trim()}
                 </span>
-                <span className="text-xs text-zinc-500">{humanizeTimeframe(row.timeframe)}</span>
+                <span className="text-xs text-on-surface-variant">{humanizeTimeframe(row.timeframe)}</span>
               </motion.li>
             ))}
           </ul>
@@ -88,24 +88,24 @@ export default function CurrentAvailabilitySection({
 
       {hasLegacySchedule && legacy ? (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant mb-2">
             Schedule
           </p>
           <div className="space-y-2">
             {legacy.is_free_this_week === true ? (
-              <p className="text-zinc-300 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm">
+              <p className="text-on-surface-variant rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm">
                 Free to meet this week
               </p>
             ) : null}
             {Array.isArray(availableDays) && availableDays.length > 0 ? (
-              <p className="text-zinc-400">
-                <span className="text-zinc-500">Days: </span>
+              <p className="text-on-surface-variant">
+                <span className="text-on-surface-variant">Days: </span>
                 {availableDays.map((d) => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')}
               </p>
             ) : null}
             {Array.isArray(preferredActivities) && preferredActivities.length > 0 ? (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant mb-1.5">
                   Activities
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -114,7 +114,7 @@ export default function CurrentAvailabilitySection({
                     return preferredActivities.map((t, i) => (
                     <span
                       key={keys[i]}
-                      className="rounded-full border border-[#8338EC]/35 bg-[#8338EC]/10 px-3 py-1 text-xs text-[#c4b5fd]"
+                      className="rounded-full border border-[#630ed4]/35 bg-[#630ed4]/10 px-3 py-1 text-xs text-[#c4b5fd]"
                     >
                       {t}
                     </span>
@@ -124,7 +124,7 @@ export default function CurrentAvailabilitySection({
               </div>
             ) : null}
             {legacy.custom_status?.trim() ? (
-              <p className="text-zinc-200 border-l-2 border-[#8338EC]/50 pl-3">{legacy.custom_status}</p>
+              <p className="text-on-surface border-l-2 border-[#630ed4]/50 pl-3">{legacy.custom_status}</p>
             ) : null}
           </div>
         </div>

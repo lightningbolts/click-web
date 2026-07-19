@@ -94,33 +94,31 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-xl flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         >
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#8338EC] rounded-full blur-[180px] opacity-15" />
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#3A86FF] rounded-full blur-[180px] opacity-10" />
-            </div>
-
             <motion.div
                 initial={{ scale: 0.9, y: 30 }}
                 animate={{ scale: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="relative z-10 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-hide"
+                className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto scrollbar-hide"
             >
-                <div className="glass rounded-3xl border border-zinc-800 p-8">
-                    <div className="text-center mb-6">
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#8338EC]/10 border border-[#8338EC]/20 mb-4">
-                            <Sparkles className="w-4 h-4 text-[#8338EC]" />
-                            <span className="text-xs text-[#8338EC] font-medium">Quick Setup</span>
+                <div
+                  className="fc-card border-2 border-border-hard p-8"
+                  style={{ backgroundColor: 'var(--color-surface)' }}
+                >
+                    <div className="mb-6 text-center">
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-border-hard bg-on-primary-container px-3 py-1.5">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <span className="text-xs font-bold text-primary">Quick Setup</span>
                         </div>
-                        <h2 className="text-3xl font-bold text-white mb-2">What are you into?</h2>
-                        <p className="text-zinc-400 text-sm">
+                        <h2 className="mb-2 text-3xl font-bold text-on-surface">What are you into?</h2>
+                        <p className="text-sm font-medium text-on-surface-variant">
                             Pick at least {MIN_TAGS} interests. Tap a category to see subcategories.
                         </p>
                     </div>
 
-                    <div className="text-center mb-5">
-                        <span className={`text-xs font-medium ${selected.length >= MIN_TAGS ? 'text-[#8338EC]' : 'text-zinc-500'}`}>
+                    <div className="mb-5 text-center">
+                        <span className={`text-xs font-bold ${selected.length >= MIN_TAGS ? 'text-primary' : 'text-on-surface-variant'}`}>
                             {selected.length} selected
                             {selected.length < MIN_TAGS && ` (min ${MIN_TAGS})`}
                         </span>
@@ -135,7 +133,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                     />
 
                     <div className="mt-5 space-y-2">
-                        <p className="text-xs uppercase tracking-wide text-zinc-500">Custom interests</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Custom interests</p>
                         <div className="flex gap-2">
                             <input
                                 value={customInterestInput}
@@ -147,12 +145,12 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                                     }
                                 }}
                                 placeholder="Add your own interest"
-                                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#8338EC]"
+                                className="fc-input flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
                             />
                             <button
                                 onClick={addCustomInterest}
                                     disabled={customInterestInput.trim().length === 0}
-                                className="inline-flex items-center gap-1 rounded-lg border border-[#8338EC]/40 px-3 py-2 text-sm text-[#caa8ff] hover:bg-[#8338EC]/15 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="fc-btn-secondary inline-flex items-center gap-1 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <Plus className="w-4 h-4" /> Add
                             </button>
@@ -163,12 +161,12 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                                 {customSelectedTags.map((tag) => (
                                     <span
                                         key={tag}
-                                        className="inline-flex items-center gap-1 rounded-lg border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2 py-1 text-xs text-[#9bc8ff]"
+                                        className="fc-chip inline-flex items-center gap-1 text-xs"
                                     >
                                         {tag}
                                         <button
                                             onClick={() => removeCustomInterest(tag)}
-                                            className="rounded p-0.5 hover:bg-white/10"
+                                            className="rounded p-0.5 hover:bg-surface-container"
                                             aria-label={`Remove ${tag}`}
                                         >
                                             <X className="w-3 h-3" />
@@ -179,18 +177,18 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         )}
                     </div>
 
-                    <div className="space-y-3 mt-8">
+                    <div className="mt-8 space-y-3">
                         <button
                             onClick={() => onComplete(selected)}
                             disabled={selected.length < MIN_TAGS}
-                            className="w-full py-3 bg-gradient-to-r from-[#8338EC] to-[#6d28d9] text-white rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="fc-btn-primary w-full py-3 disabled:cursor-not-allowed disabled:opacity-30"
                         >
                             Continue
                         </button>
                         {canSkip && (
                             <button
                                 onClick={onSkip}
-                                className="w-full py-2.5 text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+                                className="w-full py-2.5 text-sm font-semibold text-on-surface-variant hover:text-on-surface"
                             >
                                 Skip for now
                             </button>
@@ -230,22 +228,22 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
                                 onClick={() => onToggleTag(label)}
-                                className={`relative w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-sm font-medium cursor-pointer select-none ${isSelected
-                                        ? 'bg-[#8338EC]/15 border-[#8338EC]/50 text-[#8338EC]'
+                                className={`relative flex w-full cursor-pointer select-none items-center gap-2 rounded-[8px] border-2 px-3 py-2.5 text-sm font-bold transition-colors ${isSelected
+                                        ? 'border-border-hard bg-on-primary-container text-primary'
                                         : hasSelectedSubs
-                                            ? 'bg-[#8338EC]/5 border-[#8338EC]/20 text-zinc-200'
-                                            : 'bg-white/5 border-zinc-700/50 text-zinc-300 hover:border-zinc-600'
+                                            ? 'border-primary/40 bg-surface-container text-on-surface'
+                                            : 'border-border-hard bg-surface text-on-surface hover:bg-surface-container-low'
                                     }`}
                             >
                                 <span>{emoji}</span>
-                                <span className="truncate flex-1 text-left">{label}</span>
+                                <span className="flex-1 truncate text-left">{label}</span>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onToggleExpand(label); }}
-                                    className="p-0.5 hover:bg-white/10 rounded transition-colors"
+                                    className="rounded p-0.5 hover:bg-surface-container"
                                 >
                                     {isExpanded
-                                        ? <ChevronUp className="w-3.5 h-3.5 text-zinc-400" />
-                                        : <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                                        ? <ChevronUp className="h-3.5 w-3.5 text-on-surface-variant" />
+                                        : <ChevronDown className="h-3.5 w-3.5 text-on-surface-variant" />
                                     }
                                 </button>
                                 <AnimatePresence>
@@ -254,9 +252,9 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                             initial={{ scale: 0 }}
                                             animate={{ scale: 1 }}
                                             exit={{ scale: 0 }}
-                                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#8338EC] flex items-center justify-center"
+                                            className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary"
                                         >
-                                            <Check className="w-2.5 h-2.5 text-white" />
+                                            <Check className="h-2.5 w-2.5 text-on-primary" />
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
@@ -281,9 +279,9 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                                         whileTap={{ scale: 0.95 }}
                                                         onClick={() => onToggleTag(sub)}
                                                         disabled={maxTags != null && !subSelected && selected.length >= maxTags}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${subSelected
-                                                            ? 'bg-[#8338EC]/20 border-[#8338EC]/40 text-[#8338EC]'
-                                                            : 'bg-white/[0.03] border-zinc-800 text-zinc-400 hover:text-zinc-300 hover:border-zinc-600 disabled:opacity-30'
+                                                        className={`rounded-[8px] border-2 px-2.5 py-1 text-xs font-bold transition-colors ${subSelected
+                                                            ? 'border-border-hard bg-on-primary-container text-primary'
+                                                            : 'border-border-hard bg-surface text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface disabled:opacity-30'
                                                             }`}
                                                     >
                                                         {sub}

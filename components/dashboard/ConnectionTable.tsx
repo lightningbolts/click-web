@@ -176,7 +176,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
     switch (status) {
       case 'kept':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-green-500/10 text-green-400 border border-green-500/20">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20">
             <CheckCircle className="w-3 h-3" />
             Kept
           </span>
@@ -190,28 +190,28 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
         );
       case 'archived':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-600/20 text-zinc-300 border border-zinc-600/30">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-600/20 text-on-surface-variant border border-zinc-600/30">
             <Calendar className="w-3 h-3" />
             Archived
           </span>
         );
       case 'removed':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-red-500/10 text-red-300 border border-red-500/20">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20">
             <XCircle className="w-3 h-3" />
             Removed
           </span>
         );
       case 'expired':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-500/10 text-on-surface-variant border border-zinc-500/20">
             <XCircle className="w-3 h-3" />
             Expired
           </span>
         );
       case 'pending':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
             <Calendar className="w-3 h-3" />
             Pending
           </span>
@@ -241,20 +241,20 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <div className="text-sm">
-            <span className="text-zinc-500">Total:</span>{' '}
-            <span className="text-white font-semibold">{stats.total}</span>
+            <span className="text-on-surface-variant">Total:</span>{' '}
+            <span className="text-on-surface font-semibold">{stats.total}</span>
           </div>
           <div className="text-sm">
-            <span className="text-zinc-500">Kept:</span>{' '}
-            <span className="text-green-400 font-semibold">{stats.kept}</span>
+            <span className="text-on-surface-variant">Kept:</span>{' '}
+            <span className="text-green-700 dark:text-green-400 font-semibold">{stats.kept}</span>
           </div>
           <div className="text-sm">
-            <span className="text-zinc-500">Active:</span>{' '}
+            <span className="text-on-surface-variant">Active:</span>{' '}
             <span className="text-sky-300 font-semibold">{stats.active}</span>
           </div>
           <div className="text-sm">
-            <span className="text-zinc-500">Pending:</span>{' '}
-            <span className="text-amber-400 font-semibold">{stats.pending}</span>
+            <span className="text-on-surface-variant">Pending:</span>{' '}
+            <span className="text-amber-700 dark:text-amber-300 font-semibold">{stats.pending}</span>
           </div>
         </div>
 
@@ -263,7 +263,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onExport}
-          className="flex items-center gap-2 px-4 py-2 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl text-sm font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl text-sm font-medium transition-colors"
         >
           <Download className="w-4 h-4" />
           Export to CSV
@@ -273,22 +273,22 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
       {/* Search and filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <input
             type="text"
             placeholder="Search by name, location, event, weather, or noise..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors text-sm"
+            className="w-full pl-10 pr-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-[#630ed4] transition-colors text-sm"
           />
         </div>
         
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-zinc-500" />
+          <Filter className="w-4 h-4 text-on-surface-variant" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-4 py-3 bg-zinc-900/50 border border-zinc-700 rounded-xl focus:outline-none focus:border-[#8338EC] transition-colors text-sm appearance-none cursor-pointer"
+            className="px-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-[#630ed4] transition-colors text-sm appearance-none cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="kept">Kept</option>
@@ -302,12 +302,12 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border border-border-hard">
         <table className="w-full">
           <thead>
-            <tr className="bg-zinc-900/50 border-b border-zinc-800">
+            <tr className="bg-surface-container/50 border-b border-border-hard">
               <th 
-                className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center gap-1">
@@ -316,7 +316,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                 </div>
               </th>
               <th 
-                className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('dateMet')}
               >
                 <div className="flex items-center gap-1">
@@ -325,7 +325,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                 </div>
               </th>
               <th 
-                className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center gap-1">
@@ -333,11 +333,11 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                   <SortIcon field="location" />
                 </div>
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider min-w-[11rem] w-[22%]">
+              <th className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider min-w-[11rem] w-[22%]">
                 Moment
               </th>
               <th 
-                className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('status')}
               >
                 <div className="flex items-center gap-1">
@@ -345,14 +345,14 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                   <SortIcon field="status" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider" />
+              <th className="px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
             <AnimatePresence>
               {filteredConnections.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-zinc-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-on-surface-variant">
                     {searchQuery || statusFilter !== 'all' 
                       ? 'No connections match your search'
                       : 'No connections yet. Start meeting people!'}
@@ -372,7 +372,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ delay: index * 0.02 }}
-                    className="hover:bg-zinc-900/30 transition-colors cursor-pointer group"
+                    className="hover:bg-surface-container/30 transition-colors cursor-pointer group"
                   onClick={() => onSelect?.(connection)}
                   >
                     <td className="px-4 py-4 align-top">
@@ -384,7 +384,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                               e.stopPropagation();
                               onOpenProfile(peerId);
                             }}
-                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8338EC]"
+                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#630ed4]"
                             aria-label={`View ${connection.name}'s profile`}
                           >
                             <ConnectionPeerAvatar
@@ -404,37 +404,37 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                         )}
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="font-medium text-white group-hover:text-[#8338EC] transition-colors leading-snug truncate">
+                            <p className="font-medium text-on-surface group-hover:text-[#630ed4] transition-colors leading-snug truncate">
                               {connection.name}
                             </p>
                             {connection.intentOverlapLabel ? (
                               <span
-                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
                                 title={`Vibes match: ${connection.intentOverlapLabel}`}
                               >
-                                <Zap className="h-3 w-3 text-amber-300" aria-hidden />
+                                <Zap className="h-3 w-3 text-amber-800 dark:text-amber-300" aria-hidden />
                               </span>
                             ) : null}
                           </div>
                           {connection.chatPreview != null && connection.chatPreview.trim() !== '' ? (
-                            <p className="mt-0.5 truncate text-xs text-zinc-500">{connection.chatPreview.trim()}</p>
+                            <p className="mt-0.5 truncate text-xs text-on-surface-variant">{connection.chatPreview.trim()}</p>
                           ) : null}
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-2 text-sm text-zinc-200">
-                        <Calendar className="w-4 h-4 text-zinc-400 shrink-0" />
+                      <div className="flex items-center gap-2 text-sm text-on-surface">
+                        <Calendar className="w-4 h-4 text-on-surface-variant shrink-0" />
                         {formatDate(connection.dateMet)}
                       </div>
                     </td>
                     <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-2 text-sm text-zinc-200">
-                        <MapPin className="w-4 h-4 text-zinc-400 shrink-0" />
+                      <div className="flex items-center gap-2 text-sm text-on-surface">
+                        <MapPin className="w-4 h-4 text-on-surface-variant shrink-0" />
                         <span className="leading-snug">{connection.location}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top border-l border-zinc-800/80">
+                    <td className="px-4 py-4 align-top border-l border-border-hard/80">
                       {connection.context || connection.weatherSummary || connection.noiseSummary ? (
                         <MomentBlock
                           context={connection.context}
@@ -443,7 +443,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                           noiseCategory={connection.noiseCategory}
                         />
                       ) : (
-                        <span className="text-sm text-zinc-500">—</span>
+                        <span className="text-sm text-on-surface-variant">—</span>
                       )}
                     </td>
                     <td className="px-4 py-4 align-top">
@@ -452,7 +452,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                     <td className="px-4 py-4 align-top">
                       <button
                         onClick={(e) => { e.stopPropagation(); onSelect?.(connection); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-[#8338EC]/10 hover:bg-[#8338EC]/20 border border-[#8338EC]/30 rounded-xl text-xs text-[#8338EC] font-medium"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-[#630ed4]/10 hover:bg-[#630ed4]/20 border border-[#630ed4]/30 rounded-xl text-xs text-[#630ed4] font-medium"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
                         Chat
@@ -469,7 +469,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
 
       {/* Pagination hint */}
       {filteredConnections.length > 0 && (
-        <p className="text-xs text-zinc-500 text-center">
+        <p className="text-xs text-on-surface-variant text-center">
           Showing {filteredConnections.length} of {connections.length} connections
         </p>
       )}
