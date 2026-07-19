@@ -107,20 +107,71 @@ export function filterBeaconRecords(
   return rows.filter((b) => allowed.has(b.beacon_type));
 }
 
-export function parseLatLngFromLocationField(loc: unknown, fallbackLng: number, fallbackLat: number): { lat: number; lng: number } {
-  if (typeof loc === "string") {
-    const wktMatch = /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i.exec(loc);
-    if (wktMatch != null) {
-      return { lng: Number(wktMatch[1]), lat: Number(wktMatch[2]) };
-    }
+/**
+ * PostGIS EWKB Point (optional SRID flag). Supabase/PostgREST often returns geography
+ * as hex EWKB rather than WKT/GeoJSON — without this, callers used to fall back to (0,0)
+ * and wipe real map pins.
+ */
+function parseEwkbPointHex(hexRaw: string): { lat: number; lng: number } | null {
+  const hex = hexRaw.replace(/^\\x/i, "").trim();
+  if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length < 42) return null;
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
-  if (loc !== null && typeof loc === "object" && !Array.isArray(loc)) {
-    const g = loc as { type?: unknown; coordinates?: unknown };
-    if (g.type === "Point" && Array.isArray(g.coordinates) && g.coordinates.length >= 2) {
-      const lng = Number(g.coordinates[0]);
-      const lat = Number(g.coordinates[1]);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const littleEndian = view.getUint8(0) === 1;
+  const typeWord = view.getUint32(1, littleEndian);
+  const hasSrid = (typeWord & 0x20000000) !== 0;
+  const geomType = typeWord & 0xffff;
+  if (geomType !== 1) return null; // Point
+  let offset = 5;
+  if (hasSrid) offset += 4;
+  if (offset + 16 > bytes.length) return null;
+  const lng = view.getFloat64(offset, littleEndian);
+  const lat = view.getFloat64(offset + 8, littleEndian);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function parseGeoJsonPoint(g: { type?: unknown; coordinates?: unknown }): { lat: number; lng: number } | null {
+  if (g.type !== "Point" || !Array.isArray(g.coordinates) || g.coordinates.length < 2) {
+    return null;
+  }
+  const lng = Number(g.coordinates[0]);
+  const lat = Number(g.coordinates[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+export function parseLatLngFromLocationField(
+  loc: unknown,
+  fallbackLng: number,
+  fallbackLat: number,
+): { lat: number; lng: number } {
+  if (typeof loc === "string") {
+    const trimmed = loc.trim();
+    const wktMatch = /(?:SRID=\d+\s*;\s*)?POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i.exec(trimmed);
+    if (wktMatch != null) {
+      const lng = Number(wktMatch[1]);
+      const lat = Number(wktMatch[2]);
       if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
     }
+    if (trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed) as { type?: unknown; coordinates?: unknown };
+        const geo = parseGeoJsonPoint(parsed);
+        if (geo != null) return geo;
+      } catch {
+        // fall through
+      }
+    }
+    const ewkb = parseEwkbPointHex(trimmed);
+    if (ewkb != null) return ewkb;
+  }
+  if (loc !== null && typeof loc === "object" && !Array.isArray(loc)) {
+    const geo = parseGeoJsonPoint(loc as { type?: unknown; coordinates?: unknown });
+    if (geo != null) return geo;
   }
   return { lat: fallbackLat, lng: fallbackLng };
 }

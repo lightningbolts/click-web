@@ -56,7 +56,9 @@ async function enrichBeaconRow(
   admin: ReturnType<typeof createAdminSupabaseClient>,
   row: Record<string, unknown>,
 ): Promise<ReturnType<typeof parseMapBeacon>> {
-  const normalized = rowFromInsertWithLocation(row, 0, 0) as Record<string, unknown>;
+  // Never fall back to (0,0) — that poisons mobile map pins (null island).
+  // Prefer NaN so parseMapBeacon rejects unparseable locations instead of inventing coords.
+  const normalized = rowFromInsertWithLocation(row, Number.NaN, Number.NaN) as Record<string, unknown>;
   if (row.show_creator_name === true) {
     const { data: creator } = await admin
       .from("users")

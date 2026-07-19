@@ -79,7 +79,7 @@ async function findActiveSoundtrackBeacon(
     const meta = isRecord(row.metadata) ? row.metadata : {};
     const urls = musicUrlsFromMetadata(meta);
     if (urls.includes(target)) {
-      return parseInsertedBeacon(row, 0, 0);
+      return parseInsertedBeacon(row, Number.NaN, Number.NaN);
     }
   }
   return null;
