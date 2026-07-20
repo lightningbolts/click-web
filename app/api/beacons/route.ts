@@ -62,7 +62,9 @@ async function findActiveSoundtrackBeacon(
   const target = normalizeMusicUrlForDedup(musicUrl);
   const { data, error } = await admin
     .from("map_beacons")
-    .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+    .select(
+      "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
+    )
     .eq("creator_id", creatorId)
     .eq("beacon_type", "soundtrack")
     .gt("expires_at", new Date().toISOString());
@@ -83,6 +85,42 @@ async function findActiveSoundtrackBeacon(
     }
   }
   return null;
+}
+
+/**
+ * Move an existing soundtrack pin to new drop coords and refresh TTL/metadata/visibility.
+ * Dedup used to return the stale row unchanged, so proximity fetch at the new GPS missed it.
+ */
+async function relocateSoundtrackBeacon(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  existingId: string,
+  lat: number,
+  lon: number,
+  metadata: Record<string, unknown>,
+  expiresAtIso: string,
+  showCreatorName: boolean,
+  visibilityAudience: string,
+): Promise<MapBeaconRecord | null> {
+  const { data: updated, error } = await admin
+    .from("map_beacons")
+    .update({
+      location: `POINT(${lon} ${lat})`,
+      metadata,
+      expires_at: expiresAtIso,
+      show_creator_name: showCreatorName,
+      visibility_audience: visibilityAudience,
+    })
+    .eq("id", existingId)
+    .select(
+      "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
+    )
+    .maybeSingle();
+
+  if (error) {
+    console.error("relocateSoundtrackBeacon:", error.message);
+    return null;
+  }
+  return parseInsertedBeacon(updated, lon, lat);
 }
 
 /**
@@ -294,8 +332,19 @@ export async function POST(request: NextRequest) {
         const admin = createAdminSupabaseClient();
         const existing = await findActiveSoundtrackBeacon(admin, user.id, musicUrl);
         if (existing != null) {
-          const [enrichedExisting] = await enrichBeaconCreatorNames(admin, [existing]);
-          return NextResponse.json({ beacon: enrichedExisting ?? existing, deduplicated: true });
+          const relocated = await relocateSoundtrackBeacon(
+            admin,
+            existing.id,
+            lat,
+            lon,
+            metadata,
+            expiresAtIso,
+            showCreatorName,
+            visibilityAudience,
+          );
+          const beacon = relocated ?? { ...existing, lat, lng: lon };
+          const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);
+          return NextResponse.json({ beacon: enriched ?? beacon, deduplicated: true });
         }
       }
     }
