@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
       lat,
       lng,
       radius_meters: radius,
+      p_limit: 200,
     });
 
     if (error) {

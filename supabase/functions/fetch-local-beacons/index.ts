@@ -89,6 +89,7 @@ Deno.serve(async (req) => {
     lat,
     lng,
     radius_meters: radius_m,
+    p_limit: 200,
   });
 
   if (error) {

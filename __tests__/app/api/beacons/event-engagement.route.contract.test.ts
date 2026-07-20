@@ -499,6 +499,58 @@ describe("event engagement API contracts", () => {
     expect(types).toContain("rsvp_unset");
   });
 
+  it("check-in rejects far coords with 403 even when event is not live yet", async () => {
+    // Regression: not_live used to short-circuit before geofence → mobile treated 409 as
+    // "checked in early" from 12km+ away.
+    mockGetSupabaseFromRouteRequest.mockResolvedValue({
+      supabase: {},
+      user: { id: USER_ID },
+      authError: null,
+    });
+
+    mockCreateAdminSupabaseClient.mockReturnValue(
+      makeAdmin({
+        map_beacons: {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                  id: BEACON_ID,
+                  beacon_type: "event",
+                  expires_at: futureIso(48),
+                  venue_id: null,
+                  metadata: {
+                    title: "Future Event",
+                    event_start_at: futureIso(48),
+                    event_end_at: futureIso(50),
+                    venue_scale: "neighborhood",
+                    check_in_radius_meters: 250,
+                  },
+                  location: { type: "Point", coordinates: [-122.3, 47.65] },
+                },
+                error: null,
+              }),
+            }),
+          }),
+        },
+        event_engagement_events: {
+          insert: jest.fn().mockResolvedValue({ error: null }),
+        },
+      }),
+    );
+
+    const res = await postCheckIn(
+      new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({ latitude: 47.0, longitude: -122.0 }),
+      }),
+      { params: Promise.resolve({ beaconId: BEACON_ID }) },
+    );
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.reject_reason).toBe("out_of_bounds");
+  });
+
   it("returns 401 without auth", async () => {
     mockGetSupabaseFromRouteRequest.mockResolvedValue({
       supabase: {},

@@ -63,6 +63,7 @@ export async function resolveLiveEventBeaconAt(
     lat: latitude,
     lng: longitude,
     radius_meters: LIVE_EVENT_SEARCH_RADIUS_M,
+    p_limit: 200,
   });
   if (rpcErr) {
     console.warn("[resolveLiveEventBeaconAt] rpc:", rpcErr.message);

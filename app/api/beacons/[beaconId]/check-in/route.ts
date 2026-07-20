@@ -93,33 +93,8 @@ export async function POST(
     const { beacon } = loaded;
     const { radiusMeters, venueScale } = resolveCheckInRadiusMeters(beacon.metadata);
 
-    if (!isEventLiveForCheckIn(beacon.metadata)) {
-      await insertEngagementEvent(admin, {
-        beacon_id: beaconId,
-        user_id: user.id,
-        venue_id: beacon.venue_id,
-        event_type: "check_in_rejected",
-        reject_reason: "not_live",
-        latitude: telemetry.latitude,
-        longitude: telemetry.longitude,
-        accuracy_meters: telemetry.accuracy_meters,
-        client_occurred_at: telemetry.client_occurred_at,
-        source: telemetry.source,
-        platform: telemetry.platform,
-        app_version: telemetry.app_version,
-        radius_meters_applied: radiusMeters,
-        venue_scale: venueScale,
-      });
-      return NextResponse.json(
-        {
-          error: "Event not live",
-          message: "Check-in opens when the event starts",
-          reject_reason: "not_live",
-        },
-        { status: 409 },
-      );
-    }
-
+    // Geofence ALWAYS runs first. Previously `not_live` (409) short-circuited before distance
+    // checks, so the mobile client treated far-away taps as "checked in early".
     const geo = await assertEventCheckInGeofence(
       admin,
       beacon,
@@ -146,6 +121,34 @@ export async function POST(
         app_version: telemetry.app_version,
       });
       return geo.response;
+    }
+
+    if (!isEventLiveForCheckIn(beacon.metadata)) {
+      await insertEngagementEvent(admin, {
+        beacon_id: beaconId,
+        user_id: user.id,
+        venue_id: beacon.venue_id,
+        event_type: "check_in_rejected",
+        reject_reason: "not_live",
+        latitude: telemetry.latitude,
+        longitude: telemetry.longitude,
+        accuracy_meters: telemetry.accuracy_meters,
+        distance_meters: geo.distanceMeters,
+        client_occurred_at: telemetry.client_occurred_at,
+        source: telemetry.source,
+        platform: telemetry.platform,
+        app_version: telemetry.app_version,
+        radius_meters_applied: radiusMeters,
+        venue_scale: venueScale,
+      });
+      return NextResponse.json(
+        {
+          error: "Event not live",
+          message: "Check-in opens when the event starts",
+          reject_reason: "not_live",
+        },
+        { status: 409 },
+      );
     }
 
     const [{ data: rsvpRow }, { data: bookmarkRow }, { data: existing }] = await Promise.all([
