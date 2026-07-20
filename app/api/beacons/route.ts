@@ -165,25 +165,25 @@ export async function GET(request: NextRequest) {
 
     // Always merge the caller's own active beacons (any location) so creators still see
     // pins they dropped even when the map/GPS center is far from the drop site.
+    // Use RPC (lat/lng in JSON) — selecting geography `location` via PostgREST often yields
+    // opaque EWKB that parseInsertedBeacon cannot decode → own pins silently dropped.
     try {
-      const { data: ownRows, error: ownErr } = await admin
-        .from("map_beacons")
-        .select(
-          "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
-        )
-        .eq("creator_id", user.id)
-        .gt("expires_at", new Date().toISOString())
-        .limit(50);
+      const { data: ownData, error: ownErr } = await admin.rpc("fetch_creator_active_map_beacons", {
+        p_creator_id: user.id,
+        p_limit: 50,
+      });
       if (ownErr) {
         console.warn("GET /api/beacons own beacons:", ownErr.message);
-      } else if (Array.isArray(ownRows)) {
-        const ownParsed = ownRows
-          .map((row) => parseInsertedBeacon(row, Number.NaN, Number.NaN))
+      } else {
+        const ownParsed = normalizeBeaconRpcRows(ownData)
+          .map(parseMapBeacon)
           .filter((b): b is MapBeaconRecord => b != null);
-        const byId = new Map<string, MapBeaconRecord>();
-        for (const b of beacons) byId.set(b.id, b);
-        for (const b of ownParsed) byId.set(b.id, b);
-        beacons = Array.from(byId.values());
+        if (ownParsed.length > 0) {
+          const byId = new Map<string, MapBeaconRecord>();
+          for (const b of beacons) byId.set(b.id, b);
+          for (const b of ownParsed) byId.set(b.id, b);
+          beacons = Array.from(byId.values());
+        }
       }
     } catch (e) {
       console.warn("GET /api/beacons own beacons merge failed:", e);
