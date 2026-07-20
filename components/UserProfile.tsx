@@ -97,16 +97,16 @@ export default function UserProfile() {
       <button
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-2 rounded-full border border-zinc-700 hover:border-[#8338EC] transition-colors"
+        className="flex items-center gap-1 md:gap-2 rounded-[8px] border-2 border-border-hard bg-surface px-2 py-2 text-on-surface transition-colors hover:bg-surface-container md:px-4"
       >
-        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8338EC] to-purple-600 flex items-center justify-center text-xs font-bold flex-shrink-0 overflow-hidden">
+        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-border-hard bg-primary text-xs font-bold text-on-primary">
           {profileImageUrl ? (
             <img src={profileImageUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             initials
           )}
         </div>
-        <span className="text-xs md:text-sm hidden md:inline truncate max-w-[100px] lg:max-w-[150px]">{user.email}</span>
+        <span className="hidden max-w-[100px] truncate text-xs font-semibold md:inline md:text-sm lg:max-w-[150px]">{user.email}</span>
       </button>
 
       {portalRoot && createPortal(
@@ -129,23 +129,19 @@ export default function UserProfile() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.1 }}
+                className="fc-card overflow-hidden text-on-surface"
                 style={{
                   position: 'fixed',
                   top: menuPosition.top,
                   left: menuPosition.left,
                   width: 256,
                   pointerEvents: 'auto',
-                  backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(63, 63, 70, 0.5)',
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                  backgroundColor: 'var(--color-surface)',
                 }}
               >
-                <div className="p-4 border-b border-zinc-800">
-                  <p className="text-sm font-semibold text-white">{user.email}</p>
-                  <p className="text-xs text-zinc-500 mt-1">Signed in</p>
+                <div className="border-b-2 border-border-hard p-4">
+                  <p className="text-sm font-bold text-on-surface">{user.email}</p>
+                  <p className="mt-1 text-xs font-medium text-on-surface-variant">Signed in</p>
                 </div>
 
                 <div className="p-2">
@@ -154,10 +150,10 @@ export default function UserProfile() {
                       router.push('/dashboard');
                       setIsOpen(false);
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-left text-white"
+                    className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-on-surface transition-colors hover:bg-surface-container"
                   >
-                    <MessageCircle className="w-4 h-4 text-[#8338EC]" />
-                    <span className="text-sm">My Chats</span>
+                    <MessageCircle className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">My Chats</span>
                   </button>
 
                   <button
@@ -165,20 +161,20 @@ export default function UserProfile() {
                       router.push('/dashboard');
                       setIsOpen(false);
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors text-left text-white"
+                    className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-on-surface transition-colors hover:bg-surface-container"
                   >
-                    <MapPin className="w-4 h-4 text-[#8338EC]" />
-                    <span className="text-sm">Connection Map</span>
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">Connection Map</span>
                   </button>
                 </div>
 
-                <div className="p-2 border-t border-zinc-800">
+                <div className="border-t-2 border-border-hard p-2">
                   <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left text-white"
+                    className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-on-surface transition-colors hover:bg-surface-container hover:text-error"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span className="text-sm">Sign Out</span>
+                    <LogOut className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Sign Out</span>
                   </button>
                 </div>
               </motion.div>

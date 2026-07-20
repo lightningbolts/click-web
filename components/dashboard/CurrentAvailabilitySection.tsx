@@ -74,9 +74,9 @@ export default function CurrentAvailabilitySection({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.28, delay: 0.06 + i * 0.05, ease: easeOut }}
-                className="flex flex-wrap items-center gap-2 rounded-xl border border-border-hard/90 bg-surface-container/40 px-3 py-2"
+                className="flex flex-wrap items-center gap-2 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2"
               >
-                <span className="rounded-full border border-[#630ed4]/35 bg-[#630ed4]/10 px-2.5 py-0.5 text-xs text-sky-200">
+                <span className="fc-chip text-xs">
                   {row.intent_tag.trim()}
                 </span>
                 <span className="text-xs text-on-surface-variant">{humanizeTimeframe(row.timeframe)}</span>
@@ -93,7 +93,7 @@ export default function CurrentAvailabilitySection({
           </p>
           <div className="space-y-2">
             {legacy.is_free_this_week === true ? (
-              <p className="text-on-surface-variant rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm">
+              <p className="rounded-[8px] border-2 border-border-hard bg-surface-container px-3 py-2 text-sm font-medium text-on-surface">
                 Free to meet this week
               </p>
             ) : null}
@@ -114,7 +114,7 @@ export default function CurrentAvailabilitySection({
                     return preferredActivities.map((t, i) => (
                     <span
                       key={keys[i]}
-                      className="rounded-full border border-[#630ed4]/35 bg-[#630ed4]/10 px-3 py-1 text-xs text-[#c4b5fd]"
+                      className="fc-chip text-xs"
                     >
                       {t}
                     </span>
@@ -124,7 +124,7 @@ export default function CurrentAvailabilitySection({
               </div>
             ) : null}
             {legacy.custom_status?.trim() ? (
-              <p className="text-on-surface border-l-2 border-[#630ed4]/50 pl-3">{legacy.custom_status}</p>
+              <p className="border-l-2 border-primary pl-3 text-on-surface">{legacy.custom_status}</p>
             ) : null}
           </div>
         </div>

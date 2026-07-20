@@ -573,18 +573,18 @@ function ProfileLoadingSkeleton() {
       aria-label="Loading profile"
     >
       <div className="flex flex-col items-center gap-3">
-        <div className="h-24 w-24 rounded-full bg-white/5 ring-1 ring-white/[0.06] animate-pulse" />
-        <div className="h-5 w-40 rounded-lg bg-white/5 animate-pulse" />
-        <div className="h-3 w-28 rounded-md bg-white/[0.04] animate-pulse" />
+        <div className="h-24 w-24 rounded-full border-2 border-border-hard bg-surface-container animate-pulse" />
+        <div className="h-5 w-40 rounded-[8px] bg-surface-container animate-pulse" />
+        <div className="h-3 w-28 rounded-[8px] bg-surface-container animate-pulse" />
       </div>
       <div className="space-y-2">
-        <div className="h-3 w-24 rounded bg-white/[0.06] animate-pulse" />
-        <div className="h-9 w-full rounded-xl bg-white/[0.04] animate-pulse" />
-        <div className="h-9 w-[80%] rounded-xl bg-white/[0.04] animate-pulse" />
+        <div className="h-3 w-24 rounded bg-surface-container animate-pulse" />
+        <div className="h-9 w-full rounded-[8px] bg-surface-container animate-pulse" />
+        <div className="h-9 w-[80%] rounded-[8px] bg-surface-container animate-pulse" />
       </div>
       <div className="space-y-2">
-        <div className="h-3 w-20 rounded bg-white/[0.06] animate-pulse" />
-        <div className="h-16 w-full rounded-xl bg-white/[0.04] animate-pulse" />
+        <div className="h-3 w-20 rounded bg-surface-container animate-pulse" />
+        <div className="h-16 w-full rounded-[8px] bg-surface-container animate-pulse" />
       </div>
     </motion.div>
   );
@@ -1164,7 +1164,7 @@ export default function UserProfileModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/55 p-4 backdrop-blur-sm transform-gpu translate-z-0 will-change-[opacity]"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-3 sm:items-center sm:p-6 transform-gpu translate-z-0 will-change-[opacity]"
           onClick={blockingBirthday ? () => {} : onClose}
         >
           <motion.div
@@ -1172,18 +1172,22 @@ export default function UserProfileModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.98 }}
             transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.85 }}
-            className="w-full max-w-md max-h-[min(88vh,640px)] overflow-y-auto overscroll-y-contain rounded-3xl border border-zinc-700/80 bg-zinc-950 shadow-2xl transform-gpu translate-z-0 will-change-scroll"
+            className="fc-card relative flex w-full max-w-md max-h-[min(88vh,640px)] flex-col overflow-hidden text-on-surface transform-gpu translate-z-0"
+            style={{ backgroundColor: 'var(--color-surface)' }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="user-profile-modal-title"
           >
-            <div className="sticky top-0 z-10 isolate flex items-center justify-between border-b border-zinc-800/90 bg-zinc-950/95 px-4 pt-6 pb-3 backdrop-blur-md transform-gpu translate-z-0 will-change-transform supports-[backdrop-filter]:bg-zinc-950/80">
-              <h2 className="text-lg font-semibold text-white">
+            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b-2 border-border-hard bg-surface px-4 py-3 sm:px-5">
+              <h2 id="user-profile-modal-title" className="text-lg font-bold text-on-surface">
                 {blockingBirthday ? 'Add your birthday' : 'Profile'}
               </h2>
               {!blockingBirthday ? (
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+                  className="shrink-0 rounded-[8px] border-2 border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
                   aria-label="Close"
                 >
                   <X className="w-5 h-5" />
@@ -1193,13 +1197,13 @@ export default function UserProfileModal({
               )}
             </div>
 
-            <div className="p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-5">
               {blockingBirthday && (
-                <div className="mb-5 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4">
-                  <p className="text-sm text-amber-900 dark:text-amber-100 mb-3">
+                <div className="mb-5 rounded-[16px] border-2 border-border-hard bg-surface-container p-4">
+                  <p className="mb-3 text-sm font-medium text-on-surface">
                     To keep Click age-appropriate, please confirm your date of birth. This modal stays open until you save.
                   </p>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5" htmlFor="profile-gate-birthday">
+                  <label className="mb-1.5 block text-sm font-medium text-on-surface" htmlFor="profile-gate-birthday">
                     Birthday
                   </label>
                   <input
@@ -1208,11 +1212,11 @@ export default function UserProfileModal({
                     autoComplete="bday"
                     value={birthdayDraft}
                     onChange={(e) => setBirthdayDraft(e.target.value)}
-                    className="flex h-10 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                    className="fc-input h-10 w-full px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
                     max={new Date().toISOString().slice(0, 10)}
                   />
                   {birthdaySaveError ? (
-                    <p className="mt-2 text-xs text-red-700 dark:text-red-400">{birthdaySaveError}</p>
+                    <p className="mt-2 text-xs font-medium text-error">{birthdaySaveError}</p>
                   ) : null}
                   <button
                     type="button"
@@ -1220,7 +1224,7 @@ export default function UserProfileModal({
                     onClick={() => {
                       void saveOwnBirthday();
                     }}
-                    className="mt-4 w-full rounded-xl bg-[#8338EC] py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                    className="fc-btn-primary mt-4 w-full py-2.5 disabled:opacity-50"
                   >
                     {birthdaySaving ? 'Saving…' : 'Save birthday'}
                   </button>
@@ -1228,7 +1232,7 @@ export default function UserProfileModal({
               )}
               {loading && <ProfileLoadingSkeleton />}
               {errorMessage && !loading && (
-                <p className="text-sm text-red-700 dark:text-red-400 text-center py-6">{errorMessage}</p>
+                <p className="py-6 text-center text-sm font-medium text-error">{errorMessage}</p>
               )}
               {profileData && !loading && (
                 <motion.div
@@ -1239,7 +1243,7 @@ export default function UserProfileModal({
                 >
                   <div className="flex flex-col items-center gap-3">
                     {profileData.user.image ? (
-                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full ring-2 ring-[#8338EC]/40 transform-gpu translate-z-0">
+                      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-2 border-border-hard transform-gpu translate-z-0">
                         <Image
                           src={profileData.user.image}
                           alt=""
@@ -1252,20 +1256,20 @@ export default function UserProfileModal({
                       </div>
                     ) : (
                       <div
-                        className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-3xl font-bold text-white"
+                        className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-3xl font-bold text-on-primary"
                       >
                         {displayName(profileData.user).charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="text-center">
-                      <p className="text-xl font-semibold text-white">
+                      <p className="text-xl font-bold text-on-surface">
                         {displayName(profileData.user)}
                         {ageFromBirthday(profileData.user.birthday) != null && (
-                          <span className="text-zinc-400 font-normal">, {ageFromBirthday(profileData.user.birthday)}</span>
+                          <span className="font-medium text-on-surface-variant">, {ageFromBirthday(profileData.user.birthday)}</span>
                         )}
                       </p>
                       {profileData.user.email && (
-                        <p className="text-xs text-zinc-500 mt-1">{profileData.user.email}</p>
+                        <p className="mt-1 text-xs font-medium text-on-surface-variant">{profileData.user.email}</p>
                       )}
                     </div>
                   </div>
@@ -1285,14 +1289,14 @@ export default function UserProfileModal({
                         whileTap={{ scale: 0.98 }}
                         onClick={openRollPicker}
                         disabled={rollBusy}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-violet-300/25 bg-white/10 px-4 py-3 text-left shadow-lg shadow-violet-500/10 backdrop-blur-md transition-colors hover:border-violet-300/45 hover:bg-white/[0.14] disabled:cursor-wait disabled:opacity-70"
+                        className="flex w-full items-center gap-3 rounded-[16px] border-2 border-border-hard bg-surface-container px-4 py-3 text-left transition-colors hover:border-primary disabled:cursor-wait disabled:opacity-70"
                       >
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-primary">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border-2 border-border-hard bg-on-primary-container text-primary">
                           {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold text-white">Click Drop</span>
-                          <span className="mt-0.5 block text-xs leading-5 text-zinc-400">
+                          <span className="block text-sm font-bold text-on-surface">Click Drop</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-on-surface-variant">
                             {rollStatus === 'uploading'
                               ? 'Dropping your photo into the shared roll...'
                               : rollStatus === 'done'
@@ -1302,7 +1306,7 @@ export default function UserProfileModal({
                         </span>
                       </motion.button>
                       {rollStatus === 'error' && (
-                        <p className="text-xs text-red-700 dark:text-red-400">Couldn&apos;t open Click Drop — try again.</p>
+                        <p className="text-xs font-medium text-error">Couldn&apos;t open Click Drop — try again.</p>
                       )}
                     </section>
                   )}
@@ -1315,7 +1319,7 @@ export default function UserProfileModal({
                   <nav
                     role="tablist"
                     aria-label="Profile sections"
-                    className="grid grid-cols-4 gap-1 rounded-xl border border-zinc-800/90 bg-zinc-900/50 p-1"
+                    className="grid grid-cols-4 gap-1 rounded-[12px] border-2 border-border-hard bg-surface-container p-1"
                   >
                     {(
                       [
@@ -1333,10 +1337,10 @@ export default function UserProfileModal({
                           role="tab"
                           aria-selected={selected}
                           onClick={() => setActiveTab(key)}
-                          className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors ${
+                          className={`flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 text-xs font-semibold transition-colors ${
                             selected
-                              ? 'bg-[#8338EC]/20 text-[#c4b5fd] ring-1 ring-[#8338EC]/40'
-                              : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-on-surface'
+                              ? 'bg-primary text-on-primary'
+                              : 'text-on-surface-variant hover:bg-surface hover:text-on-surface'
                           }`}
                         >
                           <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -1381,15 +1385,15 @@ export default function UserProfileModal({
                                           width={400}
                                           height={112}
                                           decoding="async"
-                                          className="h-28 w-full rounded-lg object-cover ring-1 ring-zinc-800"
+                                          className="h-28 w-full rounded-[8px] border-2 border-border-hard object-cover"
                                         />
                                       </button>
-                                      <div className="pointer-events-none absolute inset-0 rounded-lg bg-black/0 transition group-hover:bg-black/30" />
+                                      <div className="pointer-events-none absolute inset-0 rounded-[8px] bg-black/0 transition group-hover:bg-black/30" />
                                       <div className="absolute bottom-1 right-1 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
                                         <button
                                           type="button"
                                           onClick={() => openMediaItem(m)}
-                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-on-surface hover:bg-black/80"
+                                          className="pointer-events-auto rounded-[8px] border-2 border-border-hard bg-surface p-1 text-on-surface hover:bg-surface-container"
                                           aria-label="Open image"
                                         >
                                           <Maximize2 className="h-3.5 w-3.5" />
@@ -1397,7 +1401,7 @@ export default function UserProfileModal({
                                         <button
                                           type="button"
                                           onClick={() => downloadMediaItem(m)}
-                                          className="pointer-events-auto rounded-md bg-black/65 p-1 text-on-surface hover:bg-black/80"
+                                          className="pointer-events-auto rounded-[8px] border-2 border-border-hard bg-surface p-1 text-on-surface hover:bg-surface-container"
                                           aria-label="Download image"
                                         >
                                           <Download className="h-3.5 w-3.5" />
@@ -1405,7 +1409,7 @@ export default function UserProfileModal({
                                       </div>
                                     </>
                                   ) : (
-                                    <div className="flex h-28 w-full items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 text-[11px] text-zinc-400">
+                                    <div className="flex h-28 w-full items-center justify-center rounded-[8px] border-2 border-border-hard bg-surface-container text-[11px] font-medium text-on-surface-variant">
                                       Secured image
                                     </div>
                                   )}
@@ -1419,16 +1423,16 @@ export default function UserProfileModal({
                               {audioItems.map((m) => {
                                 const audioUrl = resolvedMediaUrls[m.id];
                                 return (
-                                  <li key={m.id} className="rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
+                                  <li key={m.id} className="rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
                                     <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-medium text-zinc-300">Voice note</p>
+                                      <p className="text-xs font-semibold text-on-surface">Voice note</p>
                                       <div className="flex items-center gap-1">
                                         {audioUrl && (
                                           <>
                                             <button
                                               type="button"
                                               onClick={() => openMediaItem(m)}
-                                              className="rounded-md p-1 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                              className="rounded-[8px] p-1 text-on-surface-variant hover:bg-surface hover:text-on-surface"
                                               aria-label="Open audio"
                                             >
                                               <ExternalLink className="h-3.5 w-3.5" />
@@ -1436,7 +1440,7 @@ export default function UserProfileModal({
                                             <button
                                               type="button"
                                               onClick={() => downloadMediaItem(m)}
-                                              className="rounded-md p-1 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                              className="rounded-[8px] p-1 text-on-surface-variant hover:bg-surface hover:text-on-surface"
                                               aria-label="Download audio"
                                             >
                                               <Download className="h-3.5 w-3.5" />
@@ -1448,7 +1452,7 @@ export default function UserProfileModal({
                                     {audioUrl ? (
                                       <audio controls preload="metadata" src={audioUrl} className="mt-2 w-full" />
                                     ) : (
-                                      <div className="mt-2 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs text-zinc-500">
+                                      <div className="mt-2 rounded-[8px] border-2 border-border-hard bg-surface px-3 py-2 text-xs text-on-surface-variant">
                                         Secured audio
                                       </div>
                                     )}
@@ -1484,12 +1488,12 @@ export default function UserProfileModal({
                                 href={l.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-sm text-on-surface hover:border-[#8338EC]/50 hover:bg-zinc-900/80"
+                                className="flex items-start gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5 text-sm text-on-surface hover:border-primary"
                               >
-                                <LinkIcon className="h-4 w-4 shrink-0 text-[#8338EC]/80 mt-0.5" aria-hidden />
+                                <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-[#c4b5fd]">{l.url}</p>
-                                  <p className="text-[11px] text-zinc-500 mt-0.5">{l.timestamp}</p>
+                                  <p className="truncate font-medium text-primary">{l.url}</p>
+                                  <p className="mt-0.5 text-[11px] text-on-surface-variant">{l.timestamp}</p>
                                 </div>
                               </a>
                             </li>
@@ -1517,14 +1521,14 @@ export default function UserProfileModal({
                         <ul className="flex flex-col gap-2">
                           {fileItems.map((f) => (
                             <li key={f.id}>
-                              <div className="flex w-full items-start gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5 text-left hover:border-sky-400/50 hover:bg-zinc-900/80">
-                                <FileText className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
+                              <div className="flex w-full items-start gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5 text-left hover:border-primary">
+                                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-white">{f.fileName}</p>
-                                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                                  <p className="truncate text-sm font-semibold text-on-surface">{f.fileName}</p>
+                                  <p className="mt-0.5 text-[11px] text-on-surface-variant">
                                     {formatFileSize(f.sizeBytes)} · {f.mimeType}
                                   </p>
-                                  <p className="text-[11px] text-zinc-500">{f.timestamp}</p>
+                                  <p className="text-[11px] text-on-surface-variant">{f.timestamp}</p>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-1">
                                   <button
@@ -1532,7 +1536,7 @@ export default function UserProfileModal({
                                     onClick={() => {
                                       void openFileItem(f);
                                     }}
-                                    className="rounded-md p-1.5 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                    className="rounded-[8px] p-1.5 text-on-surface-variant hover:bg-surface hover:text-on-surface"
                                     aria-label="Open file"
                                   >
                                     <ExternalLink className="h-3.5 w-3.5" />
@@ -1542,7 +1546,7 @@ export default function UserProfileModal({
                                     onClick={() => {
                                       void downloadFileItem(f);
                                     }}
-                                    className="rounded-md p-1.5 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                    className="rounded-[8px] p-1.5 text-on-surface-variant hover:bg-surface hover:text-on-surface"
                                     aria-label="Download file"
                                   >
                                     <Download className="h-3.5 w-3.5" />
@@ -1561,24 +1565,24 @@ export default function UserProfileModal({
 
                   {hasMoment && momentLines && (
                     <section>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                         When you connected
                       </h3>
                       <div className="space-y-3 text-sm text-on-surface">
                         {momentLines.context && (
-                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Sparkles className="h-4 w-4 shrink-0 text-[#8338EC]/80 mt-0.5" aria-hidden />
+                          <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
+                            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Moment</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Moment</p>
                               <p className="mt-0.5 leading-snug">{momentLines.context}</p>
                             </div>
                           </div>
                         )}
                         {(momentLines.place || momentLines.addressDetail) && (
-                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <MapPin className="h-4 w-4 shrink-0 text-sky-400/90 mt-0.5" aria-hidden />
+                          <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Place</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Place</p>
                               <p className="mt-0.5 leading-snug">
                                 {[momentLines.place, momentLines.addressDetail].filter(Boolean).join(' · ')}
                               </p>
@@ -1586,37 +1590,37 @@ export default function UserProfileModal({
                           </div>
                         )}
                         {momentLines.when && (
-                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Clock className="h-4 w-4 shrink-0 text-amber-800 dark:text-amber-300/90 mt-0.5" aria-hidden />
+                          <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Time</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Time</p>
                               <p className="mt-0.5 leading-snug">{momentLines.when}</p>
                             </div>
                           </div>
                         )}
                         {momentLines.weather && (
-                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Cloud className="h-4 w-4 shrink-0 text-zinc-300 mt-0.5" aria-hidden />
+                          <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
+                            <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Weather</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Weather</p>
                               <p className="mt-0.5 leading-snug">{momentLines.weather}</p>
                             </div>
                           </div>
                         )}
                         {momentLines.noise && (
-                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Volume2 className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300/85 mt-0.5" aria-hidden />
+                          <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
+                            <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Ambience</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Ambience</p>
                               <p className="mt-0.5 leading-snug">{momentLines.noise}</p>
                             </div>
                           </div>
                         )}
                         {momentLines.elevation && (
-                          <div className="flex gap-3 rounded-xl border border-zinc-800/90 bg-zinc-900/50 px-3 py-2.5">
-                            <Mountain className="h-4 w-4 shrink-0 text-sky-300/90 mt-0.5" aria-hidden />
+                          <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
+                            <Mountain className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
                             <div className="min-w-0">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Elevation</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Elevation</p>
                               <p className="mt-0.5 leading-snug">{momentLines.elevation}</p>
                             </div>
                           </div>
@@ -1626,15 +1630,15 @@ export default function UserProfileModal({
                   )}
 
                   <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Interests</h3>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Interests</h3>
                     {profileData.tags.length === 0 ? (
-                      <p className="text-sm text-zinc-500">No interests shared yet</p>
+                      <p className="text-sm text-on-surface-variant">No interests shared yet</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {profileData.tags.map((t, i) => (
                           <span
                             key={interestTagKeys[i]}
-                            className="rounded-full border border-[#8338EC]/35 bg-[#8338EC]/10 px-3 py-1 text-xs text-[#c4b5fd]"
+                            className="fc-chip text-xs"
                           >
                             {t}
                           </span>
@@ -1645,17 +1649,17 @@ export default function UserProfileModal({
 
                   {!!profileData.sharedInterestTags?.length && (
                     <section>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                         Shared interests
                       </h3>
-                      <p className="text-[11px] text-zinc-500 mb-2">
+                      <p className="mb-2 text-[11px] text-on-surface-variant">
                         Conversation starters you both listed
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {(profileData.sharedInterestTags ?? []).map((t, i) => (
                           <span
                             key={sharedInterestTagKeys[i]}
-                            className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200"
+                            className="inline-flex items-center rounded-full border-2 border-border-hard bg-surface-container px-3 py-1 text-xs font-semibold text-on-surface"
                           >
                             {t}
                           </span>
@@ -1665,7 +1669,7 @@ export default function UserProfileModal({
                   )}
 
                   <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Availability
                     </h3>
                     <CurrentAvailabilitySection
@@ -1676,20 +1680,20 @@ export default function UserProfileModal({
 
                   {encounterTimeline && (
                     <section className="relative">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-1">
+                      <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                         Our timeline
                       </h3>
-                      <p className="text-[11px] text-zinc-500 mb-4">
+                      <p className="mb-4 text-[11px] text-on-surface-variant">
                         Every time and place you’ve crossed paths
                       </p>
                       {encounterTimeline.rows.length === 0 ? (
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm text-on-surface-variant">
                           No crossing history on file yet.
                         </p>
                       ) : (
                         <div className="relative pl-1">
                           <div
-                            className="absolute left-[15px] top-2 bottom-3 w-px bg-zinc-700/85 pointer-events-none transform-gpu translate-z-0"
+                            className="pointer-events-none absolute bottom-3 left-[15px] top-2 w-0.5 bg-border-hard transform-gpu translate-z-0"
                             aria-hidden
                           />
                           <ul className="space-y-0">
@@ -1712,19 +1716,19 @@ export default function UserProfileModal({
                               return (
                                 <li key={enc.id} className="relative pb-9 last:pb-1">
                                   <div
-                                    className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-zinc-950 bg-gradient-to-br from-[#8338EC] to-[#3A86FF] shadow-sm transform-gpu translate-z-0"
+                                    className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-border-hard bg-primary transform-gpu translate-z-0"
                                     aria-hidden
                                   />
                                   <div className="pl-8">
                                     {isOrigin && (
-                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/95 mb-1">
+                                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-primary">
                                         Where it started
                                       </p>
                                     )}
-                                    <p className="text-xs text-zinc-500 tabular-nums">
+                                    <p className="text-xs tabular-nums text-on-surface-variant">
                                       {formatEncounterWhen(enc.encounteredAt)}
                                     </p>
-                                    <p className="text-sm font-semibold text-white mt-1 leading-snug">
+                                    <p className="mt-1 text-sm font-bold leading-snug text-on-surface">
                                       {place}
                                     </p>
                                     {momentTags.length > 0 && (
@@ -1732,9 +1736,9 @@ export default function UserProfileModal({
                                         {momentTags.map((tag) => (
                                           <span
                                             key={`${enc.id}-${tag}`}
-                                            className="inline-flex items-center gap-1 rounded-full border border-[#8338EC]/35 bg-[#8338EC]/12 px-2.5 py-0.5 text-[11px] text-[#c4b5fd]"
+                                            className="fc-chip !gap-1 !px-2.5 !py-0.5 text-[11px]"
                                           >
-                                            <Sparkles className="h-3 w-3 shrink-0 text-[#8338EC]/90" aria-hidden />
+                                            <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
                                             {tag}
                                           </span>
                                         ))}
@@ -1745,10 +1749,10 @@ export default function UserProfileModal({
                                         {pills.map(({ metricKey, Icon, label }) => (
                                           <span
                                             key={`${enc.id}-${metricKey}`}
-                                            className="inline-flex items-center gap-1 rounded-full border border-zinc-700/70 bg-zinc-900/55 px-2.5 py-0.5 text-[11px] text-zinc-300"
+                                            className="inline-flex items-center gap-1 rounded-full border-2 border-border-hard bg-surface-container px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
                                           >
                                             <Icon
-                                              className="h-3 w-3 shrink-0 text-zinc-400"
+                                              className="h-3 w-3 shrink-0 text-on-surface-variant"
                                               aria-hidden
                                             />
                                             {label}
@@ -1787,10 +1791,10 @@ function EmptyTabState({
   body: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-800/90 bg-zinc-900/30 px-6 py-12 text-center">
-      <Icon className="h-10 w-10 text-zinc-600" aria-hidden />
-      <p className="mt-3 text-sm font-semibold text-on-surface">{title}</p>
-      <p className="mt-1 text-xs text-zinc-500">{body}</p>
+    <div className="flex flex-col items-center justify-center rounded-[12px] border-2 border-border-hard bg-surface-container px-6 py-12 text-center">
+      <Icon className="h-10 w-10 text-on-surface-variant" aria-hidden />
+      <p className="mt-3 text-sm font-bold text-on-surface">{title}</p>
+      <p className="mt-1 text-xs text-on-surface-variant">{body}</p>
     </div>
   );
 }
