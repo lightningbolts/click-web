@@ -110,18 +110,18 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Resolve mutual connection before interest reads so peer tags can use service role
-    // (user_interests RLS is owner-only; user-JWT reads of peer rows always return empty).
+    // Resolve mutual connection with a lightweight query first. Embedding connection_encounters
+    // can fail (ordering/RLS) and previously gated interest reads to empty forever.
     let sharedConnection: Record<string, unknown> | null = null;
+    let isMutualConnection = false;
     if (!isSelf) {
-      // Full edge row + bounded `connection_encounters` (newest first). Keep the profile payload
-      // predictable; full encounter history should be fetched through an explicit paginated surface.
       const { data: mutualRows, error: mutualErr } = await supabase
         .from('connections')
-        .select('*, connection_encounters(*)')
+        .select(
+          'id, created, last_message_at, user_ids, is_group, connection_status, initiator_id, responder_id',
+        )
         .contains('user_ids', [user.id, userId])
-        .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
-        .limit(25, { referencedTable: 'connection_encounters' });
+        .limit(25);
       if (mutualErr) {
         console.warn('profile mutual connection:', mutualErr.message);
       } else if (mutualRows && mutualRows.length > 0) {
@@ -132,6 +132,33 @@ export async function GET(
           return tb >= ta ? b : a;
         });
         sharedConnection = best as Record<string, unknown>;
+        isMutualConnection = true;
+
+        // Optional encounter history — never block interests if this fails.
+        try {
+          const connectionId =
+            typeof (best as { id?: unknown }).id === 'string'
+              ? (best as { id: string }).id
+              : null;
+          if (connectionId) {
+            const { data: encounters, error: encErr } = await supabase
+              .from('connection_encounters')
+              .select('*')
+              .eq('connection_id', connectionId)
+              .order('encountered_at', { ascending: false })
+              .limit(25);
+            if (!encErr && Array.isArray(encounters)) {
+              sharedConnection = {
+                ...sharedConnection,
+                connection_encounters: encounters,
+              };
+            } else if (encErr) {
+              console.warn('profile mutual encounters:', encErr.message);
+            }
+          }
+        } catch (e) {
+          console.warn('profile mutual encounters fetch failed:', e);
+        }
       }
     }
 
@@ -146,14 +173,19 @@ export async function GET(
         .eq('user_id', userId)
         .maybeSingle();
       profileTags = (myInterests as { tags?: string[] } | null)?.tags ?? [];
-    } else if (sharedConnection != null) {
+    } else if (isMutualConnection) {
       try {
         const admin = createAdminClient();
         const [peerRes, viewerRes] = await Promise.all([
           admin.from('user_interests').select('tags').eq('user_id', userId).maybeSingle(),
-          // Viewer can read own row via JWT; admin is fine too and keeps one code path.
           admin.from('user_interests').select('tags').eq('user_id', user.id).maybeSingle(),
         ]);
+        if (peerRes.error) {
+          console.warn('profile peer user_interests:', peerRes.error.message);
+        }
+        if (viewerRes.error) {
+          console.warn('profile viewer user_interests:', viewerRes.error.message);
+        }
         profileTags = (peerRes.data as { tags?: string[] } | null)?.tags ?? [];
         viewerInterestTags = (viewerRes.data as { tags?: string[] } | null)?.tags ?? [];
         sharedInterestTags = getSharedInterestTags(viewerInterestTags, profileTags);
@@ -163,7 +195,7 @@ export async function GET(
     }
 
     let availabilityIntents = extractAvailabilityIntentsFromClaims(user, userId);
-    if (availabilityIntents.length === 0 && (isSelf || sharedConnection != null)) {
+    if (availabilityIntents.length === 0 && (isSelf || isMutualConnection)) {
       try {
         const admin = createAdminClient();
         const { data: intentRows, error: intentErr } = await admin
