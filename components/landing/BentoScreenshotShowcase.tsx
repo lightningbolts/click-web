@@ -68,7 +68,7 @@ export default function BentoScreenshotShowcase() {
               <div className="relative aspect-[1024/706] w-full">
                 <Image
                   src={LANDING_IMG.memoryDashboard}
-                  alt="Click web — Personal dashboard with stats, availability, and milestones"
+                  alt="Click web — Personal dashboard with connection stats and milestones"
                   fill
                   sizes="(max-width: 768px) 0px, 560px"
                   className="object-cover object-top"
@@ -159,7 +159,7 @@ export default function BentoScreenshotShowcase() {
                 <div className="relative aspect-[472/1024] w-full overflow-hidden rounded-[1.85rem]">
                   <Image
                     src={LANDING_IMG.homeMobile}
-                    alt="Click mobile — Home with stay-in-touch cards and availability"
+                    alt="Click mobile — Home with saved events and explore nearby"
                     fill
                     sizes="200px"
                     className="object-cover object-top"
@@ -167,7 +167,7 @@ export default function BentoScreenshotShowcase() {
                   />
                 </div>
               </div>
-              <div className="pointer-events-none absolute -bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border-hard bg-black/50 px-3 py-1 text-[10px] font-medium text-on-surface-variant md:text-xs">
+              <div className="pointer-events-none absolute -bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-[10px] font-medium text-white md:text-xs">
                 <Smartphone className="h-3.5 w-3.5 text-[#630ed4]" aria-hidden />
                 Consumer app
               </div>

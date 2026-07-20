@@ -6,10 +6,14 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LANDING_IMG } from '@/lib/landingAssets';
 
-/** Y-axis tilt for each screenshot (Vibe Stream, Tribe Analysis, Heatmap). */
-const PANEL_ANGLES_DEG = [15, 0, -15] as const;
+/** Y-axis tilt for each screenshot (Event engagement, Vibe Stream, Tribe Analysis, Heatmap). */
+const PANEL_ANGLES_DEG = [15, 8, -8, -15] as const;
 
 const panels = [
+  {
+    src: LANDING_IMG.partnerEventEngagement,
+    alt: 'Click Insights — Event engagement funnel from impressions to check-ins',
+  },
   {
     src: LANDING_IMG.partnerVibeStream,
     alt: 'Click Insights — Vibe Stream sentiment and feedback analytics',

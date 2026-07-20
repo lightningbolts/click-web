@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Smartphone, Zap, Shield, Users, MapPin, CheckCircle, X, ArrowRight, Megaphone } from 'lucide-react';
+import { Smartphone, Zap, Shield, Users, MapPin, CheckCircle, X, ArrowRight, CalendarDays, Sparkles, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
@@ -90,7 +90,7 @@ export default function Home() {
             </h1>
 
             <p className="mx-auto mb-10 max-w-2xl px-4 text-base font-medium leading-relaxed text-on-surface-variant sm:text-lg md:text-xl">
-              Stop scrolling. Start living. Press connect and we use secure Bluetooth plus inaudible sound to prove you share the same room. If you can see them, you can connect for real.
+              Stop scrolling. Start living. Touch grass.
             </p>
 
             {/* CTA Buttons */}
@@ -355,7 +355,7 @@ export default function Home() {
             <LandingScreenshotFrame
               id="landing-shot-memory-dashboard-inline"
               src={LANDING_IMG.memoryDashboard}
-              alt="Click web — Personal dashboard with stats, availability, and milestones"
+              alt="Click web — Personal dashboard with connection stats, milestones, and memory box"
               sizes="(max-width: 768px) 100vw, (max-width: 1024px) 90vw, 1152px"
               loading="lazy"
               objectFit="contain"
@@ -409,7 +409,7 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* Availability Intents */}
+            {/* Events */}
             <motion.div
               initial={{ y: 30, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
@@ -420,32 +420,32 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-                  <Megaphone className="w-8 h-8 text-primary" />
+                  <CalendarDays className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4">Availability Intents</h3>
-                <p className="text-sm font-medium text-primary mb-2">The vibe broadcast</p>
+                <h3 className="text-2xl font-bold mb-4">Events</h3>
+                <p className="text-sm font-medium text-primary mb-2">Save it. RSVP. Show up together.</p>
                 <p className="text-on-surface-variant leading-relaxed mb-4">
-                  Stop guessing who is free. For up to twenty-four hours, broadcast what you are up for, like &quot;Looking for coffee,&quot; &quot;Down to study,&quot; or &quot;Live music.&quot; When your connections&apos; intents overlap, we nudge you both. Less planning theater, more showing up.
+                  Discover nearby gatherings, bookmark the ones that matter, and RSVP so your Clicks know you&apos;re in. Open an event for times, host, and who&apos;s already going—then join the route when it&apos;s time to meet IRL.
                 </p>
                 <ul className="space-y-2 text-on-surface-variant text-sm">
                   <li className="flex items-center gap-2">
                     <span className="text-primary">✓</span>
-                    <span>Signals expire so your status never goes stale</span>
+                    <span>Saved events and explore-nearby on Home</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-primary">✓</span>
-                    <span>Friend-led, not another public feed</span>
+                    <span>RSVP with active Clicks who are going</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-primary">✓</span>
-                    <span>Overlap alerts only when it actually matches</span>
+                    <span>Join Event Route when you&apos;re ready to meet</span>
                   </li>
                 </ul>
                 <div className="mt-8 flex justify-center">
                   <LandingScreenshotFrame
-                    id="landing-shot-share-availability"
-                    src={LANDING_IMG.shareAvailability}
-                    alt="Click mobile — Share availability with timeframe and intent tag"
+                    id="landing-shot-event-detail"
+                    src={LANDING_IMG.eventDetail}
+                    alt="Click mobile — Event detail with times, host, RSVP, and Join Event Route"
                     className="mx-auto w-full max-w-[280px]"
                     aspectClassName="aspect-[9/19]"
                     sizes="(max-width: 768px) min(100vw, 320px), 280px"
@@ -454,6 +454,54 @@ export default function Home() {
               </div>
             </motion.div>
             </div>
+
+            {/* You'll Remember How You Met */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.14 }}
+              viewport={{ once: true }}
+              className="fc-card p-8 rounded-[16px] border border-border-hard relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
+                <div>
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+                    <Sparkles className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-4">You&apos;ll Remember How You Met</h3>
+                  <p className="text-on-surface-variant leading-relaxed mb-4">
+                    After you connect, a quick sheet asks you to label the encounter (presets or a short custom line). With your permission, we attach place, time, weather, and an optional ambient snapshot. That becomes a memory capsule on the connection, so months later you know it was the comedy show at the quiet coffee shop on Pike in the drizzle, not just &quot;some person from that event.&quot;
+                  </p>
+                  <div className="space-y-3">
+                    <div className="fc-card p-3 rounded-xl text-xs">
+                      <p className="text-on-surface-variant">Met <span className="text-primary font-semibold">Historia</span> at Red Square</p>
+                      <p className="text-on-surface-variant mt-1">Weather: Sunny & Warm</p>
+                      <p className="text-on-surface-variant mt-1">Volume: Loud</p>
+                      <p className="text-on-surface-variant mt-1">Event: Outdoor concert</p>
+                      <p className="text-on-surface-variant mt-1">Time: Yesterday afternoon</p>
+                    </div>
+                    <div className="fc-card p-3 rounded-xl text-xs">
+                      <p className="text-on-surface-variant">Clicked with <span className="text-primary font-semibold">Ymir</span> at Pike Place</p>
+                      <p className="text-on-surface-variant mt-1">Weather: Drizzly & Cold</p>
+                      <p className="text-on-surface-variant mt-1">Volume: Moderate</p>
+                      <p className="text-on-surface-variant mt-1">Event: Indoor comedy show</p>
+                      <p className="text-on-surface-variant mt-1">Time: Last week</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-center lg:justify-end">
+                  <LandingScreenshotFrame
+                    id="landing-shot-profile-rich"
+                    src={LANDING_IMG.profileMobile}
+                    alt="Click mobile — Profile with moment, place, time, weather, and interests"
+                    className="mx-auto w-full max-w-[260px]"
+                    aspectClassName="aspect-[754/1024]"
+                    sizes="(max-width: 768px) min(100vw, 320px), 260px"
+                  />
+                </div>
+              </div>
+            </motion.div>
 
             {/* Multi-Tap + Click Map: one row, vertical carousel for web screenshots */}
             <motion.div
@@ -476,7 +524,7 @@ export default function Home() {
                 <ul className="mb-10 grid gap-2 text-on-surface-variant text-sm sm:grid-cols-2 lg:grid-cols-3">
                   <li className="flex items-center gap-2">
                     <span className="text-primary">✓</span>
-                    <span>N-way validation in plain English: everyone matched the same moment</span>
+                    <span>Everyone matched in the same moment</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-primary">✓</span>
@@ -495,57 +543,11 @@ export default function Home() {
                   <h3 className="text-2xl font-bold mb-4">Click Map</h3>
                   <p className="text-sm font-medium text-primary mb-2">Where your memories were made</p>
                   <p className="text-on-surface-variant leading-relaxed mb-2 max-w-3xl">
-                    See where you met everyone, then turn on layers for your network, official soundtracks, community beacons, and hazards, all on one map built for the web dashboard.
+                    See where you met everyone, browse events nearby, and turn on layers for your network, official soundtracks, community beacons, and hazards—all on one map.
                   </p>
                 </div>
 
                 <LandingWebScreensCarousel />
-              </div>
-            </motion.div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              whileInView={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.25 }}
-              viewport={{ once: true }}
-              className="fc-card p-8 rounded-[16px] border border-border-hard relative overflow-hidden group"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-                  <span className="text-3xl">📍</span>
-                </div>
-                <h3 className="text-2xl font-bold mb-4">You&apos;ll Remember How You Met</h3>
-                <p className="text-on-surface-variant leading-relaxed mb-4">
-                  After you connect, a quick sheet asks you to label the encounter (presets or a short custom line). With your permission, we attach place, time, weather, and an optional ambient snapshot. That becomes a memory capsule on the connection, so months later you know it was the comedy show at the quiet coffee shop on Pike in the drizzle, not just &quot;some person from that event.&quot;
-                </p>
-                <div className="space-y-3">
-                  <div className="fc-card p-3 rounded-xl text-xs">
-                    <p className="text-on-surface-variant">Met <span className="text-primary font-semibold">Historia</span> at Red Square</p>
-                    <p className="text-on-surface-variant mt-1">Weather: Sunny & Warm</p>
-                    <p className="text-on-surface-variant mt-1">Volume: Loud</p>
-                    <p className="text-on-surface-variant mt-1">Event: Outdoor concert</p>
-                    <p className="text-on-surface-variant mt-1">Time: Yesterday afternoon</p>
-                  </div>
-                  <div className="fc-card p-3 rounded-xl text-xs">
-                    <p className="text-on-surface-variant">Clicked with <span className="text-primary font-semibold">Ymir</span> at Pike Place</p>
-                    <p className="text-on-surface-variant mt-1">Weather: Drizzly & Cold</p>
-                    <p className="text-on-surface-variant mt-1">Volume: Moderate</p>
-                    <p className="text-on-surface-variant mt-1">Event: Indoor comedy show</p>
-                    <p className="text-on-surface-variant mt-1">Time: Last week</p>
-                  </div>
-                </div>
-                <div className="mt-8 flex justify-center">
-                  <LandingScreenshotFrame
-                    id="landing-shot-profile-rich"
-                    src={LANDING_IMG.profileMobile}
-                    alt="Click mobile — Profile with moment, place, time, weather, and interests"
-                    className="mx-auto w-full max-w-[260px]"
-                    aspectClassName="aspect-[754/1024]"
-                    sizes="(max-width: 768px) min(100vw, 320px), 260px"
-                  />
-                </div>
               </div>
             </motion.div>
 
@@ -555,16 +557,16 @@ export default function Home() {
               whileInView={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
               viewport={{ once: true }}
-              className="fc-card p-8 rounded-[16px] border border-border-hard relative overflow-visible group lg:col-span-2"
+              className="fc-card p-8 rounded-[16px] border border-border-hard relative overflow-visible group"
             >
               <div className="absolute inset-0 rounded-[16px] bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className="relative z-10">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-                  <span className="text-3xl">📊</span>
+                  <BarChart3 className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-2xl font-bold mb-4">Event and campus partners</h3>
                 <p className="text-on-surface-variant leading-relaxed mb-4 max-w-2xl lg:max-w-none">
-                  Organizers still get the anonymized pulse of where real introductions cluster, including when verified friend groups show up together. Curious about Vibe Radar or sponsorship-grade insights? See the{' '}
+                  Organizers get the anonymized pulse of where real introductions cluster—and Event engagement analytics for the full impression → RSVP → check-in funnel. Curious about Vibe Stream, tribes, or sponsorship-grade insights? See the{' '}
                   <Link href="/enterprise" className="text-primary underline-offset-4 hover:underline">
                     enterprise overview
                   </Link>
@@ -573,11 +575,11 @@ export default function Home() {
                 <ul className="space-y-2 text-on-surface-variant text-sm max-w-2xl">
                   <li className="flex items-center gap-2">
                     <span className="text-primary">•</span>
-                    <span>Connection density and verified micro-community signals where enabled</span>
+                    <span>Event engagement: bookmarks, shares, RSVPs, and check-ins</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-primary">•</span>
-                    <span>Event analytics tuned for repeat-worthy programming</span>
+                    <span>Connection density and verified micro-community signals</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-primary">•</span>
@@ -587,7 +589,6 @@ export default function Home() {
                 <PartnerDashboardShowcase />
               </div>
             </motion.div>
-          </div>
           </div>
         </div>
       </section>
@@ -678,7 +679,7 @@ export default function Home() {
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-on-surface-variant sm:text-lg">
               We&apos;re building Click in the open. Get on the waitlist for early access, or create an account now and
-              start using the web dashboard. Your profile, intents, and verified connections stay in sync when the mobile app ships.
+              start using the web dashboard. Your profile, events, and verified connections stay in sync when the mobile app ships.
             </p>
             <ul className="mx-auto mt-8 flex max-w-md flex-col gap-3 text-left text-sm text-on-surface-variant sm:mx-auto sm:max-w-lg">
               <li className="flex items-start gap-3">

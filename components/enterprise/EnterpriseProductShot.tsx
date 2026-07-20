@@ -4,19 +4,17 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 
 /**
- * Paths under `public/landing/`. Export filenames did not match UI content; keys are semantic.
- * overview → enterprise-insights-overview.png (Overview KPIs)
- * environment → enterprise-insights-map-view.png (Environment & flow section)
- * heatmapGrid → enterprise-vibe-radar.png (multi-panel: heatmap, tribes, activity, stream)
- * mapView → enterprise-insights-heatmap-grid.png (Click Map with layers)
- * vibeRadar → enterprise-insights-environment.png (Vibe Radar tab — filename is misleading)
+ * Paths under `public/landing/`. Keys are semantic (filenames may differ).
+ * overview → Overview KPIs (Social Sticky Score, density, live count)
+ * environment → Environment & flow (acoustics, peaks, GCR)
+ * heatmapGrid → multi-panel Overview (heatmap, tribes, vibe stream, social activity)
+ * eventEngagement → Event engagement funnel (impression → RSVP → check-in)
  */
 export const ENTERPRISE_SCREENSHOTS = {
   overview: '/landing/enterprise-insights-overview.png',
   environment: '/landing/enterprise-insights-map-view.png',
   heatmapGrid: '/landing/enterprise-vibe-radar.png',
-  // mapView: '/landing/enterprise-insights-heatmap-grid.png',
-  vibeRadar: '/landing/enterprise-insights-environment.png',
+  eventEngagement: '/landing/enterprise-event-engagement.png',
 } as const;
 
 type EnterpriseProductShotProps = {

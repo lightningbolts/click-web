@@ -13,7 +13,6 @@ import {
   MessageSquare,
   Mic2,
   Mountain,
-  Radar,
   Radio,
   Shield,
   Store,
@@ -32,7 +31,7 @@ const AUDIENCES = [
     body: 'Pop-ups, studios, local brands, and regional teams use Click when handshakes matter more than impressions. Turn real-world moments into contacts your staff can follow up on, without dictating handles across the counter.',
     bullets: [
       'Proximity Tap keeps lines moving without username archaeology',
-      'Vibe Radar shows neighborhood demand you can answer with Pop-Up Beacons',
+      'Event engagement shows what drove RSVPs and check-ins',
       'No feed, no algorithm between you and the customer',
     ],
   },
@@ -99,7 +98,7 @@ const CAPABILITIES = [
   {
     title: 'Business Insights workspace',
     icon: BarChart3,
-    text: 'Verified businesses open a full analytics area on the web: social patterns, micro-community graphs, Vibe Radar demand signals, maps, live pulse, and modules tuned for operators (where enabled). The Business Insights section on this page goes deeper.',
+    text: 'Verified businesses open a full analytics area on the web: social patterns, Event engagement funnels, micro-community graphs, maps, live pulse, and modules tuned for operators (where enabled). The Business Insights section on this page goes deeper.',
   },
   {
     title: 'Privacy-forward by design',
@@ -115,6 +114,7 @@ const INSIGHTS_PILLARS = [
     lead:
       'Go beyond RSVPs and door counts. Business Insights surfaces how in-person connection actually behaves: bursts of activity, where people tend to meet, how pairs repeat, and when mathematically verified friend groups arrive together so you can price sponsorships on real micro-communities.',
     bullets: [
+      { icon: CalendarDays, text: 'Event engagement: impression → RSVP → check-in funnel for venue-linked events.' },
       { icon: Activity, text: 'Social Activity: trends and pulses of connection over time.' },
       { icon: MapPin, text: 'Heatmap: spatial clustering so you see which zones drive real exchanges.' },
       { icon: Users2, text: 'Micro-Community and Tribe views: overlapping circles, verified Multi-Tap cliques, repeat overlap.' },
@@ -159,7 +159,7 @@ const FAQ = [
   },
   {
     q: 'What appears in Business Insights?',
-    a: 'Verified business accounts use the Insights area on the web, with views such as Social Activity, Heatmap, Tribe and micro-community analysis, Vibe Stream, Vibe Radar (anonymized availability intent heatmaps where enabled), Pop-Up Beacon performance, and Live Metrics. What you see depends on your configuration, data volume, and privacy choices. It is designed for aggregate and operational insight, not for surveilling individuals without consent.',
+    a: 'Verified business accounts use the Insights area on the web, with views such as Overview, Event engagement (impression → RSVP → check-in), Social Activity, Heatmap, Tribe and micro-community analysis, Vibe Stream, and Live Metrics. What you see depends on your configuration, data volume, and privacy choices. It is designed for aggregate and operational insight, not for surveilling individuals without consent.',
   },
   {
     q: 'Can we integrate with our CRM or event stack?',
@@ -440,11 +440,12 @@ export default function EnterprisePage() {
                 Business Insights
               </div>
               <h2 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
-                Analytics for <span className="text-primary">social patterns</span> and your team
+                Analytics for <span className="text-primary">events</span> and social patterns
               </h2>
               <p className="mx-auto max-w-2xl text-on-surface-variant md:text-lg">
-                Verified businesses get a web workspace to watch how connection shows up in the wild: where it clusters, how it
-                moves through time, and how staff and ambassadors who use Click compare across shifts or sites.
+                Verified businesses get a web workspace to watch how connection shows up in the wild: event funnels,
+                where exchanges cluster, how activity moves through time, and how staff and ambassadors who use Click
+                compare across shifts or sites.
               </p>
             </motion.div>
 
@@ -477,10 +478,10 @@ export default function EnterprisePage() {
 
             <div className="mt-10 md:mt-12">
               <EnterpriseProductShot
-                id="enterprise-shot-vibe-radar"
-                src={ENTERPRISE_SCREENSHOTS.vibeRadar}
-                alt="Click Insights — Vibe Radar tab with intent blobs on the map, signal strength, and trending vibes"
-                caption="Vibe Radar — anonymized availability intents near the venue with map layers and trending categories."
+                id="enterprise-shot-event-engagement"
+                src={ENTERPRISE_SCREENSHOTS.eventEngagement}
+                alt="Click Insights — Event engagement funnel: impressions, bookmarks, shares, RSVPs, and check-ins"
+                caption="Event engagement — impression → bookmark → share → RSVP → check-in for venue-linked events."
               />
             </div>
 
@@ -491,6 +492,27 @@ export default function EnterprisePage() {
               viewport={{ once: true }}
               className="mt-12 grid gap-8 lg:grid-cols-2"
             >
+              <article className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/35">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
+                  <CalendarDays className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="mb-3 text-xl font-bold leading-snug">Event engagement analytics</h3>
+                <p className="mb-6 text-sm leading-relaxed text-on-surface-variant md:text-base">
+                  Track the full funnel for venue-linked events: who saw it, who bookmarked or shared, who RSVPed, and
+                  who actually checked in. Arrival timing and check-in reject reasons help you tighten ops for the next
+                  night—not just celebrate door count.
+                </p>
+                <ul className="mt-auto space-y-2 border-t border-border-hard/80 pt-6 text-sm text-on-surface-variant">
+                  <li className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
+                    <span>Interest, share, and RSVP conversion rates in one view</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
+                    <span>RSVP → check-in with dwell percentiles and reject reasons</span>
+                  </li>
+                </ul>
+              </article>
               <article className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/35">
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
                   <Users2 className="h-6 w-6 text-primary" />
@@ -512,27 +534,6 @@ export default function EnterprisePage() {
                   </li>
                 </ul>
               </article>
-              <article className="fc-card flex flex-col rounded-[16px] border border-border-hard p-8 transition-colors hover:border-primary/35">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
-                  <Radar className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="mb-3 text-xl font-bold leading-snug">Vibe Radar and Pop-Up Beacons</h3>
-                <p className="mb-6 text-sm leading-relaxed text-on-surface-variant md:text-base">
-                  Stop paying for spammy local ads. Vibe Radar surfaces anonymized availability intents on a geographic hexbin so
-                  you can see what people nearby want to do right now. Spot fifty &quot;coffee&quot; intents within a mile? Drop a
-                  temporary Pop-Up Beacon on the Click map with a ten percent perk and pull that demand through your door on purpose.
-                </p>
-                <ul className="mt-auto space-y-2 border-t border-border-hard/80 pt-6 text-sm text-on-surface-variant">
-                  <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
-                    <span>Live heatmaps of intent categories, bounded by privacy and policy controls</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-0.5 shrink-0 text-primary">✓</span>
-                    <span>Time-boxed beacons that turn curiosity into measurable visits</span>
-                  </li>
-                </ul>
-              </article>
             </motion.div>
 
             <motion.div
@@ -549,8 +550,8 @@ export default function EnterprisePage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <p className="max-w-md text-center text-sm text-on-surface-variant sm:text-left">
-                Sign in with a verified business account to explore Overview, Social Activity, Heatmap, Tribe and micro-community
-                views, Vibe Stream, Vibe Radar, Pop-Up Beacons, and Live Metrics.
+                Sign in with a verified business account to explore Overview, Event engagement, Social Activity, Heatmap,
+                Tribe views, Vibe Stream, and Live Metrics.
               </p>
             </motion.div>
           </div>

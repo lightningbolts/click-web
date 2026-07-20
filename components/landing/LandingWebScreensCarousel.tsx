@@ -6,25 +6,72 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LANDING_IMG } from '@/lib/landingAssets';
 
-const Y_TILT_DEG = [12, -10] as const;
+const Y_TILT_DEG = [10, -10] as const;
 
 const slides = [
   {
     src: LANDING_IMG.groupChat,
-    alt: 'Click web — Verified group chat with messages and shared photo',
-    aspectClassName: 'aspect-[1024/725]',
+    alt: 'Click mobile — Verified group chat with messages and shared photo',
     label: 'Group chat',
+    width: 472,
+    height: 1024,
+    orientation: 'portrait' as const,
   },
   {
     src: LANDING_IMG.mapWeb,
-    alt: 'Click web — Map with connection pins, layer toggles, clusters, and campus context',
-    aspectClassName: 'aspect-[1024/672]',
+    alt: 'Click web — Map with connection pins, layer toggles, and campus context',
     label: 'Click Map',
+    width: 1024,
+    height: 626,
+    orientation: 'landscape' as const,
   },
 ] as const;
 
 const carouselHeightClassName =
-  'h-[min(68vh,500px)] sm:h-[min(70vh,560px)] md:h-[min(72vh,620px)] lg:h-[min(74vh,700px)] xl:h-[min(76vh,780px)]';
+  'h-[min(68vh,520px)] sm:h-[min(70vh,580px)] md:h-[min(72vh,640px)] lg:h-[min(74vh,720px)] xl:h-[min(76vh,800px)]';
+
+function SlideImage({
+  slide,
+  priority = false,
+}: {
+  slide: (typeof slides)[number];
+  priority?: boolean;
+}) {
+  const isPortrait = slide.orientation === 'portrait';
+
+  return (
+    <div
+      className={
+        isPortrait
+          ? 'relative mx-auto flex h-full max-h-full w-auto max-w-[min(100%,280px)] items-center justify-center sm:max-w-[min(100%,300px)] md:max-w-[min(100%,320px)]'
+          : 'relative mx-auto flex h-full max-h-full w-full max-w-[min(100%,1040px)] items-center justify-center'
+      }
+    >
+      {/*
+        Intrinsic width/height + CSS max constraints (not `fill` in a mismatched aspect box)
+        so landscape and portrait both stay sharp inside the shared carousel viewport.
+      */}
+      <Image
+        src={slide.src}
+        alt={slide.alt}
+        width={slide.width}
+        height={slide.height}
+        priority={priority}
+        quality={92}
+        sizes={
+          isPortrait
+            ? '(max-width: 640px) 55vw, (max-width: 1024px) 300px, 320px'
+            : '(max-width: 768px) 92vw, (max-width: 1280px) 90vw, 1040px'
+        }
+        className={
+          isPortrait
+            ? 'h-full w-auto max-h-full max-w-full object-contain'
+            : 'h-auto max-h-full w-full object-contain'
+        }
+      />
+    </div>
+  );
+}
 
 export default function LandingWebScreensCarousel() {
   const reduceMotion = useReducedMotion();
@@ -100,20 +147,20 @@ export default function LandingWebScreensCarousel() {
       {slides.map((p, i) => (
         <div
           key={p.src}
-          className="overflow-hidden rounded-2xl border border-border-hard bg-background/80"
+          className="overflow-hidden rounded-2xl border border-border-hard bg-background/80 p-3 sm:p-4"
           style={{
             transform: `perspective(1200px) rotateY(${Y_TILT_DEG[i]}deg)`,
             transformStyle: 'preserve-3d',
           }}
         >
-          <div className={`relative w-full ${p.aspectClassName}`}>
-            <Image
-              src={p.src}
-              alt={p.alt}
-              fill
-              sizes="(max-width: 768px) min(100vw, 560px), 1120px"
-              className="object-contain object-top"
-            />
+          <div
+            className={
+              p.orientation === 'portrait'
+                ? 'mx-auto flex h-[min(70vh,640px)] justify-center'
+                : 'flex w-full justify-center'
+            }
+          >
+            <SlideImage slide={p} />
           </div>
         </div>
       ))}
@@ -136,26 +183,17 @@ export default function LandingWebScreensCarousel() {
           {slides.map((p, i) => (
             <div
               key={p.src}
-              className="flex h-full min-h-0 w-full shrink-0 snap-start snap-always items-center justify-center px-2 py-3 sm:px-6 md:px-8"
+              className="flex h-full min-h-0 w-full shrink-0 snap-start snap-always items-center justify-center px-3 py-4 sm:px-6 md:px-8"
             >
-              <div className="w-full max-w-[min(100%,1120px)] origin-center [perspective:1400px]">
+              <div className="flex h-full min-h-0 w-full max-w-[min(100%,1120px)] origin-center items-center justify-center [perspective:1400px]">
                 <div
-                  className="overflow-hidden rounded-xl border border-white/12 bg-surface-container/60 shadow-[0_32px_90px_-24px_rgba(131,56,236,0.35)]"
+                  className="flex h-full max-h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-xl border border-white/12 bg-surface-container/60 p-2 shadow-[0_32px_90px_-24px_rgba(131,56,236,0.35)] sm:p-3"
                   style={{
                     transform: `rotateY(${Y_TILT_DEG[i]}deg)`,
                     transformStyle: 'preserve-3d',
                   }}
                 >
-                  <div className={`relative w-full ${p.aspectClassName}`}>
-                    <Image
-                      src={p.src}
-                      alt={p.alt}
-                      fill
-                      sizes="(max-width: 768px) min(100vw, 1120px), 1120px"
-                      className="object-contain object-top"
-                      priority={i === 0}
-                    />
-                  </div>
+                  <SlideImage slide={p} priority={i === 0} />
                 </div>
               </div>
             </div>
@@ -166,7 +204,7 @@ export default function LandingWebScreensCarousel() {
           <div className="pointer-events-auto flex w-full items-end justify-between gap-3">
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">
-                Web dashboard
+                {slides[active]?.label ?? 'Screens'}
               </span>
               <div className="flex gap-1.5">
                 {slides.map((p, i) => (
