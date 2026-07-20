@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, Users, Link2, Sparkles } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { InsightCallout } from './InsightCallout';
+import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 import type { StickyScore, ConnectionDensity, LiveCount } from '@/lib/insights/mockData';
 
 // ============================================
@@ -17,6 +18,7 @@ interface StickyScoreCardProps {
 
 export function StickyScoreCard({ data }: StickyScoreCardProps) {
   const { score, trend, change, breakdown } = data;
+  const chart = useInsightsChartTheme();
   
   // Calculate gauge arc
   const radius = 80;
@@ -59,7 +61,7 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
           <svg width={radius * 2} height={radius * 2} className="transform -rotate-90">
             {/* Background arc */}
             <circle
-              stroke="rgba(255,255,255,0.1)"
+              stroke={chart.ring}
               fill="transparent"
               strokeWidth={strokeWidth}
               r={normalizedRadius}
@@ -175,7 +177,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
             className={`flex-1 h-8 rounded-sm origin-bottom ${
               i < densityLevel 
                 ? 'bg-gradient-to-t from-[#630ed4] to-[#630ed4]/50' 
-                : 'bg-white/10'
+                : 'bg-surface-container-high'
             }`}
             style={{
               boxShadow: i < densityLevel ? '0 0 10px rgba(58, 134, 255, 0.3)' : 'none',
@@ -202,6 +204,7 @@ interface LiveCountCardProps {
 
 export function LiveCountCard({ data }: LiveCountCardProps) {
   const { current, peak, peakTime, capacity, trend } = data;
+  const chart = useInsightsChartTheme();
   const fillPercentage = (current / capacity) * 100;
   
   // Color based on capacity
@@ -243,7 +246,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
       </div>
       
       {/* Capacity bar */}
-      <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+      <div className="h-2 bg-surface-container-high rounded-full overflow-hidden mb-4">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${fillPercentage}%` }}
@@ -269,7 +272,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
               className="flex-1 rounded-t-sm origin-bottom"
               style={{
                 height: `${height}%`,
-                backgroundColor: i === trend.length - 1 ? capacityColor : 'rgba(255,255,255,0.2)',
+                backgroundColor: i === trend.length - 1 ? capacityColor : chart.barMuted,
               }}
             />
           );

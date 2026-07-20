@@ -7,6 +7,7 @@ import { CloudRain, Sun, Zap, UsersRound } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { AdvancedMetricsApiResponse } from "@/lib/insights/advancedMetrics";
+import { useInsightsChartTheme } from "@/lib/theme/insightsChartTheme";
 import { GlassPanel } from "./GlassPanel";
 import { InsightCallout } from "./InsightCallout";
 
@@ -25,7 +26,7 @@ function EnvironmentalSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="bg-white/5 rounded-2xl h-52 animate-pulse border border-white/5" />
+        <div key={i} className="bg-surface-container rounded-2xl h-52 animate-pulse border border-border-hard" />
       ))}
     </div>
   );
@@ -46,6 +47,7 @@ export default function EnvironmentalMetrics({
     fetcher,
   );
   const data = staticData ?? swrData;
+  const chart = useInsightsChartTheme();
 
   const sparkData = useMemo(() => {
     const avgs = data?.peakSocialVelocity?.hourlyAverages ?? [];
@@ -166,10 +168,11 @@ export default function EnvironmentalMetrics({
                   <XAxis dataKey="hour" hide />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "rgba(0,0,0,0.85)",
-                      border: "1px solid rgba(255,255,255,0.1)",
+                      backgroundColor: chart.tooltipBg,
+                      border: `1px solid ${chart.tooltipBorder}`,
                       borderRadius: "8px",
                       fontSize: "11px",
+                      color: chart.tooltipText,
                     }}
                     labelFormatter={(h) => `Hour ${h}`}
                     formatter={(v: number) => [`${v.toFixed(2)} / day`, "Avg"]}
@@ -189,7 +192,7 @@ export default function EnvironmentalMetrics({
                         return false;
                       }
                       return (
-                        <circle cx={cx} cy={cy} r={4} fill={AMBER} stroke="#fff" strokeWidth={1} />
+                        <circle cx={cx} cy={cy} r={4} fill={AMBER} stroke={chart.tooltipBg} strokeWidth={1} />
                       );
                     }}
                     isAnimationActive={false}
@@ -225,7 +228,7 @@ export default function EnvironmentalMetrics({
               intimate 1:1 pace.
             </p>
             <div className="space-y-2">
-              <div className="flex h-3 w-full rounded-full overflow-hidden bg-white/10 ring-1 ring-white/10">
+              <div className="flex h-3 w-full rounded-full overflow-hidden bg-surface-container-high ring-1 ring-border-hard">
                 <div
                   className="h-full shrink-0 transition-all duration-500 rounded-l-full"
                   style={{

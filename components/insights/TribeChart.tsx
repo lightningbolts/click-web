@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users2, Info } from 'lucide-react';
 import { GlassPanel } from './InsightsDashboard';
+import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 import type { TribeBubble } from '@/lib/insights/mockData';
 
 interface TribeChartProps {
@@ -17,6 +18,7 @@ interface TribeChartProps {
 export default function TribeChart({ tribes }: TribeChartProps) {
   const [hoveredTribe, setHoveredTribe] = useState<TribeBubble | null>(null);
   const [selectedTribe, setSelectedTribe] = useState<TribeBubble | null>(null);
+  const chart = useInsightsChartTheme();
 
   // Normalize bubble sizes for visualization
   const normalizedTribes = useMemo(() => {
@@ -70,13 +72,13 @@ export default function TribeChart({ tribes }: TribeChartProps) {
           </div>
           <span className="text-sm font-medium text-on-surface-variant">Tribe Analysis</span>
         </div>
-        <button className="p-2 hover:bg-white/10 rounded-lg transition-colors group">
+        <button className="p-2 hover:bg-surface-container rounded-lg transition-colors group">
           <Info className="w-4 h-4 text-on-surface-variant group-hover:text-on-surface-variant" />
         </button>
       </div>
 
       {/* Bubble Chart */}
-      <div className="relative h-[320px] bg-[#0a0a0a] rounded-xl border border-white/5 overflow-hidden">
+      <div className="relative h-[320px] bg-surface-container rounded-xl border border-border-hard overflow-hidden">
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4]/5 via-transparent to-[#630ed4]/5" />
         
@@ -93,7 +95,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
               y1={line.from.y}
               x2={line.to.x}
               y2={line.to.y}
-              stroke="rgba(255,255,255,0.1)"
+              stroke={chart.axis}
               strokeWidth="0.5"
               strokeDasharray="2 2"
               initial={{ pathLength: 0, opacity: 0 }}
@@ -146,7 +148,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                   r={svgRadius}
                   fill={tribe.color}
                   opacity={isHovered || isSelected ? 0.9 : isRelated ? 0.7 : 0.5}
-                  stroke={isHovered || isSelected ? 'white' : tribe.color}
+                  stroke={isHovered || isSelected ? chart.tooltipText : tribe.color}
                   strokeWidth={isHovered || isSelected ? 0.5 : 0.2}
                   className="cursor-pointer"
                   animate={{
@@ -168,7 +170,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                   y={tribe.y}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill="white"
+                  fill={chart.tooltipText}
                   fontSize={svgRadius > 8 ? 3.5 : 2.5}
                   fontWeight="bold"
                   className="pointer-events-none select-none"
@@ -183,7 +185,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                   y={tribe.y + (svgRadius > 8 ? 4 : 3)}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill="rgba(255,255,255,0.7)"
+                  fill={chart.pieLabel}
                   fontSize={2}
                   className="pointer-events-none select-none"
                 >
@@ -201,7 +203,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-3 left-3 right-3 bg-black/90 p-3 rounded-xl border border-white/20 z-10"
+              className="absolute bottom-3 left-3 right-3 bg-surface-container/95 p-3 rounded-xl border border-border-hard z-10"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -245,7 +247,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                     {hoveredTribe.interestTags.slice(0, 10).map((t) => (
                       <span
                         key={`${hoveredTribe.id}-${t.tag}`}
-                        className="rounded-full border border-border-hard bg-white/5 px-2 py-0.5 text-[10px] text-on-surface"
+                        className="rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] text-on-surface"
                       >
                         {t.tag}
                         <span className="ml-1 text-on-surface-variant">×{t.count}</span>

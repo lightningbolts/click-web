@@ -115,7 +115,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
         
         {/* Filter dropdown */}
         <div className="relative group">
-          <button className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1">
+          <button className="p-2 hover:bg-surface-container rounded-lg transition-colors flex items-center gap-1">
             <Filter className="w-4 h-4 text-on-surface-variant" />
           </button>
           <div className="absolute right-0 top-full mt-1 bg-surface-container border border-border-hard rounded-lg p-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[120px]">
@@ -124,7 +124,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`w-full text-left px-3 py-1.5 text-xs rounded-md transition-colors capitalize ${
-                  filter === f ? 'bg-white/10 text-on-surface' : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5'
+                  filter === f ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
                 }`}
               >
                 {f}
@@ -136,7 +136,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
 
       {/* Sentiment overview bar */}
       <div className="mb-4">
-        <div className="flex h-1.5 rounded-full overflow-hidden bg-white/5">
+        <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-container">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${(stats.positive / denom) * 100}%` }}

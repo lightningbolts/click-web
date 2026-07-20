@@ -157,7 +157,7 @@ export default function BeaconDeployModal({
                 </div>
                 <Dialog.Close
                   type="button"
-                  className="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-white/10 transition-colors"
+                  className="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
                   aria-label="Close"
                 >
                   <X className="w-5 h-5" />
@@ -179,7 +179,7 @@ export default function BeaconDeployModal({
                       {categoryTotals.map((row) => (
                         <li
                           key={row.category}
-                          className="flex items-center justify-between rounded-xl border border-border-hard bg-white/[0.04] px-3 py-2.5"
+                          className="flex items-center justify-between rounded-xl border border-border-hard bg-surface-container px-3 py-2.5"
                         >
                           <span
                             className="text-sm font-medium text-on-surface flex items-center gap-2"
@@ -212,7 +212,7 @@ export default function BeaconDeployModal({
                       rows={3}
                       maxLength={500}
                       placeholder="e.g. 10% off drinks for the next two hours"
-                      className="w-full rounded-xl bg-white/5 border border-border-hard px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/40 resize-none"
+                      className="fc-input w-full rounded-xl px-3 py-2.5 text-sm resize-none"
                     />
                   </div>
 
@@ -224,7 +224,7 @@ export default function BeaconDeployModal({
                       id="beacon-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full rounded-xl bg-white/5 border border-border-hard px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-[#630ed4]/40"
+                      className="fc-input w-full rounded-xl px-3 py-2.5 text-sm"
                     >
                       {categoryOptions.map((c) => (
                         <option key={c} value={c} className="bg-surface-container">
@@ -245,7 +245,7 @@ export default function BeaconDeployModal({
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                             durationMinutes === p.minutes
                               ? "border-[#630ed4]/50 bg-[#630ed4]/20 text-on-surface"
-                              : "border-border-hard bg-white/5 text-on-surface-variant hover:border-white/20"
+                              : "border-border-hard bg-surface-container text-on-surface-variant hover:border-border-hard"
                           }`}
                         >
                           {p.label}
@@ -263,7 +263,7 @@ export default function BeaconDeployModal({
                   <button
                     type="submit"
                     disabled={submitting || !venueId || demoLocked}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-on-surface bg-gradient-to-r from-[#630ed4] to-[#6520c0] disabled:opacity-40 disabled:cursor-not-allowed border border-border-hard shadow-lg shadow-[#630ed4]/20"
+                    className="fc-btn-primary w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {submitting ? (
                       "Deploying…"

@@ -21,8 +21,8 @@ function InsightsLayoutInner({ children }: { children: React.ReactNode }) {
 
 function InsightsLoadingFallback() {
   return (
-    <div className="min-h-screen bg-[#121212] text-white flex items-center justify-center">
-      <div className="h-10 w-10 rounded-full border-2 border-[#8338EC]/30 border-t-[#8338EC] animate-spin" />
+    <div className="flex min-h-screen items-center justify-center bg-background text-on-surface">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-border-hard border-t-primary" />
     </div>
   );
 }

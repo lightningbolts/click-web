@@ -35,6 +35,7 @@ import {
   Pie,
   Legend,
 } from 'recharts';
+import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -76,6 +77,7 @@ const insightsFetcher = (url: string) =>
   fetchInsightsApiJson<InsightsVibePayload>(url);
 
 export default function VibeStreamPage() {
+  const chart = useInsightsChartTheme();
   const { demoMode } = useInsightsDemo();
   const { user } = useAuth();
   const searchParams = useSearchParams();
@@ -150,8 +152,8 @@ export default function VibeStreamPage() {
           <MessageSquare className="w-5 h-5 text-[#FFD93D]" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white">Vibe Stream</h2>
-          <p className="text-sm text-zinc-500">
+          <h2 className="text-xl font-bold text-on-surface">Vibe Stream</h2>
+          <p className="text-sm text-on-surface-variant">
             Anonymous real-time sentiment from your venue visitors
           </p>
         </div>
@@ -162,34 +164,34 @@ export default function VibeStreamPage() {
         <GlassPanel className="p-5" glow="green">
           <div className="flex items-center gap-2 mb-3">
             <ThumbsUp className="w-4 h-4 text-green-700 dark:text-green-400" />
-            <span className="text-xs text-zinc-400">Positive</span>
+            <span className="text-xs text-on-surface-variant">Positive</span>
           </div>
           <div className="text-3xl font-bold text-green-700 dark:text-green-400">{sentiment.positive}</div>
-          <div className="text-xs text-zinc-500 mt-1">{Math.round((sentiment.positive / total) * 100)}% of messages</div>
+          <div className="text-xs text-on-surface-variant mt-1">{Math.round((sentiment.positive / total) * 100)}% of messages</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <ThumbsDown className="w-4 h-4 text-red-700 dark:text-red-400" />
-            <span className="text-xs text-zinc-400">Negative</span>
+            <span className="text-xs text-on-surface-variant">Negative</span>
           </div>
           <div className="text-3xl font-bold text-red-700 dark:text-red-400">{sentiment.negative}</div>
-          <div className="text-xs text-zinc-500 mt-1">{Math.round((sentiment.negative / total) * 100)}% of messages</div>
+          <div className="text-xs text-on-surface-variant mt-1">{Math.round((sentiment.negative / total) * 100)}% of messages</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Minus className="w-4 h-4 text-amber-700 dark:text-amber-300" />
-            <span className="text-xs text-zinc-400">Neutral</span>
+            <span className="text-xs text-on-surface-variant">Neutral</span>
           </div>
           <div className="text-3xl font-bold text-amber-700 dark:text-amber-300">{sentiment.neutral}</div>
-          <div className="text-xs text-zinc-500 mt-1">{Math.round((sentiment.neutral / total) * 100)}% of messages</div>
+          <div className="text-xs text-on-surface-variant mt-1">{Math.round((sentiment.neutral / total) * 100)}% of messages</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-[#8338EC]" />
-            <span className="text-xs text-zinc-400">Vibe Score</span>
+            <span className="text-xs text-on-surface-variant">Vibe Score</span>
           </div>
           <div
             className="text-3xl font-bold"
@@ -197,7 +199,7 @@ export default function VibeStreamPage() {
           >
             {positiveRatio}%
           </div>
-          <div className="text-xs text-zinc-500 mt-1">positive overall</div>
+          <div className="text-xs text-on-surface-variant mt-1">positive overall</div>
         </GlassPanel>
       </motion.div>
 
@@ -210,7 +212,7 @@ export default function VibeStreamPage() {
 
         {/* Sentiment breakdown */}
         <GlassPanel className="p-6 flex flex-col">
-          <h3 className="text-base font-semibold text-white mb-4">Sentiment Breakdown</h3>
+          <h3 className="text-base font-semibold text-on-surface mb-4">Sentiment Breakdown</h3>
           <div className="flex-1 flex items-center justify-center">
             <div className="w-full h-[220px] min-w-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
@@ -230,11 +232,12 @@ export default function VibeStreamPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(10,10,10,0.95)',
-                      borderColor: 'rgba(255,255,255,0.1)',
+                      backgroundColor: chart.tooltipBg,
+                      borderColor: chart.tooltipBorder,
                       borderRadius: '12px',
+                      color: chart.tooltipText,
                     }}
-                    itemStyle={{ color: '#fff' }}
+                    itemStyle={{ color: chart.tooltipText }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -248,9 +251,9 @@ export default function VibeStreamPage() {
                     className="w-2.5 h-2.5 rounded-full"
                     style={{ backgroundColor: SENTIMENT_CONFIG[s].color }}
                   />
-                  <span className="text-zinc-400 capitalize">{s}</span>
+                  <span className="text-on-surface-variant capitalize">{s}</span>
                 </div>
-                <span className="text-white font-medium">{sentiment[s]}</span>
+                <span className="text-on-surface font-medium">{sentiment[s]}</span>
               </div>
             ))}
           </div>
@@ -262,33 +265,34 @@ export default function VibeStreamPage() {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-white">Feedback by Category</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Which aspects of your venue generate the most feedback</p>
+              <h3 className="text-base font-semibold text-on-surface">Feedback by Category</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">Which aspects of your venue generate the most feedback</p>
             </div>
           </div>
           <div className="h-[200px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
               <BarChart data={categoryData} barCategoryGap="35%">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="category"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <YAxis
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  cursor={{ fill: chart.cursor }}
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
-                  itemStyle={{ color: '#fff' }}
+                  itemStyle={{ color: chart.tooltipText }}
                 />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                   {categoryData.map((entry, i) => (
@@ -303,7 +307,7 @@ export default function VibeStreamPage() {
             {categoryData.map(({ category, color }) => {
               const Icon = CATEGORY_ICONS[category] ?? MessageSquare;
               return (
-                <div key={category} className="flex items-center gap-1.5 text-xs text-zinc-400">
+                <div key={category} className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                   <Icon className="w-3.5 h-3.5" style={{ color }} />
                   <span className="capitalize">{category}</span>
                 </div>

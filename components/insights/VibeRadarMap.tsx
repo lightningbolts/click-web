@@ -430,7 +430,7 @@ export default function VibeRadarMap({
 
   if (mapError) {
     return (
-      <div className="rounded-2xl border border-border-hard bg-white/5 p-12 text-center">
+      <div className="rounded-2xl border-2 border-border-hard bg-surface-container p-12 text-center">
         <MapPin className="w-14 h-14 text-red-700 dark:text-red-400/90 mx-auto mb-3" />
         <p className="text-on-surface font-medium">Map unavailable</p>
         <p className="text-sm text-on-surface-variant mt-1">{mapError}</p>

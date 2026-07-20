@@ -135,7 +135,7 @@ export default function VibeRadarClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-on-surface bg-white/10 border border-border-hard hover:bg-white/[0.14] hover:border-[#630ed4]/35 transition-colors"
+          className="fc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-[#630ed4]/35 transition-colors"
         >
           <Crosshair className="w-4 h-4 text-[#630ed4]" />
           Deploy beacon
@@ -156,7 +156,7 @@ export default function VibeRadarClient({
             Volume drives blob size; hue reflects intent category.
           </p>
           {showSkeleton ? (
-            <div className="h-28 rounded-xl bg-white/5 animate-pulse" />
+            <div className="h-28 rounded-xl bg-surface-container animate-pulse" />
           ) : (
             <ul className="space-y-2">
               {categoryTotals.length === 0 ? (
@@ -165,7 +165,7 @@ export default function VibeRadarClient({
                 categoryTotals.map((t) => (
                   <li
                     key={t.category}
-                    className="flex justify-between text-sm border-b border-white/5 pb-2 last:border-0"
+                    className="flex justify-between text-sm border-b border-border-hard pb-2 last:border-0"
                   >
                     <span className="text-on-surface">{t.category}</span>
                     <span className="text-on-surface-variant tabular-nums">{t.count}</span>
@@ -178,7 +178,7 @@ export default function VibeRadarClient({
 
         <div className="xl:col-span-6 min-h-[420px] order-3 xl:order-none">
           {showSkeleton ? (
-            <div className="h-[min(56vh,620px)] rounded-2xl border border-border-hard bg-white/5 animate-pulse" />
+            <div className="h-[min(56vh,620px)] rounded-2xl border border-border-hard bg-surface-container animate-pulse" />
           ) : (
             <VibeRadarMap
               clusters={clusters}
@@ -195,7 +195,7 @@ export default function VibeRadarClient({
             Beacon density by type within the same radius as intent clusters.
           </p>
           {showSkeleton ? (
-            <div className="h-28 rounded-xl bg-white/5 animate-pulse" />
+            <div className="h-28 rounded-xl bg-surface-container animate-pulse" />
           ) : trendingVibes.length === 0 ? (
             <p className="text-sm text-on-surface-variant">No active community map pins in range yet.</p>
           ) : (
@@ -203,7 +203,7 @@ export default function VibeRadarClient({
               {trendingVibes.map((t) => (
                 <li
                   key={t.beacon_type}
-                  className="flex justify-between text-sm border-b border-white/5 pb-2 last:border-0"
+                  className="flex justify-between text-sm border-b border-border-hard pb-2 last:border-0"
                 >
                   <span className="text-on-surface capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
                   <span className="text-cyan-400/90 tabular-nums font-medium">{t.count}</span>

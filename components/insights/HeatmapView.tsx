@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Maximize2 } from 'lucide-react';
 import { GlassPanel } from './InsightsDashboard';
+import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 import type { HeatmapZone } from '@/lib/insights/mockData';
 
 interface HeatmapViewProps {
@@ -17,6 +18,7 @@ interface HeatmapViewProps {
 export default function HeatmapView({ zones }: HeatmapViewProps) {
   const [hoveredZone, setHoveredZone] = useState<HeatmapZone | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const chart = useInsightsChartTheme();
 
   // Get zone color based on intensity
   const getZoneColor = (intensity: number, type: HeatmapZone['type']) => {
@@ -73,7 +75,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          className="p-2 hover:bg-surface-container rounded-lg transition-colors"
         >
           <Maximize2 className="w-4 h-4 text-on-surface-variant" />
         </motion.button>
@@ -101,7 +103,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
         {/* Zones */}
         {zones.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center p-6">
-            <p className="text-sm text-on-surface-variant text-center max-w-sm">
+            <p className="max-w-sm text-center text-sm font-medium text-white/70">
               No zone data yet. When your venue records spatial check-ins, heat zones will appear here.
             </p>
           </div>
@@ -121,7 +123,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
               backgroundColor: getZoneColor(zone.intensity, zone.type),
               boxShadow: getZoneGlow(zone.intensity, zone.type),
               borderRadius: '8px',
-              border: `1px solid rgba(255,255,255,${0.1 + zone.intensity * 0.2})`,
+              border: `1px solid ${chart.ring}`,
             }}
             onMouseEnter={() => setHoveredZone(zone)}
             onMouseLeave={() => setHoveredZone(null)}
@@ -154,7 +156,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
             </div>
             
             {/* Connection count badge */}
-            <div className="absolute -top-2 -right-2 bg-white/10 px-2 py-0.5 rounded-full text-[10px] font-medium border border-white/20">
+            <div className="absolute -top-2 -right-2 bg-surface-container px-2 py-0.5 rounded-full text-[10px] font-medium text-on-surface border border-border-hard">
               {zone.connections}
             </div>
           </motion.div>
@@ -167,7 +169,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-4 left-4 right-4 bg-black/80 p-4 rounded-xl border border-white/20 z-20"
+              className="absolute bottom-4 left-4 right-4 bg-surface-container/95 p-4 rounded-xl border border-border-hard z-20"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">

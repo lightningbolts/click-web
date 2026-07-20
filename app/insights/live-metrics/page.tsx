@@ -30,6 +30,7 @@ import {
 import useSWR from 'swr';
 import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 import { useAuth } from '@/lib/AuthContext';
+import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 
 interface InsightsResponse {
   hourlyDistribution: number[];
@@ -52,6 +53,7 @@ const itemVariants = {
 
 export default function LiveMetricsPage() {
   const { user } = useAuth();
+  const chart = useInsightsChartTheme();
   const searchParams = useSearchParams();
   const venueId = searchParams.get('venue_id') ?? undefined;
   const insightsUrl = venueId ? `/api/insights/${venueId}` : '/api/insights/venue';
@@ -120,8 +122,8 @@ export default function LiveMetricsPage() {
           <Radio className="w-5 h-5 text-green-700 dark:text-green-400" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white">Live Metrics</h2>
-          <p className="text-sm text-zinc-500">Real-time occupancy, capacity, and crowd trends</p>
+          <h2 className="text-xl font-bold text-on-surface">Live Metrics</h2>
+          <p className="text-sm text-on-surface-variant">Real-time occupancy, capacity, and crowd trends</p>
         </div>
       </motion.div>
 
@@ -135,14 +137,14 @@ export default function LiveMetricsPage() {
             <div className="p-2 bg-green-500/20 rounded-lg">
               <Users className="w-4 h-4 text-green-700 dark:text-green-400" />
             </div>
-            <span className="text-sm font-medium text-zinc-400">Capacity Usage</span>
+            <span className="text-sm font-medium text-on-surface-variant">Capacity Usage</span>
           </div>
 
           {/* Large percentage display */}
           <div className="flex flex-col items-center justify-center py-4">
             <div className="relative w-36 h-36">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="10" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke={chart.track} strokeWidth="10" />
                 <motion.circle
                   cx="50"
                   cy="50"
@@ -159,13 +161,13 @@ export default function LiveMetricsPage() {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-white">{fillPct}%</span>
-                <span className="text-xs text-zinc-500">capacity</span>
+                <span className="text-3xl font-bold text-on-surface">{fillPct}%</span>
+                <span className="text-xs text-on-surface-variant">capacity</span>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-between text-xs text-zinc-500 pt-2 border-t border-white/10">
+          <div className="flex justify-between text-xs text-on-surface-variant pt-2 border-t border-border-hard">
             <span>{liveCount.current} present</span>
             <span>{Math.max(0, liveCount.capacity - liveCount.current)} remaining</span>
           </div>
@@ -177,22 +179,22 @@ export default function LiveMetricsPage() {
             <div className="p-2 bg-[#8338EC]/20 rounded-lg">
               <Zap className="w-4 h-4 text-[#8338EC]" />
             </div>
-            <span className="text-sm font-medium text-zinc-400">Peak Stats</span>
+            <span className="text-sm font-medium text-on-surface-variant">Peak Stats</span>
           </div>
           <div className="space-y-4">
             <div>
-              <div className="text-xs text-zinc-500 mb-1">Session peak count</div>
-              <div className="text-3xl font-bold text-white">{liveCount.peak}</div>
+              <div className="text-xs text-on-surface-variant mb-1">Session peak count</div>
+              <div className="text-3xl font-bold text-on-surface">{liveCount.peak}</div>
             </div>
-            <div className="h-px bg-white/10" />
+            <div className="h-px bg-surface-container" />
             <div>
-              <div className="text-xs text-zinc-500 mb-1">Peak bucket</div>
-              <div className="text-2xl font-bold text-white">{liveCount.peakTime}</div>
+              <div className="text-xs text-on-surface-variant mb-1">Peak bucket</div>
+              <div className="text-2xl font-bold text-on-surface">{liveCount.peakTime}</div>
             </div>
-            <div className="h-px bg-white/10" />
+            <div className="h-px bg-surface-container" />
             <div>
-              <div className="text-xs text-zinc-500 mb-1">Estimated capacity</div>
-              <div className="text-2xl font-bold text-white">{liveCount.capacity}</div>
+              <div className="text-xs text-on-surface-variant mb-1">Estimated capacity</div>
+              <div className="text-2xl font-bold text-on-surface">{liveCount.capacity}</div>
             </div>
           </div>
         </GlassPanel>
@@ -203,8 +205,8 @@ export default function LiveMetricsPage() {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-white">Last-Hour Occupancy Trend</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">5-minute buckets over the last hour</p>
+              <h3 className="text-base font-semibold text-on-surface">Last-Hour Occupancy Trend</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">5-minute buckets over the last hour</p>
             </div>
             <span className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -220,26 +222,27 @@ export default function LiveMetricsPage() {
                     <stop offset="95%" stopColor={capacityColor} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="t"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 10 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <YAxis
                   domain={[0, Math.max(liveCount.capacity, 1)]}
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 10 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
-                  itemStyle={{ color: '#fff' }}
+                  itemStyle={{ color: chart.tooltipText }}
                 />
                 <ReferenceLine
                   y={liveCount.capacity}
@@ -267,8 +270,8 @@ export default function LiveMetricsPage() {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-white">Hourly Distribution</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <h3 className="text-base font-semibold text-on-surface">Hourly Distribution</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">
                 Connections by hour — peak at {peakHourDisplay >= 0 ? `${peakHourDisplay}:00` : '—'}
               </p>
             </div>
@@ -276,39 +279,40 @@ export default function LiveMetricsPage() {
               <div className="p-1.5 bg-[#8338EC]/20 rounded-lg">
                 <BarChart3 className="w-3.5 h-3.5 text-[#8338EC]" />
               </div>
-              <span className="text-xs text-zinc-500">Recent window (venue insights)</span>
+              <span className="text-xs text-on-surface-variant">Recent window (venue insights)</span>
             </div>
           </div>
           <div className="h-[200px] w-full min-w-0">
             <ResponsiveContainer width="100%" height={200} minWidth={0} minHeight={180}>
               <BarChart data={hourlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="hour"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 10 }}
                   interval={2}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <YAxis
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 10 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  cursor={{ fill: chart.cursor }}
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
-                  itemStyle={{ color: '#fff' }}
+                  itemStyle={{ color: chart.tooltipText }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {hourlyData.map((_, idx) => (
                     <Cell
                       key={idx}
-                      fill={idx === peakHourDisplay ? '#8338EC' : 'rgba(255,255,255,0.12)'}
+                      fill={idx === peakHourDisplay ? '#8338EC' : chart.barMuted}
                       style={idx === peakHourDisplay ? { filter: 'drop-shadow(0 0 8px rgba(131,56,236,0.5))' } : {}}
                     />
                   ))}
@@ -316,7 +320,7 @@ export default function LiveMetricsPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-3 text-center text-xs text-zinc-400">
+          <div className="mt-3 text-center text-xs text-on-surface-variant">
             Busiest hour:{' '}
             <span className="text-[#8338EC] font-bold">{peakHourDisplay >= 0 ? `${peakHourDisplay}:00` : "—"}</span>
             {' '}— plan staff accordingly

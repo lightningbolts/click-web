@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/InsightsDashboard';
 import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
+import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 
 interface InsightsResponse {
   totalConnections: number;
@@ -67,6 +68,7 @@ const itemVariants = {
 
 export default function SocialActivityPage() {
   const { data, isLoading } = useSWR<InsightsResponse>('/api/insights/venue', fetcher);
+  const chart = useInsightsChartTheme();
 
   /** Sorted daily data (ascending) */
   const dailyData = useMemo(() => {
@@ -106,20 +108,20 @@ export default function SocialActivityPage() {
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-white/5 rounded-2xl h-32 animate-pulse" />
+            <div key={i} className="bg-surface-container rounded-2xl h-32 animate-pulse" />
           ))}
         </div>
-        <div className="bg-white/5 rounded-2xl h-80 animate-pulse" />
+        <div className="bg-surface-container rounded-2xl h-80 animate-pulse" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white/5 rounded-2xl h-64 animate-pulse" />
-          <div className="bg-white/5 rounded-2xl h-64 animate-pulse" />
+          <div className="bg-surface-container rounded-2xl h-64 animate-pulse" />
+          <div className="bg-surface-container rounded-2xl h-64 animate-pulse" />
         </div>
       </div>
     );
   }
 
   const TrendIcon = wowChange > 0 ? ArrowUpRight : wowChange < 0 ? ArrowDownRight : Minus;
-  const trendColor = wowChange > 0 ? 'text-green-700 dark:text-green-400' : wowChange < 0 ? 'text-red-700 dark:text-red-400' : 'text-zinc-400';
+  const trendColor = wowChange > 0 ? 'text-green-700 dark:text-green-400' : wowChange < 0 ? 'text-red-700 dark:text-red-400' : 'text-on-surface-variant';
 
   return (
     <motion.div
@@ -134,8 +136,8 @@ export default function SocialActivityPage() {
           <Activity className="w-5 h-5 text-[#8338EC]" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white">Social Activity</h2>
-          <p className="text-sm text-zinc-500">Detailed connection trends over the last 30 days</p>
+          <h2 className="text-xl font-bold text-on-surface">Social Activity</h2>
+          <p className="text-sm text-on-surface-variant">Detailed connection trends over the last 30 days</p>
         </div>
       </motion.div>
 
@@ -147,41 +149,41 @@ export default function SocialActivityPage() {
         <GlassPanel className="p-5" glow="purple">
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-4 h-4 text-[#8338EC]" />
-            <span className="text-xs text-zinc-400">Total Connections</span>
+            <span className="text-xs text-on-surface-variant">Total Connections</span>
           </div>
-          <div className="text-3xl font-bold text-white">
+          <div className="text-3xl font-bold text-on-surface">
             {data?.totalConnections?.toLocaleString() ?? '—'}
           </div>
-          <div className="text-xs text-zinc-500 mt-1">Last 30 days</div>
+          <div className="text-xs text-on-surface-variant mt-1">Last 30 days</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 text-[#3A86FF]" />
-            <span className="text-xs text-zinc-400">Avg / Day</span>
+            <span className="text-xs text-on-surface-variant">Avg / Day</span>
           </div>
-          <div className="text-3xl font-bold text-white">{avgPerDay}</div>
-          <div className="text-xs text-zinc-500 mt-1">connections per day</div>
+          <div className="text-3xl font-bold text-on-surface">{avgPerDay}</div>
+          <div className="text-xs text-on-surface-variant mt-1">connections per day</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-amber-700 dark:text-amber-300" />
-            <span className="text-xs text-zinc-400">Peak Day</span>
+            <span className="text-xs text-on-surface-variant">Peak Day</span>
           </div>
-          <div className="text-3xl font-bold text-white">{peakDayCount}</div>
-          <div className="text-xs text-zinc-500 mt-1">{data?.busiestDay ?? '—'}</div>
+          <div className="text-3xl font-bold text-on-surface">{peakDayCount}</div>
+          <div className="text-xs text-on-surface-variant mt-1">{data?.busiestDay ?? '—'}</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendIcon className={`w-4 h-4 ${trendColor}`} />
-            <span className="text-xs text-zinc-400">Week vs Week</span>
+            <span className="text-xs text-on-surface-variant">Week vs Week</span>
           </div>
           <div className={`text-3xl font-bold ${trendColor}`}>
             {wowChange > 0 ? '+' : ''}{wowChange.toFixed(1)}%
           </div>
-          <div className="text-xs text-zinc-500 mt-1">
+          <div className="text-xs text-on-surface-variant mt-1">
             {thisWeek} vs {lastWeek} last wk
           </div>
         </GlassPanel>
@@ -192,10 +194,10 @@ export default function SocialActivityPage() {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-base font-semibold text-white">30-Day Connection Trend</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Daily connection count with 7-day moving context</p>
+              <h3 className="text-base font-semibold text-on-surface">30-Day Connection Trend</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">Daily connection count with 7-day moving context</p>
             </div>
-            <span className="text-xs text-zinc-500 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+            <span className="text-xs text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-lg border border-border-hard">
               Last 30 days
             </span>
           </div>
@@ -208,35 +210,36 @@ export default function SocialActivityPage() {
                     <stop offset="95%" stopColor="#8338EC" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="date"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
                   tickFormatter={formatDateLabel}
                   interval={5}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <YAxis
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
                   labelFormatter={(v) => formatDateLabel(v as string)}
-                  itemStyle={{ color: '#fff' }}
-                  labelStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}
+                  itemStyle={{ color: chart.tooltipText }}
+                  labelStyle={{ color: chart.tooltipLabel, fontSize: 12 }}
                 />
                 <ReferenceLine
                   y={avgPerDay}
-                  stroke="rgba(255,255,255,0.15)"
+                  stroke={chart.axis}
                   strokeDasharray="4 4"
-                  label={{ value: `Avg: ${avgPerDay}`, fill: 'rgba(255,255,255,0.4)', fontSize: 10, position: 'insideTopRight' }}
+                  label={{ value: `Avg: ${avgPerDay}`, fill: chart.muted, fontSize: 10, position: 'insideTopRight' }}
                 />
                 <Area
                   type="monotone"
@@ -261,32 +264,33 @@ export default function SocialActivityPage() {
         {/* Day-of-week distribution */}
         <GlassPanel className="p-6">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-white">Day-of-Week Pattern</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Which days drive the most connections</p>
+            <h3 className="text-base font-semibold text-on-surface">Day-of-Week Pattern</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">Which days drive the most connections</p>
           </div>
           <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <BarChart data={dowData} barCategoryGap="30%">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="day"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <YAxis
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  cursor={{ fill: chart.cursor }}
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
-                  itemStyle={{ color: '#fff' }}
+                  itemStyle={{ color: chart.tooltipText }}
                 />
                 <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                   {dowData.map((entry, i) => {
@@ -295,7 +299,7 @@ export default function SocialActivityPage() {
                     return (
                       <Cell
                         key={i}
-                        fill={isTop ? '#8338EC' : 'rgba(255,255,255,0.12)'}
+                        fill={isTop ? '#8338EC' : chart.barMuted}
                         style={isTop ? { filter: 'drop-shadow(0 0 8px rgba(131,56,236,0.5))' } : {}}
                       />
                     );
@@ -309,8 +313,8 @@ export default function SocialActivityPage() {
         {/* Last 14 days: this-week vs last-week */}
         <GlassPanel className="p-6">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-white">Week-over-Week Comparison</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Last 7 days vs. previous 7 days</p>
+            <h3 className="text-base font-semibold text-on-surface">Week-over-Week Comparison</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">Last 7 days vs. previous 7 days</p>
           </div>
           <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
@@ -323,41 +327,42 @@ export default function SocialActivityPage() {
                 barCategoryGap="25%"
                 barGap={4}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="day"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <YAxis
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 11 }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  cursor={{ fill: chart.cursor }}
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
-                  itemStyle={{ color: '#fff' }}
+                  itemStyle={{ color: chart.tooltipText }}
                 />
-                <Bar dataKey="lastWeek" fill="rgba(255,255,255,0.1)" radius={[4, 4, 0, 0]} name="Last week" />
+                <Bar dataKey="lastWeek" fill={chart.barMutedStrong} radius={[4, 4, 0, 0]} name="Last week" />
                 <Bar dataKey="thisWeek" fill="#8338EC" radius={[4, 4, 0, 0]} name="This week"
                   style={{ filter: 'drop-shadow(0 0 6px rgba(131,56,236,0.4))' }}
                 />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
+          <div className="flex items-center gap-4 mt-3 text-xs text-on-surface-variant">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-[#8338EC] inline-block" />
               This week ({thisWeek})
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-white/20 inline-block" />
+              <span className="w-3 h-3 rounded-sm bg-surface-container border border-border-hard inline-block" />
               Last week ({lastWeek})
             </span>
           </div>
@@ -369,8 +374,8 @@ export default function SocialActivityPage() {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-white">Hourly Activity Pattern</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Connections by hour of day (peak at {data?.peakHour ?? '—'}:00)</p>
+              <h3 className="text-base font-semibold text-on-surface">Hourly Activity Pattern</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">Connections by hour of day (peak at {data?.peakHour ?? '—'}:00)</p>
             </div>
             <span className="text-xs px-2.5 py-1 rounded-lg bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC]">
               {data?.peakHour ?? '—'}:00 peak
@@ -381,28 +386,29 @@ export default function SocialActivityPage() {
               <BarChart
                 data={(data?.hourlyDistribution ?? []).map((count, hour) => ({ hour: `${hour}:00`, count, isHour: hour }))}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="hour"
-                  stroke="rgba(255,255,255,0.15)"
-                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                  stroke={chart.axis}
+                  tick={{ fill: chart.muted, fontSize: 10 }}
                   interval={2}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  axisLine={{ stroke: chart.axis }}
                 />
                 <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                  cursor={{ fill: chart.cursor }}
                   contentStyle={{
-                    backgroundColor: 'rgba(10,10,10,0.95)',
-                    borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: chart.tooltipBg,
+                    borderColor: chart.tooltipBorder,
                     borderRadius: '12px',
+                    color: chart.tooltipText,
                   }}
-                  itemStyle={{ color: '#fff' }}
+                  itemStyle={{ color: chart.tooltipText }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {(data?.hourlyDistribution ?? []).map((_, hour) => (
                     <Cell
                       key={hour}
-                      fill={hour === data?.peakHour ? '#8338EC' : 'rgba(255,255,255,0.12)'}
+                      fill={hour === data?.peakHour ? '#8338EC' : chart.barMuted}
                       style={hour === data?.peakHour ? { filter: 'drop-shadow(0 0 8px rgba(131,56,236,0.5))' } : {}}
                     />
                   ))}

@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
-import { useTheme } from "@/lib/theme/ThemeProvider";
+import { useInsightsChartTheme } from "@/lib/theme/insightsChartTheme";
 import {
   LineChart,
   Line,
@@ -88,27 +88,27 @@ function InsightsSkeleton() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="bg-white/5 rounded-2xl h-52 animate-pulse" />
+          <div key={i} className="bg-surface-container rounded-2xl h-52 animate-pulse" />
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {[0, 1].map((i) => (
           <div
             key={i}
-            className="bg-white/5 rounded-2xl h-[380px] animate-pulse"
+            className="bg-surface-container rounded-2xl h-[380px] animate-pulse"
           />
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        <div className="bg-white/5 rounded-2xl h-80 lg:col-span-2 animate-pulse" />
-        <div className="bg-white/5 rounded-2xl h-80 animate-pulse" />
+        <div className="bg-surface-container rounded-2xl h-80 lg:col-span-2 animate-pulse" />
+        <div className="bg-surface-container rounded-2xl h-80 animate-pulse" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="bg-white/5 rounded-2xl h-36 animate-pulse" />
+          <div key={i} className="bg-surface-container rounded-2xl h-36 animate-pulse" />
         ))}
       </div>
-      <div className="bg-white/5 rounded-2xl h-52 animate-pulse" />
+      <div className="bg-surface-container rounded-2xl h-52 animate-pulse" />
     </div>
   );
 }
@@ -119,23 +119,22 @@ function InsightsSkeleton() {
  */
 function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }) {
   const { user, loading: authLoading } = useAuth();
-  const { theme } = useTheme();
+  const chart = useInsightsChartTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { demoMode } = useInsightsDemo();
   const venueIdFromQuery = searchParams.get("venue_id") ?? undefined;
   const venueId = venueIdProp ?? venueIdFromQuery ?? undefined;
 
-  const isDark = theme === "dark";
-  const chartMuted = isDark ? "rgba(240,241,241,0.45)" : "rgba(26,28,28,0.45)";
-  const chartAxis = isDark ? "rgba(240,241,241,0.2)" : "rgba(26,28,28,0.2)";
-  const chartGrid = isDark ? "rgba(240,241,241,0.08)" : "rgba(26,28,28,0.08)";
-  const chartTooltipBg = isDark ? "#1c1526" : "#ffffff";
-  const chartTooltipBorder = isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)";
-  const chartTooltipText = isDark ? "#f0f1f1" : "#1a1c1c";
-  const chartTooltipLabel = isDark ? "rgba(240,241,241,0.65)" : "rgba(74,68,85,0.9)";
-  const chartCursor = isDark ? "rgba(255,255,255,0.05)" : "rgba(99,14,212,0.08)";
-  const chartDotStroke = isDark ? "#ffffff" : "#ffffff";
+  const chartMuted = chart.muted;
+  const chartAxis = chart.axis;
+  const chartGrid = chart.grid;
+  const chartTooltipBg = chart.tooltipBg;
+  const chartTooltipBorder = chart.tooltipBorder;
+  const chartTooltipText = chart.tooltipText;
+  const chartTooltipLabel = chart.tooltipLabel;
+  const chartCursor = chart.cursor;
+  const chartDotStroke = chart.tooltipBg;
 
   const insightsUrl = venueId ? `/api/insights/${venueId}` : "/api/insights/venue";
   const { data: apiData, error, isLoading } = useSWR<InsightsResponse>(
@@ -594,7 +593,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                       fill={
                         index === displayInsights?.peakHour
                           ? "#630ed4"
-                          : "rgba(255,255,255,0.15)"
+                          : chart.barMuted
                       }
                       style={
                         index === displayInsights?.peakHour
