@@ -378,7 +378,7 @@ export default function Home() {
                   <Smartphone className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-2xl font-bold mb-4">Proximity Tap</h3>
-                <p className="text-sm font-medium text-inverse-primary mb-2">Tri-Factor Handshake</p>
+                <p className="text-sm font-medium text-primary mb-2">Tri-Factor Handshake</p>
                 <p className="text-on-surface-variant leading-relaxed mb-4">
                   Press connect and let Click run a room-real handshake: secure Bluetooth plus inaudible sound prove you are standing together. Profiles swap when the moment is real, not when someone guessed a handle across the internet.
                 </p>
@@ -423,7 +423,7 @@ export default function Home() {
                   <Megaphone className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-2xl font-bold mb-4">Availability Intents</h3>
-                <p className="text-sm font-medium text-inverse-primary mb-2">The vibe broadcast</p>
+                <p className="text-sm font-medium text-primary mb-2">The vibe broadcast</p>
                 <p className="text-on-surface-variant leading-relaxed mb-4">
                   Stop guessing who is free. For up to twenty-four hours, broadcast what you are up for, like &quot;Looking for coffee,&quot; &quot;Down to study,&quot; or &quot;Live music.&quot; When your connections&apos; intents overlap, we nudge you both. Less planning theater, more showing up.
                 </p>
@@ -469,7 +469,7 @@ export default function Home() {
                   <Users className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-2xl font-bold mb-4">Multi-Tap Groups</h3>
-                <p className="text-sm font-medium text-inverse-primary mb-2">Organic Cliques</p>
+                <p className="text-sm font-medium text-primary mb-2">Organic Cliques</p>
                 <p className="text-on-surface-variant leading-relaxed mb-6 max-w-3xl">
                   Met a whole group at once? Everyone hits connect at the same beat. Click checks the graph in the background so every person in that window really opted in together, then drops you into a verified group chat. Boom. Instant clique.
                 </p>
@@ -493,7 +493,7 @@ export default function Home() {
                     <MapPin className="w-8 h-8 text-primary" />
                   </div>
                   <h3 className="text-2xl font-bold mb-4">Click Map</h3>
-                  <p className="text-sm font-medium text-inverse-primary mb-2">Where your memories were made</p>
+                  <p className="text-sm font-medium text-primary mb-2">Where your memories were made</p>
                   <p className="text-on-surface-variant leading-relaxed mb-2 max-w-3xl">
                     See where you met everyone, then turn on layers for your network, official soundtracks, community beacons, and hazards, all on one map built for the web dashboard.
                   </p>
@@ -610,7 +610,7 @@ export default function Home() {
             <div className="relative z-10">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-center">
                 Built for the moment{' '}
-                <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+                <span className="text-primary">
                   you put your phone down.
                 </span>
               </h2>
