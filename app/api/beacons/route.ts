@@ -129,7 +129,7 @@ async function relocateSoundtrackBeacon(
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, authError } = await getSupabaseFromRouteRequest(request);
+    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -146,20 +146,49 @@ export async function GET(request: NextRequest) {
     const radius = parseRadiusMeters(searchParams);
     const typeFilter = parseBeaconTypeFilters(searchParams);
 
-    const admin = createAdminSupabaseClient();
-    const { data, error } = await admin.rpc("fetch_map_beacons_within", {
+    // Use the user-scoped client so RPC visibility (auth.uid()) works for connections /
+    // core_connections — admin RPC leaves auth.uid() null and drops those rows.
+    const { data, error } = await supabase.rpc("fetch_map_beacons_within", {
       lat,
       lng,
       radius_meters: radius,
     });
 
     if (error) {
-      console.error("fetch_map_beacons_within (admin):", error.message);
+      console.error("fetch_map_beacons_within:", error.message);
       return NextResponse.json({ error: "Failed to load beacons", detail: error.message }, { status: 500 });
     }
 
+    const admin = createAdminSupabaseClient();
     const rawList = normalizeBeaconRpcRows(data);
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
+
+    // Always merge the caller's own active beacons (any location) so creators still see
+    // pins they dropped even when the map/GPS center is far from the drop site.
+    try {
+      const { data: ownRows, error: ownErr } = await admin
+        .from("map_beacons")
+        .select(
+          "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
+        )
+        .eq("creator_id", user.id)
+        .gt("expires_at", new Date().toISOString())
+        .limit(50);
+      if (ownErr) {
+        console.warn("GET /api/beacons own beacons:", ownErr.message);
+      } else if (Array.isArray(ownRows)) {
+        const ownParsed = ownRows
+          .map((row) => parseInsertedBeacon(row, Number.NaN, Number.NaN))
+          .filter((b): b is MapBeaconRecord => b != null);
+        const byId = new Map<string, MapBeaconRecord>();
+        for (const b of beacons) byId.set(b.id, b);
+        for (const b of ownParsed) byId.set(b.id, b);
+        beacons = Array.from(byId.values());
+      }
+    } catch (e) {
+      console.warn("GET /api/beacons own beacons merge failed:", e);
+    }
+
     beacons = filterBeaconRecords(beacons, typeFilter);
     beacons = filterActiveBeaconsForDiscovery(beacons);
     beacons = await filterBeaconsForViewer(admin, user.id, beacons);
