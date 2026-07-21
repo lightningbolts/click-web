@@ -90,7 +90,7 @@ export default function Home() {
             </h1>
 
             <p className="mx-auto mb-10 max-w-2xl px-4 text-base font-medium leading-relaxed text-on-surface-variant sm:text-lg md:text-xl">
-              Stop scrolling. Start living. Touch grass.
+              Stop scrolling. Start living.
             </p>
 
             {/* CTA Buttons */}
@@ -125,7 +125,7 @@ export default function Home() {
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={openLogin}
-                  className="text-sm font-bold text-primary underline-offset-4 hover:underline sm:text-base"
+                  className="fc-btn-secondary w-full whitespace-nowrap px-8 py-3.5 text-sm sm:w-auto sm:text-base"
                 >
                   Sign In
                 </motion.button>
