@@ -90,8 +90,8 @@ interface ConnectionTableProps {
   onExport?: () => void;
   /** Called when a row is clicked – opens the chat view */
   onSelect?: (connection: ConnectionRecord) => void;
-  /** Avatar tap opens public profile (does not select row). */
-  onOpenProfile?: (userId: string) => void;
+  /** Avatar tap opens public profile (does not select row). Second arg is the connection id. */
+  onOpenProfile?: (userId: string, connectionId?: string) => void;
 }
 
 type SortField = 'name' | 'dateMet' | 'location' | 'status';
@@ -382,7 +382,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onOpenProfile(peerId);
+                              onOpenProfile(peerId, connection.id);
                             }}
                             className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#630ed4]"
                             aria-label={`View ${connection.name}'s profile`}

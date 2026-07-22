@@ -110,54 +110,106 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Resolve mutual connection with a lightweight query first. Embedding connection_encounters
-    // can fail (ordering/RLS) and previously gated interest reads to empty forever.
+    // Resolve mutual connection with a full edge row first. Embedding connection_encounters in
+    // the same PostgREST select can fail (ordering/RLS) and previously gated interest reads to
+    // empty forever — so encounters are fetched in a follow-up query instead.
+    // Optional `?connectionId=` lets the client pin the row opened from the dashboard list.
     let sharedConnection: Record<string, unknown> | null = null;
     let isMutualConnection = false;
-    if (!isSelf) {
-      const { data: mutualRows, error: mutualErr } = await supabase
-        .from('connections')
-        .select(
-          'id, created, last_message_at, user_ids, is_group, connection_status, initiator_id, responder_id',
-        )
-        .contains('user_ids', [user.id, userId])
-        .limit(25);
-      if (mutualErr) {
-        console.warn('profile mutual connection:', mutualErr.message);
-      } else if (mutualRows && mutualRows.length > 0) {
-        type ConnRow = { created?: number; last_message_at?: number | null };
-        const best = (mutualRows as ConnRow[]).reduce((a, b) => {
-          const ta = Math.max(a.last_message_at ?? 0, a.created ?? 0);
-          const tb = Math.max(b.last_message_at ?? 0, b.created ?? 0);
-          return tb >= ta ? b : a;
-        });
-        sharedConnection = best as Record<string, unknown>;
-        isMutualConnection = true;
+    const requestedConnectionId = req.nextUrl.searchParams.get('connectionId')?.trim() || null;
 
-        // Optional encounter history — never block interests if this fails.
+    const attachEncounters = async (connectionId: string, base: Record<string, unknown>) => {
+      try {
+        const { data: encounters, error: encErr } = await supabase
+          .from('connection_encounters')
+          .select('*')
+          .eq('connection_id', connectionId)
+          .order('encountered_at', { ascending: false })
+          .limit(25);
+        if (!encErr && Array.isArray(encounters) && encounters.length > 0) {
+          return { ...base, connection_encounters: encounters };
+        }
+        if (encErr) {
+          console.warn('profile mutual encounters:', encErr.message);
+        }
+        // JWT read empty/failed — try service role so place/timeline still hydrate for mutuals.
         try {
-          const connectionId =
-            typeof (best as { id?: unknown }).id === 'string'
-              ? (best as { id: string }).id
-              : null;
-          if (connectionId) {
-            const { data: encounters, error: encErr } = await supabase
-              .from('connection_encounters')
-              .select('*')
-              .eq('connection_id', connectionId)
-              .order('encountered_at', { ascending: false })
-              .limit(25);
-            if (!encErr && Array.isArray(encounters)) {
-              sharedConnection = {
-                ...sharedConnection,
-                connection_encounters: encounters,
-              };
-            } else if (encErr) {
-              console.warn('profile mutual encounters:', encErr.message);
-            }
+          const admin = createAdminClient();
+          const { data: adminEncounters, error: adminEncErr } = await admin
+            .from('connection_encounters')
+            .select('*')
+            .eq('connection_id', connectionId)
+            .order('encountered_at', { ascending: false })
+            .limit(25);
+          if (!adminEncErr && Array.isArray(adminEncounters)) {
+            return { ...base, connection_encounters: adminEncounters };
+          }
+          if (adminEncErr) {
+            console.warn('profile mutual encounters admin:', adminEncErr.message);
           }
         } catch (e) {
-          console.warn('profile mutual encounters fetch failed:', e);
+          console.warn('profile mutual encounters admin fetch failed:', e);
+        }
+        return { ...base, connection_encounters: Array.isArray(encounters) ? encounters : [] };
+      } catch (e) {
+        console.warn('profile mutual encounters fetch failed:', e);
+        return base;
+      }
+    };
+
+    const connectionIncludesPeer = (row: Record<string, unknown>, peerId: string, viewerId: string) => {
+      const ids = row.user_ids;
+      if (!Array.isArray(ids)) return false;
+      const normalized = ids.map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean);
+      return normalized.includes(peerId) && normalized.includes(viewerId);
+    };
+
+    if (!isSelf) {
+      type ConnRow = { id?: string; created?: number; last_message_at?: number | null };
+
+      if (requestedConnectionId) {
+        const { data: pinned, error: pinnedErr } = await supabase
+          .from('connections')
+          .select('*')
+          .eq('id', requestedConnectionId)
+          .maybeSingle();
+        if (pinnedErr) {
+          console.warn('profile pinned connection:', pinnedErr.message);
+        } else if (
+          pinned &&
+          connectionIncludesPeer(pinned as Record<string, unknown>, userId, user.id)
+        ) {
+          const row = pinned as Record<string, unknown>;
+          const connectionId = typeof row.id === 'string' ? row.id : requestedConnectionId;
+          sharedConnection = await attachEncounters(connectionId, row);
+          isMutualConnection = true;
+        }
+      }
+
+      if (!isMutualConnection) {
+        const { data: mutualRows, error: mutualErr } = await supabase
+          .from('connections')
+          .select('*')
+          .contains('user_ids', [user.id, userId])
+          .limit(25);
+        if (mutualErr) {
+          console.warn('profile mutual connection:', mutualErr.message);
+        } else if (mutualRows && mutualRows.length > 0) {
+          const best = (mutualRows as ConnRow[]).reduce((a, b) => {
+            const ta = Math.max(a.last_message_at ?? 0, a.created ?? 0);
+            const tb = Math.max(b.last_message_at ?? 0, b.created ?? 0);
+            return tb >= ta ? b : a;
+          });
+          const connectionId =
+            typeof best.id === 'string' && best.id.trim() ? best.id.trim() : null;
+          sharedConnection = best as Record<string, unknown>;
+          isMutualConnection = true;
+          if (connectionId) {
+            sharedConnection = await attachEncounters(
+              connectionId,
+              sharedConnection,
+            );
+          }
         }
       }
     }

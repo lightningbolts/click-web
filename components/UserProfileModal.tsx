@@ -610,7 +610,12 @@ export default function UserProfileModal({
   const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
-  const profilePath = requestedUserId ? `/api/users/${encodeURIComponent(requestedUserId)}/profile` : null;
+  const profileConnectionQuery = connectionId?.trim()
+    ? `?connectionId=${encodeURIComponent(connectionId.trim())}`
+    : '';
+  const profilePath = requestedUserId
+    ? `/api/users/${encodeURIComponent(requestedUserId)}/profile${profileConnectionQuery}`
+    : null;
   const { data, error } = useSWR<UserProfilePayload>(
     profilePath,
     async (path: string) => {
@@ -1563,11 +1568,11 @@ export default function UserProfileModal({
                   {activeTab === 'timeline' && (
                   <>
 
-                  {hasMoment && momentLines && (
-                    <section>
-                      <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                        When you connected
-                      </h3>
+                  <section>
+                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                      When you connected
+                    </h3>
+                    {hasMoment && momentLines ? (
                       <div className="space-y-3 text-sm text-on-surface">
                         {momentLines.context && (
                           <div className="flex gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5">
@@ -1626,8 +1631,12 @@ export default function UserProfileModal({
                           </div>
                         )}
                       </div>
-                    </section>
-                  )}
+                    ) : (
+                      <p className="text-sm text-on-surface-variant">
+                        No place or moment details on file for this connection yet.
+                      </p>
+                    )}
+                  </section>
 
                   <section>
                     <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Interests</h3>
@@ -1678,97 +1687,95 @@ export default function UserProfileModal({
                     />
                   </section>
 
-                  {encounterTimeline && (
-                    <section className="relative">
-                      <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                        Our timeline
-                      </h3>
-                      <p className="mb-4 text-[11px] text-on-surface-variant">
-                        Every time and place you’ve crossed paths
+                  <section className="relative">
+                    <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                      Our timeline
+                    </h3>
+                    <p className="mb-4 text-[11px] text-on-surface-variant">
+                      Every time and place you’ve crossed paths
+                    </p>
+                    {!encounterTimeline || encounterTimeline.rows.length === 0 ? (
+                      <p className="text-sm text-on-surface-variant">
+                        No crossing history on file yet.
                       </p>
-                      {encounterTimeline.rows.length === 0 ? (
-                        <p className="text-sm text-on-surface-variant">
-                          No crossing history on file yet.
-                        </p>
-                      ) : (
-                        <div className="relative pl-1">
-                          <div
-                            className="pointer-events-none absolute bottom-3 left-[15px] top-2 w-0.5 bg-border-hard transform-gpu translate-z-0"
-                            aria-hidden
-                          />
-                          <ul className="space-y-0">
-                            {encounterTimeline.rows.map((enc) => {
-                              const isOrigin = enc.id === encounterTimeline.originId;
-                              const pills = encounterMetricPills(enc);
-                              const place =
-                                formatDetailedEncounterLocation({
-                                  locationName: enc.locationName,
-                                  displayLocation: enc.displayLocation,
-                                  semanticLocation: enc.semanticLocation,
-                                }) ?? 'A new location';
-                              const momentTags = Array.from(
-                                new Set(
-                                  (enc.contextTags ?? [])
-                                    .map((t) => (typeof t === 'string' ? t.trim() : ''))
-                                    .filter(Boolean),
-                                ),
-                              );
-                              return (
-                                <li key={enc.id} className="relative pb-9 last:pb-1">
-                                  <div
-                                    className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-border-hard bg-primary transform-gpu translate-z-0"
-                                    aria-hidden
-                                  />
-                                  <div className="pl-8">
-                                    {isOrigin && (
-                                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-primary">
-                                        Where it started
-                                      </p>
-                                    )}
-                                    <p className="text-xs tabular-nums text-on-surface-variant">
-                                      {formatEncounterWhen(enc.encounteredAt)}
+                    ) : (
+                      <div className="relative pl-1">
+                        <div
+                          className="pointer-events-none absolute bottom-3 left-[15px] top-2 w-0.5 bg-border-hard transform-gpu translate-z-0"
+                          aria-hidden
+                        />
+                        <ul className="space-y-0">
+                          {encounterTimeline.rows.map((enc) => {
+                            const isOrigin = enc.id === encounterTimeline.originId;
+                            const pills = encounterMetricPills(enc);
+                            const place =
+                              formatDetailedEncounterLocation({
+                                locationName: enc.locationName,
+                                displayLocation: enc.displayLocation,
+                                semanticLocation: enc.semanticLocation,
+                              }) ?? 'A new location';
+                            const momentTags = Array.from(
+                              new Set(
+                                (enc.contextTags ?? [])
+                                  .map((t) => (typeof t === 'string' ? t.trim() : ''))
+                                  .filter(Boolean),
+                              ),
+                            );
+                            return (
+                              <li key={enc.id} className="relative pb-9 last:pb-1">
+                                <div
+                                  className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border-2 border-border-hard bg-primary transform-gpu translate-z-0"
+                                  aria-hidden
+                                />
+                                <div className="pl-8">
+                                  {isOrigin && (
+                                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+                                      Where it started
                                     </p>
-                                    <p className="mt-1 text-sm font-bold leading-snug text-on-surface">
-                                      {place}
-                                    </p>
-                                    {momentTags.length > 0 && (
-                                      <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {momentTags.map((tag) => (
-                                          <span
-                                            key={`${enc.id}-${tag}`}
-                                            className="fc-chip !gap-1 !px-2.5 !py-0.5 text-[11px]"
-                                          >
-                                            <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
-                                            {tag}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {pills.length > 0 && (
-                                      <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {pills.map(({ metricKey, Icon, label }) => (
-                                          <span
-                                            key={`${enc.id}-${metricKey}`}
-                                            className="inline-flex items-center gap-1 rounded-full border-2 border-border-hard bg-surface-container px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
-                                          >
-                                            <Icon
-                                              className="h-3 w-3 shrink-0 text-on-surface-variant"
-                                              aria-hidden
-                                            />
-                                            {label}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      )}
-                    </section>
-                  )}
+                                  )}
+                                  <p className="text-xs tabular-nums text-on-surface-variant">
+                                    {formatEncounterWhen(enc.encounteredAt)}
+                                  </p>
+                                  <p className="mt-1 text-sm font-bold leading-snug text-on-surface">
+                                    {place}
+                                  </p>
+                                  {momentTags.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {momentTags.map((tag) => (
+                                        <span
+                                          key={`${enc.id}-${tag}`}
+                                          className="fc-chip !gap-1 !px-2.5 !py-0.5 text-[11px]"
+                                        >
+                                          <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {pills.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {pills.map(({ metricKey, Icon, label }) => (
+                                        <span
+                                          key={`${enc.id}-${metricKey}`}
+                                          className="inline-flex items-center gap-1 rounded-full border-2 border-border-hard bg-surface-container px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
+                                        >
+                                          <Icon
+                                            className="h-3 w-3 shrink-0 text-on-surface-variant"
+                                            aria-hidden
+                                          />
+                                          {label}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </section>
                   </>
                   )}
                 </motion.div>

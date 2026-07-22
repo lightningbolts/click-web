@@ -208,6 +208,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   // Interest tagging onboarding gate
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [profileConnectionId, setProfileConnectionId] = useState<string | null>(null);
   const [chatMessagesSnapshot, setChatMessagesSnapshot] = useState<Message[]>([]);
   const profileDecryptedMessages = useMemo<DecryptedProfileMessage[]>(
     () =>
@@ -1222,6 +1223,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
           (typeof bd === 'string' && !bd.trim());
         if (missing) {
           setBirthdayProfileGateOpen(true);
+          setProfileConnectionId(null);
           setProfileUserId(user.id);
         } else {
           setBirthdayProfileGateOpen(false);
@@ -2807,7 +2809,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     connections={connectionRecordsWithChatPreview}
                     onExport={handleExport}
                     onSelect={handleOpenChat}
-                    onOpenProfile={(id) => setProfileUserId(id)}
+                    onOpenProfile={(id, connectionId) => {
+                      setProfileConnectionId(connectionId ?? null);
+                      setProfileUserId(id);
+                    }}
                   />
                 </section>
 
@@ -2883,7 +2888,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         onUnblock={() => unblockUser(selectedConnection)}
                         onStartCall={(videoEnabled) => startOutgoingCall(selectedConnection, videoEnabled)}
                         onClose={() => setSelectedConnection(null)}
-                        onOpenProfile={(id) => setProfileUserId(id)}
+                        onOpenProfile={(id) => {
+                          setProfileConnectionId(selectedConnection?.id ?? null);
+                          setProfileUserId(id);
+                        }}
                         onGroupChatChanged={() => {
                           setGroupClicksReloadNonce((n) => n + 1);
                         }}
@@ -3059,6 +3067,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          setProfileConnectionId(conn.id);
                                           setProfileUserId(listPeerId);
                                         }}
                                         className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -3471,6 +3480,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                       type="button"
                       className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface"
                       onClick={() => {
+                        setProfileConnectionId(selectedConnection?.id ?? null);
                         setProfileUserId(row.userId);
                         setShowGroupMemberPicker(false);
                       }}
@@ -3568,12 +3578,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
         currentUserId={user?.id ?? null}
         onClose={() => {
           setProfileUserId(null);
+          setProfileConnectionId(null);
           setBirthdayProfileGateOpen(false);
         }}
         forceOwnProfileBirthdayCompletion={Boolean(
           user?.id && profileUserId === user.id && birthdayProfileGateOpen,
         )}
-        connectionId={selectedConnection?.id ?? null}
+        connectionId={profileConnectionId ?? selectedConnection?.id ?? null}
         decryptedMessages={profileDecryptedMessages}
       />
 
