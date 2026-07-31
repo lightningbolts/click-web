@@ -369,12 +369,13 @@ export async function confirmProximityHandshakeSelection(
       .maybeSingle();
 
     if (recent?.id && recent.encountered_at) {
-      const recentMs = Date.parse(String(recent.encountered_at));
+      const recentAtIso = String(recent.encountered_at);
+      const recentMs = Date.parse(recentAtIso);
       const nowMs = Date.parse(encounteredAtIso);
       if (
         Number.isFinite(recentMs) &&
         Number.isFinite(nowMs) &&
-        twelveHourUtcBlockId(recentMs) === twelveHourUtcBlockId(nowMs)
+        twelveHourUtcBlockId(recentAtIso) === twelveHourUtcBlockId(encounteredAtIso)
       ) {
         const rLat = finiteNumber(recent.gps_lat);
         const rLon = finiteNumber(recent.gps_lon);
