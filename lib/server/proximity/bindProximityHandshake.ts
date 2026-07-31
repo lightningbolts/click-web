@@ -7,6 +7,7 @@ import {
   applyLiveEventBeaconToEncounterRow,
   resolveLiveEventBeaconAt,
 } from '@/lib/server/resolveLiveEventBeaconAt';
+import { emitProximityAtEventOutcome } from '@/lib/server/telemetry/connectionFlowEvents';
 import {
   bfsComponent,
   buildUserAdjacency,
@@ -31,6 +32,10 @@ import {
   tokenEvidenceBetweenRows,
   type HandshakeRowLite,
   utcTimeOfDayLabelFromMs,
+  PENDING_CANDIDATE_BBOX_RADIUS_M,
+  PENDING_CANDIDATE_MAX_ROWS,
+  PROXIMITY_HOST_SELECTION_MAX_MEMBERS,
+  pendingCandidateBBox,
 } from '@/lib/server/proximity/matching';
 import type {
   PendingHandshakeRow,
@@ -55,6 +60,97 @@ const USER_PROFILE_SELECT = 'id, name, email, image, created_at:createdAt';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Load unmatched pending rows near the caller (token overlap and/or GPS bbox).
+ * Never scans the full unmatched table — required for global scale.
+ */
+async function fetchScopedPendingCandidates(
+  admin: SupabaseClient,
+  opts: {
+    nowIso: string;
+    callerUserId: string;
+    evidenceTokens: string[];
+    lat: number | null;
+    lon: number | null;
+  },
+): Promise<{ rows: PendingHandshakeRow[]; error: string | null }> {
+  const { nowIso, callerUserId, evidenceTokens, lat, lon } = opts;
+  const byId = new Map<string, PendingHandshakeRow>();
+
+  const mergeRows = (data: unknown) => {
+    for (const raw of Array.isArray(data) ? data : []) {
+      if (!raw || typeof raw !== 'object') continue;
+      const row = raw as PendingHandshakeRow;
+      if (!row.id) continue;
+      byId.set(String(row.id), row);
+    }
+  };
+
+  // Always include caller's unmatched rows.
+  const { data: selfRows, error: selfErr } = await admin
+    .from('pending_handshakes')
+    .select(PENDING_HANDSHAKE_SELECT)
+    .eq('user_id', callerUserId)
+    .gt('expires_at', nowIso)
+    .is('matched_at', null)
+    .limit(PENDING_CANDIDATE_MAX_ROWS);
+  if (selfErr) {
+    return { rows: [], error: selfErr.message };
+  }
+  mergeRows(selfRows);
+
+  const tokens = [...new Set(evidenceTokens.map((t) => normalizeToken(t)).filter((t): t is string => t != null))];
+  if (tokens.length > 0) {
+    const tokenList = tokens.slice(0, 32).join(',');
+    const { data: tokenRows, error: tokenErr } = await admin
+      .from('pending_handshakes')
+      .select(PENDING_HANDSHAKE_SELECT)
+      .gt('expires_at', nowIso)
+      .is('matched_at', null)
+      .in('my_token', tokens.slice(0, 32))
+      .limit(PENDING_CANDIDATE_MAX_ROWS);
+    if (tokenErr) {
+      // Fallback: PostgREST `or` for heard_tokens overlap when .in fails shape
+      console.warn('[proximity] token candidate query:', tokenErr.message);
+      const { data: orRows, error: orErr } = await admin
+        .from('pending_handshakes')
+        .select(PENDING_HANDSHAKE_SELECT)
+        .gt('expires_at', nowIso)
+        .is('matched_at', null)
+        .or(`my_token.in.(${tokenList})`)
+        .limit(PENDING_CANDIDATE_MAX_ROWS);
+      if (orErr) {
+        return { rows: [], error: orErr.message };
+      }
+      mergeRows(orRows);
+    } else {
+      mergeRows(tokenRows);
+    }
+  }
+
+  if (lat != null && lon != null && !(lat === 0 && lon === 0)) {
+    const box = pendingCandidateBBox(lat, lon, PENDING_CANDIDATE_BBOX_RADIUS_M);
+    const { data: geoRows, error: geoErr } = await admin
+      .from('pending_handshakes')
+      .select(PENDING_HANDSHAKE_SELECT)
+      .gt('expires_at', nowIso)
+      .is('matched_at', null)
+      .gte('lat', box.minLat)
+      .lte('lat', box.maxLat)
+      .gte('lon', box.minLon)
+      .lte('lon', box.maxLon)
+      .limit(PENDING_CANDIDATE_MAX_ROWS);
+    if (geoErr) {
+      console.warn('[proximity] geo candidate query:', geoErr.message);
+    } else {
+      mergeRows(geoRows);
+    }
+  }
+
+  const rows = [...byId.values()].slice(0, PENDING_CANDIDATE_MAX_ROWS);
+  return { rows, error: null };
 }
 
 type BindResult =
@@ -358,7 +454,8 @@ export async function bindProximityHandshake(
   const nowIso = new Date().toISOString();
   const expiresAtIso = new Date(Date.now() + PENDING_HANDSHAKE_TTL_MS).toISOString();
 
-  await admin.from('pending_handshakes').delete().lt('expires_at', nowIso);
+  // Expired-row cleanup runs on cron (pending-handshakes-cleanup). Request path only
+  // replaces this user's unmatched row.
 
   await admin
     .from('pending_handshakes')
@@ -395,25 +492,61 @@ export async function bindProximityHandshake(
     await sleep(PROXIMITY_GROUP_COALESCE_MIN_MS);
   }
 
-  const pendingQuery = admin
-    .from('pending_handshakes')
-    .select(PENDING_HANDSHAKE_SELECT)
-    .gt('expires_at', nowIso)
-    .is('matched_at', null);
-  const { data: pendingRows, error: qErr } = await pendingQuery;
+  async function loadMatchGraph(): Promise<{
+    rows: PendingHandshakeRow[];
+    nodeRows: HandshakeRowLite[];
+    latestByUser: Map<string, HandshakeRowLite>;
+    adj: Map<string, Set<string>>;
+    matchedIds: Set<string>;
+    error: string | null;
+  }> {
+    const scoped = await fetchScopedPendingCandidates(admin, {
+      nowIso,
+      callerUserId: uid,
+      evidenceTokens: combinedEvidenceTokens.length > 0 ? combinedEvidenceTokens : heardTokens,
+      lat,
+      lon,
+    });
+    if (scoped.error) {
+      return {
+        rows: [],
+        nodeRows: [],
+        latestByUser: new Map(),
+        adj: new Map(),
+        matchedIds: new Set(),
+        error: scoped.error,
+      };
+    }
+    const rows = scoped.rows;
+    const handshakeLites = rows.map(pendingRowToHandshakeLite);
+    const latestByUser = latestHandshakeRowPerUser(handshakeLites);
+    const nodeRows = [...latestByUser.values()];
+    const adj = buildUserAdjacency(nodeRows);
+    const component = bfsComponent(uid, adj);
+    const matchedIds = new Set<string>([...component].filter((id) => id !== uid));
+    return { rows, nodeRows, latestByUser, adj, matchedIds, error: null };
+  }
 
-  if (qErr) {
-    console.error('[proximity] pending query:', qErr);
+  let graph = await loadMatchGraph();
+  if (graph.error) {
+    console.error('[proximity] pending query:', graph.error);
     return { kind: 'error', status: 500, body: { error: 'Failed to load peer handshakes' } };
   }
 
-  const rows = (pendingRows ?? []) as PendingHandshakeRow[];
-  const handshakeLites = rows.map(pendingRowToHandshakeLite);
-  const latestByUser = latestHandshakeRowPerUser(handshakeLites);
-  const nodeRows = [...latestByUser.values()];
-  const adj = buildUserAdjacency(nodeRows);
-  const component = bfsComponent(uid, adj);
-  const matchedIds = new Set<string>([...component].filter((id) => id !== uid));
+  // Late-joiner re-query: if we already slept for empty evidence, reload immediately;
+  // otherwise wait once when the clique is still incomplete (0–1 peers).
+  if (graph.matchedIds.size <= 1) {
+    if (combinedEvidenceTokens.length > 0) {
+      await sleep(PROXIMITY_GROUP_COALESCE_MIN_MS);
+    }
+    graph = await loadMatchGraph();
+    if (graph.error) {
+      console.error('[proximity] pending re-query:', graph.error);
+      return { kind: 'error', status: 500, body: { error: 'Failed to load peer handshakes' } };
+    }
+  }
+
+  const { nodeRows, matchedIds, latestByUser } = graph;
 
   if (matchedIds.size === 0) {
     return {
@@ -822,6 +955,14 @@ export async function bindProximityHandshake(
       console.warn('[proximity] live event resolve:', err);
       return null;
     });
+    void emitProximityAtEventOutcome(admin, {
+      attachment: liveEventAttachment,
+      latitude: encounterLat,
+      longitude: encounterLon,
+      participantIds: participantUserIds,
+      peerCount: participantUserIds.length,
+      isGroup: participantUserIds.length > 2,
+    });
     insertRow = applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment);
 
     const encounteredAtIso = String(insertRow.encountered_at ?? '');
@@ -927,6 +1068,52 @@ export async function bindProximityHandshake(
   const peerEncounterLogged: PeerBindMeta[] = [];
   let handshakeCreatedNewConnection = false;
   let aggregateConnectionId: string | null = null;
+
+  // First-time multi-peer (≥3 members): defer durable create until host confirms selection.
+  if (memberIds.length > 2) {
+    const existingGroup = await lookupConnectionForMemberSet(memberIds);
+    if (!existingGroup?.id) {
+      const { data: candidateUsers, error: candidateUsersErr } = await admin
+        .from('users')
+        .select(USER_PROFILE_SELECT)
+        .in('id', ids);
+      if (candidateUsersErr) {
+        console.error('[proximity] users (awaiting_selection):', candidateUsersErr);
+        return { kind: 'error', status: 500, body: { error: 'Failed to load user profiles' } };
+      }
+      const matches: ProximityMatchUserProfile[] = (candidateUsers ?? []).map((u: Record<string, unknown>) => ({
+        id: String(u.id),
+        name: (u.name as string | null | undefined) ?? null,
+        email: (u.email as string | null | undefined) ?? null,
+        image: (u.image as string | null | undefined) ?? null,
+        created_at:
+          typeof u.created_at === 'string'
+            ? Date.parse(u.created_at)
+            : typeof u.created_at === 'number'
+              ? u.created_at
+              : 0,
+        connection_id: null,
+        encounter_logged: false,
+        is_new_connection: true,
+        encounter_persisted_on_bind: false,
+      }));
+      return {
+        kind: 'ok',
+        status: 200,
+        body: {
+          success: true,
+          encounter_logged: false,
+          matches,
+          awaiting_selection: true,
+          pending_handshake_id: insertedRow.id,
+          expires_at: insertedRow.expires_at,
+          is_group: true,
+          is_new_connection: true,
+          group_clique_candidate: { member_user_ids: memberIds },
+        },
+      };
+    }
+  }
 
   const ensured = await ensureConnectionForMemberSet(memberIds);
   if (!ensured) {

@@ -12,6 +12,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  *   GET /api/cron/disposable-reveal
  *   GET /api/cron/friction-intent-expirations
  *   GET /api/cron/event-reminders
+ *   GET /api/cron/pending-handshakes-cleanup
  *
  * Auth: Authorization: Bearer $CRON_SECRET
  */
@@ -24,23 +25,26 @@ export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const headers = { Authorization: `Bearer ${CRON_SECRET}` };
 
-  const [disposableRes, frictionRes, eventRes] = await Promise.all([
+  const [disposableRes, frictionRes, eventRes, pendingRes] = await Promise.all([
     fetch(`${origin}/api/cron/disposable-reveal`, { headers, cache: 'no-store' }),
     fetch(`${origin}/api/cron/friction-intent-expirations`, { headers, cache: 'no-store' }),
     fetch(`${origin}/api/cron/event-reminders`, { headers, cache: 'no-store' }),
+    fetch(`${origin}/api/cron/pending-handshakes-cleanup`, { headers, cache: 'no-store' }),
   ]);
 
   const disposable = await disposableRes.json().catch(() => ({ error: 'invalid json' }));
   const friction = await frictionRes.json().catch(() => ({ error: 'invalid json' }));
   const events = await eventRes.json().catch(() => ({ error: 'invalid json' }));
+  const pendingHandshakes = await pendingRes.json().catch(() => ({ error: 'invalid json' }));
 
-  if (!disposableRes.ok || !frictionRes.ok || !eventRes.ok) {
+  if (!disposableRes.ok || !frictionRes.ok || !eventRes.ok || !pendingRes.ok) {
     return NextResponse.json(
       {
         ok: false,
         disposable: { status: disposableRes.status, body: disposable },
         friction: { status: frictionRes.status, body: friction },
         events: { status: eventRes.status, body: events },
+        pendingHandshakes: { status: pendingRes.status, body: pendingHandshakes },
       },
       { status: 500 },
     );
@@ -51,5 +55,6 @@ export async function GET(request: NextRequest) {
     disposable,
     friction,
     events,
+    pendingHandshakes,
   });
 }

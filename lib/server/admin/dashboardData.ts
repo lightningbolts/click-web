@@ -79,6 +79,8 @@ export type EncounterDiagnostics = {
   uniqueConstraintCrashProxy24h: number;
   encountersInserted24h: number;
   estimatedSuccessRatePct: number;
+  /** Count of rows in `connection_flow_events` (0 when table missing). */
+  connectionFlowEvents24h: number;
 };
 
 export type AdminDashboardData = {
@@ -647,6 +649,7 @@ async function fetchEncounterDiagnostics(
     uniqueConstraintCrashProxy24h: 0,
     encountersInserted24h: 0,
     estimatedSuccessRatePct: 0,
+    connectionFlowEvents24h: 0,
   };
 
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -708,12 +711,25 @@ async function fetchEncounterDiagnostics(
     Math.min(100, Math.round((encountersInserted24h / denominator) * 1000) / 10),
   );
 
+  let connectionFlowEvents24h = 0;
+  const flowCount = await admin
+    .from('connection_flow_events')
+    .select('id', { head: true, count: 'exact' })
+    .gte('created_at', sinceIso);
+  if (flowCount.error) {
+    // Non-breaking: migration may not be applied yet.
+    warnings.push(`connection_flow_events count unavailable: ${flowCount.error.message}`);
+  } else {
+    connectionFlowEvents24h = flowCount.count ?? 0;
+  }
+
   return {
     sampledHandshakeEvents24h,
     sampledHandshakeFailures24h,
     uniqueConstraintCrashProxy24h,
     encountersInserted24h,
     estimatedSuccessRatePct,
+    connectionFlowEvents24h,
   };
 }
 

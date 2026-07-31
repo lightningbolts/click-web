@@ -56,6 +56,8 @@ Shared rules (`lib/server/proximity/matching.ts`):
 - GPS ≤ **15 m** when both have coordinates
 - Token evidence — mutual hear or heard-token intersection
 - **BFS** for Multi-Tap cliques (3+ users)
+- Candidate fetch — **geo-scoped** + **token-scoped** pending rows (bounded; never full-table scan)
+- Host selection defer — first-time multi-peer returns `awaiting_selection`; create via `confirmProximitySelection` with selection size cap **≤12** (`PROXIMITY_HOST_SELECTION_MAX_MEMBERS`)
 - Encounter debounce — 50 m, same 12-hour UTC block → `Extended Hangout`
 
 ### QR token lifecycle
@@ -96,7 +98,8 @@ Lives in `lib/dashboard/connectionExtras.ts` (consumed by connections UI):
 | Route | Methods | Role |
 |-------|---------|------|
 | `/api/connections` | GET, POST | List/create/restore connections |
-| `/api/connections/proximity` | POST, GET | Async Tri-Factor bind + pending poll |
+| `/api/connections/proximity` | POST, GET | Async Tri-Factor bind + pending poll (`awaiting_selection` for first-time multi-peer) |
+| `/api/connections/proximity/confirm` | POST | Host confirms selected members after `awaiting_selection` (≤12) |
 | `/api/connections/encounter` | POST | Log encounter with sensor payload |
 | `/api/connections/core` | GET, POST, DELETE | Core connection pins |
 | `/api/connections/archive` | POST | Gentle archive |
@@ -139,7 +142,7 @@ Lives in `lib/dashboard/connectionExtras.ts` (consumed by connections UI):
 
 - **Connect in person (Tri-Factor)** — Primary flow via proximity API; sensors become Memory Capsule rows.
 - **Scan QR** — 90-second rotating QR; must be physically near initiator.
-- **Group connect (Multi-Tap)** — Clique detection creates group connection candidate.
+- **Group connect (Multi-Tap)** — Clique detection; first-time multi-peer defers create until host confirms selection (≤12).
 - **Private encrypted chat** — Created when connection row + chat row exist.
 - **Send photos/files/voice notes** — After connection active.
 - **Emoji reactions** — In chat, not connection APIs.

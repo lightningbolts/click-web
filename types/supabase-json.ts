@@ -91,6 +91,16 @@ export interface ProximityBindOkResponse {
   encounter_id?: string;
   collaboration_ttl?: string;
   simulator_mock?: boolean;
+  /** Multi-peer first-time bind: host must confirm selected members before create. */
+  awaiting_selection?: boolean;
+  pending_handshake_id?: string;
+  expires_at?: string;
+}
+
+export interface ProximityConfirmSelectionRequest {
+  pending_handshake_id: string;
+  selected_member_ids: string[];
+  context_tags?: unknown;
 }
 
 export interface ProximityBindPendingResponse {

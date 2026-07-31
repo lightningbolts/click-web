@@ -3,6 +3,7 @@
  *   1. Click Drops reveal pushes after collaboration_ttl
  *   2. Event beacon day-of + one-hour-before reminders
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
+ *   4. Delete expired pending_handshakes (expires_at < now())
  *
  * Deploy:
  *   supabase functions deploy cron-hourly-maintenance --no-verify-jwt
@@ -332,6 +333,23 @@ async function runEventReminders(
   return { scanned: rows.length, pushAttempts };
 }
 
+async function runPendingHandshakesCleanup(
+  admin: ReturnType<typeof createClient>,
+): Promise<{ deleted: number }> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from('pending_handshakes')
+    .delete()
+    .lt('expires_at', nowIso)
+    .select('id');
+
+  if (error) {
+    throw new Error(`pending-handshakes-cleanup: ${error.message}`);
+  }
+
+  return { deleted: data?.length ?? 0 };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -364,7 +382,8 @@ Deno.serve(async (req: Request) => {
     const disposable = await runDisposableReveal(admin);
     const events = await runEventReminders(admin);
     const friction = await runFrictionIntentExpirations(admin);
-    const body = { ok: true, disposable, events, friction };
+    const pendingHandshakes = await runPendingHandshakesCleanup(admin);
+    const body = { ok: true, disposable, events, friction, pendingHandshakes };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,

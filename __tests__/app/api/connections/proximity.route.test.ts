@@ -127,36 +127,71 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             },
           }),
         })),
-        select: jest.fn(() => ({
-          gt: (_col: string, val: string) => ({
-            is: (_col2: string, val2: null) => {
-              const filterRows = (mode: 'all' | 'or', overlapTokens: string[] | null) => {
-                let rows = pending.filter((r) => r.expires_at > val && r.matched_at === val2);
-                if (mode === 'or' && overlapTokens != null && overlapTokens.length > 0) {
-                  rows = rows.filter(
-                    (r) =>
-                      r.heard_tokens.some((t) => overlapTokens.includes(t)) ||
-                      overlapTokens.includes(r.my_token),
-                  );
-                }
-                return { data: rows, error: null };
-              };
-              return {
-                or: (_expr: string) => {
-                  const tokens = _expr
-                    .split('my_token.in.(')[1]
-                    ?.split(')')[0]
-                    ?.split(',')
-                    .filter(Boolean) ?? [];
-                  return Promise.resolve(filterRows('or', tokens));
-                },
-                then: (
-                  resolve: (v: { data: PendingHandshakeRow[]; error: null }) => void,
-                ) => Promise.resolve(filterRows('all', null)).then(resolve),
-              };
-            },
-          }),
-        })),
+        select: jest.fn(() => {
+          type Filters = {
+            userId?: string;
+            expiresAfter?: string;
+            unmatchedOnly?: boolean;
+            myTokensIn?: string[];
+            minLat?: number;
+            maxLat?: number;
+            minLon?: number;
+            maxLon?: number;
+            limit?: number;
+          };
+          const state: Filters = {};
+          const resolveRows = () => {
+            let rows = [...pending];
+            if (state.userId) rows = rows.filter((r) => r.user_id === state.userId);
+            if (state.expiresAfter) rows = rows.filter((r) => r.expires_at > state.expiresAfter!);
+            if (state.unmatchedOnly) rows = rows.filter((r) => r.matched_at == null);
+            if (state.myTokensIn?.length) {
+              rows = rows.filter((r) => state.myTokensIn!.includes(r.my_token));
+            }
+            if (state.minLat != null) rows = rows.filter((r) => r.lat != null && r.lat >= state.minLat!);
+            if (state.maxLat != null) rows = rows.filter((r) => r.lat != null && r.lat <= state.maxLat!);
+            if (state.minLon != null) rows = rows.filter((r) => r.lon != null && r.lon >= state.minLon!);
+            if (state.maxLon != null) rows = rows.filter((r) => r.lon != null && r.lon <= state.maxLon!);
+            if (state.limit != null) rows = rows.slice(0, state.limit);
+            return { data: rows, error: null };
+          };
+          const chain: Record<string, unknown> = {};
+          const wrap = () => chain;
+          chain.eq = (col: string, val: string) => {
+            if (col === 'user_id') state.userId = val;
+            return wrap();
+          };
+          chain.gt = (col: string, val: string) => {
+            if (col === 'expires_at') state.expiresAfter = val;
+            return wrap();
+          };
+          chain.is = (col: string, val: null) => {
+            if (col === 'matched_at' && val === null) state.unmatchedOnly = true;
+            return wrap();
+          };
+          chain.in = (col: string, vals: string[]) => {
+            if (col === 'my_token') state.myTokensIn = vals;
+            return wrap();
+          };
+          chain.gte = (col: string, val: number) => {
+            if (col === 'lat') state.minLat = val;
+            if (col === 'lon') state.minLon = val;
+            return wrap();
+          };
+          chain.lte = (col: string, val: number) => {
+            if (col === 'lat') state.maxLat = val;
+            if (col === 'lon') state.maxLon = val;
+            return wrap();
+          };
+          chain.limit = (n: number) => {
+            state.limit = n;
+            return wrap();
+          };
+          chain.or = (_expr: string) => Promise.resolve(resolveRows());
+          chain.then = (resolve: (v: { data: PendingHandshakeRow[]; error: null }) => void) =>
+            Promise.resolve(resolveRows()).then(resolve);
+          return chain;
+        }),
         update: jest.fn((patch: { matched_at: string }) => ({
           in: (col: string, ids: string[]) => ({
             is: (_col2: string, val2: null) => {
@@ -200,6 +235,11 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             },
           }),
         })),
+        update: jest.fn(() => ({
+          eq: () => ({
+            eq: () => Promise.resolve({ error: null }),
+          }),
+        })),
       };
     }
 
@@ -240,6 +280,9 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
           return Promise.resolve({ error: null });
         }),
         select: jest.fn(() => encounterSelectChain),
+        update: jest.fn(() => ({
+          eq: () => Promise.resolve({ error: null }),
+        })),
       };
     }
 
@@ -266,6 +309,7 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
 
   return {
     from,
+    rpc: jest.fn().mockResolvedValue({ data: [], error: null }),
     _pending: pending,
     _connections: connections,
     _encounters: encounters,
@@ -343,7 +387,7 @@ describe('POST /api/connections/proximity contract', () => {
     });
   }
 
-  async function expectSimultaneousGroupMatch(size: 5 | 10) {
+  async function expectSimultaneousGroupAwaitingSelection(size: 5 | 10) {
     const userIds = extraGroupUsers.slice(0, size);
     adminStore = createInMemoryAdmin(userIds);
     mockCreateAdminClient.mockReturnValue(adminStore);
@@ -370,18 +414,22 @@ describe('POST /api/connections/proximity contract', () => {
       const matched = (await finalResponses[0]!.json()) as {
         success: boolean;
         is_group?: boolean;
+        awaiting_selection?: boolean;
         matches: { id: string }[];
         connection_id?: string;
+        pending_handshake_id?: string;
         group_clique_candidate?: { member_user_ids: string[] };
       };
 
       expect(matched.success).toBe(true);
+      expect(matched.awaiting_selection).toBe(true);
       expect(matched.is_group).toBe(true);
-      expect(matched.connection_id).toBe('conn-1');
+      expect(matched.connection_id).toBeUndefined();
+      expect(matched.pending_handshake_id).toBeTruthy();
       expect(matched.matches).toHaveLength(size - 1);
       expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual(userIds.sort());
-      expect(adminStore._connections).toHaveLength(1 + (size * (size - 1)) / 2);
-      expect(adminStore._connections[0]?.user_ids.sort()).toEqual(userIds.sort());
+      // Durable create deferred until host confirm
+      expect(adminStore._connections).toHaveLength(0);
     } finally {
       dateSpy.mockRestore();
     }
@@ -505,7 +553,7 @@ describe('POST /api/connections/proximity contract', () => {
     dateSpy.mockRestore();
   });
 
-  it('matches a three-user group via graph clustering and creates every pair edge', async () => {
+  it('matches a three-user group via graph clustering and defers create until host selection', async () => {
     const t0 = Date.now();
     const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
 
@@ -538,22 +586,22 @@ describe('POST /api/connections/proximity contract', () => {
     const matched = (await resC.json()) as {
       success: boolean;
       is_group?: boolean;
+      awaiting_selection?: boolean;
       matches: { id: string }[];
       connection_id?: string;
+      pending_handshake_id?: string;
+      group_clique_candidate?: { member_user_ids: string[] };
     };
     expect(matched.success).toBe(true);
+    expect(matched.awaiting_selection).toBe(true);
     expect(matched.is_group).toBe(true);
     expect(matched.matches).toHaveLength(2);
-    expect(matched.connection_id).toBe('conn-1');
-    expect(adminStore._connections[0]?.user_ids.sort()).toEqual([userA, userB, userC].sort());
-    expect(adminStore._connections.map((c) => c.user_ids.sort())).toEqual(
-      expect.arrayContaining([
-        [userA, userB, userC].sort(),
-        [userA, userB].sort(),
-        [userA, userC].sort(),
-        [userB, userC].sort(),
-      ]),
+    expect(matched.connection_id).toBeUndefined();
+    expect(matched.pending_handshake_id).toBeTruthy();
+    expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual(
+      [userA, userB, userC].sort(),
     );
+    expect(adminStore._connections).toHaveLength(0);
 
     dateSpy.mockRestore();
   });
@@ -610,21 +658,16 @@ describe('POST /api/connections/proximity contract', () => {
     const matched = (await resC.json()) as {
       success: boolean;
       is_group?: boolean;
+      awaiting_selection?: boolean;
       matches: { id: string }[];
       group_clique_candidate?: { member_user_ids: string[] };
     };
     expect(matched.success).toBe(true);
+    expect(matched.awaiting_selection).toBe(true);
     expect(matched.is_group).toBe(true);
     expect(matched.matches.map((m) => m.id).sort()).toEqual([userA, userB].sort());
     expect(matched.group_clique_candidate?.member_user_ids.sort()).toEqual([userA, userB, userC].sort());
-    expect(adminStore._connections.map((c) => c.user_ids.sort())).toEqual(
-      expect.arrayContaining([
-        [userA, userB, userC].sort(),
-        [userA, userB].sort(),
-        [userA, userC].sort(),
-        [userB, userC].sort(),
-      ]),
-    );
+    expect(adminStore._connections).toHaveLength(0);
 
     dateSpy.mockRestore();
   });
@@ -691,11 +734,11 @@ describe('POST /api/connections/proximity contract', () => {
     dateSpy.mockRestore();
   });
 
-  it('matches five simultaneous nearby phones into one group connection', async () => {
-    await expectSimultaneousGroupMatch(5);
+  it('matches five simultaneous nearby phones into awaiting_selection', async () => {
+    await expectSimultaneousGroupAwaitingSelection(5);
   });
 
-  it('matches ten simultaneous nearby phones into one group connection', async () => {
-    await expectSimultaneousGroupMatch(10);
+  it('matches ten simultaneous nearby phones into awaiting_selection', async () => {
+    await expectSimultaneousGroupAwaitingSelection(10);
   });
 });

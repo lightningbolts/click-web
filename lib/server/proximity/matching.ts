@@ -8,6 +8,37 @@ export const ENCOUNTER_DEBOUNCE_MAX_M = 50;
 export const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 export const EXTENDED_HANGOUT_TAG = 'Extended Hangout';
 export const MOTION_VARIANCE_ACTIVE_THRESHOLD = 1.25;
+/** Bounding-box radius for pending_handshakes candidate fetch (scale: never full-table scan). */
+export const PENDING_CANDIDATE_BBOX_RADIUS_M = 3_000;
+/** Hard cap on rows loaded into the in-process match graph. */
+export const PENDING_CANDIDATE_MAX_ROWS = 400;
+/** Host may select at most this many peers (pairwise E2EE edges are O(n²)). */
+export const PROXIMITY_HOST_SELECTION_MAX_MEMBERS = 12;
+
+/** Approximate degree delta for a meter offset at a given latitude. */
+export function metersToLatLonDelta(
+  latitudeDeg: number,
+  radiusMeters: number,
+): { dLat: number; dLon: number } {
+  const dLat = radiusMeters / 111_320;
+  const cos = Math.cos((latitudeDeg * Math.PI) / 180);
+  const dLon = radiusMeters / (111_320 * Math.max(0.01, Math.abs(cos)));
+  return { dLat, dLon };
+}
+
+export function pendingCandidateBBox(
+  lat: number,
+  lon: number,
+  radiusMeters: number = PENDING_CANDIDATE_BBOX_RADIUS_M,
+): { minLat: number; maxLat: number; minLon: number; maxLon: number } {
+  const { dLat, dLon } = metersToLatLonDelta(lat, radiusMeters);
+  return {
+    minLat: lat - dLat,
+    maxLat: lat + dLat,
+    minLon: lon - dLon,
+    maxLon: lon + dLon,
+  };
+}
 
 export type HandshakeRowLite = {
   id: string;

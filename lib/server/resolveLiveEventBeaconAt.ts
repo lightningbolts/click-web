@@ -36,7 +36,8 @@ function metaStr(meta: Record<string, unknown>, ...keys: string[]): string | nul
 
 /**
  * Find the nearest live map event where GPS is inside the check-in fence
- * and every user in [userIds] has an RSVP (`beacon_attendees`) row.
+ * and every user in [userIds] has an RSVP (`beacon_attendees`) row plus an
+ * active check-in (`event_check_ins` with `checked_out_at IS NULL`).
  */
 export async function resolveLiveEventBeaconAt(
   admin: SupabaseClient,
@@ -106,6 +107,23 @@ export async function resolveLiveEventBeaconAt(
         .filter((id): id is string => id != null),
     );
     if (!ids.every((id) => present.has(id))) continue;
+
+    const { data: checkIns, error: checkInErr } = await admin
+      .from("event_check_ins")
+      .select("user_id")
+      .eq("beacon_id", beacon.id)
+      .in("user_id", ids)
+      .is("checked_out_at", null);
+    if (checkInErr) {
+      console.warn("[resolveLiveEventBeaconAt] check-ins:", checkInErr.message);
+      continue;
+    }
+    const checkedIn = new Set(
+      (Array.isArray(checkIns) ? checkIns : [])
+        .map((c) => (isRecord(c) && typeof c.user_id === "string" ? c.user_id : null))
+        .filter((id): id is string => id != null),
+    );
+    if (!ids.every((id) => checkedIn.has(id))) continue;
 
     let startAt = metaStr(meta, "event_start_at", "eventStartAt");
     let endAt = metaStr(meta, "event_end_at", "eventEndAt");

@@ -2,7 +2,13 @@ import {
   bfsComponent,
   buildUserAdjacency,
   hasProximityPeerEvidence,
+  metersToLatLonDelta,
   peerEvidenceTokens,
+  PENDING_CANDIDATE_BBOX_RADIUS_M,
+  PENDING_CANDIDATE_MAX_ROWS,
+  pendingCandidateBBox,
+  PROXIMITY_HOST_SELECTION_MAX_MEMBERS,
+  PROXIMITY_MATCH_MAX_M,
   sharedOverlappingPeerTokens,
   simultaneousTapEvidenceBetweenRows,
   tokenEvidenceBetweenRows,
@@ -26,6 +32,46 @@ function row(
     ...extras,
   };
 }
+
+describe('proximity matching constants', () => {
+  it('exposes expected scale limits for candidate fetch and host selection', () => {
+    expect(PROXIMITY_MATCH_MAX_M).toBe(15);
+    expect(PENDING_CANDIDATE_BBOX_RADIUS_M).toBe(3_000);
+    expect(PENDING_CANDIDATE_MAX_ROWS).toBe(400);
+    expect(PROXIMITY_HOST_SELECTION_MAX_MEMBERS).toBe(12);
+  });
+});
+
+describe('metersToLatLonDelta / pendingCandidateBBox', () => {
+  it('converts meters to latitude/longitude degree deltas', () => {
+    const equator = metersToLatLonDelta(0, 1_000);
+    expect(equator.dLat).toBeCloseTo(1_000 / 111_320, 8);
+    expect(equator.dLon).toBeCloseTo(1_000 / 111_320, 8);
+
+    const seattle = metersToLatLonDelta(47.6, 3_000);
+    expect(seattle.dLat).toBeCloseTo(3_000 / 111_320, 8);
+    expect(seattle.dLon).toBeGreaterThan(seattle.dLat);
+  });
+
+  it('builds a symmetric bbox around a point with default radius', () => {
+    const lat = 47.655;
+    const lon = -122.303;
+    const box = pendingCandidateBBox(lat, lon);
+    const { dLat, dLon } = metersToLatLonDelta(lat, PENDING_CANDIDATE_BBOX_RADIUS_M);
+
+    expect(box.minLat).toBeCloseTo(lat - dLat, 10);
+    expect(box.maxLat).toBeCloseTo(lat + dLat, 10);
+    expect(box.minLon).toBeCloseTo(lon - dLon, 10);
+    expect(box.maxLon).toBeCloseTo(lon + dLon, 10);
+  });
+
+  it('accepts an explicit radius override', () => {
+    const box = pendingCandidateBBox(0, 0, 500);
+    const { dLat, dLon } = metersToLatLonDelta(0, 500);
+    expect(box.maxLat - box.minLat).toBeCloseTo(2 * dLat, 10);
+    expect(box.maxLon - box.minLon).toBeCloseTo(2 * dLon, 10);
+  });
+});
 
 describe('proximity matching peer evidence', () => {
   it('hasProximityPeerEvidence requires audio or BLE tokens', () => {

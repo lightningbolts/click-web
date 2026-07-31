@@ -395,7 +395,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           </p>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <div className="glass-panel rounded-2xl p-4">
             <p className="text-xs uppercase tracking-wide text-zinc-400">Handshake Events (24h)</p>
             <p className="mt-2 text-2xl font-semibold text-white">
@@ -424,6 +424,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <p className="text-xs uppercase tracking-wide text-zinc-400">Estimated Success Rate</p>
             <p className="mt-2 text-2xl font-semibold text-emerald-700 dark:text-emerald-300">
               {data.operations.encounterDiagnostics.estimatedSuccessRatePct.toFixed(1)}%
+            </p>
+          </div>
+          <div className="glass-panel rounded-2xl p-4">
+            <p className="text-xs uppercase tracking-wide text-zinc-400">Connection-Flow Events (24h)</p>
+            <p className="mt-2 text-2xl font-semibold text-white">
+              {data.operations.encounterDiagnostics.connectionFlowEvents24h}
             </p>
           </div>
         </div>
