@@ -204,8 +204,22 @@ export async function POST(req: NextRequest) {
         ? body.chat_id
         : '';
   const connectionId = typeof body.connectionId === 'string' ? body.connectionId : typeof body.connection_id === 'string' ? body.connection_id : '';
-  const { content, message_type: rawMessageType, metadata } = body;
-  const messageType = parsePostMessageType(rawMessageType);
+  const { content, metadata } = body;
+  const rawMessageType =
+    (body as Record<string, unknown>).message_type ??
+    (body as Record<string, unknown>).messageType;
+  let messageType = parsePostMessageType(rawMessageType);
+  const meta =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? (metadata as Record<string, unknown>)
+      : {};
+  // Infer beacon when clients send structured beacon metadata under message_type=text.
+  if (
+    messageType === 'text' &&
+    (typeof meta.beacon_id === 'string' || typeof meta.beaconId === 'string')
+  ) {
+    messageType = 'beacon';
+  }
   const isCallLog = messageType === 'call_log';
   const isBeacon = messageType === 'beacon';
   const isMedia = messageType === 'image' || messageType === 'audio';
@@ -214,10 +228,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'chatId or connectionId is required' }, { status: 400 });
   }
 
-  const meta =
-    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
-      ? (metadata as Record<string, unknown>)
-      : {};
   const mediaUrl = typeof meta.media_url === 'string' ? meta.media_url.trim() : '';
 
   if (isCallLog || isBeacon) {
