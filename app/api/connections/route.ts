@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ConnectionLifecycleStatus } from '@/types/connection';
 import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatus';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
-import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
+import {
+  deriveHeightCategoryFromRelativeAltitudeM,
+  fetchTerrainElevationMeters,
+} from '@/lib/server/terrainElevation';
 import {
   normalizeContextTag,
   normalizeContextTagsArray,
@@ -385,9 +388,13 @@ async function enrichEncounterRelativeAltitude(
     }
 
     const relativeAltitudeM = barometricElevationM - terrainM;
+    const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
     const { error } = await adminClient
       .from('connection_encounters')
-      .update({ relative_altitude_m: relativeAltitudeM })
+      .update({
+        relative_altitude_m: relativeAltitudeM,
+        ...(elevationCategory != null ? { elevation_category: elevationCategory } : {}),
+      })
       .eq('id', latestEnc.id);
 
     if (error) {
@@ -1205,9 +1212,8 @@ export async function POST(request: NextRequest) {
     if (resolvedNoiseForEncounter != null) {
       encounterInsert.noise_level = resolvedNoiseForEncounter;
     }
-    if (resolvedElevationCategory != null) {
-      encounterInsert.elevation_category = resolvedElevationCategory;
-    }
+    // elevation_category is set later from relative_altitude_m (AGL) via enrichEncounterRelativeAltitude.
+    // Do not persist client AMSL-derived categories here.
     const resolvedLocationName = manualLocationName ?? specificLocationName ?? memoryCapsule.locationName;
     if (resolvedLocationName) {
       encounterInsert.location_name = resolvedLocationName;

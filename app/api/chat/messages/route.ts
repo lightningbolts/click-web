@@ -188,6 +188,7 @@ export async function GET(req: NextRequest) {
 function parsePostMessageType(raw: unknown): MessageType {
   const s = typeof raw === 'string' ? raw.toLowerCase() : '';
   if (s === 'call_log') return 'call_log';
+  if (s === 'beacon') return 'beacon';
   if (s === 'image') return 'image';
   if (s === 'audio') return 'audio';
   if (s === 'file') return 'file';
@@ -206,6 +207,7 @@ export async function POST(req: NextRequest) {
   const { content, message_type: rawMessageType, metadata } = body;
   const messageType = parsePostMessageType(rawMessageType);
   const isCallLog = messageType === 'call_log';
+  const isBeacon = messageType === 'beacon';
   const isMedia = messageType === 'image' || messageType === 'audio';
 
   if (!chatId && !connectionId) {
@@ -218,8 +220,8 @@ export async function POST(req: NextRequest) {
       : {};
   const mediaUrl = typeof meta.media_url === 'string' ? meta.media_url.trim() : '';
 
-  if (isCallLog) {
-    // call_log rows may use empty content
+  if (isCallLog || isBeacon) {
+    // call_log / beacon rows may use empty or short plaintext content + metadata
   } else if (isMedia) {
     if (!mediaUrl) {
       return NextResponse.json(

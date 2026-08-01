@@ -480,6 +480,21 @@ function buildVibeContextTags(input: {
 }
 
 /**
+ * Classifies height above local ground (AGL). Pass `relative_altitude_m`
+ * (barometric AMSL − DEM terrain), never raw AMSL.
+ * Thresholds mirror KMP `deriveHeightCategory` / click-web `deriveHeightCategoryFromRelativeAltitudeM`.
+ */
+function deriveHeightCategoryFromRelativeAltitudeM(
+  relativeAltitudeM: number | null | undefined,
+): string | null {
+  if (relativeAltitudeM == null || !Number.isFinite(relativeAltitudeM)) return null;
+  if (relativeAltitudeM < -3.0) return 'BELOW_GROUND';
+  if (relativeAltitudeM < 8.0) return 'GROUND_LEVEL';
+  if (relativeAltitudeM < 35.0) return 'ELEVATED';
+  return 'HIGH_RISE';
+}
+
+/**
  * Terrain elevation (m above sea level) at a point from Open-Elevation (SRTM-backed DEM).
  */
 async function fetchTerrainElevationM(lat: number, lon: number): Promise<number | null> {
@@ -1041,8 +1056,12 @@ Deno.serve(async (req) => {
     if (noiseLevel != null) bindingInsertRow.noise_level = noiseLevel;
     if (exactNoiseLevelDb != null) bindingInsertRow.exact_noise_level_db = exactNoiseLevelDb;
     if (exactBarometricElevationM != null) bindingInsertRow.exact_barometric_elevation_m = exactBarometricElevationM;
-    if (clientHeightCategory != null) bindingInsertRow.elevation_category = clientHeightCategory;
-    if (relativeAltitudeM != null) bindingInsertRow.relative_altitude_m = relativeAltitudeM;
+    if (relativeAltitudeM != null) {
+      bindingInsertRow.relative_altitude_m = relativeAltitudeM;
+      const aglCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
+      if (aglCategory != null) bindingInsertRow.elevation_category = aglCategory;
+    }
+    // Do not persist client AMSL-derived height_category when AGL is unknown.
     if (selfLux != null) bindingInsertRow.lux_level = selfLux;
     if (selfMotion != null) bindingInsertRow.motion_variance = selfMotion;
     if (selfAz != null) bindingInsertRow.compass_azimuth = selfAz;

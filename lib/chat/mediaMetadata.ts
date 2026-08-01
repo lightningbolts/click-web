@@ -38,12 +38,30 @@ export function originalMimeTypeFromMetadata(
 }
 
 /** Short preview label (list / reply banner), aligned with KMP `Message.previewLabel()`. */
-export function previewLabelForMessage(message: Pick<Message, 'message_type' | 'content'>): string {
+export function previewLabelForMessage(
+  message: Pick<Message, 'message_type' | 'content'> & { metadata?: Message['metadata'] },
+): string {
   const cap = message.content.replace(/\n/g, ' ').trim();
   const t = message.message_type as MessageType;
   if (t === 'image') return cap || 'Photo';
   if (t === 'audio') return cap || 'Voice message';
   if (t === 'call_log') return 'Call';
+  if (t === 'beacon') {
+    const meta = message.metadata && typeof message.metadata === 'object' ? message.metadata : null;
+    const title =
+      meta && typeof (meta as { title?: unknown }).title === 'string'
+        ? String((meta as { title: string }).title).trim()
+        : '';
+    const beaconType =
+      meta && typeof (meta as { beacon_type?: unknown }).beacon_type === 'string'
+        ? String((meta as { beacon_type: string }).beacon_type).trim().toLowerCase()
+        : '';
+    if (title && (beaconType === 'event' || beaconType === 'social' || beaconType === 'social_vibe')) {
+      return `Event: ${title}`;
+    }
+    if (title) return title;
+    return 'Beacon';
+  }
   // C6 regression fix: attachment envelopes (`ccx:v1:{...}`) must never bleed into
   // the chat list / reply banner as raw JSON. Render a neutral "📎 Attachment"
   // placeholder — the full preview is only materialised after client-side decryption.

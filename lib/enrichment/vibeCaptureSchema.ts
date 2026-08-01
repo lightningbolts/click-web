@@ -53,6 +53,7 @@ export type VibeClassificationInput = {
   elevation_category?: string | null;
   lux_level?: number | null;
   exact_barometric_elevation_m?: number | null;
+  relative_altitude_m?: number | null;
   noise_level?: string | null;
   exact_noise_level_db?: number | null;
 };

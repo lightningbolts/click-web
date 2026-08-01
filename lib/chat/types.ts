@@ -25,7 +25,7 @@ export interface Chat {
 /**
  * Aligned with `public.messages.message_type` (lowercase text column) and KMP `ChatMessageType`.
  */
-export type MessageType = 'text' | 'image' | 'audio' | 'file' | 'call_log';
+export type MessageType = 'text' | 'image' | 'audio' | 'file' | 'call_log' | 'beacon';
 
 /** Structured fields stored in `messages.metadata` for media (matches mobile `MessageMediaMetadata`). */
 export interface MessageMediaMetadata {

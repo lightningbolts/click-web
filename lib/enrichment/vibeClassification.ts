@@ -39,6 +39,7 @@ export function classifyEncounterVibe(input: VibeClassificationInput): VibeCaptu
     elevation_category: input.elevation_category,
     lux_level: input.lux_level,
     exact_barometric_elevation_m: input.exact_barometric_elevation_m,
+    relative_altitude_m: input.relative_altitude_m,
     noise_level: input.noise_level,
     exact_noise_level_db: input.exact_noise_level_db,
     zoningCategory,

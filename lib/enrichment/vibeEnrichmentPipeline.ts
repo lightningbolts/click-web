@@ -35,6 +35,7 @@ type EncounterTelemetryRow = {
   elevation_category: string | null;
   lux_level: number | null;
   exact_barometric_elevation_m: number | null;
+  relative_altitude_m: number | null;
   noise_level: string | null;
   exact_noise_level_db: number | null;
   vibe_capture: Record<string, unknown> | null;
@@ -67,7 +68,7 @@ export async function runVibeEnrichmentPipeline(
   const { data: row, error } = await supabase
     .from('connection_encounters')
     .select(
-      'id, encountered_at, gps_lat, gps_lon, semantic_location, elevation_category, lux_level, exact_barometric_elevation_m, noise_level, exact_noise_level_db, vibe_capture',
+      'id, encountered_at, gps_lat, gps_lon, semantic_location, elevation_category, lux_level, exact_barometric_elevation_m, relative_altitude_m, noise_level, exact_noise_level_db, vibe_capture',
     )
     .eq('id', encounter_id)
     .maybeSingle();
@@ -104,6 +105,7 @@ export async function runVibeEnrichmentPipeline(
     elevation_category: enc.elevation_category,
     lux_level: enc.lux_level,
     exact_barometric_elevation_m: enc.exact_barometric_elevation_m,
+    relative_altitude_m: enc.relative_altitude_m,
     noise_level: enc.noise_level,
     exact_noise_level_db: enc.exact_noise_level_db,
   });

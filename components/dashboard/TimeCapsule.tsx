@@ -54,9 +54,11 @@ function encounterTelemetryPills(enc: NonNullable<ConnectionRecord['encounters']
       ? enc.exactNoiseLevelDb
       : null;
   const elevation =
-    typeof enc.exactBarometricElevationM === 'number' && Number.isFinite(enc.exactBarometricElevationM)
-      ? enc.exactBarometricElevationM
-      : null;
+    typeof enc.relativeAltitudeM === 'number' && Number.isFinite(enc.relativeAltitudeM)
+      ? enc.relativeAltitudeM
+      : typeof enc.exactBarometricElevationM === 'number' && Number.isFinite(enc.exactBarometricElevationM)
+        ? enc.exactBarometricElevationM
+        : null;
   const lux =
     typeof enc.luxLevel === 'number' && Number.isFinite(enc.luxLevel) && enc.luxLevel >= 0 ? enc.luxLevel : null;
   const motion =

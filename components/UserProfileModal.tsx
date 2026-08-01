@@ -181,7 +181,13 @@ function encounterMetricPills(enc: ConnectionEncounterRow): { metricKey: string;
   if (elCat) {
     out.push({ metricKey: 'el-cat', Icon: Mountain, label: prettyElevationCategoryKey(elCat) });
   }
-  const elRaw = enc.exactBarometricElevationM;
+  const elRaw =
+    enc.relativeAltitudeM !== null &&
+    enc.relativeAltitudeM !== undefined &&
+    typeof enc.relativeAltitudeM === 'number' &&
+    Number.isFinite(enc.relativeAltitudeM)
+      ? enc.relativeAltitudeM
+      : enc.exactBarometricElevationM;
   if (elRaw !== null && elRaw !== undefined && typeof elRaw === 'number' && Number.isFinite(elRaw)) {
     out.push({ metricKey: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
   }

@@ -8,6 +8,7 @@ import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropRevea
 export function coerceMessageType(value: unknown): MessageType {
   const s = typeof value === 'string' ? value.toLowerCase() : '';
   if (s === 'call_log') return 'call_log';
+  if (s === 'beacon') return 'beacon';
   if (s === 'image') return 'image';
   if (s === 'audio') return 'audio';
   if (s === 'file') return 'file';

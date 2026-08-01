@@ -178,6 +178,8 @@ export type SpaceProbabilityInput = {
   elevation_category?: string | null;
   lux_level?: number | null;
   exact_barometric_elevation_m?: number | null;
+  /** Height above local terrain (m). Prefer for elevated/high-rise inference. */
+  relative_altitude_m?: number | null;
   noise_level?: string | null;
   exact_noise_level_db?: number | null;
   zoningCategory: ZoningCategory;
@@ -252,15 +254,18 @@ export function evaluateSpaceProbability(input: SpaceProbabilityInput): SpacePro
 
   const elevatedIndoor = isHighRise && dimLux && groundCommercial;
 
-  const baro = input.exact_barometric_elevation_m;
-  const highBaro = typeof baro === 'number' && Number.isFinite(baro) && baro >= 20;
+  const agl =
+    typeof input.relative_altitude_m === 'number' && Number.isFinite(input.relative_altitude_m)
+      ? input.relative_altitude_m
+      : null;
+  const highAgl = agl != null && agl >= 20;
 
   const indoorScore = scoreIndoorLikelihood(input);
   const indoor = indoorScore >= 2;
 
   return {
     indoor,
-    elevated: elevatedIndoor || (isHighRise && highBaro),
+    elevated: elevatedIndoor || (isHighRise && highAgl),
   };
 }
 

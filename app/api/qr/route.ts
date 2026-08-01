@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
-import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
+import {
+  deriveHeightCategoryFromRelativeAltitudeM,
+  fetchTerrainElevationMeters,
+} from '@/lib/server/terrainElevation';
 import {
   normalizeContextTag,
   normalizeContextTagsArray,
@@ -601,9 +604,6 @@ export async function POST(request: NextRequest) {
 
         const encDb = finiteNumber(exactNoiseLevelDb);
         const encElev = finiteNumber(exactBarometricElevationMeters);
-        if (encElev != null && resolvedElevationCategory != null) {
-          encounterInsert.elevation_category = resolvedElevationCategory;
-        }
         if (encDb != null) {
           encounterInsert.exact_noise_level_db = encDb;
         }
@@ -629,6 +629,12 @@ export async function POST(request: NextRequest) {
         }
         if (relativeAltitudeM != null) {
           encounterInsert.relative_altitude_m = relativeAltitudeM;
+          const aglCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
+          if (aglCategory != null) {
+            encounterInsert.elevation_category = aglCategory;
+          }
+        } else if (encElev != null && resolvedElevationCategory != null) {
+          // No DEM yet — do not persist client AMSL-derived category.
         }
 
         encounterInsert.context_tags = mergedEncounterContextTags;

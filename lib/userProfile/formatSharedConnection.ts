@@ -49,6 +49,8 @@ export type ProfileOriginEncounter = {
   exactNoiseLevelDb?: number | null;
   elevationCategory?: string | null;
   exactBarometricElevationM?: number | null;
+  /** Height above local terrain (m); prefer for display over AMSL barometric. */
+  relativeAltitudeM?: number | null;
   contextTags: string[];
 };
 
@@ -208,6 +210,7 @@ function parseEncounterPayloads(raw: unknown): ProfileOriginEncounter[] {
       exactNoiseLevelDb: numberOrNull(encounter.exact_noise_level_db),
       elevationCategory: stringOrNull(encounter.elevation_category),
       exactBarometricElevationM: numberOrNull(encounter.exact_barometric_elevation_m),
+      relativeAltitudeM: numberOrNull(encounter.relative_altitude_m),
       contextTags: Array.isArray(tagsRaw)
         ? tagsRaw
             .filter((tag): tag is string => typeof tag === 'string')
@@ -330,7 +333,10 @@ function extractStrictOriginElevation(origin: ProfileOriginEncounter): string | 
   if (typeof origin.elevationCategory === 'string' && origin.elevationCategory.trim()) {
     parts.push(prettyElevationCategoryKey(origin.elevationCategory.trim()));
   }
-  const m = origin.exactBarometricElevationM;
+  const m =
+    typeof origin.relativeAltitudeM === 'number' && Number.isFinite(origin.relativeAltitudeM)
+      ? origin.relativeAltitudeM
+      : origin.exactBarometricElevationM;
   if (typeof m === 'number' && Number.isFinite(m)) parts.push(`${Math.round(m)} m`);
   return parts.length > 0 ? parts.join(' · ') : undefined;
 }

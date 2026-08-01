@@ -7,7 +7,10 @@ import {
   resolveContextTagId,
 } from '@/lib/server/connectionEncounterContextTag';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
-import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
+import {
+  deriveHeightCategoryFromRelativeAltitudeM,
+  fetchTerrainElevationMeters,
+} from '@/lib/server/terrainElevation';
 
 function createAdminClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -223,9 +226,13 @@ export async function PATCH(
             const terrainM = await fetchTerrainElevationMeters(lat, lon);
             if (terrainM == null) return;
             const relativeAltitudeM = encElev - terrainM;
+            const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
             const { error: relErr } = await adminClient
               .from('connection_encounters')
-              .update({ relative_altitude_m: relativeAltitudeM })
+              .update({
+                relative_altitude_m: relativeAltitudeM,
+                ...(elevationCategory != null ? { elevation_category: elevationCategory } : {}),
+              })
               .eq('id', updated.id);
             if (relErr) {
               console.error('connection_encounters relative_altitude async update:', relErr);

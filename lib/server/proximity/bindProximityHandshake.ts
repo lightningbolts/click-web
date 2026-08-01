@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
-import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
+import {
+  deriveHeightCategoryFromRelativeAltitudeM,
+  fetchTerrainElevationMeters,
+} from '@/lib/server/terrainElevation';
 import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterContextTag';
 import {
   AT_EVENT_CONTEXT_TAG,
@@ -702,7 +705,12 @@ export async function bindProximityHandshake(
     if (memberExactBarometricElevationM != null) {
       const terrainM = await fetchTerrainElevationM(memberLat, memberLon);
       if (terrainM != null) {
-        updates.relative_altitude_m = memberExactBarometricElevationM - terrainM;
+        const relativeAltitudeM = memberExactBarometricElevationM - terrainM;
+        updates.relative_altitude_m = relativeAltitudeM;
+        const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
+        if (elevationCategory != null) {
+          updates.elevation_category = elevationCategory;
+        }
       }
     }
 
