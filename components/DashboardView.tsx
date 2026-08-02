@@ -1909,6 +1909,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   Number.isFinite(e.exactBarometricElevationM)
                     ? { exactBarometricElevationM: e.exactBarometricElevationM }
                     : {}),
+                  ...(typeof e.relativeAltitudeM === 'number' && Number.isFinite(e.relativeAltitudeM)
+                    ? { relativeAltitudeM: e.relativeAltitudeM }
+                    : {}),
                   ...(typeof e.luxLevel === 'number' && Number.isFinite(e.luxLevel) ? { luxLevel: e.luxLevel } : {}),
                   ...(typeof e.motionVariance === 'number' && Number.isFinite(e.motionVariance)
                     ? { motionVariance: e.motionVariance }
@@ -3177,12 +3180,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
                                             ? latest.exactNoiseLevelDb
                                             : null;
                                         const el =
-                                          latest.exactBarometricElevationM !== null &&
-                                          latest.exactBarometricElevationM !== undefined &&
-                                          typeof latest.exactBarometricElevationM === 'number' &&
-                                          Number.isFinite(latest.exactBarometricElevationM)
-                                            ? latest.exactBarometricElevationM
-                                            : null;
+                                          latest.relativeAltitudeM !== null &&
+                                          latest.relativeAltitudeM !== undefined &&
+                                          typeof latest.relativeAltitudeM === 'number' &&
+                                          Number.isFinite(latest.relativeAltitudeM)
+                                            ? latest.relativeAltitudeM
+                                            : latest.exactBarometricElevationM !== null &&
+                                                latest.exactBarometricElevationM !== undefined &&
+                                                typeof latest.exactBarometricElevationM === 'number' &&
+                                                Number.isFinite(latest.exactBarometricElevationM)
+                                              ? latest.exactBarometricElevationM
+                                              : null;
                                         if (db === null && el === null) return null;
                                         return (
                                           <div className="mt-1.5 flex flex-wrap gap-1 pr-2">

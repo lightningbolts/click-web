@@ -35,6 +35,8 @@ export interface ConnectionEncounterBrief {
   weatherSnapshot?: unknown;
   /** Present only when barometric altitude was captured */
   exactBarometricElevationM?: number;
+  /** AGL relative to terrain when derived; prefer over absolute barometric for UI */
+  relativeAltitudeM?: number;
   luxLevel?: number;
   motionVariance?: number;
   compassAzimuth?: number;
