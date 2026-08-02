@@ -80,7 +80,7 @@ export function parseEventCategoryTags(metadata: Record<string, unknown>): strin
 }
 
 export function parseEventLocationName(metadata: Record<string, unknown>): string | null {
-  return metaStr(
+  const raw = metaStr(
     metadata,
     "location_name",
     "locationName",
@@ -88,8 +88,14 @@ export function parseEventLocationName(metadata: Record<string, unknown>): strin
     "venueName",
     "place_name",
     "placeName",
+    "formatted_address",
+    "formattedAddress",
     "address",
   );
+  if (raw == null) return null;
+  // Never surface the literal placeholder used by legacy "use my location" drops.
+  if (raw.toLowerCase() === "current location") return null;
+  return raw;
 }
 
 export function parseEventTitle(metadata: Record<string, unknown>): string {

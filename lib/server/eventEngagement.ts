@@ -272,6 +272,7 @@ function parseBeaconLatLng(row: Record<string, unknown>): { lat: number | null; 
 export async function loadEventBeaconOrResponse(
   admin: SupabaseClient,
   beaconId: string,
+  options: { allowExpired?: boolean } = {},
 ): Promise<{ beacon: EventBeaconRow } | { response: NextResponse }> {
   if (!EVENT_BEACON_UUID_RE.test(beaconId)) {
     return { response: NextResponse.json({ error: "Invalid beacon id" }, { status: 400 }) };
@@ -303,7 +304,9 @@ export async function loadEventBeaconOrResponse(
 
   const expRaw = data.expires_at;
   const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
-  if (!Number.isFinite(exp) || exp <= Date.now()) {
+  const expired = !Number.isFinite(exp) || exp <= Date.now();
+  // Read paths (RSVP list / people directory) must work for past events; mutations still reject.
+  if (expired && !options.allowExpired) {
     return { response: NextResponse.json({ error: "Expired" }, { status: 404 }) };
   }
 

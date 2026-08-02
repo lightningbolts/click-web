@@ -113,7 +113,8 @@ export async function GET(
     }
 
     const admin = createAdminSupabaseClient();
-    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    // Past / expired events still expose who RSVPed (read-only).
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
     if ("response" in loaded) return loaded.response;
 
     const { data, error } = await admin

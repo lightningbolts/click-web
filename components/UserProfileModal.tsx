@@ -259,7 +259,7 @@ type UserProfileModalProps = {
   decryptedMessages?: DecryptedProfileMessage[];
 };
 
-type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files';
+type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files' | 'beacons';
 
 type ConnectionTabsPayload = {
   chatId: string | null;
@@ -277,6 +277,32 @@ type ConnectionTabsPayload = {
     message_type: string;
     metadata: Record<string, unknown> | null;
   }>;
+  beacons?: Array<{
+    id: string;
+    content: string;
+    time_created: number | string;
+    message_type: string;
+    metadata: Record<string, unknown> | null;
+  }>;
+};
+
+type BeaconPreviewItem = {
+  id: string;
+  beaconId: string;
+  title: string;
+  description?: string;
+  scheduleLabel?: string;
+  locationLabel?: string;
+};
+
+type EventRecommendationPayload = {
+  recommendation: {
+    beacon_id: string;
+    title: string;
+    peer_name?: string;
+    event_start_at?: string | null;
+    location_name?: string | null;
+  } | null;
 };
 
 type ChatMessagesPayload = {
@@ -497,8 +523,56 @@ function mergeFileItems(localItems: FileItem[], bffItems: FileItem[]): FileItem[
 
 function mergeLinkItems(primary: LinkItem[], fallback: LinkItem[]): LinkItem[] {
   const merged = new Map<string, LinkItem>();
-  for (const item of fallback) merged.set(item.url, item);
-  for (const item of primary) merged.set(item.url, item);
+  for (const item of [...fallback, ...primary]) {
+    if (!merged.has(item.url)) merged.set(item.url, item);
+  }
+  return Array.from(merged.values());
+}
+
+function metaString(meta: Record<string, unknown> | null | undefined, ...keys: string[]): string | null {
+  if (!meta) return null;
+  for (const key of keys) {
+    const v = meta[key];
+    if (typeof v === 'string' && v.trim()) {
+      const t = v.trim();
+      if (t.toLowerCase() === 'current location') return null;
+      return t;
+    }
+  }
+  return null;
+}
+
+function mapBeaconPreview(row: {
+  id: string;
+  content: string;
+  message_type?: string;
+  metadata: Record<string, unknown> | null;
+}): BeaconPreviewItem | null {
+  const meta = row.metadata;
+  const beaconId =
+    metaString(meta, 'beacon_id', 'beaconId') ??
+    (typeof meta?.id === 'string' ? meta.id.trim() : null);
+  if (!beaconId) return null;
+  const title =
+    metaString(meta, 'title', 'event_title', 'eventTitle', 'label', 'name') ??
+    (row.content.replace(/^Beacon:\s*/i, '').trim() || 'Beacon');
+  return {
+    id: row.id,
+    beaconId,
+    title,
+    description: metaString(meta, 'description', 'body', 'subtitle') ?? undefined,
+    scheduleLabel: metaString(meta, 'schedule_label', 'scheduleLabel') ?? undefined,
+    locationLabel:
+      metaString(meta, 'formatted_address', 'formattedAddress', 'location_name', 'locationName') ??
+      undefined,
+  };
+}
+
+function mergeBeaconItems(localItems: BeaconPreviewItem[], bffItems: BeaconPreviewItem[]): BeaconPreviewItem[] {
+  const merged = new Map<string, BeaconPreviewItem>();
+  for (const item of [...bffItems, ...localItems]) {
+    if (!merged.has(item.beaconId)) merged.set(item.beaconId, item);
+  }
   return Array.from(merged.values());
 }
 
@@ -790,6 +864,146 @@ export default function UserProfileModal({
   const fileItems = useMemo(
     () => mergeFileItems(localFileItems, bffFileItems),
     [localFileItems, bffFileItems],
+  );
+
+  const localBeaconItems = useMemo(() => {
+    return decryptedMessages
+      .filter((m) => coerceMessageType(m.messageType) === 'beacon')
+      .map((m) =>
+        mapBeaconPreview({
+          id: m.id,
+          content: m.content,
+          message_type: coerceMessageType(m.messageType),
+          metadata: m.metadata ?? null,
+        }),
+      )
+      .filter((row): row is BeaconPreviewItem => row != null);
+  }, [decryptedMessages]);
+
+  const bffBeaconItems = useMemo(() => {
+    return (tabsPayload?.beacons ?? [])
+      .map((row) =>
+        mapBeaconPreview({
+          id: row.id,
+          content: row.content,
+          message_type: row.message_type,
+          metadata: row.metadata,
+        }),
+      )
+      .filter((row): row is BeaconPreviewItem => row != null);
+  }, [tabsPayload]);
+
+  const beaconItems = useMemo(
+    () => mergeBeaconItems(localBeaconItems, bffBeaconItems),
+    [localBeaconItems, bffBeaconItems],
+  );
+
+  const recommendationPath = effectiveConnectionId
+    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/event-recommendation`
+    : null;
+  const { data: recommendationPayload } = useSWR<EventRecommendationPayload>(
+    recommendationPath,
+    async (path: string) => {
+      const headers = await getAuthHeaders();
+      const res = await fetch(path, { headers });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof json?.error === 'string' && json.error.trim()
+            ? json.error
+            : res.statusText || 'Failed to load recommendation',
+        );
+      }
+      return json as EventRecommendationPayload;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
+      keepPreviousData: false,
+    },
+  );
+  const [recommendationDismissed, setRecommendationDismissed] = useState(false);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [beaconDetail, setBeaconDetail] = useState<{
+    loading: boolean;
+    error: string | null;
+    title: string;
+    description?: string;
+    location?: string;
+    schedule?: string;
+    expired?: boolean;
+  } | null>(null);
+
+  const openBeaconDetail = useCallback(
+    async (beaconId: string, fallback?: BeaconPreviewItem) => {
+      setBeaconDetail({
+        loading: true,
+        error: null,
+        title: fallback?.title ?? 'Event',
+        description: fallback?.description,
+        location: fallback?.locationLabel,
+        schedule: fallback?.scheduleLabel,
+      });
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/beacons/${encodeURIComponent(beaconId)}`, { headers });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // Fallback to chat metadata so expired / out-of-scope beacons still open.
+          if (fallback) {
+            setBeaconDetail({
+              loading: false,
+              error: null,
+              title: fallback.title,
+              description: fallback.description,
+              location: fallback.locationLabel,
+              schedule: fallback.scheduleLabel,
+            });
+            return;
+          }
+          throw new Error(
+            typeof json?.error === 'string' && json.error.trim()
+              ? json.error
+              : 'Could not load beacon',
+          );
+        }
+        const beacon = (json as { beacon?: Record<string, unknown>; expired?: boolean }).beacon;
+        const expired = Boolean((json as { expired?: boolean }).expired);
+        const meta =
+          beacon && typeof beacon.metadata === 'object' && beacon.metadata != null
+            ? (beacon.metadata as Record<string, unknown>)
+            : null;
+        setBeaconDetail({
+          loading: false,
+          error: null,
+          title: metaString(meta, 'title', 'event_title', 'eventTitle', 'label', 'name') ?? fallback?.title ?? 'Event',
+          description: metaString(meta, 'description', 'body') ?? fallback?.description,
+          location:
+            metaString(meta, 'formatted_address', 'formattedAddress', 'location_name', 'locationName') ??
+            fallback?.locationLabel,
+          schedule: metaString(meta, 'schedule_label', 'scheduleLabel') ?? fallback?.scheduleLabel,
+          expired,
+        });
+      } catch (e) {
+        if (fallback) {
+          setBeaconDetail({
+            loading: false,
+            error: null,
+            title: fallback.title,
+            description: fallback.description,
+            location: fallback.locationLabel,
+            schedule: fallback.scheduleLabel,
+          });
+          return;
+        }
+        setBeaconDetail({
+          loading: false,
+          error: e instanceof Error ? e.message : 'Could not load beacon',
+          title: 'Event',
+        });
+      }
+    },
+    [getAuthHeaders],
   );
 
   useEffect(() => {
@@ -1084,6 +1298,8 @@ export default function UserProfileModal({
     setBirthdaySaveError(null);
     setBirthdaySaving(false);
     setRollStatus('idle');
+    setRecommendationDismissed(false);
+    setBeaconDetail(null);
   }, [requestedUserId]);
 
   useEffect(() => {
@@ -1323,14 +1539,13 @@ export default function UserProfileModal({
                   )}
 
                   {/*
-                    Four-tab secondary nav mirroring the KMP [ProfileBottomSheet]
-                    subtabs: Timeline · Media · Links · Files. Tab content is derived
-                    from local decrypted message state to preserve E2EE integrity.
+                    Five-tab secondary nav mirroring the KMP [ProfileBottomSheet]
+                    subtabs: Timeline · Media · Links · Files · Beacons.
                   */}
                   <nav
                     role="tablist"
                     aria-label="Profile sections"
-                    className="grid grid-cols-4 gap-1 rounded-[12px] border-2 border-border-hard bg-surface-container p-1"
+                    className="grid grid-cols-5 gap-1 rounded-[12px] border-2 border-border-hard bg-surface-container p-1"
                   >
                     {(
                       [
@@ -1338,6 +1553,7 @@ export default function UserProfileModal({
                         { key: 'media', label: 'Media', Icon: ImageIcon },
                         { key: 'links', label: 'Links', Icon: LinkIcon },
                         { key: 'files', label: 'Files', Icon: Paperclip },
+                        { key: 'beacons', label: 'Beacons', Icon: MapPin },
                       ] as const
                     ).map(({ key, label, Icon }) => {
                       const selected = activeTab === key;
@@ -1348,14 +1564,14 @@ export default function UserProfileModal({
                           role="tab"
                           aria-selected={selected}
                           onClick={() => setActiveTab(key)}
-                          className={`flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 text-xs font-semibold transition-colors ${
+                          className={`flex items-center justify-center gap-1.5 rounded-[8px] px-1.5 py-2 text-[11px] font-semibold transition-colors sm:text-xs ${
                             selected
                               ? 'bg-primary text-on-primary'
                               : 'text-on-surface-variant hover:bg-surface hover:text-on-surface'
                           }`}
                         >
                           <Icon className="h-3.5 w-3.5" aria-hidden />
-                          <span>{label}</span>
+                          <span className="hidden sm:inline">{label}</span>
                         </button>
                       );
                     })}
@@ -1567,6 +1783,155 @@ export default function UserProfileModal({
                             </li>
                           ))}
                         </ul>
+                      )}
+                    </section>
+                  )}
+
+                  {activeTab === 'beacons' && (
+                    <section role="tabpanel" aria-label="Beacons" className="space-y-3">
+                      {recommendationPayload?.recommendation && !recommendationDismissed && (
+                        <div className="rounded-[16px] border-2 border-border-hard bg-surface-container p-4">
+                          <p className="text-xs font-bold uppercase tracking-wide text-primary">Go together?</p>
+                          <p className="mt-1 text-sm font-semibold text-on-surface">
+                            {(recommendationPayload.recommendation.peer_name ?? 'They')} are going to{' '}
+                            {recommendationPayload.recommendation.title}
+                          </p>
+                          {(recommendationPayload.recommendation.event_start_at ||
+                            recommendationPayload.recommendation.location_name) && (
+                            <p className="mt-1 text-xs text-on-surface-variant">
+                              {[
+                                recommendationPayload.recommendation.event_start_at
+                                  ?.slice(0, 16)
+                                  ?.replace('T', ' '),
+                                recommendationPayload.recommendation.location_name
+                                  ?.trim()
+                                  .toLowerCase() === 'current location'
+                                  ? null
+                                  : recommendationPayload.recommendation.location_name?.trim(),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          )}
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              disabled={rsvpBusy}
+                              onClick={() => {
+                                const beaconId = recommendationPayload.recommendation?.beacon_id;
+                                if (!beaconId) return;
+                                setRsvpBusy(true);
+                                void (async () => {
+                                  try {
+                                    const headers = await getAuthHeaders();
+                                    await fetch(`/api/beacons/${encodeURIComponent(beaconId)}/rsvp`, {
+                                      method: 'POST',
+                                      headers: {
+                                        ...headers,
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: '{}',
+                                    });
+                                    setRecommendationDismissed(true);
+                                    void openBeaconDetail(beaconId);
+                                  } finally {
+                                    setRsvpBusy(false);
+                                  }
+                                })();
+                              }}
+                              className="flex-1 rounded-[10px] border-2 border-border-hard bg-primary px-3 py-2 text-sm font-semibold text-on-primary disabled:opacity-60"
+                            >
+                              {rsvpBusy ? 'RSVPing…' : 'RSVP'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRecommendationDismissed(true)}
+                              className="rounded-[10px] border-2 border-border-hard bg-surface px-3 py-2 text-sm font-semibold text-on-surface"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {beaconItems.length === 0 && tabsLoading ? (
+                        <EmptyTabState
+                          Icon={MapPin}
+                          title="Loading shared beacons"
+                          body="Pulling events shared in this conversation."
+                        />
+                      ) : beaconItems.length === 0 ? (
+                        <EmptyTabState
+                          Icon={MapPin}
+                          title="No shared beacons"
+                          body="Events and map pins shared in this chat show up here."
+                        />
+                      ) : (
+                        <ul className="flex flex-col gap-2">
+                          {beaconItems.map((b) => (
+                            <li key={b.beaconId}>
+                              <button
+                                type="button"
+                                onClick={() => void openBeaconDetail(b.beaconId, b)}
+                                className="flex w-full items-start gap-3 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2.5 text-left hover:border-primary"
+                              >
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-semibold text-on-surface">{b.title}</p>
+                                  {(b.scheduleLabel || b.locationLabel) && (
+                                    <p className="mt-0.5 text-[11px] text-on-surface-variant">
+                                      {[b.scheduleLabel, b.locationLabel].filter(Boolean).join(' · ')}
+                                    </p>
+                                  )}
+                                  {b.description && (
+                                    <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">
+                                      {b.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {beaconDetail && (
+                        <div className="rounded-[16px] border-2 border-border-hard bg-surface p-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                                {beaconDetail.expired ? 'Past event' : 'Event'}
+                              </p>
+                              <p className="mt-1 text-base font-semibold text-on-surface">{beaconDetail.title}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setBeaconDetail(null)}
+                              className="rounded-[8px] border-2 border-border-hard bg-surface-container p-1 text-on-surface"
+                              aria-label="Close event detail"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {beaconDetail.loading ? (
+                            <p className="mt-3 text-sm text-on-surface-variant">Loading…</p>
+                          ) : beaconDetail.error ? (
+                            <p className="mt-3 text-sm text-error">{beaconDetail.error}</p>
+                          ) : (
+                            <div className="mt-3 space-y-2 text-sm text-on-surface">
+                              {beaconDetail.schedule && (
+                                <p className="text-on-surface-variant">{beaconDetail.schedule}</p>
+                              )}
+                              {beaconDetail.location && (
+                                <p className="flex items-start gap-2 text-on-surface-variant">
+                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                  <span>{beaconDetail.location}</span>
+                                </p>
+                              )}
+                              {beaconDetail.description && <p>{beaconDetail.description}</p>}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </section>
                   )}

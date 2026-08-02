@@ -115,18 +115,18 @@ export async function GET(
     }
 
     const row = data as Record<string, unknown>;
+    // Authenticated single-beacon GET serves expired rows too (chat / profile history).
+    // Discovery list routes still filter by expires_at; mutations still reject expired.
     const expRaw = row.expires_at;
     const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
-    if (!Number.isFinite(exp) || exp <= Date.now()) {
-      return NextResponse.json({ error: "Expired" }, { status: 404 });
-    }
+    const expired = Number.isFinite(exp) && exp <= Date.now();
 
     const beacon = await enrichBeaconRow(admin, row);
     if (beacon == null) {
       return NextResponse.json({ error: "Malformed beacon" }, { status: 500 });
     }
 
-    return NextResponse.json({ beacon });
+    return NextResponse.json({ beacon, expired });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

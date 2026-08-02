@@ -26,7 +26,7 @@ export async function GET(
     }
 
     const admin = createAdminSupabaseClient();
-    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
     if ("response" in loaded) return loaded.response;
 
     let enriched;

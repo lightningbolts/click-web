@@ -7,6 +7,7 @@
  *   - `attachments` → rows where `message_type IN ('image','audio','file')`
  *   - `media`       → attachments filtered to `image` / `audio`
  *   - `files`       → attachments filtered to `file`
+ *   - `beacons`     → rows where `message_type = 'beacon'` (plaintext metadata)
  *   - `links`  → intentionally omitted server-side; [content] is E2EE,
  *                so clients filter their locally-decrypted message state for
  *                `http://` / `https://` substrings.
@@ -83,20 +84,36 @@ export async function GET(
     return Math.min(Math.max(raw, 1), 500);
   })();
 
-  const attachmentsRes = await supabase
-    .schema('public')
-    .from('messages')
-    .select('*')
-    .eq('chat_id', chatId)
-    .in('message_type', ['image', 'audio', 'file'])
-    .order('time_created', { ascending: false })
-    .limit(limit);
+  const [attachmentsRes, beaconsRes] = await Promise.all([
+    supabase
+      .schema('public')
+      .from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .in('message_type', ['image', 'audio', 'file'])
+      .order('time_created', { ascending: false })
+      .limit(limit),
+    supabase
+      .schema('public')
+      .from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .eq('message_type', 'beacon')
+      .order('time_created', { ascending: false })
+      .limit(limit),
+  ]);
 
   if (attachmentsRes.error) {
     return NextResponse.json({ error: attachmentsRes.error.message }, { status: 500 });
   }
+  if (beaconsRes.error) {
+    return NextResponse.json({ error: beaconsRes.error.message }, { status: 500 });
+  }
 
   const attachments: TabMessage[] = (attachmentsRes.data ?? []).map((row: Record<string, unknown>) =>
+    normalizeDbMessage(row),
+  );
+  const beacons: TabMessage[] = (beaconsRes.data ?? []).map((row: Record<string, unknown>) =>
     normalizeDbMessage(row),
   );
   const media = attachments.filter((item) => item.message_type === 'image' || item.message_type === 'audio');
@@ -108,5 +125,6 @@ export async function GET(
     // NB: `links` is intentionally omitted — see the route-level doc comment.
     media,
     files,
+    beacons,
   });
 }
