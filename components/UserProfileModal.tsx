@@ -1550,10 +1550,10 @@ export default function UserProfileModal({
                     {(
                       [
                         { key: 'timeline', label: 'Timeline', Icon: History },
+                        { key: 'beacons', label: 'Beacons', Icon: MapPin },
                         { key: 'media', label: 'Media', Icon: ImageIcon },
                         { key: 'links', label: 'Links', Icon: LinkIcon },
                         { key: 'files', label: 'Files', Icon: Paperclip },
-                        { key: 'beacons', label: 'Beacons', Icon: MapPin },
                       ] as const
                     ).map(({ key, label, Icon }) => {
                       const selected = activeTab === key;
