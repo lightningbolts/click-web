@@ -66,6 +66,7 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | `FcInput` | Hard-bordered field |
 | `FcPageShell` | Flat background page wrapper |
 | `FcSectionHeader` | Oversized headline + muted support line |
+| Call overlay | Full-screen Grid / Speaker (`components/chat/CallOverlay.tsx`) — `bg-[#101212]`, `border-2 border-border-hard`, primary active border; layout policy in `lib/calls/callLayoutPolicy.ts` |
 
 ---
 
@@ -79,8 +80,9 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | `.text-gradient`, `.gradient-border` | Solid `on-surface` / `primary` |
 | `backdrop-blur`, glass modals | Opaque `surface` + hard border |
 | Space Grotesk / `.font-heading` | Manrope / bold weight |
-| `bg-zinc-950`, `#121212` | `bg-background` |
+| `bg-zinc-950`, `#121212` | `bg-background` (call chrome may use fixed `#101212`) |
 | `border-zinc-800`, `border-white/10` | `border-border-hard` (2px) |
+| Call overlay glass / single remote track | Multi-participant Grid/Speaker + FC tokens |
 
 ---
 

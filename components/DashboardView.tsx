@@ -60,6 +60,7 @@ import CallOverlay, {
   type WebCallInvite,
   type WebCallOverlayState,
 } from '@/components/chat/CallOverlay';
+import { buildCallParticipantsFromRoom } from '@/lib/calls/buildParticipants';
 import UserProfileModal, { type DecryptedProfileMessage } from '@/components/UserProfileModal';
 import type { Message } from '@/lib/chat/types';
 import PostConnectionVibePrompt from '@/components/dashboard/PostConnectionVibePrompt';
@@ -146,6 +147,8 @@ const IDLE_ACTIVE_CALL: WebActiveCallState = {
   cameraEnabled: false,
   remoteVideoTrack: null,
   localVideoTrack: null,
+  participants: [],
+  connectedAtMs: null,
 };
 
 /**
@@ -694,12 +697,31 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       const room = new Room({ adaptiveStream: true, dynacast: true });
       roomRef.current = room;
+      const speakingIds = new Set<string>();
+
+      const syncRoster = () => {
+        const participants = buildCallParticipantsFromRoom(
+          room,
+          speakingIds,
+          room.localParticipant.isCameraEnabled,
+        );
+        const localVideo =
+          room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
+        const firstRemoteVideo =
+          [...room.remoteParticipants.values()]
+            .map((p) => p.getTrackPublication(Track.Source.Camera)?.track)
+            .find(Boolean) ?? null;
+        setActiveCallState((current) => ({
+          ...current,
+          participants,
+          localVideoTrack: localVideo,
+          remoteVideoTrack: firstRemoteVideo,
+          cameraEnabled: room.localParticipant.isCameraEnabled,
+          microphoneEnabled: room.localParticipant.isMicrophoneEnabled,
+        }));
+      };
 
       room.on(RoomEvent.TrackSubscribed, (track: any) => {
-        if (track.kind === 'video') {
-          setActiveCallState((current) => ({ ...current, remoteVideoTrack: track }));
-        }
-
         if (track.kind === 'audio') {
           const element = track.attach();
           element.autoplay = true;
@@ -707,27 +729,43 @@ export default function DashboardView({ user }: DashboardViewProps) {
           document.body.appendChild(element);
           remoteAudioElementsRef.current.push(element);
         }
+        syncRoster();
       });
 
-      room.on(RoomEvent.TrackUnsubscribed, (track: any) => {
-        if (track.kind === 'video') {
-          setActiveCallState((current) => ({ ...current, remoteVideoTrack: null }));
-        }
+      room.on(RoomEvent.TrackUnsubscribed, () => {
+        syncRoster();
       });
 
-      room.on(RoomEvent.LocalTrackPublished, (publication: any) => {
-        if (publication.track?.source === Track.Source.Camera) {
-          setActiveCallState((current) => ({ ...current, localVideoTrack: publication.track }));
-        }
+      room.on(RoomEvent.LocalTrackPublished, () => {
+        syncRoster();
       });
 
-      room.on(RoomEvent.LocalTrackUnpublished, (publication: any) => {
-        if (publication.track?.source === Track.Source.Camera) {
-          setActiveCallState((current) => ({ ...current, localVideoTrack: null }));
+      room.on(RoomEvent.LocalTrackUnpublished, () => {
+        syncRoster();
+      });
+
+      room.on(RoomEvent.ParticipantConnected, () => {
+        syncRoster();
+      });
+
+      room.on(RoomEvent.TrackMuted, () => {
+        syncRoster();
+      });
+
+      room.on(RoomEvent.TrackUnmuted, () => {
+        syncRoster();
+      });
+
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers: { identity?: string }[]) => {
+        speakingIds.clear();
+        for (const speaker of speakers) {
+          if (speaker.identity) speakingIds.add(speaker.identity);
         }
+        syncRoster();
       });
 
       room.on(RoomEvent.ParticipantDisconnected, () => {
+        syncRoster();
         if (room.remoteParticipants.size === 0) {
           endWithReason(invite, 'Call ended');
         }
@@ -746,12 +784,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
       const localCameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
       callConnectedAtRef.current = Date.now();
       completedCallLoggedRef.current = false;
+      const participants = buildCallParticipantsFromRoom(
+        room,
+        speakingIds,
+        invite.videoEnabled,
+      );
       setActiveCallState((current) => ({
         ...current,
         status: 'connected',
         localVideoTrack: localCameraTrack,
         cameraEnabled: invite.videoEnabled,
         microphoneEnabled: true,
+        participants,
+        connectedAtMs: callConnectedAtRef.current,
       }));
     } catch (error: any) {
       const peerId = user.id === invite.callerId ? invite.calleeId : invite.callerId;
@@ -934,7 +979,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
     if (!room) return;
     const next = !activeCallState.microphoneEnabled;
     await room.localParticipant.setMicrophoneEnabled(next);
-    setActiveCallState((current) => ({ ...current, microphoneEnabled: next }));
+    const participants = buildCallParticipantsFromRoom(room, new Set(), room.localParticipant.isCameraEnabled);
+    setActiveCallState((current) => ({
+      ...current,
+      microphoneEnabled: next,
+      participants,
+    }));
   }, [activeCallState.microphoneEnabled]);
 
   const toggleCamera = useCallback(async () => {
@@ -943,7 +993,13 @@ export default function DashboardView({ user }: DashboardViewProps) {
     const next = !activeCallState.cameraEnabled;
     await room.localParticipant.setCameraEnabled(next);
     const localCameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track ?? null;
-    setActiveCallState((current) => ({ ...current, cameraEnabled: next, localVideoTrack: localCameraTrack }));
+    const participants = buildCallParticipantsFromRoom(room, new Set(), next);
+    setActiveCallState((current) => ({
+      ...current,
+      cameraEnabled: next,
+      localVideoTrack: localCameraTrack,
+      participants,
+    }));
   }, [activeCallState.cameraEnabled]);
 
   useEffect(() => {
