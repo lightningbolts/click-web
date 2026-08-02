@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assertHubGeofenceFromCoords } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { checkHubMessageCooldown } from '@/lib/hub/hubMessageCooldown';
 
 type HubMessageInsert = {
   hub_id: string;
@@ -71,6 +72,35 @@ export async function POST(request: NextRequest) {
     .upsert({ hub_id: hubId, user_id: auth.user.id }, { onConflict: 'hub_id,user_id', ignoreDuplicates: true });
   if (participantErr) {
     console.error('[hub/messages] participant upsert:', participantErr.message);
+  }
+
+  // Per-user send cooldown (spam guard).
+  const { data: lastRow } = await admin
+    .from('hub_messages')
+    .select('created_at')
+    .eq('hub_id', hubId)
+    .eq('user_id', auth.user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lastCreatedAt =
+    lastRow != null && typeof (lastRow as { created_at?: unknown }).created_at === 'string'
+      ? (lastRow as { created_at: string }).created_at
+      : null;
+  const cooldown = checkHubMessageCooldown(lastCreatedAt);
+  if (!cooldown.allowed) {
+    return NextResponse.json(
+      {
+        error: 'HUB_MESSAGE_COOLDOWN',
+        retry_after_seconds: cooldown.retryAfterSeconds,
+        message: `Please wait ${cooldown.retryAfterSeconds}s before sending again.`,
+      },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(cooldown.retryAfterSeconds) },
+      },
+    );
   }
 
   const messageType =

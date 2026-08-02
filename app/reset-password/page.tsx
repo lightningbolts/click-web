@@ -150,13 +150,13 @@ export default function ResetPassword() {
             {error || 'This password reset link is invalid or has expired.'}
           </p>
           <p className="text-zinc-500 text-sm mb-8">
-            Please request a new password reset link from the login page.
+            Please request a new password reset link.
           </p>
           <a
-            href="/"
+            href="/forgot-password"
             className="inline-block px-6 py-3 bg-[#8338EC] hover:bg-[#9d4eff] rounded-xl font-semibold transition-colors"
           >
-            Back to Home
+            Request new link
           </a>
         </motion.div>
       </div>
