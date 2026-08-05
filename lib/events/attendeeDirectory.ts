@@ -400,8 +400,36 @@ export async function enrichAttendeeDirectory(
     throw new Error("Failed to load attendees");
   }
 
-  const attendeeRows = parseAttendeeDirectoryRows(attendeeData);
-  const has_rsvp = attendeeRows.some((row) => row.user_id === viewerId);
+  const attendeeRowsFromRsvp = parseAttendeeDirectoryRows(attendeeData);
+
+  const { data: allCheckInsData, error: allCheckInsErr } = await admin
+    .from("event_check_ins")
+    .select("user_id, checked_in_at, checked_out_at")
+    .eq("beacon_id", beaconId);
+
+  if (allCheckInsErr) {
+    console.error("enrichAttendeeDirectory all check-ins:", allCheckInsErr.message);
+  }
+
+  // Include check-in-only attendees (they are not always in beacon_attendees).
+  const rsvpIds = new Set(attendeeRowsFromRsvp.map((r) => r.user_id));
+  const checkInOnlyRows: AttendeeRow[] = [];
+  if (Array.isArray(allCheckInsData)) {
+    for (const raw of allCheckInsData) {
+      if (!isRecord(raw) || typeof raw.user_id !== "string") continue;
+      if (rsvpIds.has(raw.user_id)) continue;
+      const signed =
+        typeof raw.checked_in_at === "string" ? raw.checked_in_at : null;
+      if (signed == null) continue;
+      checkInOnlyRows.push({
+        user_id: raw.user_id,
+        signed_up_at: signed,
+        distance_meters: null,
+      });
+    }
+  }
+  const attendeeRows = [...attendeeRowsFromRsvp, ...checkInOnlyRows];
+  const has_rsvp = attendeeRowsFromRsvp.some((row) => row.user_id === viewerId);
 
   const { data: checkInRow, error: checkInErr } = await admin
     .from("event_check_ins")

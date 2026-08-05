@@ -75,18 +75,23 @@ export async function GET(request: NextRequest) {
       .map((row) => {
         if (!isRecord(row) || typeof row.beacon_id !== "string") return null;
         const beacon = beaconById.get(row.beacon_id);
-        if (beacon == null) return null;
-        const meta = isRecord(beacon.metadata) ? beacon.metadata : {};
-        const coords = parseLatLngFromLocationField(beacon.location, Number.NaN, Number.NaN);
+        const meta = beacon != null && isRecord(beacon.metadata) ? beacon.metadata : {};
+        const coords =
+          beacon != null
+            ? parseLatLngFromLocationField(beacon.location, Number.NaN, Number.NaN)
+            : { lat: Number.NaN, lng: Number.NaN };
         return {
           beacon_id: row.beacon_id,
           bookmarked_at: typeof row.created_at === "string" ? row.created_at : null,
-          title: metaStr(meta, "title", "label", "name"),
+          title:
+            metaStr(meta, "title", "label", "name") ??
+            (beacon == null ? "Unavailable event" : null),
           event_start_at: metaStr(meta, "event_start_at", "eventStartAt"),
           event_end_at: metaStr(meta, "event_end_at", "eventEndAt"),
           latitude: Number.isFinite(coords.lat) ? coords.lat : null,
           longitude: Number.isFinite(coords.lng) ? coords.lng : null,
-          expires_at: typeof beacon.expires_at === "string" ? beacon.expires_at : null,
+          expires_at:
+            beacon != null && typeof beacon.expires_at === "string" ? beacon.expires_at : null,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x != null);
