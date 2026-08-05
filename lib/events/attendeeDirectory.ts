@@ -193,12 +193,14 @@ export function peerIdsFromConnections(
 
 /**
  * Build FoF mutual_via map: for each non-direct peer A, which members of C connect to A.
+ * When [attendeeIds] is provided, only emit entries for attendees at the event.
  */
 export function buildMutualViaMap(
   viewerId: string,
   directPeers: ReadonlySet<string>,
   fofConnections: ConnectionRow[],
   nameById: ReadonlyMap<string, string>,
+  attendeeIds?: ReadonlySet<string>,
 ): Map<string, Array<{ user_id: string; name: string }>> {
   const viaByAttendee = new Map<string, Map<string, string>>();
 
@@ -209,7 +211,10 @@ export function buildMutualViaMap(
     if (viasInC.length === 0) continue;
 
     const targets = members.filter(
-      (id) => id !== viewerId && !directPeers.has(id),
+      (id) =>
+        id !== viewerId &&
+        !directPeers.has(id) &&
+        (attendeeIds == null || attendeeIds.has(id)),
     );
     for (const target of targets) {
       let viaMap = viaByAttendee.get(target);
@@ -301,54 +306,71 @@ function parseInterestTags(raw: unknown): string[] {
   return tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0);
 }
 
+const IN_QUERY_CHUNK = 150;
+
+async function loadInChunks<T>(
+  ids: string[],
+  loadChunk: (chunk: string[]) => Promise<Map<string, T>>,
+): Promise<Map<string, T>> {
+  const unique = [...new Set(ids.filter((id) => id.length > 0))];
+  if (unique.length === 0) return new Map();
+  if (unique.length <= IN_QUERY_CHUNK) return loadChunk(unique);
+
+  const out = new Map<string, T>();
+  for (let i = 0; i < unique.length; i += IN_QUERY_CHUNK) {
+    const chunk = unique.slice(i, i + IN_QUERY_CHUNK);
+    const part = await loadChunk(chunk);
+    for (const [k, v] of part) out.set(k, v);
+  }
+  return out;
+}
+
 async function loadProfiles(
   admin: SupabaseClient,
   userIds: string[],
 ): Promise<Map<string, UserProfileRow>> {
-  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
-  if (unique.length === 0) return new Map();
+  return loadInChunks(userIds, async (chunk) => {
+    const { data, error } = await admin
+      .from("users")
+      .select("id, name, image, first_name, last_name")
+      .in("id", chunk);
 
-  const { data, error } = await admin
-    .from("users")
-    .select("id, name, image, first_name, last_name")
-    .in("id", unique);
+    if (error != null || !Array.isArray(data)) {
+      console.error("attendeeDirectory loadProfiles:", error?.message);
+      return new Map();
+    }
 
-  if (error != null || !Array.isArray(data)) {
-    console.error("attendeeDirectory loadProfiles:", error?.message);
-    return new Map();
-  }
-
-  const out = new Map<string, UserProfileRow>();
-  for (const raw of data) {
-    const profile = parseUserProfile(raw);
-    if (profile != null) out.set(profile.id, profile);
-  }
-  return out;
+    const out = new Map<string, UserProfileRow>();
+    for (const raw of data) {
+      const profile = parseUserProfile(raw);
+      if (profile != null) out.set(profile.id, profile);
+    }
+    return out;
+  });
 }
 
 async function loadInterestTagsByUser(
   admin: SupabaseClient,
   userIds: string[],
 ): Promise<Map<string, string[]>> {
-  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
-  if (unique.length === 0) return new Map();
+  return loadInChunks(userIds, async (chunk) => {
+    const { data, error } = await admin
+      .from("user_interests")
+      .select("user_id, tags")
+      .in("user_id", chunk);
 
-  const { data, error } = await admin
-    .from("user_interests")
-    .select("user_id, tags")
-    .in("user_id", unique);
+    if (error != null || !Array.isArray(data)) {
+      console.error("attendeeDirectory loadInterestTags:", error?.message);
+      return new Map();
+    }
 
-  if (error != null || !Array.isArray(data)) {
-    console.error("attendeeDirectory loadInterestTags:", error?.message);
-    return new Map();
-  }
-
-  const out = new Map<string, string[]>();
-  for (const raw of data) {
-    if (!isRecord(raw) || typeof raw.user_id !== "string") continue;
-    out.set(raw.user_id, parseInterestTags(raw));
-  }
-  return out;
+    const out = new Map<string, string[]>();
+    for (const raw of data) {
+      if (!isRecord(raw) || typeof raw.user_id !== "string") continue;
+      out.set(raw.user_id, parseInterestTags(raw));
+    }
+    return out;
+  });
 }
 
 /**
@@ -426,6 +448,7 @@ export async function enrichAttendeeDirectory(
   }
 
   const attendeeIds = attendeeRows.map((r) => r.user_id);
+  const attendeeIdSet = new Set(attendeeIds);
   const profileIds = [
     ...new Set([...attendeeIds, viewerId, ...directPeers]),
   ];
@@ -447,6 +470,7 @@ export async function enrichAttendeeDirectory(
     directPeers,
     fofConnections,
     nameById,
+    attendeeIdSet,
   );
 
   const attendees = buildDirectoryAttendees({
