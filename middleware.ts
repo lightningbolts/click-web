@@ -83,7 +83,7 @@ function isConnectionsApiPath(pathname: string): boolean {
   return pathname === '/api/connections' || pathname.startsWith('/api/connections/');
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -121,7 +121,7 @@ export async function proxy(request: NextRequest) {
   }
   // API routes authenticate in each Route Handler (`getSupabaseFromRouteRequest`, etc.). Running
   // `getUser()` here duplicates a network round-trip to Supabase Auth on every `/api/*` request and
-  // dominated dev timing (see Next `proxy.ts` segment). Page navigations still refresh the session below.
+  // dominated dev timing (see Next middleware segment). Page navigations still refresh the session below.
   if (pathname.startsWith('/api/')) {
     return NextResponse.next({
       request: {

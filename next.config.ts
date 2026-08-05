@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  // OpenNext on Workers needs an IMAGES binding (Cloudflare Images) for /_next/image.
+  // Without it, optimized URLs 404; serve public assets as-is on the free plan.
+  images: {
+    unoptimized: true,
+  },
   async headers() {
     return [
       {

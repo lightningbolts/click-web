@@ -3,13 +3,13 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Radar, Crosshair } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
 import { DemoBanner } from "@/components/insights/DemoBanner";
 import { GlassPanel } from "@/components/insights/GlassPanel";
-import VibeRadarMap from "@/components/insights/VibeRadarMap";
 import BeaconDeployModal from "@/components/insights/BeaconDeployModal";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import {
@@ -18,6 +18,10 @@ import {
   type VenuePopUpHubBeacon,
 } from "@/lib/insights/vibeRadar";
 import type { MapBeaconRecord } from "@/lib/map/mapBeacons";
+
+const VibeRadarMap = dynamic(() => import("@/components/insights/VibeRadarMap"), {
+  ssr: false,
+});
 
 const containerVariants = {
   hidden: { opacity: 0 },

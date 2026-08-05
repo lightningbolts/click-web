@@ -3,10 +3,10 @@
 import { motion } from 'framer-motion';
 import { Smartphone, Zap, Shield, Users, MapPin, CheckCircle, X, ArrowRight, CalendarDays, Sparkles, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import LoadingScreen from '@/components/LoadingScreen';
-import DashboardView from '@/components/DashboardView';
 import LoginModal from '@/components/LoginModal';
 import LiveConnectionTicker from '@/components/LiveConnectionTicker';
 import BentoScreenshotShowcase from '@/components/landing/BentoScreenshotShowcase';
@@ -15,6 +15,12 @@ import PartnerDashboardShowcase from '@/components/landing/PartnerDashboardShowc
 import LandingScreenshotFrame from '@/components/landing/LandingScreenshotFrame';
 import LandingWebScreensCarousel from '@/components/landing/LandingWebScreensCarousel';
 import { LANDING_IMG } from '@/lib/landingAssets';
+
+/** Keep livekit/maplibre/emoji-mart out of the Cloudflare Worker SSR bundle. */
+const DashboardView = dynamic(() => import('@/components/DashboardView'), {
+  ssr: false,
+  loading: () => <LoadingScreen />,
+});
 
 export default function Home() {
   const { user, loading } = useAuth();

@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users2, Info } from 'lucide-react';
-import { GlassPanel } from './InsightsDashboard';
+import { GlassPanel } from './GlassPanel';
 import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
 import type { TribeBubble } from '@/lib/insights/mockData';
 
