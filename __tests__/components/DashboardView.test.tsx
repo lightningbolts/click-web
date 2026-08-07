@@ -1,5 +1,6 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import DashboardView from '@/components/DashboardView';
+import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks — isolate DashboardView from external services & children   */
@@ -127,6 +128,14 @@ jest.mock('@/lib/dashboard/userMetrics', () => ({
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 
+function jsonResponse(body: unknown, status = 200) {
+  return Promise.resolve({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  } as Response);
+}
+
 function buildMockUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'user-123',
@@ -139,7 +148,15 @@ function buildMockUser(overrides: Record<string, unknown> = {}) {
 async function renderDashboard(user: Record<string, unknown> = buildMockUser()) {
   let result: ReturnType<typeof render>;
   await act(async () => {
-    result = render(<DashboardView user={user} />);
+    result = render(
+      <ThemeProvider>
+        <DashboardView user={user} />
+      </ThemeProvider>,
+    );
+  });
+  // Wait until loading gates clear (connections + birthday profile).
+  await waitFor(() => {
+    expect(screen.getByTestId('call-overlay')).toBeInTheDocument();
   });
   return result!;
 }
@@ -151,6 +168,16 @@ async function renderDashboard(user: Record<string, unknown> = buildMockUser()) 
 describe('DashboardView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/users/') && url.includes('/profile')) {
+        return jsonResponse({ user: { birthday: '2000-01-01' } });
+      }
+      if (url.includes('/api/connections')) {
+        return jsonResponse({ active: [], archived: [], map: [], core: [] });
+      }
+      return jsonResponse({});
+    }) as jest.Mock;
   });
 
   it('renders without crashing when given a minimal user prop', async () => {
@@ -160,14 +187,14 @@ describe('DashboardView', () => {
 
   it('displays the user name in the welcome header', async () => {
     await renderDashboard();
-    expect(screen.getByText(/Alice Smith/)).toBeInTheDocument();
+    expect(await screen.findByText(/Alice Smith/)).toBeInTheDocument();
   });
 
   it('falls back to the email prefix when full_name is absent', async () => {
     await renderDashboard(
       buildMockUser({ user_metadata: {}, email: 'bob@example.com' }),
     );
-    expect(screen.getByText(/bob/)).toBeInTheDocument();
+    expect(await screen.findByText(/bob/)).toBeInTheDocument();
   });
 
   it('prefers first_name and last_name in user_metadata over full_name', async () => {
@@ -180,7 +207,7 @@ describe('DashboardView', () => {
         },
       }),
     );
-    expect(screen.getByText(/Pat Lee/)).toBeInTheDocument();
+    expect(await screen.findByText(/Pat Lee/)).toBeInTheDocument();
   });
 
   it('renders all five navigation tabs', async () => {
@@ -188,14 +215,14 @@ describe('DashboardView', () => {
 
     const expectedLabels = ['Memory Box', 'Map', 'Chat', 'QR Identity', 'Settings'];
     for (const label of expectedLabels) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(await screen.findByText(label)).toBeInTheDocument();
     }
   });
 
   it('shows the Memory Box tab content by default (stats + milestones)', async () => {
     await renderDashboard();
 
-    expect(screen.getByTestId('stats-overview')).toBeInTheDocument();
+    expect(await screen.findByTestId('stats-overview')).toBeInTheDocument();
     expect(screen.getByTestId('milestone-progress')).toBeInTheDocument();
     expect(screen.getByTestId('time-capsule')).toBeInTheDocument();
     expect(screen.getByTestId('connection-table')).toBeInTheDocument();
@@ -204,13 +231,13 @@ describe('DashboardView', () => {
   it('shows "No achievements yet" when the achievements list is empty', async () => {
     await renderDashboard();
     expect(
-      screen.getByText(/No achievements yet/),
+      await screen.findByText(/No achievements yet/),
     ).toBeInTheDocument();
   });
 
   it('renders the data sovereignty notice', async () => {
     await renderDashboard();
-    expect(screen.getByText(/Your data belongs to you/)).toBeInTheDocument();
+    expect(await screen.findByText(/Your data belongs to you/)).toBeInTheDocument();
   });
 
   it('renders the CallOverlay component', async () => {

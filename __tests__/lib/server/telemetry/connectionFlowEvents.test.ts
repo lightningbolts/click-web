@@ -17,7 +17,8 @@ describe('connectionFlowEvents', () => {
   it('classifies skip reasons without GPS or enough participants', () => {
     expect(proximityAtEventSkipReason(null, null, ['a', 'b'])).toBe('missing_gps');
     expect(proximityAtEventSkipReason(0, 0, ['a', 'b'])).toBe('missing_gps');
-    expect(proximityAtEventSkipReason(47.6, -122.3, ['a'])).toBe('insufficient_participants');
+    expect(proximityAtEventSkipReason(47.6, -122.3, [])).toBe('insufficient_participants');
+    expect(proximityAtEventSkipReason(47.6, -122.3, ['a'])).toBe('no_live_event_match');
     expect(proximityAtEventSkipReason(47.6, -122.3, ['a', 'b'])).toBe('no_live_event_match');
   });
 
