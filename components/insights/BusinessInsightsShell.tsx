@@ -7,7 +7,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import {
-  Zap,
   RefreshCw,
   Download,
   Settings,
@@ -26,6 +25,7 @@ import {
 import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
 import VenueBroadcastingModule from "@/components/insights/VenueBroadcastingModule";
 import ThemeToggle from "@/components/ThemeToggle";
+import ClickLogo from "@/components/ClickLogo";
 
 const navItems = [
   { href: "/insights", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -123,8 +123,13 @@ export default function BusinessInsightsShell({
           {/* Header row */}
           <div className="flex items-center justify-between py-3 md:py-4">
             <div className="flex items-center gap-3">
-              <div className="relative flex-shrink-0 rounded-[8px] border-2 border-border-hard bg-on-primary-container p-2.5">
-                <Zap className="h-4 w-4 text-primary md:h-5 md:w-5" />
+              <div className="relative flex-shrink-0">
+                <ClickLogo
+                  variant="boxed"
+                  size={40}
+                  className="h-10 w-10 rounded-[8px] border-2 border-border-hard"
+                  priority
+                />
                 {isLive && (
                   <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />

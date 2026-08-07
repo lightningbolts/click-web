@@ -6,6 +6,7 @@ import UserProfile from "@/components/UserProfile";
 import { useEffect, useRef, useState } from "react";
 import LoginModal from "@/components/LoginModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import ClickLogo from "@/components/ClickLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { User, LogOut, BarChart2, Menu, X } from "lucide-react";
 import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
@@ -86,9 +87,15 @@ export default function Navbar() {
         style={{ backgroundColor: "var(--color-surface)" }}
       >
         <div className="flex items-center justify-between gap-3">
-          <Link href="/" className="shrink-0 text-xl font-bold md:text-2xl">
-            <span className="text-primary">C</span>
-            <span className="text-on-surface">lick</span>
+          <Link
+            href="/"
+            className="flex shrink-0 items-center gap-2 text-xl font-bold md:gap-2.5 md:text-2xl"
+          >
+            <ClickLogo size={28} className="h-7 w-7 md:h-8 md:w-8" priority />
+            <span>
+              <span className="text-primary">C</span>
+              <span className="text-on-surface">lick</span>
+            </span>
           </Link>
 
           <div className="flex items-center gap-2 md:gap-4">

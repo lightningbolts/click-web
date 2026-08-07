@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import ClickLogo from '@/components/ClickLogo';
 
 export default function LoadingScreen() {
   return (
@@ -10,10 +11,13 @@ export default function LoadingScreen() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4 }}
-          className="text-5xl font-bold md:text-6xl"
+          className="flex flex-col items-center gap-4"
         >
-          <span className="text-primary">C</span>
-          <span className="text-on-surface">lick</span>
+          <ClickLogo size={72} className="h-[72px] w-[72px]" priority />
+          <div className="text-5xl font-bold md:text-6xl">
+            <span className="text-primary">C</span>
+            <span className="text-on-surface">lick</span>
+          </div>
         </motion.div>
 
         <div className="flex gap-3">

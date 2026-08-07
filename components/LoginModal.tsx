@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { startOAuth, type OAuthProvider } from '@/lib/auth/oauth';
 import { useRouter } from 'next/navigation';
+import ClickLogo from '@/components/ClickLogo';
 
 function isAtLeastYearsOld(isoDate: string, years: number): boolean {
   const d = new Date(`${isoDate}T12:00:00Z`);
@@ -227,21 +228,24 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
             >
               {/* Sticky chrome */}
               <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b-2 border-border-hard bg-surface px-4 py-3 sm:px-6 sm:py-4">
-                <div className="min-w-0 pr-2">
-                  <h2 id="login-modal-title" className="text-xl font-bold text-on-surface sm:text-2xl">
-                    {isForgotPassword
-                      ? 'Reset Password'
-                      : isSignup
-                        ? 'Create Account'
-                        : 'Welcome Back'}
-                  </h2>
-                  <p className="mt-1 text-sm font-medium text-on-surface-variant">
-                    {isForgotPassword
-                      ? 'Enter your email to receive a reset link'
-                      : isSignup
-                        ? 'Join Click and start building real connections'
-                        : 'Sign in to your Click account'}
-                  </p>
+                <div className="flex min-w-0 items-start gap-3 pr-2">
+                  <ClickLogo size={36} className="mt-0.5 h-9 w-9 shrink-0" />
+                  <div className="min-w-0">
+                    <h2 id="login-modal-title" className="text-xl font-bold text-on-surface sm:text-2xl">
+                      {isForgotPassword
+                        ? 'Reset Password'
+                        : isSignup
+                          ? 'Create Account'
+                          : 'Welcome Back'}
+                    </h2>
+                    <p className="mt-1 text-sm font-medium text-on-surface-variant">
+                      {isForgotPassword
+                        ? 'Enter your email to receive a reset link'
+                        : isSignup
+                          ? 'Join Click and start building real connections'
+                          : 'Sign in to your Click account'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"

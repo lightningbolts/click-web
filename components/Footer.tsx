@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
+import ClickLogo from '@/components/ClickLogo';
 
 export default function Footer() {
   const { user } = useAuth();
@@ -15,9 +16,12 @@ export default function Footer() {
     >
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col items-center justify-center gap-6">
-          <div className="text-2xl font-bold md:text-3xl">
-            <span className="text-primary">C</span>
-            <span className="text-on-surface">lick</span>
+          <div className="flex items-center gap-3 text-2xl font-bold md:text-3xl">
+            <ClickLogo size={36} className="h-9 w-9 md:h-10 md:w-10" />
+            <span>
+              <span className="text-primary">C</span>
+              <span className="text-on-surface">lick</span>
+            </span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-semibold md:gap-6 md:text-base">
             <Link href="/privacy" className="text-on-surface hover:text-primary">

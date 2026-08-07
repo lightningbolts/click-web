@@ -610,8 +610,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
     const notification = new Notification(title, {
       body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
+      icon: '/icon.png',
+      badge: '/icon.png',
       silent: false,
     });
 
