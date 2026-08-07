@@ -8,7 +8,8 @@ const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 /**
  * GET — enriched attendee directory for an event beacon.
- * Requires auth + viewer RSVP or check-in (403 otherwise).
+ * Requires authentication. RSVP and check-in status affect engagement CTAs only;
+ * all signed-in viewers can plan around the enriched event directory.
  */
 export async function GET(
   request: NextRequest,
@@ -35,13 +36,6 @@ export async function GET(
     } catch (e) {
       console.error("GET attendees/directory enrich:", e);
       return NextResponse.json({ error: "Failed to load directory" }, { status: 500 });
-    }
-
-    if (!enriched.has_rsvp && !enriched.has_check_in) {
-      return NextResponse.json(
-        { error: "RSVP or check-in required to view attendee directory" },
-        { status: 403 },
-      );
     }
 
     return NextResponse.json({

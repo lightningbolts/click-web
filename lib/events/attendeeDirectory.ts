@@ -446,8 +446,8 @@ async function loadInterestTagsByUser(
 }
 
 /**
- * Enrich RSVP attendees with interests, distances, and relationship labels.
- * Caller must enforce privacy (RSVP or check-in) before returning to clients.
+ * Enrich RSVP attendees with interests, distances, and relationship labels for an
+ * authenticated event-directory viewer.
  */
 export async function enrichAttendeeDirectory(
   admin: SupabaseClient,
@@ -518,7 +518,9 @@ export async function enrichAttendeeDirectory(
   const current_user_checked_in =
     isRecord(checkInRow) &&
     (checkInRow.checked_out_at == null || checkInRow.checked_out_at === undefined);
-  const mutuals_section_unlocked = current_user_checked_in;
+  // The event directory is a planning tool. Authenticated viewers can use mutual
+  // relationship ordering before RSVP/check-in; those states only govern engagement CTAs.
+  const mutuals_section_unlocked = true;
 
   const { data: viewerConnsData, error: viewerConnsErr } = await admin
     .from("connections")
