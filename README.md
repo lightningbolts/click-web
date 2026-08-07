@@ -114,7 +114,7 @@ Create **`.env.local`** in the `click-web` directory (never commit secrets). See
 
 | Variable | Purpose |
 |----------|---------|
-| `NEXT_PUBLIC_BASE_URL` | Canonical site URL; falls back to `VERCEL_URL` in some routes |
+| `NEXT_PUBLIC_BASE_URL` | Canonical site URL (`https://joinclick.co`); falls back to `VERCEL_URL` in some routes |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth if enabled |
 | `NEXT_PUBLIC_IOS_STORE_URL` / `NEXT_PUBLIC_ANDROID_STORE_URL` | Store links (`lib/config.ts`) |
 | `NEXT_PUBLIC_APP_LAUNCHED` | Set to `true` when the app is publicly launched |

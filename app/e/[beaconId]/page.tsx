@@ -14,7 +14,7 @@ type PublicEvent = {
 };
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "") || "https://click-us.vercel.app";
+  process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "") || "https://joinclick.co";
 const IOS_APP_ID = process.env.NEXT_PUBLIC_IOS_APP_ID || "6757996346";
 
 function isUuidLike(v: string): boolean {

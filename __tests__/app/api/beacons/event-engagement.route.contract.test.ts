@@ -415,7 +415,7 @@ describe("event engagement API contracts", () => {
         body: JSON.stringify({
           surface: "detail",
           platform: "ios",
-          share_url: `https://click-us.vercel.app/e/${BEACON_ID}`,
+          share_url: `https://joinclick.co/e/${BEACON_ID}`,
         }),
       }),
       { params: Promise.resolve({ beaconId: BEACON_ID }) },
