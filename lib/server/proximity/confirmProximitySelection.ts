@@ -3,7 +3,7 @@ import { createCollaborationSessionForConnection } from '@/lib/collaboration/cre
 import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterContextTag';
 import {
   applyLiveEventBeaconToEncounterRow,
-  resolveLiveEventBeaconAt,
+  resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
 import { emitProximityAtEventOutcome } from '@/lib/server/telemetry/connectionFlowEvents';
 import {
@@ -345,14 +345,19 @@ export async function confirmProximityHandshakeSelection(
       elevation_category: sensorPayload.height_category ?? null,
       exact_barometric_elevation_m: sensorPayload.exact_barometric_elevation_m ?? null,
     };
-    const attachment = await resolveLiveEventBeaconAt(admin, memberLat, memberLon, participantIds);
+    const attachment = await resolveLiveEventBeaconForReportingUser(
+      admin,
+      memberLat,
+      memberLon,
+      memberId,
+    );
     if (!atEventTelemetryEmitted) {
       atEventTelemetryEmitted = true;
       void emitProximityAtEventOutcome(admin, {
         attachment,
         latitude: memberLat,
         longitude: memberLon,
-        participantIds,
+        participantIds: [memberId],
         peerCount: participantIds.length,
         isGroup: participantIds.length > 2,
       });

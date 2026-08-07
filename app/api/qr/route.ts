@@ -16,7 +16,7 @@ import { computeCollaborationTtl } from '@/lib/collaboration/collaborationTtl';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import {
   applyLiveEventBeaconToEncounterRow,
-  resolveLiveEventBeaconAt,
+  resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
 
 /**
@@ -639,7 +639,7 @@ export async function POST(request: NextRequest) {
 
         encounterInsert.context_tags = mergedEncounterContextTags;
 
-        const liveEventAttachment = await resolveLiveEventBeaconAt(
+        const liveEventAttachment = await resolveLiveEventBeaconForReportingUser(
           adminClient,
           gpsPair.lat != null && gpsPair.lon != null && !(gpsPair.lat === 0 && gpsPair.lon === 0)
             ? gpsPair.lat
@@ -647,7 +647,7 @@ export async function POST(request: NextRequest) {
           gpsPair.lat != null && gpsPair.lon != null && !(gpsPair.lat === 0 && gpsPair.lon === 0)
             ? gpsPair.lon
             : null,
-          [user.id, targetUserId],
+          user.id,
         );
         Object.assign(
           encounterInsert,

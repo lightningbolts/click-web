@@ -18,7 +18,10 @@ import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichmen
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import {
   applyLiveEventBeaconToEncounterRow,
-  resolveLiveEventBeaconAt,
+  collectEventBeaconIdsFromConnections,
+  filterBeaconIdsWithActiveEngagement,
+  resolveLiveEventBeaconForReportingUser,
+  stripConnectionEncountersEventFieldsForViewer,
 } from '@/lib/server/resolveLiveEventBeaconAt';
 
 /**
@@ -39,6 +42,29 @@ function createAdminClient() {
     serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } }
   );
+}
+
+/**
+ * Hide event_beacon_* / at_event on embedded encounters unless the viewer has
+ * RSVP + active check-in for that beacon (per-person event attachment).
+ */
+async function redactEventFieldsForViewer(
+  viewerUserId: string,
+  connections: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  const beaconIds = collectEventBeaconIdsFromConnections(connections);
+  if (beaconIds.length === 0) return connections;
+  const admin = createAdminClient();
+  const eligible = await filterBeaconIdsWithActiveEngagement(admin, viewerUserId, beaconIds);
+  return stripConnectionEncountersEventFieldsForViewer(connections, eligible);
+}
+
+async function redactSingleConnectionForViewer(
+  viewerUserId: string,
+  connection: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const [redacted] = await redactEventFieldsForViewer(viewerUserId, [connection]);
+  return redacted ?? connection;
 }
 
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
@@ -604,7 +630,11 @@ export async function GET(request: NextRequest) {
         console.error('Error fetching connections:', error);
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
-      return NextResponse.json({ connections: connections || [] });
+      const redacted = await redactEventFieldsForViewer(
+        user.id,
+        (connections ?? []) as Record<string, unknown>[],
+      );
+      return NextResponse.json({ connections: redacted });
     }
 
     // Single connection patch (Realtime row refresh without full dashboard bundle).
@@ -626,7 +656,11 @@ export async function GET(request: NextRequest) {
       if (!connection) {
         return NextResponse.json({ connection: null }, { status: 404 });
       }
-      return NextResponse.json({ connection });
+      const redacted = await redactSingleConnectionForViewer(
+        user.id,
+        connection as Record<string, unknown>,
+      );
+      return NextResponse.json({ connection: redacted });
     }
 
     // Dashboard bundle: one sweep + one junction fetch + parallel selects (replaces 3 HTTP calls).
@@ -660,10 +694,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: mapResult.error.message }, { status: 400 });
       }
 
+      const [active, archived, map] = await Promise.all([
+        redactEventFieldsForViewer(user.id, (activeResult.data ?? []) as Record<string, unknown>[]),
+        redactEventFieldsForViewer(user.id, (archivedResult.data ?? []) as Record<string, unknown>[]),
+        redactEventFieldsForViewer(user.id, (mapResult.data ?? []) as Record<string, unknown>[]),
+      ]);
+
       return NextResponse.json({
-        active: activeResult.data ?? [],
-        archived: archivedResult.data ?? [],
-        map: mapResult.data ?? [],
+        active,
+        archived,
+        map,
         core: coreForUser,
       });
     }
@@ -688,7 +728,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: mapError.message }, { status: 400 });
       }
 
-      return NextResponse.json({ connections: mapConnections || [] });
+      const redacted = await redactEventFieldsForViewer(
+        user.id,
+        (mapConnections ?? []) as Record<string, unknown>[],
+      );
+      return NextResponse.json({ connections: redacted });
     }
 
     // ─── Archived channel: `connection_archives` ids minus `connection_hidden`, then `.in('id', …)` ───
@@ -706,7 +750,11 @@ export async function GET(request: NextRequest) {
         console.error('Error fetching archived connections:', error);
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
-      return NextResponse.json({ connections: connections || [] });
+      const redacted = await redactEventFieldsForViewer(
+        user.id,
+        (connections ?? []) as Record<string, unknown>[],
+      );
+      return NextResponse.json({ connections: redacted });
     }
 
     // ─── Active channel: visible lifecycle states, excluding archived ∪ hidden junction ids ───
@@ -726,7 +774,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ connections: connections || [] });
+    const redacted = await redactEventFieldsForViewer(
+      user.id,
+      (connections ?? []) as Record<string, unknown>[],
+    );
+    return NextResponse.json({ connections: redacted });
   } catch (error) {
     console.error('Server error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -1237,7 +1289,7 @@ export async function POST(request: NextRequest) {
       encounterInsert.exact_barometric_elevation_m = encElev;
     }
 
-    const liveEventAttachment = await resolveLiveEventBeaconAt(
+    const liveEventAttachment = await resolveLiveEventBeaconForReportingUser(
       adminClient,
       Number.isFinite(geoLocation.lat) && !(geoLocation.lat === 0 && geoLocation.lon === 0)
         ? geoLocation.lat
@@ -1245,7 +1297,7 @@ export async function POST(request: NextRequest) {
       Number.isFinite(geoLocation.lon) && !(geoLocation.lat === 0 && geoLocation.lon === 0)
         ? geoLocation.lon
         : null,
-      [userId1, userId2],
+      user.id,
     );
     Object.assign(
       encounterInsert,

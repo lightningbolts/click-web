@@ -12,7 +12,7 @@ import { buildEncounterInsertFromSensor } from '@/lib/connections/encounterSenso
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
 import {
   applyLiveEventBeaconToEncounterRow,
-  resolveLiveEventBeaconAt,
+  resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
 
 function isUuidLike(v: string): boolean {
@@ -165,11 +165,11 @@ export async function POST(request: NextRequest) {
     const gpsLatPre = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
     const gpsLonPre = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
     const admin = createAdminClient();
-    const liveEventAttachment = await resolveLiveEventBeaconAt(
+    const liveEventAttachment = await resolveLiveEventBeaconForReportingUser(
       admin,
       gpsLatPre,
       gpsLonPre,
-      [userId, peerId],
+      userId,
     );
     Object.assign(insertRow, applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment));
 

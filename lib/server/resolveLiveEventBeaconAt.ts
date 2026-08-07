@@ -9,7 +9,7 @@ import {
   resolveCheckInRadiusMeters,
 } from "@/lib/server/eventEngagement";
 
-/** System context tag when both parties RSVPed at a live map event. */
+/** System context tag when the reporting user RSVPed + checked in at a live map event. */
 export const AT_EVENT_CONTEXT_TAG = "at_event";
 
 /** Search radius upper bound (campus scale). */
@@ -38,6 +38,10 @@ function metaStr(meta: Record<string, unknown>, ...keys: string[]): string | nul
  * Find the nearest live map event where GPS is inside the check-in fence
  * and every user in [userIds] has an RSVP (`beacon_attendees`) row plus an
  * active check-in (`event_check_ins` with `checked_out_at IS NULL`).
+ *
+ * For encounter writes, pass only the reporting user (see
+ * {@link resolveLiveEventBeaconForReportingUser}). Passing multiple ids still
+ * requires all of them to qualify (used by eligibility batch checks).
  */
 export async function resolveLiveEventBeaconAt(
   admin: SupabaseClient,
@@ -58,7 +62,7 @@ export async function resolveLiveEventBeaconAt(
       userIds.map((id) => id.trim()).filter((id) => id.length > 0),
     ),
   ];
-  if (ids.length < 2) return null;
+  if (ids.length < 1) return null;
 
   const { data: rpcData, error: rpcErr } = await admin.rpc("fetch_map_beacons_within", {
     lat: latitude,
@@ -155,6 +159,136 @@ export async function resolveLiveEventBeaconAt(
     event_beacon_start_at: best.event_beacon_start_at,
     event_beacon_end_at: best.event_beacon_end_at,
   };
+}
+
+/**
+ * Attach a live event to an encounter row for the reporting user only —
+ * RSVP + active check-in + geofence for that single user.
+ */
+export async function resolveLiveEventBeaconForReportingUser(
+  admin: SupabaseClient,
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+  reportingUserId: string,
+  nowMs: number = Date.now(),
+): Promise<LiveEventBeaconAttachment | null> {
+  const uid = typeof reportingUserId === "string" ? reportingUserId.trim() : "";
+  if (!uid) return null;
+  return resolveLiveEventBeaconAt(admin, latitude, longitude, [uid], nowMs);
+}
+
+/**
+ * Returns beacon ids from [beaconIds] where [userId] has RSVP + active check-in.
+ */
+export async function filterBeaconIdsWithActiveEngagement(
+  admin: SupabaseClient,
+  userId: string,
+  beaconIds: string[],
+): Promise<Set<string>> {
+  const uid = userId.trim();
+  const ids = [
+    ...new Set(beaconIds.map((id) => id.trim()).filter((id) => id.length > 0)),
+  ];
+  const eligible = new Set<string>();
+  if (!uid || ids.length === 0) return eligible;
+
+  const { data: attendees, error: attErr } = await admin
+    .from("beacon_attendees")
+    .select("beacon_id")
+    .eq("user_id", uid)
+    .in("beacon_id", ids);
+  if (attErr) {
+    console.warn("[filterBeaconIdsWithActiveEngagement] attendees:", attErr.message);
+    return eligible;
+  }
+  const rsvped = new Set(
+    (Array.isArray(attendees) ? attendees : [])
+      .map((a) => (isRecord(a) && typeof a.beacon_id === "string" ? a.beacon_id : null))
+      .filter((id): id is string => id != null),
+  );
+  if (rsvped.size === 0) return eligible;
+
+  const rsvpedIds = [...rsvped];
+  const { data: checkIns, error: checkInErr } = await admin
+    .from("event_check_ins")
+    .select("beacon_id")
+    .eq("user_id", uid)
+    .in("beacon_id", rsvpedIds)
+    .is("checked_out_at", null);
+  if (checkInErr) {
+    console.warn("[filterBeaconIdsWithActiveEngagement] check-ins:", checkInErr.message);
+    return eligible;
+  }
+  for (const row of Array.isArray(checkIns) ? checkIns : []) {
+    if (isRecord(row) && typeof row.beacon_id === "string" && row.beacon_id.trim()) {
+      eligible.add(row.beacon_id.trim());
+    }
+  }
+  return eligible;
+}
+
+/** Strip event attachment fields when the viewer is not engaged with that beacon. */
+export function stripEncounterEventFieldsForViewer(
+  encounter: Record<string, unknown>,
+  eligibleBeaconIds: Set<string>,
+): Record<string, unknown> {
+  const beaconId =
+    typeof encounter.event_beacon_id === "string" ? encounter.event_beacon_id.trim() : "";
+  if (!beaconId || eligibleBeaconIds.has(beaconId)) {
+    return encounter;
+  }
+  const prevTags = Array.isArray(encounter.context_tags)
+    ? encounter.context_tags.filter((t): t is string => typeof t === "string")
+    : [];
+  const context_tags = prevTags.filter((t) => t !== AT_EVENT_CONTEXT_TAG);
+  return {
+    ...encounter,
+    context_tags,
+    event_beacon_id: null,
+    event_beacon_title: null,
+    event_beacon_start_at: null,
+    event_beacon_end_at: null,
+  };
+}
+
+/**
+ * Strip event fields on embedded connection_encounters arrays for a viewer.
+ * Mutates shallow copies of connection rows; returns a new array.
+ */
+export function stripConnectionEncountersEventFieldsForViewer(
+  connections: Record<string, unknown>[],
+  eligibleBeaconIds: Set<string>,
+): Record<string, unknown>[] {
+  return connections.map((conn) => {
+    const encounters = conn.connection_encounters;
+    if (!Array.isArray(encounters)) return conn;
+    return {
+      ...conn,
+      connection_encounters: encounters.map((enc) =>
+        isRecord(enc)
+          ? stripEncounterEventFieldsForViewer(enc, eligibleBeaconIds)
+          : enc,
+      ),
+    };
+  });
+}
+
+/** Collect distinct event_beacon_id values from connection rows with embedded encounters. */
+export function collectEventBeaconIdsFromConnections(
+  connections: Record<string, unknown>[],
+): string[] {
+  const ids = new Set<string>();
+  for (const conn of connections) {
+    const encounters = conn.connection_encounters;
+    if (!Array.isArray(encounters)) continue;
+    for (const enc of encounters) {
+      if (!isRecord(enc)) continue;
+      const id =
+        typeof enc.event_beacon_id === "string" ? enc.event_beacon_id.trim() : "";
+      if (id) ids.add(id);
+    }
+  }
+  return [...ids];
 }
 
 /** Merge `at_event` into context_tags and set event_beacon_* columns on an insert row. */

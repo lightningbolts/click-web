@@ -8,7 +8,7 @@ import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterConte
 import {
   AT_EVENT_CONTEXT_TAG,
   applyLiveEventBeaconToEncounterRow,
-  resolveLiveEventBeaconAt,
+  resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
 import { emitProximityAtEventOutcome } from '@/lib/server/telemetry/connectionFlowEvents';
 import {
@@ -954,20 +954,26 @@ export async function bindProximityHandshake(
       insertRow.reporting_user_id = reportingUserId;
     }
 
-    const liveEventAttachment = await resolveLiveEventBeaconAt(
-      admin,
-      encounterLat,
-      encounterLon,
-      participantUserIds,
-    ).catch((err) => {
-      console.warn('[proximity] live event resolve:', err);
-      return null;
-    });
+    const reportingForEvent =
+      typeof reportingUserId === 'string' && reportingUserId.trim()
+        ? reportingUserId.trim()
+        : null;
+    const liveEventAttachment = reportingForEvent
+      ? await resolveLiveEventBeaconForReportingUser(
+          admin,
+          encounterLat,
+          encounterLon,
+          reportingForEvent,
+        ).catch((err) => {
+          console.warn('[proximity] live event resolve:', err);
+          return null;
+        })
+      : null;
     void emitProximityAtEventOutcome(admin, {
       attachment: liveEventAttachment,
       latitude: encounterLat,
       longitude: encounterLon,
-      participantIds: participantUserIds,
+      participantIds: reportingForEvent ? [reportingForEvent] : [],
       peerCount: participantUserIds.length,
       isGroup: participantUserIds.length > 2,
     });

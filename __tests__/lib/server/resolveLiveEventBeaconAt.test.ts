@@ -5,7 +5,10 @@
 import {
   applyLiveEventBeaconToEncounterRow,
   AT_EVENT_CONTEXT_TAG,
+  filterBeaconIdsWithActiveEngagement,
   resolveLiveEventBeaconAt,
+  resolveLiveEventBeaconForReportingUser,
+  stripEncounterEventFieldsForViewer,
 } from "@/lib/server/resolveLiveEventBeaconAt";
 
 const BEACON_ID = "11111111-1111-4111-8111-111111111111";
@@ -103,7 +106,70 @@ describe("resolveLiveEventBeaconAt", () => {
     expect(row.event_beacon_id).toBe(BEACON_ID);
   });
 
-  it("returns null when one user has not RSVPed", async () => {
+  it("attaches for a single reporting user who RSVPed and checked in", async () => {
+    const admin = {
+      rpc: jest.fn().mockResolvedValue({
+        data: [liveEventBeaconRpcRow()],
+        error: null,
+      }),
+      from: mockFromTables({
+        beacon_attendees: {
+          data: [{ user_id: USER_A }],
+          error: null,
+        },
+        event_check_ins: {
+          data: [{ user_id: USER_A }],
+          error: null,
+        },
+      }),
+    };
+
+    const attachment = await resolveLiveEventBeaconForReportingUser(
+      admin as never,
+      47.6501,
+      -122.3001,
+      USER_A,
+    );
+    expect(attachment?.event_beacon_id).toBe(BEACON_ID);
+    expect(attachment?.event_beacon_title).toBe("Park Party");
+  });
+
+  it("attaches for reporting user A when only A RSVPed/checked in (B does not block)", async () => {
+    const admin = {
+      rpc: jest.fn().mockResolvedValue({
+        data: [liveEventBeaconRpcRow()],
+        error: null,
+      }),
+      from: mockFromTables({
+        beacon_attendees: {
+          data: [{ user_id: USER_A }],
+          error: null,
+        },
+        event_check_ins: {
+          data: [{ user_id: USER_A }],
+          error: null,
+        },
+      }),
+    };
+
+    const forA = await resolveLiveEventBeaconForReportingUser(
+      admin as never,
+      47.6501,
+      -122.3001,
+      USER_A,
+    );
+    expect(forA?.event_beacon_title).toBe("Park Party");
+
+    const forB = await resolveLiveEventBeaconForReportingUser(
+      admin as never,
+      47.6501,
+      -122.3001,
+      USER_B,
+    );
+    expect(forB).toBeNull();
+  });
+
+  it("returns null when multi-user set is incomplete (one user has not RSVPed)", async () => {
     const admin = {
       rpc: jest.fn().mockResolvedValue({
         data: [liveEventBeaconRpcRow()],
@@ -227,5 +293,58 @@ describe("resolveLiveEventBeaconAt", () => {
       [USER_A, USER_B],
     );
     expect(attachment).toBeNull();
+  });
+});
+
+describe("viewer event field strip / engagement filter", () => {
+  it("strips event fields when beacon is not eligible for viewer", () => {
+    const stripped = stripEncounterEventFieldsForViewer(
+      {
+        context_tags: ["party", AT_EVENT_CONTEXT_TAG],
+        event_beacon_id: BEACON_ID,
+        event_beacon_title: "Park Party",
+        event_beacon_start_at: pastIso(1),
+        event_beacon_end_at: futureIso(2),
+      },
+      new Set(),
+    );
+    expect(stripped.event_beacon_id).toBeNull();
+    expect(stripped.event_beacon_title).toBeNull();
+    expect(stripped.context_tags).toEqual(["party"]);
+  });
+
+  it("keeps event fields when beacon is eligible", () => {
+    const kept = stripEncounterEventFieldsForViewer(
+      {
+        context_tags: [AT_EVENT_CONTEXT_TAG],
+        event_beacon_id: BEACON_ID,
+        event_beacon_title: "Park Party",
+      },
+      new Set([BEACON_ID]),
+    );
+    expect(kept.event_beacon_id).toBe(BEACON_ID);
+    expect(kept.event_beacon_title).toBe("Park Party");
+  });
+
+  it("filterBeaconIdsWithActiveEngagement returns only engaged beacons", async () => {
+    const admin = {
+      from: mockFromTables({
+        beacon_attendees: {
+          data: [{ beacon_id: BEACON_ID }],
+          error: null,
+        },
+        event_check_ins: {
+          data: [{ beacon_id: BEACON_ID }],
+          error: null,
+        },
+      }),
+    };
+    const eligible = await filterBeaconIdsWithActiveEngagement(
+      admin as never,
+      USER_A,
+      [BEACON_ID, "22222222-2222-4222-8222-222222222222"],
+    );
+    expect(eligible.has(BEACON_ID)).toBe(true);
+    expect(eligible.size).toBe(1);
   });
 });

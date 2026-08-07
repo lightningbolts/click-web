@@ -95,7 +95,7 @@ export function proximityAtEventSkipReason(
   const ids = [
     ...new Set(participantIds.map((id) => id.trim()).filter((id) => id.length > 0)),
   ];
-  if (ids.length < 2) return 'insufficient_participants';
+  if (ids.length < 1) return 'insufficient_participants';
   return 'no_live_event_match';
 }
 
