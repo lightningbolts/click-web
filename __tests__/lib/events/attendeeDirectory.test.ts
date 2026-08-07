@@ -4,6 +4,7 @@
 
 import {
   buildDirectoryAttendees,
+  buildFriendsInCommonByConnection,
   buildMutualViaMap,
   classifyRelationship,
   isActiveIshConnection,
@@ -115,6 +116,44 @@ describe("peerIdsFromConnections + buildMutualViaMap", () => {
     expect(via.get(C)?.map((x) => x.user_id).sort()).toEqual([A, B].sort());
     expect(via.get(D)?.map((x) => x.user_id)).toEqual([A]);
     expect(via.has(A)).toBe(false);
+  });
+});
+
+describe("buildFriendsInCommonByConnection + directory counts", () => {
+  it("counts shared friends for direct connections at the event", () => {
+    // V—A, V—B, A—B ⇒ A and B share 1 mutual (each other) with viewer… 
+    // Friends in common for A: peers(V)∩peers(A) excluding A = {B} ∩ {V,B} = {B}
+    const fof: ConnectionRow[] = [
+      { id: "c1", user_ids: [V, A], status: "active", expiry_state: "active" },
+      { id: "c2", user_ids: [V, B], status: "active", expiry_state: "active" },
+      { id: "c3", user_ids: [A, B], status: "active", expiry_state: "active" },
+    ];
+    const direct = new Set([A, B]);
+    const names = new Map([
+      [A, "Alice"],
+      [B, "Bob"],
+    ]);
+    const shared = buildFriendsInCommonByConnection(V, direct, fof, names, new Set([A, B]));
+    expect(shared.get(A)?.map((x) => x.user_id)).toEqual([B]);
+    expect(shared.get(B)?.map((x) => x.user_id)).toEqual([A]);
+
+    const rows = buildDirectoryAttendees({
+      viewerId: V,
+      attendeeRows: [
+        { user_id: V, signed_up_at: "2026-08-01T10:00:00.000Z", distance_meters: null },
+        { user_id: A, signed_up_at: "2026-08-01T11:00:00.000Z", distance_meters: null },
+      ],
+      profiles: new Map([
+        [V, profile(V, "Viewer")],
+        [A, profile(A, "Alice")],
+      ]),
+      interestsByUser: new Map(),
+      directPeers: direct,
+      mutualViaByAttendee: new Map(),
+      friendsInCommonByConnection: shared,
+    });
+    expect(rows.find((r) => r.user_id === A)?.relationship).toBe("connection");
+    expect(rows.find((r) => r.user_id === A)?.mutual_connection_count).toBe(1);
   });
 });
 

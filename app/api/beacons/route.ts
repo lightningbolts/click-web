@@ -5,6 +5,7 @@ import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
 import {
   enrichSoundtrackMetadata,
   isAllowedMusicShareUrl,
+  mergeSoundtrackMetadataOnRelocate,
 } from "@/lib/map/beaconSoundtrackEnrichment";
 import {
   filterBeaconRecords,
@@ -90,6 +91,7 @@ async function findActiveSoundtrackBeacon(
 /**
  * Move an existing soundtrack pin to new drop coords and refresh TTL/metadata/visibility.
  * Dedup used to return the stale row unchanged, so proximity fetch at the new GPS missed it.
+ * When new enrichment is URL-only, preserve previously rich track/preview/art fields.
  */
 async function relocateSoundtrackBeacon(
   admin: ReturnType<typeof createAdminSupabaseClient>,
@@ -100,12 +102,17 @@ async function relocateSoundtrackBeacon(
   expiresAtIso: string,
   showCreatorName: boolean,
   visibilityAudience: string,
+  existingMetadata?: Record<string, unknown> | null,
 ): Promise<MapBeaconRecord | null> {
+  const mergedMetadata =
+    existingMetadata != null
+      ? mergeSoundtrackMetadataOnRelocate(existingMetadata, metadata)
+      : metadata;
   const { data: updated, error } = await admin
     .from("map_beacons")
     .update({
       location: `POINT(${lon} ${lat})`,
-      metadata,
+      metadata: mergedMetadata,
       expires_at: expiresAtIso,
       show_creator_name: showCreatorName,
       visibility_audience: visibilityAudience,
@@ -362,6 +369,7 @@ export async function POST(request: NextRequest) {
         const admin = createAdminSupabaseClient();
         const existing = await findActiveSoundtrackBeacon(admin, user.id, musicUrl);
         if (existing != null) {
+          const existingMeta = isRecord(existing.metadata) ? existing.metadata : {};
           const relocated = await relocateSoundtrackBeacon(
             admin,
             existing.id,
@@ -371,6 +379,7 @@ export async function POST(request: NextRequest) {
             expiresAtIso,
             showCreatorName,
             visibilityAudience,
+            existingMeta,
           );
           const beacon = relocated ?? { ...existing, lat, lng: lon };
           const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);

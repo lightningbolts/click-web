@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
+import { parseEventCategoryTags } from "@/lib/events/connectionEventRecommendation";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -88,6 +89,14 @@ export async function GET(request: NextRequest) {
             (beacon == null ? "Unavailable event" : null),
           event_start_at: metaStr(meta, "event_start_at", "eventStartAt"),
           event_end_at: metaStr(meta, "event_end_at", "eventEndAt"),
+          location_name: metaStr(meta, "location_name", "place_name", "venue_name"),
+          formatted_address: metaStr(
+            meta,
+            "formatted_address",
+            "address",
+            "display_address",
+          ),
+          event_categories: parseEventCategoryTags(meta),
           latitude: Number.isFinite(coords.lat) ? coords.lat : null,
           longitude: Number.isFinite(coords.lng) ? coords.lng : null,
           expires_at:

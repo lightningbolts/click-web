@@ -95,7 +95,7 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 | `lib/map/beaconVisibility.ts` | Audience filtering |
 | `lib/map/mapBeaconApiShared.ts` | Shared route logic |
 | `lib/map/beaconPopupHtml.ts` | Popup templates |
-| `lib/map/beaconSoundtrackEnrichment.ts` | Spotify metadata |
+| `lib/map/beaconSoundtrackEnrichment.ts` | Soundtrack share URL → iTunes preview/art/track metadata |
 | `lib/map/eventSchedule.ts` | Event window helpers |
 | `supabase/functions/fetch-local-beacons/index.ts` | Mobile radius fetch |
 

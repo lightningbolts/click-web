@@ -240,6 +240,65 @@ export function buildMutualViaMap(
   return out;
 }
 
+/**
+ * Friends-in-common for each direct connection: |peers(viewer) ∩ peers(connection)|.
+ * Built from the same FoF connection graph (edges overlapping viewer peers).
+ */
+export function buildFriendsInCommonByConnection(
+  viewerId: string,
+  directPeers: ReadonlySet<string>,
+  fofConnections: ConnectionRow[],
+  nameById: ReadonlyMap<string, string>,
+  connectionAttendeeIds: ReadonlySet<string>,
+): Map<string, Array<{ user_id: string; name: string }>> {
+  const peersOf = new Map<string, Set<string>>();
+  const addEdge = (a: string, b: string) => {
+    if (a === b || a.length === 0 || b.length === 0) return;
+    let setA = peersOf.get(a);
+    if (setA == null) {
+      setA = new Set();
+      peersOf.set(a, setA);
+    }
+    setA.add(b);
+    let setB = peersOf.get(b);
+    if (setB == null) {
+      setB = new Set();
+      peersOf.set(b, setB);
+    }
+    setB.add(a);
+  };
+
+  for (const conn of fofConnections) {
+    if (!isActiveIshConnection(conn)) continue;
+    const members = conn.user_ids.filter((id) => id.length > 0);
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) {
+        addEdge(members[i]!, members[j]!);
+      }
+    }
+  }
+  // Ensure viewer→direct peer edges are present even if FoF query omitted a row.
+  for (const peerId of directPeers) {
+    addEdge(viewerId, peerId);
+  }
+
+  const viewerPeerSet = peersOf.get(viewerId) ?? new Set(directPeers);
+  const out = new Map<string, Array<{ user_id: string; name: string }>>();
+  for (const connectionId of connectionAttendeeIds) {
+    if (connectionId === viewerId || !directPeers.has(connectionId)) continue;
+    const theirPeers = peersOf.get(connectionId) ?? new Set<string>();
+    const shared: Array<{ user_id: string; name: string }> = [];
+    for (const id of viewerPeerSet) {
+      if (id === connectionId || id === viewerId) continue;
+      if (theirPeers.has(id)) {
+        shared.push({ user_id: id, name: nameById.get(id) ?? "Connection" });
+      }
+    }
+    if (shared.length > 0) out.set(connectionId, shared);
+  }
+  return out;
+}
+
 export function buildDirectoryAttendees(args: {
   viewerId: string;
   attendeeRows: AttendeeRow[];
@@ -247,8 +306,11 @@ export function buildDirectoryAttendees(args: {
   interestsByUser: Map<string, string[]>;
   directPeers: ReadonlySet<string>;
   mutualViaByAttendee: Map<string, Array<{ user_id: string; name: string }>>;
+  /** Friends-in-common for direct connections (optional; defaults to empty). */
+  friendsInCommonByConnection?: Map<string, Array<{ user_id: string; name: string }>>;
 }): DirectoryAttendee[] {
   const viewerTags = args.interestsByUser.get(args.viewerId) ?? [];
+  const friendsInCommon = args.friendsInCommonByConnection ?? new Map();
 
   return args.attendeeRows.map((row) => {
     const profile = args.profiles.get(row.user_id) ?? null;
@@ -258,8 +320,10 @@ export function buildDirectoryAttendees(args: {
       row.user_id === args.viewerId
         ? []
         : getSharedInterestTags(viewerTags, peerTags);
+    const isDirect = args.directPeers.has(row.user_id);
+    // FoF mutual_via only for non-direct peers (relationship classification).
     const mutual_via =
-      row.user_id === args.viewerId || args.directPeers.has(row.user_id)
+      row.user_id === args.viewerId || isDirect
         ? []
         : (args.mutualViaByAttendee.get(row.user_id) ?? []);
     const relationship = classifyRelationship(
@@ -268,6 +332,14 @@ export function buildDirectoryAttendees(args: {
       args.directPeers,
       mutual_via,
     );
+    // Display count: FoF via length, or friends-in-common for direct connections.
+    const friendsShared = isDirect ? (friendsInCommon.get(row.user_id) ?? []) : [];
+    const mutual_connection_count =
+      row.user_id === args.viewerId
+        ? 0
+        : isDirect
+          ? friendsShared.length
+          : mutual_via.length;
 
     return {
       user_id: row.user_id,
@@ -279,7 +351,7 @@ export function buildDirectoryAttendees(args: {
       shared_interest_count: shared_interests.length,
       relationship,
       mutual_via,
-      mutual_connection_count: mutual_via.length,
+      mutual_connection_count,
     };
   });
 }
@@ -460,13 +532,19 @@ export async function enrichAttendeeDirectory(
   const viewerConnections = parseConnectionRows(viewerConnsData);
   const directPeers = peerIdsFromConnections(viewerConnections, viewerId);
 
+  const attendeeIds = attendeeRows.map((r) => r.user_id);
+  const attendeeIdSet = new Set(attendeeIds);
+  const connectionAttendeesAtEvent = new Set(
+    [...attendeeIdSet].filter((id) => directPeers.has(id)),
+  );
+
   let fofConnections: ConnectionRow[] = [];
-  if (directPeers.size > 0) {
-    const peerList = [...directPeers];
+  const overlapIds = [...new Set([...directPeers, ...connectionAttendeesAtEvent])];
+  if (overlapIds.length > 0) {
     const { data: fofData, error: fofErr } = await admin
       .from("connections")
       .select("id, user_ids, status, expiry_state")
-      .overlaps("user_ids", peerList);
+      .overlaps("user_ids", overlapIds);
 
     if (fofErr) {
       console.error("enrichAttendeeDirectory FoF connections:", fofErr.message);
@@ -474,9 +552,15 @@ export async function enrichAttendeeDirectory(
       fofConnections = parseConnectionRows(fofData);
     }
   }
+  // Include viewer's own edges so friends-in-common graph is complete.
+  const connById = new Map(fofConnections.map((c) => [c.id, c]));
+  for (const c of viewerConnections) {
+    if (!connById.has(c.id)) {
+      fofConnections.push(c);
+      connById.set(c.id, c);
+    }
+  }
 
-  const attendeeIds = attendeeRows.map((r) => r.user_id);
-  const attendeeIdSet = new Set(attendeeIds);
   const profileIds = [
     ...new Set([...attendeeIds, viewerId, ...directPeers]),
   ];
@@ -500,6 +584,13 @@ export async function enrichAttendeeDirectory(
     nameById,
     attendeeIdSet,
   );
+  const friendsInCommonByConnection = buildFriendsInCommonByConnection(
+    viewerId,
+    directPeers,
+    fofConnections,
+    nameById,
+    connectionAttendeesAtEvent,
+  );
 
   const attendees = buildDirectoryAttendees({
     viewerId,
@@ -508,6 +599,7 @@ export async function enrichAttendeeDirectory(
     interestsByUser,
     directPeers,
     mutualViaByAttendee,
+    friendsInCommonByConnection,
   });
 
   return {
