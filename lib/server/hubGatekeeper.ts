@@ -56,7 +56,13 @@ export async function assertHubGeofenceFromCoords(
   if (expiresRaw) {
     const expMs = Date.parse(expiresRaw);
     if (Number.isFinite(expMs) && expMs <= Date.now()) {
-      return NextResponse.json({ error: 'Hub expired' }, { status: 410 });
+      return NextResponse.json(
+        {
+          error: 'HUB_EXPIRED',
+          message: 'This hub is no longer active.',
+        },
+        { status: 410 },
+      );
     }
   }
 

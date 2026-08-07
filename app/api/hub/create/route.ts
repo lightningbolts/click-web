@@ -1,11 +1,10 @@
 /**
  * POST /api/hub/create
- * Ephemeral community hub: server computes expires_at (now + 24h), inserts hub + creator participant.
+ * Community hub: inserts hub + creator participant. Hubs do not expire (`expires_at` null).
  */
 
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { computeEphemeralHubExpiry } from '@/lib/hub/ephemeralHubTtl';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 
 type LocationPayload = {
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
   }
 
   const hubId = `hub_${randomUUID().replace(/-/g, '')}`;
-  const { expires_at_iso } = computeEphemeralHubExpiry();
 
   const admin = createChatGatekeeperAdmin();
 
@@ -75,7 +73,7 @@ export async function POST(request: NextRequest) {
     geofence_lat: location.lat,
     geofence_long: location.lng,
     radius_meters: location.radius,
-    expires_at: expires_at_iso,
+    expires_at: null,
     creator_id: auth.user.id,
   });
 
@@ -95,6 +93,6 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     hub_id: hubId,
-    expires_at: expires_at_iso,
+    expires_at: null,
   });
 }
