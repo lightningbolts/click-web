@@ -13,19 +13,24 @@ export type CallParticipant = {
 
 export const SPEAKER_MAX_PARTICIPANTS = 3;
 
+/** Speaker layout shows at most 3 remotes (+ local); above this always use grid. */
+export const SPEAKER_LAYOUT_MAX_PARTICIPANTS = 4;
+
 export function defaultCallLayoutMode(participantCount: number): CallLayoutMode {
   return participantCount <= SPEAKER_MAX_PARTICIPANTS ? 'speaker' : 'grid';
 }
 
 /**
  * Manual override sticks until participant count crosses the speaker/grid threshold
- * relative to when the override was set.
+ * relative to when the override was set. Speaker is never used above
+ * [SPEAKER_LAYOUT_MAX_PARTICIPANTS] so remotes are not silently dropped.
  */
 export function resolveCallLayoutMode(
   participantCount: number,
   manualOverride: CallLayoutMode | null,
   overrideAtCount = 0,
 ): CallLayoutMode {
+  if (participantCount > SPEAKER_LAYOUT_MAX_PARTICIPANTS) return 'grid';
   if (!manualOverride) return defaultCallLayoutMode(participantCount);
   const wasSpeakerSide = overrideAtCount <= SPEAKER_MAX_PARTICIPANTS;
   const isSpeakerSide = participantCount <= SPEAKER_MAX_PARTICIPANTS;

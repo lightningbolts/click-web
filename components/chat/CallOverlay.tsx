@@ -13,7 +13,6 @@ import {
   Rows3,
   Video,
   VideoOff,
-  Volume2,
 } from 'lucide-react';
 import {
   formatCallDuration,
@@ -185,13 +184,6 @@ function CallControlCapsule({
         className="flex h-12 w-12 items-center justify-center rounded-full border border-border-hard bg-[#e8e8e8] text-black"
       >
         {cameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-      </button>
-      <button
-        type="button"
-        aria-label="Speaker"
-        className="flex h-12 w-12 items-center justify-center rounded-full border border-border-hard bg-[#e8e8e8] text-black"
-      >
-        <Volume2 className="h-5 w-5" />
       </button>
       <button
         type="button"

@@ -32,7 +32,12 @@ describe('callLayoutPolicy', () => {
 
   it('honors manual override within the same threshold side', () => {
     expect(resolveCallLayoutMode(2, 'grid', 2)).toBe('grid');
-    expect(resolveCallLayoutMode(5, 'speaker', 5)).toBe('speaker');
+    expect(resolveCallLayoutMode(4, 'speaker', 4)).toBe('speaker');
+  });
+
+  it('forces grid above speaker layout max so remotes are not dropped', () => {
+    expect(resolveCallLayoutMode(5, 'speaker', 5)).toBe('grid');
+    expect(resolveCallLayoutMode(8, null)).toBe('grid');
   });
 
   it('clears override when participant count crosses the threshold', () => {

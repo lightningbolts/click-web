@@ -3,7 +3,7 @@
  * Server is source of truth; clients mirror for UX countdown.
  */
 
-export const HUB_MESSAGE_COOLDOWN_SECONDS = 15;
+export const HUB_MESSAGE_COOLDOWN_SECONDS = 5;
 
 export type HubCooldownCheck = {
   allowed: true;
