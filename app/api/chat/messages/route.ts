@@ -26,15 +26,18 @@ import {
   requireBearerUser,
 } from '@/lib/server/chatGatekeeper';
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
+import { runtimeEnv } from '@/lib/server/runtimeEnv';
 
 const CHAT_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
-  : null;
+function chatPushFunctionUrl(): string | null {
+  const base = runtimeEnv('NEXT_PUBLIC_SUPABASE_URL');
+  return base ? `${base}/functions/v1/send-push-notification` : null;
+}
 
 async function notifyChatMessagePush(token: string | null, chatId: string, messageId: string, senderUserId: string) {
+  const pushFunctionUrl = chatPushFunctionUrl();
   if (!token || !pushFunctionUrl) return;
 
   const response = await fetch(pushFunctionUrl, {

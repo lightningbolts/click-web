@@ -771,9 +771,14 @@ export default function ChatView({
           ? `groupId=${encodeURIComponent(connection.id)}`
           : `connectionId=${encodeURIComponent(connection.id)}`;
         const res = await fetch(`/api/chat?${qs}`, { headers });
-        const json = await res.json();
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          chat?: { id?: string };
+        };
         if (!res.ok) throw new Error(json.error ?? 'Failed to load chat');
-        setChatId(json.chat.id);
+        const id = json.chat?.id;
+        if (!id) throw new Error('Failed to load chat');
+        setChatId(id);
       } catch (err: any) {
         setError(err.message);
         setLoading(false);
@@ -790,10 +795,13 @@ export default function ChatView({
 
     const headers = await getAuthHeaders();
     const res = await fetch(`/api/chat/messages?${params}`, { headers });
-    const json = await res.json();
+    const json = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      messages?: Record<string, unknown>[];
+    };
     if (!res.ok) throw new Error(json.error ?? 'Failed to load messages');
 
-    const raw: Message[] = (json.messages as Record<string, unknown>[])
+    const raw: Message[] = (json.messages ?? [])
       .reverse()
       .map(normalizeDbMessage);
 
