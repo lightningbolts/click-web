@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
 import { isAdminUser } from '@/lib/server/adminRole';
+import {
+  shouldApplyReadHeavyRateLimit,
+} from '@/lib/server/readHeavyRateLimit';
 
 const CONNECTIONS_RATE_LIMIT = 10;
 const CONNECTIONS_RATE_WINDOW_MS = 60_000;
@@ -10,19 +13,6 @@ const READ_HEAVY_RATE_WINDOW_MS = 60_000;
 
 const connectionsRequestTimestampsByIp = new Map<string, number[]>();
 const readHeavyTimestampsByIp = new Map<string, number[]>();
-
-const READ_HEAVY_API_PREFIXES = [
-  '/api/beacons',
-  '/api/map/beacons',
-  '/api/hub/nearby',
-  '/api/livekit/token',
-] as const;
-
-function isReadHeavyApiPath(pathname: string): boolean {
-  return READ_HEAVY_API_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-}
 
 function slidingWindowRateLimitExceeded(
   ip: string,
@@ -110,8 +100,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const clientIp = getClientIp(request);
   if (
-    pathname.startsWith('/api/') &&
-    isReadHeavyApiPath(pathname) &&
+    shouldApplyReadHeavyRateLimit(pathname, request.method) &&
     readHeavyRateLimitExceeded(clientIp)
   ) {
     return NextResponse.json(

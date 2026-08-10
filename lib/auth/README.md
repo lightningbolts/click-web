@@ -76,6 +76,11 @@ startOAuth(supabase, { provider, origin, next })
 
 Connections API mutations rate-limited 10/min/IP in same middleware.
 
+Read-heavy GET/HEAD under `/api/beacons`, `/api/map/beacons`, `/api/hub/nearby`, and
+`/api/livekit/token` are rate-limited 60/min/IP (`lib/server/readHeavyRateLimit.ts`).
+**Mutations** (POST/PUT/PATCH/DELETE — RSVP, bookmark, check-in, etc.) are **excluded**
+from that bucket so map browsing cannot 429 engagement actions.
+
 ### Insights access control
 
 `userMayAccessBusinessInsights` (`lib/server/businessInsightsEligibility.ts`):
