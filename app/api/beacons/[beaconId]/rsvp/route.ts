@@ -270,16 +270,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid beacon id" }, { status: 400 });
     }
 
-    const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
+    const { user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const admin = createAdminSupabaseClient();
-    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    // allowExpired: cancel must work after the event window so users can leave a stuck RSVP.
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
     const venueId = "beacon" in loaded ? loaded.beacon.venue_id : null;
 
-    const { error: deleteError } = await supabase
+    // Admin client: user-scoped DELETE was hitting RLS and surfacing as RSVP failures.
+    const { error: deleteError } = await admin
       .from("beacon_attendees")
       .delete()
       .eq("beacon_id", beaconId)

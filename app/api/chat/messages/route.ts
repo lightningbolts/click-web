@@ -27,6 +27,9 @@ import {
 } from '@/lib/server/chatGatekeeper';
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 
+const CHAT_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
   : null;
@@ -253,16 +256,28 @@ export async function POST(req: NextRequest) {
 
   try {
     let resolvedChatId: string | null = null;
+    const trimmedChatId = chatId.trim();
+    const trimmedConnectionId = connectionId.trim();
 
-    if (chatId.trim()) {
-      const denied = await assertChatWritable(admin, user.id, chatId.trim());
-      if (denied) return denied;
-      resolvedChatId = chatId.trim();
-    } else if (connectionId.trim()) {
+    // Reject optimistic/temp client ids (e.g. temp-…) — fall through to connection_id.
+    // If a UUID chat_id is stale/missing, also fall through when connection_id is present
+    // (avoids "Chat not found" while the user is already inside the thread).
+    if (trimmedChatId && CHAT_UUID_RE.test(trimmedChatId)) {
+      const denied = await assertChatWritable(admin, user.id, trimmedChatId);
+      if (!denied) {
+        resolvedChatId = trimmedChatId;
+      } else if (!trimmedConnectionId) {
+        return denied;
+      } else if (denied.status !== 404) {
+        return denied;
+      }
+    }
+
+    if (!resolvedChatId && trimmedConnectionId) {
       const { data: conn, error: connErr } = await admin
         .from('connections')
         .select('id, user_ids, status, expiry_state')
-        .eq('id', connectionId.trim())
+        .eq('id', trimmedConnectionId)
         .maybeSingle();
 
       if (connErr) throw connErr;
@@ -276,7 +291,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Connection not active for chat' }, { status: 403 });
       }
 
-      const chat = await getOrCreateChatAdmin(admin, connectionId.trim());
+      const chat = await getOrCreateChatAdmin(admin, trimmedConnectionId);
       resolvedChatId = chat.id as string;
     }
 

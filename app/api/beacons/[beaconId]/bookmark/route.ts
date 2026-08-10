@@ -25,7 +25,7 @@ export async function GET(
     }
 
     const admin = createAdminSupabaseClient();
-    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
     if ("response" in loaded) return loaded.response;
 
     const { data, error } = await admin
@@ -74,7 +74,8 @@ export async function PUT(
     }
 
     const admin = createAdminSupabaseClient();
-    const loaded = await loadEventBeaconOrResponse(admin, beaconId);
+    // Allow saving past/expired events (Home saved list keeps them).
+    const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
     if ("response" in loaded) return loaded.response;
     const { beacon } = loaded;
 
