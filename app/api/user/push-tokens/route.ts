@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
-import { createAdminClient } from '@/lib/server/connectionWriteAuth';
+import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 
 type PushPlatform = 'ios' | 'android';
 type PushTokenType = 'standard' | 'voip';
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   const tokenType: PushTokenType = isPushTokenType(body.token_type) ? body.token_type : 'standard';
 
-  const admin = createAdminClient();
+  const admin = createAdminSupabaseClient();
   const updatedAt = Date.now();
 
   const { error } = await admin.from('push_tokens').upsert(

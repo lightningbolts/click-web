@@ -5,12 +5,19 @@ import type { User } from '@supabase/supabase-js';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 export function createAdminClient(): SupabaseClient {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } },
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  // Never fall back to the anon key — that runs under RLS and surfaces as
+  // "new row violates row-level security policy" on service-only tables
+  // (system_friction_logs, push_tokens upserts, etc.).
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client',
+    );
+  }
+  return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 export function isJunctionTableOptionalError(error: { code?: string; message?: string }): boolean {

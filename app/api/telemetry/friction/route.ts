@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/server/connectionWriteAuth';
+import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 type FrictionBody = {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   const hexbinId = sanitizeHexbinId(body.hexbin_id);
 
-  const admin = createAdminClient();
+  const admin = createAdminSupabaseClient();
   const { error } = await admin.from('system_friction_logs').insert({
     event_type: eventType,
     duration_sec: durationSec,
