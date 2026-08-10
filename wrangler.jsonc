@@ -2,9 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "click-web",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2024-12-30",
+  // After 2025-04-01, nodejs_compat populates process.env by default. We also set the
+  // flag explicitly so dashboard Runtime variables (SUPABASE_*, etc.) are visible to
+  // API routes — without this, chat gatekeeper throws "Missing NEXT_PUBLIC_SUPABASE_URL…".
+  "compatibility_date": "2025-04-01",
   "compatibility_flags": [
     "nodejs_compat",
+    "nodejs_compat_populate_process_env",
     "global_fetch_strictly_public"
   ],
   "assets": {

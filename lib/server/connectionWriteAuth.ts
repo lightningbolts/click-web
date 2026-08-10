@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { runtimeEnv } from '@/lib/server/runtimeEnv';
 
 export function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const url = runtimeEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const serviceRoleKey = runtimeEnv('SUPABASE_SERVICE_ROLE_KEY');
   // Never fall back to the anon key — that runs under RLS and surfaces as
   // "new row violates row-level security policy" on service-only tables
   // (system_friction_logs, push_tokens upserts, etc.).
