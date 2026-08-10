@@ -1,5 +1,6 @@
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { NextRequest } from 'next/server';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 type AuthenticatedSupabaseResult = {
   token: string | null;
@@ -7,51 +8,19 @@ type AuthenticatedSupabaseResult = {
   supabase: SupabaseClient;
 };
 
-function extractBearerToken(req: NextRequest): string | null {
-  const authCookie =
-    req.cookies.get('sb-access-token') ||
-    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token');
-  if (authCookie?.value) return authCookie.value;
-
-  const authHeader = req.headers.get('Authorization');
-  const fromHeader = authHeader?.startsWith('Bearer ')
-    ? authHeader.slice(7).trim()
-    : authHeader?.trim() || null;
-  return fromHeader || null;
-}
-
-function createSupabaseClient(token?: string | null): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  return createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false },
-    global: token
-      ? {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      : undefined,
-  });
-}
-
+/**
+ * Authenticate a Route Handler request.
+ *
+ * Prefers `Authorization: Bearer` (mobile + web fetch), then falls back to the
+ * SSR cookie session via `@supabase/ssr`. Never treat the raw SSR cookie blob as a JWT —
+ * that was returning 401 for every logged-in web chat/profile call.
+ */
 export async function getAuthenticatedSupabase(req: NextRequest): Promise<AuthenticatedSupabaseResult> {
-  const token = extractBearerToken(req);
-  const supabase = createSupabaseClient(token);
-
-  if (!token) {
-    return { token: null, user: null, supabase };
+  const bearer =
+    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() || null;
+  const { user, supabase, authError } = await getSupabaseFromRouteRequest(req);
+  if (authError || !user) {
+    return { token: bearer, user: null, supabase };
   }
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !user) {
-    return { token, user: null, supabase };
-  }
-
-  return { token, user, supabase };
+  return { token: bearer, user, supabase };
 }
