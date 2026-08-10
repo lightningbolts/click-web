@@ -1814,30 +1814,33 @@ export default function DashboardView({ user }: DashboardViewProps) {
               ? { ...conn }
               : conn;
 
+        // Map pins: stored geo_location, then first-meet (origin) GPS — never latest beacon crossing.
         let geoLoc: { latitude: number; longitude: number } | undefined;
-        if (
-          latestEnc &&
-          typeof latestEnc.gpsLat === 'number' &&
-          typeof latestEnc.gpsLon === 'number' &&
-          Number.isFinite(latestEnc.gpsLat) &&
-          Number.isFinite(latestEnc.gpsLon) &&
-          !(latestEnc.gpsLat === 0 && latestEnc.gpsLon === 0)
-        ) {
-          geoLoc = { latitude: latestEnc.gpsLat, longitude: latestEnc.gpsLon };
-        } else {
-          const geo = conn.geo_location as Record<string, unknown> | null | undefined;
-          if (geo && typeof geo === 'object') {
-            const rawLat = geo.lat ?? geo.latitude;
-            const rawLon = geo.lon ?? geo.longitude ?? geo.lng ?? geo.long;
-            const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
-            const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
-            if (
-              typeof lat === 'number' && typeof lon === 'number' &&
-              isFinite(lat) && isFinite(lon) &&
-              !(lat === 0 && lon === 0)
-            ) {
-              geoLoc = { latitude: lat, longitude: lon };
-            }
+        const geo = conn.geo_location as Record<string, unknown> | null | undefined;
+        if (geo && typeof geo === 'object') {
+          const rawLat = geo.lat ?? geo.latitude;
+          const rawLon = geo.lon ?? geo.longitude ?? geo.lng ?? geo.long;
+          const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+          const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
+          if (
+            typeof lat === 'number' && typeof lon === 'number' &&
+            isFinite(lat) && isFinite(lon) &&
+            !(lat === 0 && lon === 0)
+          ) {
+            geoLoc = { latitude: lat, longitude: lon };
+          }
+        }
+        if (!geoLoc) {
+          const pinEnc = originEnc ?? latestEnc;
+          if (
+            pinEnc &&
+            typeof pinEnc.gpsLat === 'number' &&
+            typeof pinEnc.gpsLon === 'number' &&
+            Number.isFinite(pinEnc.gpsLat) &&
+            Number.isFinite(pinEnc.gpsLon) &&
+            !(pinEnc.gpsLat === 0 && pinEnc.gpsLon === 0)
+          ) {
+            geoLoc = { latitude: pinEnc.gpsLat, longitude: pinEnc.gpsLon };
           }
         }
 

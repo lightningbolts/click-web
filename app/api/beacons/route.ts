@@ -412,13 +412,41 @@ export async function POST(request: NextRequest) {
 
     const beacon = parseInsertedBeacon(inserted, lon, lat);
     if (beacon == null) {
-      return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+      // Insert succeeded but PostGIS location was opaque — never 500 after a write.
+      if (inserted == null || typeof inserted !== "object") {
+        return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+      }
+      const row = inserted as Record<string, unknown>;
+      const fallbackBeacon = {
+        id: typeof row.id === "string" ? row.id : "",
+        creator_id: typeof row.creator_id === "string" ? row.creator_id : user.id,
+        venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
+        beacon_type: typeof row.beacon_type === "string" ? row.beacon_type : beacon_type,
+        show_creator_name: showCreatorName,
+        visibility_audience: visibilityAudience,
+        lat,
+        lng: lon,
+        metadata: (isRecord(row.metadata) ? row.metadata : metadata) as Record<string, unknown>,
+        created_at:
+          typeof row.created_at === "string" ? row.created_at : new Date().toISOString(),
+        expires_at:
+          typeof row.expires_at === "string" ? row.expires_at : expiresAtIso,
+        creator_name: null as string | null,
+      };
+      if (!fallbackBeacon.id) {
+        return NextResponse.json({ error: "Insert failed" }, { status: 500 });
+      }
+      return NextResponse.json({ beacon: fallbackBeacon });
     }
 
-    const admin = createAdminSupabaseClient();
-    const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);
-
-    return NextResponse.json({ beacon: enriched ?? beacon });
+    try {
+      const admin = createAdminSupabaseClient();
+      const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);
+      return NextResponse.json({ beacon: enriched ?? beacon });
+    } catch (enrichErr) {
+      console.error("POST /api/beacons enrich:", enrichErr);
+      return NextResponse.json({ beacon });
+    }
   } catch (e) {
     console.error("POST /api/beacons:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

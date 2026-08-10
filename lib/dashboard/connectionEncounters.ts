@@ -95,3 +95,37 @@ export function originEncounter(conn: Record<string, unknown>): ConnectionEncoun
   const all = parseConnectionEncounters(conn);
   return all.length ? all[all.length - 1] : undefined;
 }
+
+/** Map pin GPS: stored `geo_location`, then origin encounter, then latest as last resort. */
+export function connectionMapPinGeo(
+  conn: Record<string, unknown>,
+): { latitude: number; longitude: number } | undefined {
+  const geo = conn.geo_location as Record<string, unknown> | null | undefined;
+  if (geo && typeof geo === 'object') {
+    const rawLat = geo.lat ?? geo.latitude;
+    const rawLon = geo.lon ?? geo.longitude ?? geo.lng ?? geo.long;
+    const lat = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+    const lon = typeof rawLon === 'number' ? rawLon : Number(rawLon);
+    if (
+      typeof lat === 'number' &&
+      typeof lon === 'number' &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      !(lat === 0 && lon === 0)
+    ) {
+      return { latitude: lat, longitude: lon };
+    }
+  }
+  const pinEnc = originEncounter(conn) ?? latestEncounter(conn);
+  if (
+    pinEnc &&
+    typeof pinEnc.gpsLat === 'number' &&
+    typeof pinEnc.gpsLon === 'number' &&
+    Number.isFinite(pinEnc.gpsLat) &&
+    Number.isFinite(pinEnc.gpsLon) &&
+    !(pinEnc.gpsLat === 0 && pinEnc.gpsLon === 0)
+  ) {
+    return { latitude: pinEnc.gpsLat, longitude: pinEnc.gpsLon };
+  }
+  return undefined;
+}
