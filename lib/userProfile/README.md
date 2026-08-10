@@ -11,7 +11,7 @@ Profile surfaces: **modal inspection** of connections, **timeline journal**, **i
 | `formatSharedConnection.ts` | Shared connection card + weather snapshot normalize |
 | `availability.ts` | Availability state helpers |
 | `sharedInterests.ts` | Interest overlap between peers |
-| `components/UserProfileModal.tsx` | Rich peer profile + decrypted message preview |
+| `components/UserProfileModal.tsx` | Rich peer profile + Media/Beacons/Links/Files tabs; 1:1 keys or group master unwrap; tabs via `/api/connections/.../tabs` (chat/connection/**group** id) |
 | `components/UserProfile.tsx` | Profile page sections |
 | `components/InterestTagging.tsx` | Tag editor UI |
 | `components/SettingsView.tsx` | Settings shell (imported by dashboard) |

@@ -22,6 +22,7 @@ import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { assertChatWritable, createChatGatekeeperAdmin } from '@/lib/server/chatGatekeeper';
 import { normalizeDbMessage } from '@/lib/chat/messages';
 import { filterBeaconIdsWithActiveEngagement } from '@/lib/server/resolveLiveEventBeaconAt';
+import { resolveChatForTabsParam } from '@/lib/server/resolveChatForTabsParam';
 
 type TabMessage = ReturnType<typeof normalizeDbMessage>;
 
@@ -33,41 +34,6 @@ function chatIdFromQueryOrParam(req: NextRequest, param: string): string {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-async function resolveChatForParam(
-  supabase: Awaited<ReturnType<typeof getAuthenticatedSupabase>>['supabase'],
-  paramId: string,
-): Promise<{ chatId: string; connectionId: string | null } | null> {
-  // The dynamic segment is named `connectionId` by filesystem convention
-  // (see `app/api/connections/[connectionId]/...`), but the directive frames
-  // it as `chatId`. Accept either by trying a direct chat lookup first and
-  // falling back to a connection → chat resolution.
-  const { data: chatRow } = await supabase
-    .from('chats')
-    .select('id, connection_id')
-    .eq('id', paramId)
-    .maybeSingle();
-  if (isRecord(chatRow) && typeof chatRow.id === 'string') {
-    return {
-      chatId: chatRow.id,
-      connectionId: typeof chatRow.connection_id === 'string' ? chatRow.connection_id : null,
-    };
-  }
-
-  const { data: byConn } = await supabase
-    .from('chats')
-    .select('id, connection_id')
-    .eq('connection_id', paramId)
-    .maybeSingle();
-  if (isRecord(byConn) && typeof byConn.id === 'string') {
-    return {
-      chatId: byConn.id,
-      connectionId:
-        typeof byConn.connection_id === 'string' ? byConn.connection_id : paramId,
-    };
-  }
-  return null;
 }
 
 type EncounterEventRow = {
@@ -142,7 +108,7 @@ export async function GET(
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const resolved = await resolveChatForParam(supabase, rawId);
+  const resolved = await resolveChatForTabsParam(supabase, rawId);
   if (!resolved) {
     return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
   }

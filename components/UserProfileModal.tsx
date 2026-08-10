@@ -58,11 +58,16 @@ import {
 } from '@/lib/chat/attachmentCrypto';
 import {
   decryptContent,
+  decryptGroupMessageContent,
   deriveKeysForConnection,
   isEncrypted,
+  isGroupMessageEncrypted,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
-import { createSecureMediaObjectUrl } from '@/lib/chat/useSecureMedia';
+import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
+import { getSupabaseClient } from '@/lib/supabase';
+import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
+import { createSecureMediaObjectUrl, type SecureMediaChatKey } from '@/lib/chat/useSecureMedia';
 import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import { stableKeysForStringList } from '@/lib/react/stableKeysForStringList';
@@ -251,6 +256,10 @@ type UserProfileModalProps = {
   forceOwnProfileBirthdayCompletion?: boolean;
   /** Optional parent context for call sites opening from a specific chat row. */
   connectionId?: string | null;
+  /** When set, tabs resolve via chatId query (group or 1:1). */
+  chatId?: string | null;
+  /** Group clique id — enables group master key unwrap for Media/Links/Files. */
+  groupId?: string | null;
   /**
    * Locally-decrypted chat messages scanned client-side for `http(s)://` URLs.
    * Required for the Links subtab — the server cannot parse links because
@@ -677,6 +686,8 @@ export default function UserProfileModal({
   currentUserId = null,
   forceOwnProfileBirthdayCompletion = false,
   connectionId = null,
+  chatId = null,
+  groupId = null,
   decryptedMessages = [],
 }: UserProfileModalProps) {
   const { mutate } = useSWRConfig();
@@ -688,6 +699,8 @@ export default function UserProfileModal({
   const [birthdaySaving, setBirthdaySaving] = useState(false);
   const [rollStatus, setRollStatus] = useState<'idle' | 'opening' | 'uploading' | 'done' | 'error'>('idle');
   const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
+  const [groupMasterKey, setGroupMasterKey] = useState<ArrayBuffer | null>(null);
+  const [cryptoUnlockError, setCryptoUnlockError] = useState<string | null>(null);
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
   const profileConnectionQuery = connectionId?.trim()
@@ -704,9 +717,12 @@ export default function UserProfileModal({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          typeof json?.error === 'string' && json.error.trim()
-            ? json.error
-            : res.statusText || 'Failed to load profile',
+          authFailureMessage(
+            res.status,
+            typeof json?.error === 'string' && json.error.trim()
+              ? json.error
+              : res.statusText || 'Failed to load profile',
+          ),
         );
       }
       return json as UserProfilePayload;
@@ -740,9 +756,19 @@ export default function UserProfileModal({
     return fromProp || null;
   }, [connectionId, profileData?.sharedConnection]);
 
-  const tabsPath = effectiveConnectionId
-    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/tabs?limit=200`
-    : null;
+  const tabsPath = (() => {
+    const paramId = (chatId?.trim() || effectiveConnectionId || groupId?.trim() || '').trim();
+    if (!paramId) return null;
+    const base = `/api/connections/${encodeURIComponent(paramId)}/tabs?limit=200`;
+    const explicitChat = chatId?.trim();
+    if (explicitChat && explicitChat !== paramId) {
+      return `${base}&chatId=${encodeURIComponent(explicitChat)}`;
+    }
+    if (explicitChat) {
+      return `${base}&chatId=${encodeURIComponent(explicitChat)}`;
+    }
+    return base;
+  })();
   const { data: tabsPayload, isLoading: tabsLoading } = useSWR<ConnectionTabsPayload>(
     tabsPath,
     async (path: string) => {
@@ -751,9 +777,12 @@ export default function UserProfileModal({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          typeof json?.error === 'string' && json.error.trim()
-            ? json.error
-            : res.statusText || 'Failed to load profile tabs',
+          authFailureMessage(
+            res.status,
+            typeof json?.error === 'string' && json.error.trim()
+              ? json.error
+              : res.statusText || 'Failed to load profile tabs',
+          ),
         );
       }
       return json as ConnectionTabsPayload;
@@ -802,6 +831,38 @@ export default function UserProfileModal({
   useEffect(() => {
     let cancelled = false;
     setDerivedKeys(null);
+    setGroupMasterKey(null);
+    setCryptoUnlockError(null);
+
+    const gid = groupId?.trim();
+    if (gid && currentUserId) {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setCryptoUnlockError('Could not unlock group encryption for this device.');
+        return;
+      }
+      void unwrapGroupMasterKeyBytes(supabase, {
+        groupId: gid,
+        viewerUserId: currentUserId,
+      })
+        .then((master) => {
+          if (cancelled) return;
+          if (master) {
+            setGroupMasterKey(master);
+          } else {
+            setCryptoUnlockError('Could not unlock group encryption for this device.');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setCryptoUnlockError('Could not unlock group encryption for this device.');
+          }
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!effectiveConnectionId || connectionUserIds.length < 2) return;
 
     void deriveKeysForConnection(effectiveConnectionId, connectionUserIds)
@@ -809,13 +870,18 @@ export default function UserProfileModal({
         if (!cancelled) setDerivedKeys(keys);
       })
       .catch(() => {
-        if (!cancelled) setDerivedKeys(null);
+        if (!cancelled) {
+          setDerivedKeys(null);
+          setCryptoUnlockError('Could not derive chat keys for media decryption.');
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [effectiveConnectionId, connectionUserIdsKey]);
+  }, [effectiveConnectionId, connectionUserIdsKey, groupId, currentUserId]);
+
+  const mediaChatKey: SecureMediaChatKey | null = groupMasterKey ?? derivedKeys;
 
   const localMediaItems = useMemo(() => {
     return decryptedMessages
@@ -1022,10 +1088,17 @@ export default function UserProfileModal({
           if (!sourceUrl) continue;
 
           if (item.isEncrypted) {
-            if (!derivedKeys) continue;
+            if (!mediaChatKey) {
+              if (!cancelled) {
+                setCryptoUnlockError((prev) =>
+                  prev ?? 'Encrypted media could not be unlocked for this profile.',
+                );
+              }
+              continue;
+            }
             const objectUrl = await createSecureMediaObjectUrl({
               storageUrl: sourceUrl,
-              chatKey: derivedKeys,
+              chatKey: mediaChatKey,
               mimeType: item.mimeType ?? undefined,
             });
             objectUrls.push(objectUrl);
@@ -1047,7 +1120,7 @@ export default function UserProfileModal({
         URL.revokeObjectURL(url);
       }
     };
-  }, [derivedKeys, getAuthHeaders, mediaItems]);
+  }, [mediaChatKey, getAuthHeaders, mediaItems]);
 
   const localLinkItems = useMemo(
     () =>
@@ -1077,7 +1150,9 @@ export default function UserProfileModal({
         if (coerceMessageType(row.message_type) !== 'text') continue;
 
         let content = row.content;
-        if (isEncrypted(content) && derivedKeys) {
+        if (isGroupMessageEncrypted(content) && groupMasterKey) {
+          content = await decryptGroupMessageContent(content, groupMasterKey);
+        } else if (isEncrypted(content) && derivedKeys) {
           content = await decryptContent(content, derivedKeys);
         }
 
@@ -1099,7 +1174,7 @@ export default function UserProfileModal({
     return () => {
       cancelled = true;
     };
-  }, [chatMessagesPayload?.messages, derivedKeys, localLinkItems.length]);
+  }, [chatMessagesPayload?.messages, derivedKeys, groupMasterKey, localLinkItems.length]);
 
   const linkItems = useMemo(
     () => mergeLinkItems(localLinkItems, fallbackLinkItems),
@@ -1579,6 +1654,11 @@ export default function UserProfileModal({
 
                   {activeTab === 'media' && (
                     <section role="tabpanel" aria-label="Media">
+                      {cryptoUnlockError ? (
+                        <p className="mb-3 rounded-[10px] border-2 border-border-hard bg-surface-container px-3 py-2 text-xs text-error">
+                          {cryptoUnlockError}
+                        </p>
+                      ) : null}
                       {mediaItems.length === 0 && tabsLoading ? (
                         <EmptyTabState
                           Icon={ImageIcon}

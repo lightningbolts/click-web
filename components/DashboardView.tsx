@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
+import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { coerceMessageType, insertCallLogMessage } from '@/lib/chat/messages';
 import { fetchInboxPreviews } from '@/lib/chat/inboxPreviews';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
@@ -239,15 +240,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [birthdayProfileGateResolved, setBirthdayProfileGateResolved] = useState(false);
   const [birthdayProfileGateOpen, setBirthdayProfileGateOpen] = useState(false);
 
-  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return { 'Content-Type': 'application/json' };
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      'Content-Type': 'application/json',
-      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-    };
-  }, []);
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => getFreshAuthHeaders(), []);
 
   const openVerifiedCliqueMemberPicker = useCallback(async (memberUserIds: string[]) => {
     const ids = [...new Set(memberUserIds)].filter(Boolean).sort();
@@ -3651,7 +3644,27 @@ export default function DashboardView({ user }: DashboardViewProps) {
         forceOwnProfileBirthdayCompletion={Boolean(
           user?.id && profileUserId === user.id && birthdayProfileGateOpen,
         )}
-        connectionId={profileConnectionId ?? selectedConnection?.id ?? null}
+        connectionId={
+          (profileConnectionId ?? selectedConnection?.id ?? null) &&
+          (selectedConnection?.chatKind === 'group_clique' ||
+            groupCliqueRecords.some(
+              (g) => g.id === (profileConnectionId ?? selectedConnection?.id),
+            ))
+            ? null
+            : (profileConnectionId ?? selectedConnection?.id ?? null)
+        }
+        chatId={
+          selectedConnection?.chatKind === 'group_clique'
+            ? selectedConnection.groupChatId ?? null
+            : groupCliqueRecords.find((g) => g.id === profileConnectionId)?.groupChatId ?? null
+        }
+        groupId={
+          selectedConnection?.chatKind === 'group_clique'
+            ? selectedConnection.id
+            : groupCliqueRecords.some((g) => g.id === profileConnectionId)
+              ? profileConnectionId
+              : null
+        }
         decryptedMessages={profileDecryptedMessages}
       />
 

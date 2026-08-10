@@ -9,6 +9,7 @@ Web authentication: **PKCE OAuth** (Google/Apple), email magic links, session co
 | Piece | Location | Role |
 |-------|----------|------|
 | `oauth.ts` | `lib/auth/` | `startOAuth`, scopes, redirect URL builder |
+| `freshAuthHeaders.ts` | `lib/auth/` | Single-flight browser JWT refresh + `Authorization` headers for BFF fetches |
 | `AuthContext.tsx` | `lib/` | `AuthProvider`, `useAuth` hook |
 | `proxy.ts` | project root | Next.js middleware — session refresh, `/admin`, `/insights` gates |
 | `app/api/auth/*` | routes | Callback, signout, session exchange |

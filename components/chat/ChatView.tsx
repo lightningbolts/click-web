@@ -32,6 +32,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { authFailureMessage, getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { normalizeDbMessage, notifyMessagesDelivered } from '@/lib/chat/messages';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
@@ -333,15 +334,7 @@ export default function ChatView({
 
   // ─────────────────────────── auth header helper ─────────────────────────
 
-  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return { 'Content-Type': 'application/json' };
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      'Content-Type': 'application/json',
-      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-    };
-  }, []);
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => getFreshAuthHeaders(), []);
 
   /** Recipient device receipt for peer-authored rows (true “Delivered” for the sender). */
   const firePeerDeliveredAck = useCallback(
@@ -775,7 +768,11 @@ export default function ChatView({
           error?: string;
           chat?: { id?: string };
         };
-        if (!res.ok) throw new Error(json.error ?? 'Failed to load chat');
+        if (!res.ok) {
+          throw new Error(
+            authFailureMessage(res.status, json.error ?? 'Failed to load chat'),
+          );
+        }
         const id = json.chat?.id;
         if (!id) throw new Error('Failed to load chat');
         setChatId(id);
@@ -799,7 +796,7 @@ export default function ChatView({
       error?: string;
       messages?: Record<string, unknown>[];
     };
-    if (!res.ok) throw new Error(json.error ?? 'Failed to load messages');
+    if (!res.ok) throw new Error(authFailureMessage(res.status, json.error ?? 'Failed to load messages'));
 
     const raw: Message[] = (json.messages ?? [])
       .reverse()
