@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+import { requireRuntimeEnv } from '@/lib/server/runtimeEnv';
 
 type RouteAuthResult = {
   supabase: SupabaseClient;
@@ -16,8 +17,8 @@ type RouteAuthResult = {
 export async function getSupabaseFromRouteRequest(
   request: NextRequest,
 ): Promise<RouteAuthResult> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = requireRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const anonKey = requireRuntimeEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
   const bearer =
     request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim() || null;
 
