@@ -13,14 +13,49 @@ function readBinding(env: CloudflareEnvBag, name: string): string | undefined {
 }
 
 /**
+ * Next.js replaces *static* `process.env.NEXT_PUBLIC_*` accesses with build-time
+ * literals. Dynamic `process.env[name]` does **not** see those inlined values, which
+ * made `runtimeEnv('NEXT_PUBLIC_SUPABASE_URL')` return undefined in production even
+ * when `process.env.NEXT_PUBLIC_SUPABASE_URL` was present (see /api/health/env).
+ */
+function readStaticProcessEnv(name: string): string | undefined {
+  switch (name) {
+    case 'NEXT_PUBLIC_SUPABASE_URL':
+      return process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || undefined;
+    case 'NEXT_PUBLIC_SUPABASE_ANON_KEY':
+      return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || undefined;
+    case 'NEXT_PUBLIC_BASE_URL':
+      return process.env.NEXT_PUBLIC_BASE_URL?.trim() || undefined;
+    case 'SUPABASE_SERVICE_ROLE_KEY':
+      return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || undefined;
+    case 'STRIPE_SECRET_KEY':
+      return process.env.STRIPE_SECRET_KEY?.trim() || undefined;
+    case 'STRIPE_WEBHOOK_SECRET':
+      return process.env.STRIPE_WEBHOOK_SECRET?.trim() || undefined;
+    case 'STRIPE_PRICE_ID':
+      return process.env.STRIPE_PRICE_ID?.trim() || undefined;
+    case 'GOOGLE_CLIENT_ID':
+      return process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
+    case 'GOOGLE_CLIENT_SECRET':
+      return process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Read a runtime env var on Cloudflare Workers / OpenNext.
  *
  * Order:
- * 1. `process.env` (populated when `nodejs_compat_populate_process_env` is on)
- * 2. OpenNext `getCloudflareContext().env`
- * 3. `cloudflare:workers` importable `env` (Workers runtime)
+ * 1. Static `process.env.NAME` (Next inlining + OpenNext request env)
+ * 2. Dynamic `process.env[name]` (Worker-populated secrets)
+ * 3. OpenNext `getCloudflareContext().env`
+ * 4. `cloudflare:workers` importable `env`
  */
 export function runtimeEnv(name: string): string | undefined {
+  const fromStatic = readStaticProcessEnv(name);
+  if (fromStatic) return fromStatic;
+
   const fromProcess = process.env[name]?.trim();
   if (fromProcess) return fromProcess;
 
@@ -31,7 +66,10 @@ export function runtimeEnv(name: string): string | undefined {
         env?: CloudflareEnvBag;
       };
     };
-    const fromContext = readBinding(getCloudflareContext({ async: false })?.env, name);
+    // Prefer sync context (request handlers). Do not force `{ async: false }` only —
+    // some OpenNext versions expose env on the default call.
+    const ctx = getCloudflareContext();
+    const fromContext = readBinding(ctx?.env, name);
     if (fromContext) return fromContext;
   } catch {
     // Outside Cloudflare request context / local next without adapter.

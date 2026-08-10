@@ -108,7 +108,8 @@ export async function GET(
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const resolved = await resolveChatForTabsParam(supabase, rawId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- avoid deep Supabase generic instantiation
+  const resolved = await resolveChatForTabsParam(supabase as any, rawId);
   if (!resolved) {
     return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
   }

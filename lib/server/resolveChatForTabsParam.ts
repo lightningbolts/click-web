@@ -3,22 +3,25 @@
  * Accepts chat id, 1:1 connection id, or group id.
  */
 
-type ChatLookupClient = {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+type LooseSupabase = {
   from: (table: string) => {
     select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        maybeSingle: () => Promise<{ data: unknown }>;
+      eq: (
+        column: string,
+        value: string,
+      ) => {
+        maybeSingle: () => PromiseLike<{ data: unknown }>;
       };
     };
   };
 };
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
 export async function resolveChatForTabsParam(
-  supabase: ChatLookupClient,
+  supabase: LooseSupabase,
   paramId: string,
 ): Promise<{ chatId: string; connectionId: string | null } | null> {
   const { data: chatRow } = await supabase
