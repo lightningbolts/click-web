@@ -18,13 +18,13 @@ describe('hub message cooldown', () => {
   });
 
   it('blocks send inside the cooldown window with retry_after_seconds', () => {
-    const last = new Date(now - 5_000).toISOString();
+    const last = new Date(now - 2_000).toISOString();
     const result = checkHubMessageCooldown(last, now);
-    expect(result).toEqual({ allowed: false, retryAfterSeconds: 10 });
+    expect(result).toEqual({ allowed: false, retryAfterSeconds: 3 });
   });
 
   it('ceilings partial seconds', () => {
-    const last = new Date(now - 14_100).toISOString();
+    const last = new Date(now - 4_100).toISOString();
     const result = checkHubMessageCooldown(last, now);
     expect(result).toEqual({ allowed: false, retryAfterSeconds: 1 });
   });
