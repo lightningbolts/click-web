@@ -252,9 +252,9 @@ export async function POST(req: NextRequest) {
   const jwt = await requireBearerUser(req);
   if (!jwt.ok) return jwt.response;
   const { user, bearer: token } = jwt;
-  const admin = createChatGatekeeperAdmin();
 
   try {
+    const admin = createChatGatekeeperAdmin();
     let resolvedChatId: string | null = null;
     const trimmedChatId = chatId.trim();
     const trimmedConnectionId = connectionId.trim();
@@ -374,7 +374,14 @@ export async function PATCH(req: NextRequest) {
   const jwt = await requireBearerUser(req);
   if (!jwt.ok) return jwt.response;
   const { user } = jwt;
-  const admin = createChatGatekeeperAdmin();
+
+  let admin;
+  try {
+    admin = createChatGatekeeperAdmin();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Chat admin unavailable';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   const { data: row, error: fetchErr } = await admin
     .from('messages')
