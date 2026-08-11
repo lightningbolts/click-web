@@ -1,5 +1,7 @@
 # Supabase Edge Functions (`click-web/supabase/functions`)
 
+> **Note:** This `supabase/` tree is the **source of truth** for shared Postgres migrations and `bind-proximity-connection`. The mobile (`click`) repo mirrors a subset — keep them in sync via `click/scripts/sync-supabase-from-click-web.sh`. Mobile-only Edge Functions (`send-push-notification`, etc.) live only in `click`.
+
 Serverless Deno workers deployed to Supabase. They handle proximity binding, scheduled maintenance, beacon discovery, and availability matching. Mobile and web clients invoke user-facing functions with a **Bearer JWT**; cron jobs use **CRON_SECRET** or the service role key.
 
 > **Note:** `POST /api/connections/proximity` (Next.js) is the **newer async handshake path** with `pending_handshakes` and HTTP 202 polling. The `bind-proximity-connection` Edge Function remains deployed for legacy clients and documents the canonical matching semantics both paths share.

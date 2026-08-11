@@ -13,8 +13,9 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 | Install deps | `npm install` |
 | Dev server | `npm run dev` (port 3000) |
 | Build | `npm run build` |
+| Typecheck | `npm run lint` (runs `tsc --noEmit`; ESLint not configured yet) |
 | Tests | `npm test` |
-| Watch tests | `npm test:watch` |
+| Watch tests | `npm run test:watch` |
 
 ### Non-obvious setup notes
 
@@ -25,3 +26,4 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 - **Dashboard route (`/dashboard`) redirects to home** when there is no authenticated session, which is expected behavior without Supabase credentials.
 - **Turbopack root override** in `next.config.ts` (`turbopack.root: process.cwd()`) exists to prevent lockfile resolution issues. Do not remove it.
 - **React Compiler** is enabled (`reactCompiler: true` in `next.config.ts`). The `babel-plugin-react-compiler` dev dependency supports this.
+- **`supabase/` in this repo is the source of truth** for shared Postgres migrations and `bind-proximity-connection`. The mobile (`click`) repo mirrors a subset; sync/drift scripts live there.
