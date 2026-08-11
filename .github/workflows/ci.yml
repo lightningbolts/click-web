@@ -26,11 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck (npm run lint)
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
         run: npm run lint
 
       - name: Unit tests
-        run: npm test -- --ci --passWithNoTests
+        run: npm test -- --ci --coverage --passWithNoTests
 
       - name: Production build
         run: npm run build

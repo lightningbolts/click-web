@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   normalizeContextTag,
@@ -7,23 +6,11 @@ import {
   resolveContextTagId,
 } from '@/lib/server/connectionEncounterContextTag';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import {
   deriveHeightCategoryFromRelativeAltitudeM,
   fetchTerrainElevationMeters,
 } from '@/lib/server/terrainElevation';
-
-function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client',
-    );
-  }
-  return createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);

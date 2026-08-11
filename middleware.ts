@@ -1,62 +1,17 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
 import { isAdminUser } from '@/lib/server/adminRole';
+import { shouldApplyReadHeavyRateLimit } from '@/lib/server/readHeavyRateLimit';
 import {
-  shouldApplyReadHeavyRateLimit,
-} from '@/lib/server/readHeavyRateLimit';
-
-const CONNECTIONS_RATE_LIMIT = 10;
-const CONNECTIONS_RATE_WINDOW_MS = 60_000;
-const READ_HEAVY_RATE_LIMIT = 60;
-const READ_HEAVY_RATE_WINDOW_MS = 60_000;
-
-const connectionsRequestTimestampsByIp = new Map<string, number[]>();
-const readHeavyTimestampsByIp = new Map<string, number[]>();
-
-function slidingWindowRateLimitExceeded(
-  ip: string,
-  store: Map<string, number[]>,
-  limit: number,
-  windowMs: number,
-): boolean {
-  const now = Date.now();
-  const windowStart = now - windowMs;
-  let stamps = store.get(ip) ?? [];
-  stamps = stamps.filter((t) => t > windowStart);
-  if (stamps.length >= limit) {
-    store.set(ip, stamps);
-    return true;
-  }
-  stamps.push(now);
-  store.set(ip, stamps);
-  if (store.size > 50_000) {
-    for (const [key, ts] of store) {
-      const recent = ts.filter((t) => t > windowStart);
-      if (recent.length === 0) store.delete(key);
-      else store.set(key, recent);
-    }
-  }
-  return false;
-}
-
-function connectionsRateLimitExceeded(ip: string): boolean {
-  return slidingWindowRateLimitExceeded(
-    ip,
-    connectionsRequestTimestampsByIp,
-    CONNECTIONS_RATE_LIMIT,
-    CONNECTIONS_RATE_WINDOW_MS,
-  );
-}
-
-function readHeavyRateLimitExceeded(ip: string): boolean {
-  return slidingWindowRateLimitExceeded(
-    ip,
-    readHeavyTimestampsByIp,
-    READ_HEAVY_RATE_LIMIT,
-    READ_HEAVY_RATE_WINDOW_MS,
-  );
-}
+  CONNECTIONS_RATE_LIMIT,
+  CONNECTIONS_RATE_LIMIT_BINDING,
+  CONNECTIONS_RATE_WINDOW_MS,
+  isRateLimited,
+  READ_HEAVY_RATE_LIMIT,
+  READ_HEAVY_RATE_LIMIT_BINDING,
+  READ_HEAVY_RATE_WINDOW_MS,
+} from '@/lib/server/rateLimit';
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -73,6 +28,13 @@ function isConnectionsApiPath(pathname: string): boolean {
   return pathname === '/api/connections' || pathname.startsWith('/api/connections/');
 }
 
+function tooManyRequests(): NextResponse {
+  return NextResponse.json(
+    { error: 'Too many requests', code: 'rate_limited' },
+    { status: 429, headers: { 'Retry-After': '60' } },
+  );
+}
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request: {
@@ -80,37 +42,40 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  const pathname = request.nextUrl.pathname;
+  const clientIp = getClientIp(request);
+
   // Dashboard loads use GET /api/connections twice per refresh (active + archived) plus Realtime-driven
   // refetches; implicit-flow auth is Bearer-based. Only throttle abuse-prone mutations.
   const connectionsMutation =
-    isConnectionsApiPath(request.nextUrl.pathname) &&
+    isConnectionsApiPath(pathname) &&
     ['POST', 'PATCH', 'DELETE'].includes(request.method);
-  if (connectionsMutation && connectionsRateLimitExceeded(getClientIp(request))) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': '60',
-        },
-      },
-    );
+  if (
+    connectionsMutation &&
+    (await isRateLimited({
+      bindingName: CONNECTIONS_RATE_LIMIT_BINDING,
+      key: `connections:${clientIp}`,
+      limit: CONNECTIONS_RATE_LIMIT,
+      windowMs: CONNECTIONS_RATE_WINDOW_MS,
+    }))
+  ) {
+    return tooManyRequests();
   }
 
-  const pathname = request.nextUrl.pathname;
-  const clientIp = getClientIp(request);
   if (
     shouldApplyReadHeavyRateLimit(pathname, request.method) &&
-    readHeavyRateLimitExceeded(clientIp)
+    (await isRateLimited({
+      bindingName: READ_HEAVY_RATE_LIMIT_BINDING,
+      key: `read-heavy:${clientIp}`,
+      limit: READ_HEAVY_RATE_LIMIT,
+      windowMs: READ_HEAVY_RATE_WINDOW_MS,
+    }))
   ) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': '60' } },
-    );
+    return tooManyRequests();
   }
-  // API routes authenticate in each Route Handler (`getSupabaseFromRouteRequest`, etc.). Running
-  // `getUser()` here duplicates a network round-trip to Supabase Auth on every `/api/*` request and
-  // dominated dev timing (see Next middleware segment). Page navigations still refresh the session below.
+
+  // API routes authenticate in each Route Handler (`requireUser` / `getSupabaseFromRouteRequest`).
+  // Running `getUser()` here duplicates a network round-trip on every `/api/*` request.
   if (pathname.startsWith('/api/')) {
     return NextResponse.next({
       request: {
@@ -128,8 +93,8 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set({ name, value, ...options });
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
           });
 
           supabaseResponse = NextResponse.next({

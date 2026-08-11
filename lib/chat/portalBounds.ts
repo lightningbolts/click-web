@@ -154,7 +154,7 @@ export function placeMineMessageActionBar(
     return { left: clampedLeft, top };
   }
 
-  let left = clampBarLeftToBubble(
+  const left = clampBarLeftToBubble(
     bubbleRect.left,
     bubbleRect.right,
     barW,
@@ -202,7 +202,7 @@ export function placeTheirMessageActionBar(
     return { left: clampedLeft, top };
   }
 
-  let left = clampBarLeftToBubble(
+  const left = clampBarLeftToBubble(
     bubbleRect.left,
     bubbleRect.right,
     barW,

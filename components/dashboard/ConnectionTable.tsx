@@ -118,7 +118,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
 
   // Filter and sort connections
   const filteredConnections = useMemo(() => {
-    let filtered = connections.filter((conn) => {
+    const filtered = connections.filter((conn) => {
       const q = deferredSearchQuery.toLowerCase();
       const matchesSearch = 
         conn.name.toLowerCase().includes(q) ||

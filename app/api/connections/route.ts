@@ -1,8 +1,9 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import type { ConnectionLifecycleStatus } from '@/types/connection';
 import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatus';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import {
   deriveHeightCategoryFromRelativeAltitudeM,
   fetchTerrainElevationMeters,
@@ -34,19 +35,6 @@ import {
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client',
-    );
-  }
-  return createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
 
 /**
  * Hide event_beacon_* / at_event on embedded encounters unless the viewer has

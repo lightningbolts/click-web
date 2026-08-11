@@ -13,7 +13,8 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 | Install deps | `npm install` |
 | Dev server | `npm run dev` (port 3000) |
 | Build | `npm run build` |
-| Typecheck | `npm run lint` (runs `tsc --noEmit`; ESLint not configured yet) |
+| Typecheck | `npm run typecheck` (`tsc --noEmit`) |
+| Lint | `npm run lint` (ESLint `next/core-web-vitals`) |
 | Tests | `npm test` |
 | Watch tests | `npm run test:watch` |
 
