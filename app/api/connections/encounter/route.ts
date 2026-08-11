@@ -164,13 +164,16 @@ export async function POST(request: NextRequest) {
 
     const gpsLatPre = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
     const gpsLonPre = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
-    const admin = createAdminClient();
-    const liveEventAttachment = await resolveLiveEventBeaconForReportingUser(
-      admin,
-      gpsLatPre,
-      gpsLonPre,
-      userId,
-    );
+    // Skip admin client when there is no GPS — live-event attachment cannot resolve without coords.
+    const liveEventAttachment =
+      gpsLatPre != null && gpsLonPre != null
+        ? await resolveLiveEventBeaconForReportingUser(
+            createAdminClient(),
+            gpsLatPre,
+            gpsLonPre,
+            userId,
+          )
+        : null;
     Object.assign(insertRow, applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment));
 
     const { data: inserted, error: insErr } = await supabase
