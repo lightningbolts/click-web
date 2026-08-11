@@ -13,6 +13,8 @@ import {
   type AvailabilityIntentRow,
 } from '@/lib/userProfile/availability';
 import { getSharedInterestTags } from '@/lib/userProfile/sharedInterests';
+import { parseBody } from '@/lib/api/parseBody';
+import { userProfilePatchBodySchema } from '@/lib/api/schemas/user';
 
 /** Trim and case-insensitively dedupe interest tag strings for `user_interests.tags`. */
 function parseProfileTagsInput(raw: unknown[]): string[] {
@@ -315,16 +317,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  let parsed: unknown;
-  try {
-    parsed = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-  if (!isJsonObject(parsed)) {
-    return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 });
-  }
-  const body = parsed;
+  const parsedBody = await parseBody(req, userProfilePatchBodySchema);
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.data as Record<string, unknown>;
 
   const updates: Record<string, unknown> = {};
 

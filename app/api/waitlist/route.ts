@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { parseBody } from '@/lib/api/parseBody';
+import { waitlistBodySchema } from '@/lib/api/schemas/user';
 import { apiError } from '@/lib/api/errors';
 import { publicRoute } from '@/lib/server/withAuth';
 
 export { publicRoute };
-
-const waitlistBodySchema = z.object({
-  email: z.string().trim().email('Invalid email address'),
-  source: z.string().trim().min(1).max(200).optional(),
-  referrer_user_id: z.string().uuid().optional(),
-});
 
 export async function POST(request: NextRequest) {
   try {

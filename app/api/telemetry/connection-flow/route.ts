@@ -5,6 +5,8 @@ import {
   CONNECTION_FLOW_ALLOWED_EVENTS,
   emitConnectionFlowEvent,
 } from '@/lib/server/telemetry/connectionFlowEvents';
+import { parseBody } from '@/lib/api/parseBody';
+import { connectionFlowTelemetryBodySchema } from '@/lib/api/schemas/user';
 
 type ConnectionFlowBody = {
   event?: unknown;
@@ -86,19 +88,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  let body: ConnectionFlowBody;
-  try {
-    body = (await request.json()) as ConnectionFlowBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, connectionFlowTelemetryBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data as ConnectionFlowBody;
 
-  const rawEvent =
-    typeof body.event === 'string'
-      ? body.event
-      : typeof body.event_type === 'string'
-        ? body.event_type
-        : '';
+  const rawEvent = typeof body.event === 'string' ? body.event : '';
   const eventType = rawEvent.trim();
   if (!CONNECTION_FLOW_ALLOWED_EVENTS.has(eventType)) {
     return NextResponse.json({ error: 'Unsupported event type' }, { status: 400 });

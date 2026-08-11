@@ -11,10 +11,10 @@ import {
   deriveHeightCategoryFromRelativeAltitudeM,
   fetchTerrainElevationMeters,
 } from '@/lib/server/terrainElevation';
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
+import { parseBody } from '@/lib/api/parseBody';
+import { parseParams } from '@/lib/api/parseParams';
+import { tagsBodySchema } from '@/lib/api/schemas/connections';
+import { connectionIdParamSchema } from '@/lib/api/schemas/common';
 
 function finiteNumber(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -61,13 +61,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { connectionId } = await params;
-    if (!connectionId?.trim()) {
-      return NextResponse.json({ error: 'Missing connection id' }, { status: 400 });
-    }
+    const paramParsed = parseParams(await params, connectionIdParamSchema);
+    if (!paramParsed.ok) return paramParsed.response;
+    const connectionId = paramParsed.data.connectionId;
 
-    const rawBody = await request.json().catch(() => null);
-    const body = isRecord(rawBody) ? rawBody : {};
+    const parsed = await parseBody(request, tagsBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
 
     const contextTag = body.contextTag ?? body.context_tag;
     const contextTagObject = body.contextTagObject ?? body.context_tag_object;

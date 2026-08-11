@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { parseBody } from '@/lib/api/parseBody';
+import { frictionTelemetryBodySchema } from '@/lib/api/schemas/user';
 
 type FrictionBody = {
   event?: unknown;
@@ -31,19 +33,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: FrictionBody;
-  try {
-    body = (await request.json()) as FrictionBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, frictionTelemetryBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data as FrictionBody;
 
-  const rawEvent =
-    typeof body.event === 'string'
-      ? body.event
-      : typeof body.event_type === 'string'
-        ? body.event_type
-        : '';
+  const rawEvent = typeof body.event === 'string' ? body.event : '';
   const eventType = rawEvent.trim();
   if (!ALLOWED_EVENTS.has(eventType)) {
     return NextResponse.json({ error: 'Unsupported event type' }, { status: 400 });

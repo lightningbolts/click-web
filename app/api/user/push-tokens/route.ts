@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
+import { parseBody } from '@/lib/api/parseBody';
+import { pushTokensBodySchema } from '@/lib/api/schemas/user';
 
 type PushPlatform = 'ios' | 'android';
 type PushTokenType = 'standard' | 'voip';
@@ -34,12 +36,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: PushTokensBody;
-  try {
-    body = (await request.json()) as PushTokensBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, pushTokensBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data as PushTokensBody;
 
   const token = typeof body.token === 'string' ? body.token.trim() : '';
   if (!token) {

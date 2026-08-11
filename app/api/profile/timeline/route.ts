@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { assertChatWritable } from '@/lib/server/chatGatekeeper';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { parseBody } from '@/lib/api/parseBody';
+import { timelineDeleteBodySchema, timelinePostBodySchema, timelinePutBodySchema } from '@/lib/api/schemas/user';
 
 type TargetType = 'user' | 'chat';
 
@@ -237,12 +239,9 @@ export async function POST(request: NextRequest) {
   const { user, authError } = await getSupabaseFromRouteRequest(request);
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let body: { target_type?: unknown; target_id?: unknown; body?: unknown; visibility?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, timelinePostBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const targetType = normalizeTargetType(body.target_type);
   const targetId = typeof body.target_id === 'string' ? body.target_id.trim() : '';
@@ -302,12 +301,9 @@ export async function PUT(request: NextRequest) {
   const { user, authError } = await getSupabaseFromRouteRequest(request);
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let body: { id?: unknown; body?: unknown; visibility?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, timelinePutBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const entryId = typeof body.id === 'string' ? body.id.trim() : '';
   const text = typeof body.body === 'string' ? body.body.trim() : '';
@@ -346,12 +342,9 @@ export async function DELETE(request: NextRequest) {
   const { user, authError } = await getSupabaseFromRouteRequest(request);
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let body: { id?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, timelineDeleteBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const entryId = typeof body.id === 'string' ? body.id.trim() : '';
   if (!entryId) return NextResponse.json({ error: 'id is required' }, { status: 400 });

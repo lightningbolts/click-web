@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { parseBody } from '@/lib/api/parseBody';
+import { displayNamesBodySchema } from '@/lib/api/schemas/user';
 
 type UserRow = {
   id: string;
@@ -90,8 +92,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: authError || 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const requestedIds = Array.isArray(body?.userIds)
+  const parsed = await parseBody(req, displayNamesBodySchema);
+  if (!parsed.ok) {
+    // Prior handler treated missing/empty userIds (and bad JSON) as empty maps
+    return NextResponse.json({ names: {}, images: {} });
+  }
+  const body = parsed.data;
+  const requestedIds = Array.isArray(body.userIds)
     ? body.userIds.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
     : [];
 

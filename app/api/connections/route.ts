@@ -24,6 +24,8 @@ import {
   resolveLiveEventBeaconForReportingUser,
   stripConnectionEncountersEventFieldsForViewer,
 } from '@/lib/server/resolveLiveEventBeaconAt';
+import { parseBody } from '@/lib/api/parseBody';
+import { connectionsCreateBodySchema, connectionsPatchBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * Connections API
@@ -792,12 +794,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let body: PatchBody;
-    try {
-      body = (await request.json()) as PatchBody;
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, connectionsPatchBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as PatchBody;
 
     if (body.action !== 'restore') {
       return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
@@ -959,8 +958,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rawBody = await request.json();
-    const body = isRecord(rawBody) ? rawBody : {};
+    const parsed = await parseBody(request, connectionsCreateBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
 
     const userId1 = typeof body.userId1 === 'string' ? body.userId1 : null;
     const userId2 = typeof body.userId2 === 'string' ? body.userId2 : null;

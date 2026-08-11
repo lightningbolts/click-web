@@ -9,6 +9,8 @@ import {
   AVAILABILITY_INTENT_DURATION_PRESETS,
   DEFAULT_AVAILABILITY_INTENT_DURATION_MS,
 } from '@/lib/availabilityIntentDurations';
+import { parseBody } from '@/lib/api/parseBody';
+import { availabilityIntentBodySchema } from '@/lib/api/schemas/user';
 
 const INTENT_TAG_MAX = 25;
 
@@ -68,12 +70,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { intent_tag?: unknown; timeframe?: unknown; durationMs?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, availabilityIntentBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const tagRaw = typeof body.intent_tag === 'string' ? body.intent_tag.trim() : '';
   if (!tagRaw || tagRaw.length > INTENT_TAG_MAX) {

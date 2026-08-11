@@ -3,16 +3,11 @@ import { AccessToken } from 'livekit-server-sdk';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
+import { parseBody } from '@/lib/api/parseBody';
+import { livekitTokenBodySchema } from '@/lib/api/schemas/chat';
 
 /** Group voice/video rooms cap at eight participants (caller + up to seven others). */
 const MAX_GROUP_CALL_PARTICIPANTS = 8;
-
-type LiveKitTokenRequestBody = {
-  connection_id?: unknown;
-  group_id?: unknown;
-  room_name?: unknown;
-  participant_name?: unknown;
-};
 
 export type LiveKitTokenSuccessResponse = {
   token: string;
@@ -63,12 +58,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: LiveKitTokenRequestBody;
-  try {
-    body = (await request.json()) as LiveKitTokenRequestBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, livekitTokenBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const connectionId = isNonEmptyString(body.connection_id) ? body.connection_id.trim() : '';
   const groupId = isNonEmptyString(body.group_id) ? body.group_id.trim() : '';

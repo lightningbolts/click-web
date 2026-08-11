@@ -10,19 +10,18 @@ import {
   assertChatWritable,
   createChatGatekeeperAdmin,
 } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatDeliveredBodySchema } from '@/lib/api/schemas/chat';
 
 const MAX_IDS = 120;
 
 export async function PATCH(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const chatId =
-    typeof body.chat_id === 'string'
-      ? body.chat_id.trim()
-      : typeof body.chatId === 'string'
-        ? body.chatId.trim()
-        : '';
+  const parsed = await parseBody(req, chatDeliveredBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const chatId = body.chat_id.trim();
 
-  const rawIds = body.message_ids ?? body.messageIds;
+  const rawIds = body.message_ids;
   const messageIds = Array.isArray(rawIds)
     ? rawIds
         .filter((x: unknown) => typeof x === 'string')
@@ -30,9 +29,6 @@ export async function PATCH(req: NextRequest) {
         .filter((x: string) => x.length > 0)
     : [];
 
-  if (!chatId) {
-    return NextResponse.json({ error: 'chat_id is required' }, { status: 400 });
-  }
   if (messageIds.length === 0) {
     return NextResponse.json({ error: 'message_ids is required' }, { status: 400 });
   }

@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { hubPatchBodySchema } from '@/lib/api/schemas/beacons';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -69,12 +71,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Hub id is required' }, { status: 400 });
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, hubPatchBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data as Record<string, unknown>;
 
   const admin = createChatGatekeeperAdmin();
   const { hub, errorResponse } = await resolveHubAndVerifyOwner(admin, hubId.trim(), auth.user.id);

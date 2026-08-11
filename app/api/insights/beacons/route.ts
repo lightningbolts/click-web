@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
 import type { VenuePopUpHubBeacon } from "@/lib/insights/vibeRadar";
+import { parseBody } from "@/lib/api/parseBody";
+import { insightsBeaconCreateBodySchema } from "@/lib/api/schemas/user";
 
 const PERK_MAX = 500;
 const CATEGORY_MAX = 80;
@@ -25,17 +27,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let body: {
-      venue_id?: unknown;
-      perk_description?: unknown;
-      category_target?: unknown;
-      duration_minutes?: unknown;
-    };
-    try {
-      body = (await request.json()) as typeof body;
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, insightsBeaconCreateBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const venueId = typeof body.venue_id === "string" ? body.venue_id.trim() : "";
     const perk =

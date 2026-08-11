@@ -4,6 +4,8 @@ import { bindProximityHandshake } from '@/lib/server/proximity/bindProximityHand
 import { RECENT_CONNECTION_LOCK_MS, sameMemberSet } from '@/lib/server/proximity/matching';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import type { PendingHandshakeRow, ProximityHandshakeRequest, ProximityMatchUserProfile } from '@/types/supabase-json';
+import { parseBody } from '@/lib/api/parseBody';
+import { proximityHandshakeBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * POST /api/connections/proximity
@@ -20,12 +22,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let body: ProximityHandshakeRequest;
-    try {
-      body = (await request.json()) as ProximityHandshakeRequest;
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, proximityHandshakeBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as ProximityHandshakeRequest;
 
     const admin = createAdminClient();
     const result = await bindProximityHandshake(admin, user.id, body);

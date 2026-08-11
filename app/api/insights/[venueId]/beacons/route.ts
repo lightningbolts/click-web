@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
 import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
+import { parseBody } from "@/lib/api/parseBody";
+import { insightsVenueBeaconBodySchema } from "@/lib/api/schemas/user";
 
 const SPOTIFY_PREFIX = "spotify:playlist:";
 
@@ -120,12 +122,9 @@ export async function POST(
       );
     }
 
-    let body: { spotify_playlist_uri?: unknown };
-    try {
-      body = (await request.json()) as typeof body;
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
+    const parsedBody = await parseBody(request, insightsVenueBeaconBodySchema);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.data;
 
     const uri =
       typeof body.spotify_playlist_uri === "string" ? body.spotify_playlist_uri.trim() : "";

@@ -7,6 +7,8 @@ import {
   minutesBeforeStart,
   parseEngagementTelemetryBody,
 } from "@/lib/server/eventEngagement";
+import { parseBody } from "@/lib/api/parseBody";
+import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 
 /**
  * GET — whether the current user bookmarked this event.
@@ -61,12 +63,9 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown = null;
-    try {
-      body = await request.json();
-    } catch {
-      body = null;
-    }
+    const parsed = await parseBody(request, engagementTelemetryBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const telemetry = parseEngagementTelemetryBody(body);
     const bookmarked = telemetry.bookmarked;
     if (bookmarked == null) {

@@ -4,6 +4,8 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconType } from "@/lib/map/mapBeacons";
 import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
+import { parseBody } from "@/lib/api/parseBody";
+import { beaconPatchBodySchema } from "@/lib/api/schemas/beacons";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -151,15 +153,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!isRecord(body)) {
-      return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, beaconPatchBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
 
     const admin = createAdminSupabaseClient();
     const { row, errorResponse } = await resolveBeaconAndVerifyCreator(admin, beaconId, user.id);

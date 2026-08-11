@@ -3,8 +3,8 @@ import {
   isJunctionTableOptionalError,
   requireConnectionParticipant,
 } from '@/lib/server/connectionWriteAuth';
-
-type Body = { connection_id?: string };
+import { parseBody } from '@/lib/api/parseBody';
+import { connectionIdBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * Per-user hide: upsert `connection_hidden` for the JWT user only (other participant unchanged).
@@ -12,14 +12,10 @@ type Body = { connection_id?: string };
  */
 export async function POST(request: NextRequest) {
   try {
-    let body: Body;
-    try {
-      body = (await request.json()) as Body;
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, connectionIdBodySchema);
+    if (!parsed.ok) return parsed.response;
 
-    const gate = await requireConnectionParticipant(request, body.connection_id);
+    const gate = await requireConnectionParticipant(request, parsed.data.connection_id);
     if (!gate.ok) return gate.response;
 
     const { user, connectionId, admin } = gate;

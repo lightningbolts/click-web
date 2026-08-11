@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { normalizeStringArrayField } from '@/lib/userProfile/availability';
+import { parseBody } from '@/lib/api/parseBody';
+import { availabilityBodySchema } from '@/lib/api/schemas/user';
 
 type PatchBody = {
   preferred_activities?: unknown;
@@ -21,12 +23,9 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: PatchBody;
-  try {
-    body = (await request.json()) as PatchBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, availabilityBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data as PatchBody;
 
   const { data: existing, error: loadErr } = await supabase
     .from('user_availability')

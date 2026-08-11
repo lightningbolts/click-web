@@ -18,6 +18,8 @@ import {
   applyLiveEventBeaconToEncounterRow,
   resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
+import { parseBody } from '@/lib/api/parseBody';
+import { qrScanBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -390,8 +392,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthenticatedSupabase(request);
-    const rawBody = (await request.json()) as unknown;
-    const body = isRecord(rawBody) ? rawBody : {};
+    const parsed = await parseBody(request, qrScanBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
 
     if (!user) {
       return NextResponse.json(
