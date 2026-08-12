@@ -54,6 +54,7 @@ describe('LandingPlayground', () => {
     await waitFor(() => {
       expect(screen.getByTestId('playground-pin-overlay')).toBeInTheDocument();
     });
+    expect(screen.getAllByTestId('playground-map-pin').length).toBeGreaterThan(0);
     expect(screen.getByTestId('playground-pin-overlay')).toHaveTextContent('Campus Comedy Night');
     expect(screen.getByTestId('playground-pin-popup-card')).toHaveStyle({ background: '#18181b' });
   });

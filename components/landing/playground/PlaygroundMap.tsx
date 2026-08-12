@@ -1,16 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Loader2, MapPin } from 'lucide-react';
+import { escapeHtml } from '@/lib/dashboard/connectionExtras';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { mapStyleForTheme } from '@/lib/theme/mapStyles';
-import PinStack, { type OverlayPin } from './PinStack';
+import {
+  applyPinStack,
+  pinBorderForTheme,
+  type OverlayPin,
+} from './PinStack';
 import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from './mockData';
 import type { PlaygroundActions, PlaygroundEvent, PlaygroundPerson, PlaygroundState } from './types';
 
 const CLUSTER_METERS = 90;
+const PRIMARY = '#630ed4';
+const SECONDARY = '#224CFF';
 
 type Cluster = {
   id: string;
@@ -102,6 +109,32 @@ function overlayPinsFor(cluster: Cluster, connectedIds: ReadonlySet<string>): Ov
   return [...peoplePins, ...attendeePins, ...eventPins];
 }
 
+function buildPinPopupHtml(cluster: Cluster, state: PlaygroundState, actions?: PlaygroundActions): string {
+  const headline = cluster.events[0]?.title ?? cluster.people[0]?.name ?? '';
+  const subline = cluster.events[0]
+    ? `${cluster.events[0].when} · ${cluster.events[0].venue}`
+    : (() => {
+        const memory = cluster.people[0]
+          ? (state.memories[cluster.people[0].id] ?? cluster.people[0].memory)
+          : undefined;
+        return memory ? `${memory.label} · ${memory.place}` : '';
+      })();
+  const going = cluster.events.some((e) => state.rsvpIds.has(e.id));
+  const chatPerson = cluster.people[0];
+  const chatBtn =
+    chatPerson && actions
+      ? `<button type="button" data-playground-chat="${escapeHtml(chatPerson.id)}" style="display:block;width:100%;margin-top:10px;padding:6px 12px;background:linear-gradient(135deg, #630ed4, #6520c0);color:white;font-size:12px;font-weight:600;border:none;border-radius:8px;cursor:pointer;text-align:center;">Chat →</button>`
+      : '';
+  return `<div data-testid="playground-pin-overlay">
+    <div data-testid="playground-pin-popup-card" style="color:#fff;background:#18181b;padding:14px;border-radius:14px;border:1px solid #27272a;box-shadow:0 8px 32px rgba(0,0,0,0.4);min-width:200px;max-width:260px;">
+      <strong style="color:${PRIMARY};font-size:14px;display:block;line-height:1.25;">${escapeHtml(headline)}</strong>
+      ${subline ? `<span style="color:#a1a1aa;font-size:12px;display:block;margin-top:4px;line-height:1.35;">${escapeHtml(subline)}</span>` : ''}
+      ${going ? `<span style="color:${SECONDARY};font-size:12px;font-weight:600;display:block;margin-top:8px;">You're going</span>` : ''}
+      ${chatBtn}
+    </div>
+  </div>`;
+}
+
 export default function PlaygroundMap({
   state,
   actions,
@@ -114,15 +147,15 @@ export default function PlaygroundMap({
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
   const actionsRef = useRef(actions);
-  const reprojectRef = useRef<() => void>(() => {});
   const initialFitDoneRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNetwork, setShowNetwork] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [points, setPoints] = useState<Record<string, { x: number; y: number }>>({});
 
   actionsRef.current = actions;
 
@@ -137,24 +170,13 @@ export default function PlaygroundMap({
   const clusters = useMemo(() => clusterItems(people, events), [people, events]);
 
   const selected = clusters.find((c) => c.id === selectedId) ?? null;
-
-  const reproject = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const next: Record<string, { x: number; y: number }> = {};
-    clusters.forEach((cluster) => {
-      const pt = map.project([cluster.lng, cluster.lat]);
-      next[cluster.id] = { x: pt.x, y: pt.y };
-    });
-    setPoints(next);
-  }, [clusters]);
-  reprojectRef.current = reproject;
+  const pinBorder = pinBorderForTheme(theme);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || mapRef.current) return;
     let fallback: number | null = null;
-    const onMove = () => reprojectRef.current();
+    let resizeObserver: ResizeObserver | null = null;
     try {
       const map = new maplibregl.Map({
         container,
@@ -165,6 +187,10 @@ export default function PlaygroundMap({
       });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      resizeObserver = new ResizeObserver(() => {
+        map.resize();
+      });
+      resizeObserver.observe(container);
       map.on('load', () => {
         map.resize();
         let revealed = false;
@@ -178,25 +204,34 @@ export default function PlaygroundMap({
         map.once('idle', reveal);
       });
       map.on('error', () => setError('Failed to load map tiles'));
-      map.on('move', onMove);
-      map.on('zoom', onMove);
     } catch {
       setError('Failed to initialize map');
     }
 
+    const onPopupClick = (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement).closest('[data-playground-chat]') as HTMLElement | null;
+      const id = btn?.getAttribute('data-playground-chat');
+      const next = actionsRef.current;
+      if (!id || !next) return;
+      next.setOpenChatId(id);
+      next.setDashboardTab('chat');
+    };
+    container.addEventListener('click', onPopupClick);
+
     return () => {
       if (fallback != null) window.clearTimeout(fallback);
+      resizeObserver?.disconnect();
+      container.removeEventListener('click', onPopupClick);
+      popupRef.current?.remove();
+      popupRef.current = null;
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
       mapRef.current?.remove();
       mapRef.current = null;
       initialFitDoneRef.current = false;
       setReady(false);
     };
   }, [theme]);
-
-  useEffect(() => {
-    if (!ready) return;
-    reproject();
-  }, [ready, reproject]);
 
   useEffect(() => {
     if (!ready || selectedId) return;
@@ -223,25 +258,58 @@ export default function PlaygroundMap({
   }, [ready, clusters]);
 
   useEffect(() => {
-    const onResize = () => {
-      mapRef.current?.resize();
-      reproject();
-    };
-    window.addEventListener('resize', onResize);
-    const t = window.setTimeout(onResize, 100);
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
+    clusters.forEach((cluster) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.setAttribute('data-testid', 'playground-map-pin');
+      el.setAttribute(
+        'aria-label',
+        cluster.events[0]?.title ?? cluster.people[0]?.name ?? 'Map pin',
+      );
+      el.style.background = 'none';
+      el.style.border = 'none';
+      el.style.padding = '0';
+      el.style.cursor = 'pointer';
+      applyPinStack(el, overlayPinsFor(cluster, state.connectedIds), { borderColor: pinBorder });
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setSelectedId(cluster.id);
+      });
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([cluster.lng, cluster.lat])
+        .addTo(map);
+      markersRef.current.push(marker);
+    });
     return () => {
-      window.removeEventListener('resize', onResize);
-      window.clearTimeout(t);
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
     };
-  }, [ready, reproject]);
+  }, [ready, clusters, state.connectedIds, pinBorder]);
 
-  const openCluster = (cluster: Cluster) => {
-    setSelectedId(cluster.id);
-    const person = cluster.people[0];
-    if (person && actionsRef.current && cluster.events.length === 0) {
-      /* keep selection; chat is available from overlay */
-    }
-  };
+  useEffect(() => {
+    const map = mapRef.current;
+    popupRef.current?.remove();
+    popupRef.current = null;
+    if (!map || !ready || !selected) return;
+    const popup = new maplibregl.Popup({
+      offset: 22,
+      closeButton: false,
+      closeOnClick: false,
+      maxWidth: '280px',
+    })
+      .setLngLat([selected.lng, selected.lat])
+      .setHTML(buildPinPopupHtml(selected, state, actions))
+      .addTo(map);
+    popupRef.current = popup;
+    return () => {
+      popup.remove();
+      if (popupRef.current === popup) popupRef.current = null;
+    };
+  }, [ready, selected, state, actions]);
 
   if (error) {
     return (
@@ -252,22 +320,6 @@ export default function PlaygroundMap({
       </div>
     );
   }
-
-  const selectedPoint = selected ? points[selected.id] : null;
-  const headline = selected
-    ? (selected.events[0]?.title ?? selected.people[0]?.name ?? '')
-    : '';
-  const subline = selected
-    ? selected.events[0]
-      ? `${selected.events[0].when} · ${selected.events[0].venue}`
-      : (() => {
-          const memory = selected.people[0]
-            ? (state.memories[selected.people[0].id] ?? selected.people[0].memory)
-            : undefined;
-          return memory ? `${memory.label} · ${memory.place}` : '';
-        })()
-    : '';
-  const going = selected?.events.some((e) => state.rsvpIds.has(e.id)) ?? false;
 
   return (
     <div className={`relative overflow-hidden rounded-[16px] border border-border-hard bg-surface-container ${fill ? 'h-full' : 'h-[420px] md:h-[560px]'}`}>
@@ -284,74 +336,8 @@ export default function PlaygroundMap({
       </div>
       <div
         ref={containerRef}
-        className={`absolute inset-0 transition-opacity duration-500 ease-out ${ready ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 z-0 transition-opacity duration-500 ease-out ${ready ? 'opacity-100' : 'opacity-0'}`}
       />
-      {ready
-        ? clusters.map((cluster) => {
-            const pt = points[cluster.id];
-            if (!pt) return null;
-            return (
-              <button
-                key={cluster.id}
-                type="button"
-                aria-label={
-                  cluster.events[0]?.title ?? cluster.people[0]?.name ?? 'Map pin'
-                }
-                onClick={() => openCluster(cluster)}
-                className="absolute z-[5] -translate-x-1/2 -translate-y-1/2"
-                style={{ left: pt.x, top: pt.y }}
-              >
-                <PinStack pins={overlayPinsFor(cluster, state.connectedIds)} />
-              </button>
-            );
-          })
-        : null}
-      {ready && selected && selectedPoint ? (
-        <div
-          className="absolute z-[7] flex -translate-x-1/2 -translate-y-full flex-col items-center pb-3"
-          style={{ left: selectedPoint.x, top: selectedPoint.y }}
-          data-testid="playground-pin-overlay"
-        >
-          <div
-            data-testid="playground-pin-popup-card"
-            className="pointer-events-auto min-w-[200px] max-w-[260px] px-3.5 py-3.5 text-left"
-            style={{
-              color: '#fff',
-              background: '#18181b',
-              borderRadius: 14,
-              border: '1px solid #27272a',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            }}
-          >
-            <p className="text-sm font-bold leading-tight" style={{ color: '#630ed4' }}>
-              {headline}
-            </p>
-            {subline ? (
-              <p className="mt-1 text-xs leading-snug" style={{ color: '#a1a1aa' }}>
-                {subline}
-              </p>
-            ) : null}
-            {going ? (
-              <p className="mt-2 text-xs font-semibold" style={{ color: '#224CFF' }}>
-                You&apos;re going
-              </p>
-            ) : null}
-            {selected.people[0] && actions ? (
-              <button
-                type="button"
-                className="mt-2.5 w-full rounded-lg py-1.5 text-center text-xs font-semibold text-white"
-                style={{ background: 'linear-gradient(135deg, #630ed4, #6520c0)' }}
-                onClick={() => {
-                  actions.setOpenChatId(selected.people[0].id);
-                  actions.setDashboardTab('chat');
-                }}
-              >
-                Chat →
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
       {ready ? (
         <>
           <div className="absolute left-4 top-4 z-[8] max-w-[220px] rounded-[16px] border border-border-hard bg-surface p-3 text-xs shadow-lg">

@@ -192,6 +192,19 @@ body {
   left: 0;
   width: 100% !important;
   height: 100% !important;
+  z-index: 0;
+}
+
+.maplibregl-marker {
+  z-index: 2;
+}
+
+.maplibregl-popup {
+  z-index: 3;
+}
+
+.maplibregl-control-container {
+  z-index: 4;
 }
 
 .maplibregl-ctrl-group {

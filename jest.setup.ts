@@ -57,12 +57,39 @@ jest.mock('maplibre-gl', () => {
     default: {
       Map: jest.fn(() => map),
       NavigationControl: jest.fn(),
-      Popup: jest.fn().mockImplementation(() => ({
-        setLngLat: jest.fn().mockReturnThis(),
-        setHTML: jest.fn().mockReturnThis(),
-        addTo: jest.fn().mockReturnThis(),
-        remove: jest.fn(),
-      })),
+      Marker: jest.fn().mockImplementation(({ element }: { element?: HTMLElement } = {}) => {
+        const el = element ?? document.createElement('div');
+        const api = {
+          setLngLat: jest.fn().mockReturnThis(),
+          addTo: jest.fn(() => {
+            document.body.appendChild(el);
+            return api;
+          }),
+          remove: jest.fn(() => {
+            el.remove();
+          }),
+          getElement: jest.fn(() => el),
+        };
+        return api;
+      }),
+      Popup: jest.fn().mockImplementation(() => {
+        const host = document.createElement('div');
+        const api = {
+          setLngLat: jest.fn().mockReturnThis(),
+          setHTML: jest.fn((html: string) => {
+            host.innerHTML = html;
+            return api;
+          }),
+          addTo: jest.fn(() => {
+            document.body.appendChild(host);
+            return api;
+          }),
+          remove: jest.fn(() => {
+            host.remove();
+          }),
+        };
+        return api;
+      }),
       LngLatBounds: jest.fn().mockImplementation(() => ({
         extend: jest.fn().mockReturnThis(),
       })),
