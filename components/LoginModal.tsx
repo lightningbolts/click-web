@@ -227,7 +227,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
               aria-labelledby="login-modal-title"
             >
               {/* Sticky chrome */}
-              <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b-2 border-border-hard bg-surface px-4 py-3 sm:px-6 sm:py-4">
+              <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-border-hard bg-surface px-4 py-3 sm:px-6 sm:py-4">
                 <div className="flex min-w-0 items-start gap-3 pr-2">
                   <ClickLogo size={36} className="mt-0.5 h-9 w-9 shrink-0" />
                   <div className="min-w-0">
@@ -250,7 +250,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                 <button
                   type="button"
                   onClick={onClose}
-                  className="shrink-0 rounded-[8px] border-2 border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
+                  className="shrink-0 rounded-[8px] border border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -297,7 +297,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     onClick={() => handleOAuth('apple')}
                     disabled={isLoading}
                     aria-label={isSignup ? 'Continue with Apple' : 'Sign in with Apple'}
-                    className="flex w-full items-center justify-center gap-3 rounded-[8px] border-2 border-border-hard bg-on-surface py-3 font-bold text-surface disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-3 rounded-[8px] border border-border-hard bg-on-surface py-3 font-bold text-surface disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <svg aria-hidden="true" width="16" height="18" viewBox="0 0 16 18" fill="currentColor">
                       <path d="M13.35 9.58c-.02-2.02 1.65-2.99 1.73-3.04-.95-1.38-2.42-1.57-2.94-1.59-1.25-.13-2.44.74-3.07.74-.64 0-1.61-.72-2.65-.7-1.36.02-2.63.8-3.33 2.02-1.42 2.46-.36 6.1 1.02 8.09.67.97 1.47 2.06 2.52 2.02 1.02-.04 1.4-.66 2.63-.66s1.57.66 2.65.64c1.1-.02 1.79-.99 2.46-1.97.78-1.12 1.09-2.22 1.11-2.28-.02-.01-2.13-.82-2.15-3.27zM11.4 3.64c.56-.68.94-1.62.83-2.56-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.56-.85 2.48.9.07 1.83-.46 2.39-1.14z" />
@@ -437,7 +437,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                 )}
 
                 {success && (
-                  <div className="rounded-[8px] border-2 border-border-hard bg-on-primary-container p-3 text-sm font-medium text-primary">
+                  <div className="rounded-[8px] border border-border-hard bg-on-primary-container p-3 text-sm font-medium text-primary">
                     {success}
                   </div>
                 )}

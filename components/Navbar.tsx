@@ -69,13 +69,13 @@ export default function Navbar() {
     }
   };
 
-  const scrollToMission = () => {
+  const scrollToHowItWorks = () => {
     setMobileOpen(false);
-    const missionSection = document.getElementById("mission");
-    if (missionSection) {
-      missionSection.scrollIntoView({ behavior: "smooth" });
+    const section = document.getElementById("how-it-works");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth" });
     } else {
-      window.location.href = "/#mission";
+      window.location.href = "/#how-it-works";
     }
   };
 
@@ -83,7 +83,7 @@ export default function Navbar() {
     <>
       <nav
         data-navbar-root="true"
-        className="relative z-[99999] border-b-2 border-border-hard bg-surface px-4 py-4 text-on-surface md:px-12 md:py-5"
+        className="relative z-[99999] border-b border-border-hard bg-surface px-4 py-4 text-on-surface md:px-12 md:py-5"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -132,20 +132,20 @@ export default function Navbar() {
                 <div className="hidden items-center gap-4 md:flex">
                   <button
                     type="button"
-                    onClick={scrollToMission}
-                    className="text-sm font-semibold text-on-surface hover:text-primary"
+                    onClick={scrollToHowItWorks}
+                    className="text-sm font-semibold text-on-surface hover:text-secondary"
                   >
-                    Mission
+                    How it works
                   </button>
                   <Link
                     href="/enterprise"
-                    className="text-sm font-semibold text-on-surface hover:text-primary"
+                    className="text-sm font-semibold text-on-surface hover:text-secondary"
                   >
                     Enterprise
                   </Link>
                   <Link
                     href="/about"
-                    className="text-sm font-semibold text-on-surface hover:text-primary"
+                    className="text-sm font-semibold text-on-surface hover:text-secondary"
                   >
                     About
                   </Link>
@@ -167,20 +167,20 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => setMobileOpen((o) => !o)}
-                    className="rounded-[8px] border-2 border-border-hard p-2 text-on-surface"
+                    className="rounded-[8px] border border-border-hard p-2 text-on-surface"
                     aria-expanded={mobileOpen}
                     aria-label={mobileOpen ? "Close menu" : "Open menu"}
                   >
                     {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                   </button>
                   {mobileOpen ? (
-                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-[12px] border-2 border-border-hard bg-surface p-2 shadow-lg">
+                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-[12px] border border-border-hard bg-surface p-2 shadow-lg">
                       <button
                         type="button"
-                        onClick={scrollToMission}
+                        onClick={scrollToHowItWorks}
                         className="block w-full rounded-[8px] px-3 py-2.5 text-left text-sm font-semibold text-on-surface hover:bg-surface-container"
                       >
-                        Mission
+                        How it works
                       </button>
                       <Link
                         href="/enterprise"

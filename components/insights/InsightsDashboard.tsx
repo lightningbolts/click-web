@@ -221,7 +221,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+            className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
           >
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-on-surface mb-2">
@@ -246,7 +246,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-on-surface mb-2">
@@ -273,7 +273,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <Users className="w-16 h-16 text-outline mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-on-surface mb-2">

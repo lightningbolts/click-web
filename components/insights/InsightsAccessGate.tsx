@@ -23,7 +23,7 @@ function AccessDenied() {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="fc-card max-w-md border-2 border-border-hard p-8 text-center"
+        className="fc-card max-w-md border border-border-hard p-8 text-center"
       >
         <AlertCircle className="mx-auto mb-4 h-16 w-16 text-error" />
         <h1 className="mb-2 text-2xl font-bold text-on-surface">Access Denied</h1>

@@ -2745,7 +2745,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
         {/* Tabs */}
         <div
-          className="sticky top-0 z-20 border-b-2 border-border-hard bg-surface"
+          className="sticky top-0 z-20 border-b border-border-hard bg-surface"
           style={{ backgroundColor: "var(--color-surface)" }}
         >
           <div className="px-6 md:px-12 flex gap-1 overflow-x-auto scrollbar-hide">

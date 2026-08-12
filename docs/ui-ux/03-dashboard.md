@@ -8,7 +8,7 @@
 
 ## Shell
 
-- Flat `background`; sticky tab bar = opaque `surface` + 2px hard border (no backdrop-blur).
+- Flat `background`; sticky tab bar = opaque `surface` + 1px outline-variant border (no backdrop-blur).
 - Tabs: memory, map, chat, identity, settings.
 - Active tab: solid primary underline or primary-container chip.
 
@@ -20,13 +20,13 @@ Migrate glass panels → `FcCard`:
 
 - Stats, QR identity, connections table, map, chat list, availability, time capsule
 
-Accent: `#630ED4` / primary-container (no blue gradient avatars).
+Accent: `#630ED4` / primary-container for brand; `#224CFF` secondary for events/map emphasis (no blue gradient avatars).
 
 ---
 
 ## Appearance
 
-Settings tab includes a **Dark mode** switch bound to `ThemeProvider` (same as Navbar toggle).
+Theme is controlled from the **Navbar** toggle only. Settings does not duplicate dark/light mode.
 
 ---
 

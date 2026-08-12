@@ -108,8 +108,8 @@ export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: A
   }, [envelope, getAuthHeaders, state.kind]);
 
   const bubbleClass = isMine
-    ? 'border-2 border-border-hard bg-primary text-on-primary'
-    : 'border-2 border-border-hard bg-surface-container text-on-surface';
+    ? 'border border-border-hard bg-primary text-on-primary'
+    : 'border border-border-hard bg-surface-container text-on-surface';
 
   const busy = state.kind === 'downloading' || state.kind === 'verifying';
   const error = state.kind === 'error' ? state.message : null;

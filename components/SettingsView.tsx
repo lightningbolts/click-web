@@ -5,12 +5,11 @@ import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import * as Switch from '@radix-ui/react-switch';
-import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone, MapPin, Map, Shield, Camera, Loader2, Moon } from 'lucide-react';
+import { User, Lock, Trash2, Save, AlertTriangle, RefreshCw, Tag, Plus, X, Bell, MessageCircle, Phone, MapPin, Map, Shield, Camera, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid, INTEREST_CATEGORIES } from '@/components/InterestTagging';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
 import { displayNameFromUserMetadata, firstLastFromUserMetadata } from '@/lib/userDisplayName';
-import { useTheme } from '@/lib/theme/ThemeProvider';
 
 interface SettingsViewProps {
   notificationPreferences: NotificationPreferences;
@@ -22,7 +21,6 @@ export default function SettingsView({
   onSaveNotificationPreferences,
 }: SettingsViewProps) {
   const { user, signOut, refreshUser, profileImageUrl, setProfileImageUrl } = useAuth();
-  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -482,40 +480,10 @@ export default function SettingsView({
     >
       <h2 className="mb-6 text-3xl font-bold text-on-surface">Settings</h2>
 
-      {/* Appearance */}
-      <div className="fc-card space-y-4 border-2 border-border-hard p-8">
-        <div className="mb-2 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border-2 border-border-hard bg-on-primary-container">
-            <Moon className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-on-surface">Appearance</h3>
-            <p className="text-sm font-medium text-on-surface-variant">
-              Match the Click app light and dark themes
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-4 rounded-[16px] border-2 border-border-hard bg-surface-container px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-bold text-on-surface">Dark mode</p>
-            <p className="text-sm font-medium text-on-surface-variant">
-              Use the Functional Clarity dark palette
-            </p>
-          </div>
-          <Switch.Root
-            checked={theme === 'dark'}
-            onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-            className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-border-hard bg-surface outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary data-[state=checked]:bg-primary"
-          >
-            <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-on-surface transition-transform data-[state=checked]:translate-x-[22px] data-[state=checked]:bg-on-primary" />
-          </Switch.Root>
-        </div>
-      </div>
-
       {/* Profile Settings */}
-      <div className="fc-card border-2 border-border-hard p-8">
+      <div className="fc-card border border-border-hard p-8">
         <div className="mb-6 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border-2 border-border-hard bg-on-primary-container">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[8px] border border-border-hard bg-on-primary-container">
             <User className="h-6 w-6 text-primary" />
           </div>
           <div>

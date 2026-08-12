@@ -1751,7 +1751,7 @@ export default function ChatView({
         </div>
       )}
       {/* ── Header (safe-area only; IME resizes the message column in the parent layout) ── */}
-      <div className="relative z-50 mb-4 shrink-0 overflow-visible rounded-[16px] border-2 border-border-hard bg-surface pt-[env(safe-area-inset-top,0px)]">
+      <div className="relative z-50 mb-4 shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface pt-[env(safe-area-inset-top,0px)]">
         {isGroupClique && groupKeyError ? (
           <div className="mx-4 mt-3 rounded-[8px] border-2 border-amber-600/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-100">
             {groupKeyError}
@@ -2193,7 +2193,7 @@ export default function ChatView({
                     damping: 28,
                     delay: 0.14 + i * 0.045,
                   }}
-                  className="rounded-full border-2 border-border-hard bg-surface px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
+                  className="rounded-full border border-border-hard bg-surface px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
                 >
                   {t}
                 </motion.span>
@@ -2206,7 +2206,7 @@ export default function ChatView({
       {/* ── Messages area ── */}
       <div
         ref={messagesPanelRef}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-[16px] border-2 border-border-hard bg-surface"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-[16px] border border-border-hard bg-surface"
       >
         {/* Subtle gradient glow behind messages */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -2369,7 +2369,7 @@ export default function ChatView({
                     />
                   )}
                 </div>
-                <div className="rounded-2xl rounded-bl-sm border-2 border-border-hard bg-surface-container px-4 py-2.5">
+                <div className="rounded-2xl rounded-bl-sm border border-border-hard bg-surface-container px-4 py-2.5">
                   <span className="inline-flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <span
@@ -2405,9 +2405,9 @@ export default function ChatView({
       </div>
 
       {/* ── Input area (overflow visible so portaled pickers align; chrome stacks above messages) ── */}
-      <div className="relative z-40 mt-2 shrink-0 overflow-visible rounded-[16px] border-2 border-border-hard bg-surface px-4 py-2">
+      <div className="relative z-40 mt-2 shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface px-4 py-2">
         {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
-          <div className="mb-2 flex w-full items-start gap-2 rounded-[8px] border-2 border-border-hard bg-surface-container px-3 py-2.5 text-xs">
+          <div className="mb-2 flex w-full items-start gap-2 rounded-[8px] border border-border-hard bg-surface-container px-3 py-2.5 text-xs">
             <span className="shrink-0 font-medium text-primary">Replying</span>
             <p className="min-w-0 flex-1 line-clamp-2 text-on-surface-variant">{replyBannerText}</p>
             <button
@@ -2440,7 +2440,7 @@ export default function ChatView({
               type="button"
               onClick={() => photoInputRef.current?.click()}
               disabled={!chatId || mediaBusy || isRecording}
-              className="rounded-[8px] border-2 border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              className="rounded-[8px] border border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
               title="Attach photo"
             >
               {mediaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
@@ -2449,7 +2449,7 @@ export default function ChatView({
               type="button"
               onClick={() => attachmentInputRef.current?.click()}
               disabled={!chatId || mediaBusy || isRecording}
-              className="rounded-[8px] border-2 border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              className="rounded-[8px] border border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
               title="Attach file (2 MB max)"
               aria-label="Attach file"
             >
@@ -2460,7 +2460,7 @@ export default function ChatView({
                 type="button"
                 onClick={() => void beginVoiceRecording()}
                 disabled={!chatId || mediaBusy}
-                className="rounded-[8px] border-2 border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                className="rounded-[8px] border border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
                 title="Record voice message"
               >
                 <Mic className="w-4 h-4" />
@@ -2481,7 +2481,7 @@ export default function ChatView({
                 <button
                   type="button"
                   onClick={cancelVoiceRecording}
-                  className="rounded-[8px] border-2 border-border-hard p-2.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                  className="rounded-[8px] border border-border-hard p-2.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                   title="Cancel"
                 >
                   <X className="w-4 h-4" />
@@ -2489,7 +2489,7 @@ export default function ChatView({
               </>
             )}
           </div>
-          <div className="flex min-w-0 flex-1 items-center rounded-[8px] border-2 border-border-hard bg-surface-container px-4 py-[7px] transition-colors focus-within:border-primary">
+          <div className="flex min-w-0 flex-1 items-center rounded-[8px] border border-border-hard bg-surface-container px-4 py-[7px] transition-colors focus-within:border-primary">
             <textarea
               ref={inputRef}
               value={inputText}

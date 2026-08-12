@@ -347,7 +347,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         {/* Click ID Display */}
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-3">
-            <code className="rounded-[8px] border-2 border-border-hard bg-surface-container px-4 py-2 font-mono text-lg tracking-wider text-primary">
+            <code className="rounded-[8px] border border-border-hard bg-surface-container px-4 py-2 font-mono text-lg tracking-wider text-primary">
               {clickId}
             </code>
             <motion.button

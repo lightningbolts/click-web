@@ -103,11 +103,11 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                 className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto scrollbar-hide"
             >
                 <div
-                  className="fc-card border-2 border-border-hard p-8"
+                  className="fc-card border border-border-hard p-8"
                   style={{ backgroundColor: 'var(--color-surface)' }}
                 >
                     <div className="mb-6 text-center">
-                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-border-hard bg-on-primary-container px-3 py-1.5">
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-hard bg-on-primary-container px-3 py-1.5">
                             <Sparkles className="h-4 w-4 text-primary" />
                             <span className="text-xs font-bold text-primary">Quick Setup</span>
                         </div>

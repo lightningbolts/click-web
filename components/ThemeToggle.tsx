@@ -21,7 +21,7 @@ export default function ThemeToggle({
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Light mode" : "Dark mode"}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[8px] border-2 border-border-hard bg-surface px-2.5 py-2 text-on-surface hover:bg-surface-container-low active:translate-x-0.5 active:translate-y-0.5",
+        "inline-flex items-center justify-center gap-2 rounded-[8px] border border-border-hard bg-surface px-2.5 py-2 text-on-surface hover:bg-surface-container-low active:translate-x-0.5 active:translate-y-0.5",
         className,
       )}
       style={{ backgroundColor: "var(--color-surface)" }}

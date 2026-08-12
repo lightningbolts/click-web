@@ -135,7 +135,7 @@ function ParticipantTile({
         <VideoTrackSurface track={participant.videoTrack} mirror={participant.isLocal} />
       ) : (
         <div className="flex h-full min-h-[120px] w-full items-center justify-center bg-[#2a2c2c]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-lg font-bold text-on-primary">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border-hard bg-primary text-lg font-bold text-on-primary">
             {initialsFor(participant.displayName)}
           </div>
         </div>
@@ -168,7 +168,7 @@ function CallControlCapsule({
   onEndCall: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-full border-2 border-border-hard bg-[#101212] px-4 py-3">
+    <div className="flex items-center gap-3 rounded-full border border-border-hard bg-[#101212] px-4 py-3">
       <button
         type="button"
         onClick={onToggleMicrophone}
@@ -321,7 +321,7 @@ function ActiveCallStage({
             setManualOverride(next);
             setOverrideAtCount(roster.length);
           }}
-          className="flex h-10 w-10 items-center justify-center rounded-[10px] border-2 border-border-hard bg-[#1a1c1c]"
+          className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-border-hard bg-[#1a1c1c]"
           aria-label={layoutMode === 'grid' ? 'Speaker view' : 'Grid view'}
         >
           {layoutMode === 'grid' ? <Rows3 className="h-5 w-5" /> : <Grid2X2 className="h-5 w-5" />}
@@ -361,7 +361,7 @@ function ActiveCallStage({
                   labelOverride={selfLabel(local.displayName)}
                 />
                 {pipRemote ? (
-                  <div className="absolute right-3 top-3 h-32 w-24 overflow-hidden rounded-[14px] border-2 border-border-hard shadow-lg">
+                  <div className="absolute right-3 top-3 h-32 w-24 overflow-hidden rounded-[14px] border border-border-hard shadow-lg">
                     <ParticipantTile
                       participant={pipRemote}
                       isActiveSpeaker={pipRemote.identity === activeSpeaker?.identity}
@@ -476,12 +476,12 @@ export default function CallOverlay({
               dragMomentum={false}
               className="pointer-events-auto w-full max-w-sm"
             >
-              <div className="relative overflow-hidden rounded-[28px] border-2 border-border-hard bg-[#101212] p-6 text-center">
+              <div className="relative overflow-hidden rounded-[28px] border border-border-hard bg-[#101212] p-6 text-center">
                 <DragHandle
                   label="Move call panel"
                   onPointerDown={(event) => previewDragControls.start(event)}
                 />
-                <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-3xl font-bold text-on-primary">
+                <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border border-border-hard bg-primary text-3xl font-bold text-on-primary">
                   {initialsFor(name)}
                 </div>
                 <p className="relative text-sm font-medium uppercase tracking-[0.18em] text-on-primary-container">
@@ -512,7 +512,7 @@ export default function CallOverlay({
                       <button
                         type="button"
                         onClick={onDecline}
-                        className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-red-600 text-white"
+                        className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-red-600 text-white"
                         aria-label="Decline call"
                       >
                         <PhoneOff className="h-6 w-6" />
@@ -520,7 +520,7 @@ export default function CallOverlay({
                       <button
                         type="button"
                         onClick={onAccept}
-                        className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-white"
+                        className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-primary text-white"
                         aria-label="Accept call"
                       >
                         {isVideo ? <Video className="h-6 w-6" /> : <Phone className="h-6 w-6" />}
@@ -531,7 +531,7 @@ export default function CallOverlay({
                     <button
                       type="button"
                       onClick={onCancel}
-                      className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-red-600 text-white"
+                      className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-red-600 text-white"
                       aria-label="Cancel call"
                     >
                       <PhoneOff className="h-6 w-6" />
@@ -541,7 +541,7 @@ export default function CallOverlay({
                     <button
                       type="button"
                       onClick={onDismissEnded}
-                      className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-white"
+                      className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-primary text-white"
                       aria-label="Dismiss"
                     >
                       <Check className="h-6 w-6" />

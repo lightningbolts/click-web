@@ -7,7 +7,7 @@ import { FcCard } from "@/components/fc";
  */
 export function DemoBanner({ onTurnOff }: { onTurnOff?: () => void }) {
   return (
-    <FcCard className="flex flex-col gap-3 border-2 border-border-hard bg-surface px-4 py-3 text-sm text-on-surface sm:flex-row sm:items-start">
+    <FcCard className="flex flex-col gap-3 border border-border-hard bg-surface px-4 py-3 text-sm text-on-surface sm:flex-row sm:items-start">
       <div className="min-w-0 flex-1">
         <p className="font-bold text-primary">Demo data is on</p>
         <p className="mt-1 font-medium leading-relaxed text-on-surface-variant">

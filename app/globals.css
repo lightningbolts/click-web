@@ -14,6 +14,10 @@
   --color-on-primary: #ffffff;
   --color-primary-container: #7c3aed;
   --color-on-primary-container: #ede0ff;
+  --color-secondary: #224cff;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e8edff;
+  --color-on-secondary-container: #0d1f73;
   --color-surface: #ffffff;
   --color-surface-container-low: #f3f3f4;
   --color-surface-container: #eeeeee;
@@ -24,7 +28,7 @@
   --color-on-surface-variant: #4a4455;
   --color-outline: #7b7487;
   --color-outline-variant: #ccc3d8;
-  --color-border-hard: #000000;
+  --color-border-hard: #ccc3d8;
   --color-error: #ba1a1a;
   --color-surface-tint: #732ee4;
   --color-inverse-primary: #d2bbff;
@@ -48,10 +52,12 @@
     --color-on-surface-variant: #cfc4e0;
     --color-outline: #9b8fb0;
     --color-outline-variant: #4a3d5c;
-    --color-border-hard: #ffffff;
+    --color-border-hard: #4a3d5c;
     --color-on-primary-container: #ede0ff;
     --color-inverse-primary: #d2bbff;
-    /* primary / on-primary / primary-container stay brand purple */
+    --color-secondary-container: #1a2a6e;
+    --color-on-secondary-container: #d6e0ff;
+    /* primary stays brand purple; secondary stays #224CFF */
   }
 }
 
@@ -74,12 +80,16 @@
   --on-primary: var(--color-on-primary);
   --primary-container: var(--color-primary-container);
   --on-primary-container: var(--color-on-primary-container);
+  --secondary: var(--color-secondary);
+  --on-secondary: var(--color-on-secondary);
+  --secondary-container: var(--color-secondary-container);
+  --on-secondary-container: var(--color-on-secondary-container);
   --surface-tint: var(--color-surface-tint);
   --inverse-primary: var(--color-inverse-primary);
   --error: var(--color-error);
   --radius-btn: 8px;
   --radius-card: 16px;
-  --border-width: 2px;
+  --border-width: 1px;
 }
 
 body {
@@ -186,7 +196,7 @@ body {
 
 .maplibregl-ctrl-group {
   background: var(--color-surface) !important;
-  border: 2px solid var(--color-border-hard) !important;
+  border: 1px solid var(--color-border-hard) !important;
   border-radius: 8px !important;
   overflow: hidden;
 }

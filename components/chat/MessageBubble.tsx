@@ -378,7 +378,7 @@ export default function MessageBubble({
   const isAttachment = attachmentEnvelope !== null;
   const textBubbleClass = isMine
     ? 'bg-primary text-on-primary rounded-br-sm'
-    : 'border-2 border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
+    : 'border border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
 
   return (
     <motion.div

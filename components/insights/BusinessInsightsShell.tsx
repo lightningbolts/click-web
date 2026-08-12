@@ -116,7 +116,7 @@ export default function BusinessInsightsShell({
     <div className="relative min-h-screen bg-background text-on-surface">
       {/* Sticky business insights nav */}
       <div
-        className="sticky top-0 z-50 border-b-2 border-border-hard bg-surface"
+        className="sticky top-0 z-50 border-b border-border-hard bg-surface"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
         <div className="mx-auto max-w-[1800px] px-4 md:px-6 lg:px-8">
@@ -127,7 +127,7 @@ export default function BusinessInsightsShell({
                 <ClickLogo
                   variant="boxed"
                   size={40}
-                  className="h-10 w-10 rounded-[8px] border-2 border-border-hard"
+                  className="h-10 w-10 rounded-[8px] border border-border-hard"
                   priority
                 />
                 {isLive && (
@@ -180,7 +180,7 @@ export default function BusinessInsightsShell({
                 Dashboard
               </Link>
 
-              <div className="hidden items-center gap-2 rounded-[8px] border-2 border-border-hard bg-surface px-3 py-1.5 md:flex">
+              <div className="hidden items-center gap-2 rounded-[8px] border border-border-hard bg-surface px-3 py-1.5 md:flex">
                 <div
                   className={`h-1.5 w-1.5 rounded-full ${
                     isLive ? "animate-pulse bg-green-500" : "bg-outline"
@@ -194,7 +194,7 @@ export default function BusinessInsightsShell({
               <button
                 type="button"
                 onClick={handleRefresh}
-                className="rounded-[8px] border-2 border-border-hard bg-surface p-2 hover:bg-surface-container-low"
+                className="rounded-[8px] border border-border-hard bg-surface p-2 hover:bg-surface-container-low"
                 title="Refresh data"
               >
                 <RefreshCw className="h-3.5 w-3.5 text-on-surface-variant md:h-4 md:w-4" />
@@ -202,7 +202,7 @@ export default function BusinessInsightsShell({
 
               <button
                 type="button"
-                className="rounded-[8px] border-2 border-border-hard bg-surface p-2 hover:bg-surface-container-low"
+                className="rounded-[8px] border border-border-hard bg-surface p-2 hover:bg-surface-container-low"
                 title="Export data"
               >
                 <Download className="h-3.5 w-3.5 text-on-surface-variant md:h-4 md:w-4" />
@@ -210,7 +210,7 @@ export default function BusinessInsightsShell({
 
               <button
                 type="button"
-                className="hidden rounded-[8px] border-2 border-border-hard bg-surface p-2 hover:bg-surface-container-low md:flex"
+                className="hidden rounded-[8px] border border-border-hard bg-surface p-2 hover:bg-surface-container-low md:flex"
                 title="Settings"
               >
                 <Settings className="h-4 w-4 text-on-surface-variant" />
@@ -220,7 +220,7 @@ export default function BusinessInsightsShell({
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="rounded-[8px] border-2 border-border-hard bg-surface p-2 hover:border-error hover:text-error"
+                  className="rounded-[8px] border border-border-hard bg-surface p-2 hover:border-error hover:text-error"
                   title="Sign out"
                 >
                   <LogOut className="h-3.5 w-3.5 text-on-surface-variant md:h-4 md:w-4" />

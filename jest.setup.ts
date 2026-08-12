@@ -23,3 +23,50 @@ if (!(globalThis as unknown as { crypto?: unknown }).crypto) {
     configurable: true,
   });
 }
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+jest.mock('maplibre-gl', () => {
+  const map = {
+    addControl: jest.fn(),
+    on: jest.fn((event: string, cb: () => void) => {
+      if (event === 'load') cb();
+    }),
+    once: jest.fn((event: string, cb: () => void) => {
+      if (event === 'idle') cb();
+    }),
+    addSource: jest.fn(),
+    addLayer: jest.fn(),
+    getSource: jest.fn(() => ({ setData: jest.fn() })),
+    getLayer: jest.fn(() => true),
+    setLayoutProperty: jest.fn(),
+    fitBounds: jest.fn(),
+    resize: jest.fn(),
+    remove: jest.fn(),
+    getCanvas: jest.fn(() => ({ style: {} })),
+    project: jest.fn(() => ({ x: 140, y: 220 })),
+  };
+  return {
+    __esModule: true,
+    default: {
+      Map: jest.fn(() => map),
+      NavigationControl: jest.fn(),
+      Popup: jest.fn().mockImplementation(() => ({
+        setLngLat: jest.fn().mockReturnThis(),
+        setHTML: jest.fn().mockReturnThis(),
+        addTo: jest.fn().mockReturnThis(),
+        remove: jest.fn(),
+      })),
+      LngLatBounds: jest.fn().mockImplementation(() => ({
+        extend: jest.fn().mockReturnThis(),
+      })),
+    },
+  };
+});
+

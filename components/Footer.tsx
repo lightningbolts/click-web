@@ -11,7 +11,7 @@ export default function Footer() {
 
   return (
     <footer
-      className="relative z-50 border-t-2 border-border-hard bg-surface px-6 py-12 text-on-surface md:px-12"
+      className="relative z-50 border-t border-border-hard bg-surface px-6 py-12 text-on-surface md:px-12"
       style={{ backgroundColor: "var(--color-surface)" }}
     >
       <div className="mx-auto max-w-6xl">
@@ -24,19 +24,19 @@ export default function Footer() {
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-semibold md:gap-6 md:text-base">
-            <Link href="/privacy" className="text-on-surface hover:text-primary">
+            <Link href="/privacy" className="text-on-surface hover:text-secondary">
               Privacy
             </Link>
             <span className="text-outline">•</span>
-            <Link href="/terms" className="text-on-surface hover:text-primary">
+            <Link href="/terms" className="text-on-surface hover:text-secondary">
               Terms
             </Link>
             <span className="text-outline">•</span>
-            <Link href="/about" className="text-on-surface hover:text-primary">
+            <Link href="/about" className="text-on-surface hover:text-secondary">
               About
             </Link>
             <span className="text-outline">•</span>
-            <Link href="/enterprise" className="text-on-surface hover:text-primary">
+            <Link href="/enterprise" className="text-on-surface hover:text-secondary">
               Enterprise
             </Link>
           </div>

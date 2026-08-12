@@ -815,7 +815,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       />
 
       {mapPresentationReady && (
-        <div className="absolute top-4 left-4 z-[6] max-w-[220px] rounded-[16px] border-2 border-border-hard bg-surface p-3 text-xs text-on-surface shadow-lg">
+        <div className="absolute top-4 left-4 z-[6] max-w-[220px] rounded-[16px] border border-border-hard bg-surface p-3 text-xs text-on-surface shadow-lg">
           <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
             <Layers className="w-3.5 h-3.5 text-[#630ed4]" />
             Map layers
