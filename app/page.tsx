@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
 import HomeAuthenticated from '@/components/HomeAuthenticated';
 import LandingPage from '@/components/landing/LandingPage';
+import type { User } from '@supabase/supabase-js';
 
 /**
  * Root route: resolve the cookie session on the server so anonymous crawlers
@@ -14,17 +15,19 @@ export default async function Home() {
     return <LandingPage />;
   }
 
+  let user: User | null = null;
   try {
     const supabase = await createSupabaseServerClient();
     const {
-      data: { user },
+      data: { user: sessionUser },
     } = await supabase.auth.getUser();
-
-    if (user) {
-      return <HomeAuthenticated user={user} />;
-    }
+    user = sessionUser;
   } catch (err) {
     console.error('Root route session check failed:', err);
+  }
+
+  if (user) {
+    return <HomeAuthenticated user={user} />;
   }
 
   return <LandingPage />;
