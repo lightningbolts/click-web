@@ -6,6 +6,8 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { hubCreateBodySchema } from '@/lib/api/schemas/beacons';
 
 type LocationPayload = {
   latitude?: number;
@@ -33,12 +35,9 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (!auth.ok) return auth.response;
 
-  let body: Record<string, unknown>;
-  try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, hubCreateBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data as Record<string, unknown>;
 
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const category = typeof body.category === 'string' ? body.category.trim() : 'general';

@@ -11,6 +11,8 @@ import {
   addCliqueMemberFromConnections,
   removeCliqueMemberRpc,
 } from '@/lib/chat/createVerifiedClick';
+import { parseBody } from '@/lib/api/parseBody';
+import { cliquesMembersBodySchema } from '@/lib/api/schemas/connections';
 
 export async function POST(request: NextRequest) {
   const { user, supabase, authError } = await getSupabaseFromRouteRequest(request);
@@ -18,24 +20,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { group_id?: unknown; groupId?: unknown; new_member_user_id?: unknown; newMemberUserId?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, cliquesMembersBodySchema);
+  if (!parsed.ok) return parsed.response;
 
-  const groupId =
-    (typeof body.group_id === 'string' ? body.group_id : typeof body.groupId === 'string' ? body.groupId : '')
-      .trim();
-  const newMemberUserId =
-    (
-      typeof body.new_member_user_id === 'string'
-        ? body.new_member_user_id
-        : typeof body.newMemberUserId === 'string'
-          ? body.newMemberUserId
-          : ''
-    ).trim();
+  const groupId = parsed.data.group_id.trim();
+  const newMemberUserId = (parsed.data.new_member_user_id ?? '').trim();
 
   if (!groupId || !newMemberUserId) {
     return NextResponse.json({ error: 'group_id and new_member_user_id are required' }, { status: 400 });
@@ -60,24 +49,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { group_id?: unknown; groupId?: unknown; member_user_id?: unknown; memberUserId?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, cliquesMembersBodySchema);
+  if (!parsed.ok) return parsed.response;
 
-  const groupId =
-    (typeof body.group_id === 'string' ? body.group_id : typeof body.groupId === 'string' ? body.groupId : '')
-      .trim();
-  const memberUserId =
-    (
-      typeof body.member_user_id === 'string'
-        ? body.member_user_id
-        : typeof body.memberUserId === 'string'
-          ? body.memberUserId
-          : ''
-    ).trim();
+  const groupId = parsed.data.group_id.trim();
+  const memberUserId = (parsed.data.member_user_id ?? '').trim();
 
   if (!groupId || !memberUserId) {
     return NextResponse.json({ error: 'group_id and member_user_id are required' }, { status: 400 });

@@ -905,7 +905,7 @@ export async function bindProximityHandshake(
       memberVibeTags,
     );
 
-    let memberRelativeAltitudeM: number | null = null;
+    const memberRelativeAltitudeM: number | null = null;
     const memberDisplayLocation = DISPLAY_LOCATION_FALLBACK;
     const memberSpecificLocationName: string | null = null;
     const memberSemanticLocation: Record<string, unknown> | null = null;

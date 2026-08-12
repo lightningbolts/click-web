@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { runEncounterEnrichment } from '@/lib/enrichment/runEncounterEnrichment';
+import { parseBody } from '@/lib/api/parseBody';
+import { enrichmentEventBodySchema } from '@/lib/api/schemas/connections';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -29,25 +31,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, enrichmentEventBodySchema);
+    if (!parsed.ok) return parsed.response;
 
-    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 });
-    }
-
-    const raw = body as Record<string, unknown>;
+    const raw = parsed.data;
     const encounterId = typeof raw.encounter_id === 'string' ? raw.encounter_id.trim() : '';
     const lat = raw.lat;
     const lon = raw.lon;
     const timestamp =
       typeof raw.timestamp === 'string' && raw.timestamp.trim().length > 0
         ? raw.timestamp.trim()
-        : new Date().toISOString();
+        : typeof raw.timestamp === 'number' && Number.isFinite(raw.timestamp)
+          ? new Date(raw.timestamp).toISOString()
+          : new Date().toISOString();
 
     if (!encounterId || !isUuidLike(encounterId)) {
       return NextResponse.json({ error: 'encounter_id must be a valid UUID' }, { status: 400 });

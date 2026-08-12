@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireConnectionParticipant } from '@/lib/server/connectionWriteAuth';
-
-type Body = { connection_id?: string; reason?: string };
+import { parseBody } from '@/lib/api/parseBody';
+import { safetyReportBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * Report a connection for safety review.
@@ -9,19 +9,12 @@ type Body = { connection_id?: string; reason?: string };
  */
 export async function POST(request: NextRequest) {
   try {
-    let body: Body;
-    try {
-      body = (await request.json()) as Body;
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, safetyReportBodySchema);
+    if (!parsed.ok) return parsed.response;
 
-    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-    if (!reason) {
-      return NextResponse.json({ error: 'connection_id and reason are required' }, { status: 400 });
-    }
+    const { connection_id, reason } = parsed.data;
 
-    const gate = await requireConnectionParticipant(request, body.connection_id);
+    const gate = await requireConnectionParticipant(request, connection_id);
     if (!gate.ok) return gate.response;
 
     const { user, connectionId, admin } = gate;

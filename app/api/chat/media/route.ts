@@ -11,17 +11,13 @@ import {
   createChatGatekeeperAdmin,
   requireBearerUser,
 } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatMediaBodySchema } from '@/lib/api/schemas/chat';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
 
 const CHAT_MEDIA_BUCKET = 'chat-media';
-
-interface ChatMediaUploadBody {
-  chat_id: string;
-  mime_type: string;
-  file_b64: string;
-}
 
 function extForMime(mime: string): string {
   const m = mime.toLowerCase();
@@ -54,32 +50,18 @@ export async function POST(request: NextRequest) {
     const auth = await requireBearerUser(request);
     if (!auth.ok) return auth.response;
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch (parseErr) {
-      const e = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
-      console.error('[chat/media] json parse failed', {
-        message: e.message,
-        stack: e.stack,
-        name: e.name,
-        cause: e.cause,
-      });
-      return NextResponse.json({ error: 'Expected valid application/json body' }, { status: 400 });
-    }
+    const parsedBody = await parseBody(request, chatMediaBodySchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
-    const parsed = body as Partial<ChatMediaUploadBody> | null;
-    const chatId = typeof parsed?.chat_id === 'string' ? parsed.chat_id.trim() : '';
+    const parsed = parsedBody.data;
+    const chatId = parsed.chat_id.trim();
     const mimeType =
-      typeof parsed?.mime_type === 'string' && parsed.mime_type.trim().length > 0
+      typeof parsed.mime_type === 'string' && parsed.mime_type.trim().length > 0
         ? parsed.mime_type.trim()
         : 'application/octet-stream';
-    const fileB64Raw = typeof parsed?.file_b64 === 'string' ? parsed.file_b64 : '';
+    const fileB64Raw = parsed.file_b64;
     const fileB64 = stripDataUriPrefix(fileB64Raw);
 
-    if (!chatId) {
-      return NextResponse.json({ error: 'chat_id is required' }, { status: 400 });
-    }
     if (!fileB64) {
       return NextResponse.json({ error: 'file_b64 is required' }, { status: 400 });
     }

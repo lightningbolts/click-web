@@ -150,9 +150,23 @@ describe('POST /api/insights/beacons contract', () => {
     });
 
     it.each([
+      ['a blank venue_id', { ...VALID_BODY, venue_id: '   ' }],
+      ['a non-string venue_id', { ...VALID_BODY, venue_id: 42 }],
+    ])('rejects %s at the request schema', async (_label, body) => {
+      const mock = setupSupabase();
+
+      const res = await callRoute(body);
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.code).toBe('validation_error');
+      // parseBody prefixes the offending field; the wording comes from zod.
+      expect(json.error).toMatch(/^venue_id: /);
+      expect(mock.from).not.toHaveBeenCalled();
+    });
+
+    it.each([
       ['a missing venue_id', { ...VALID_BODY, venue_id: undefined }, 'venue_id is required'],
-      ['a blank venue_id', { ...VALID_BODY, venue_id: '   ' }, 'venue_id is required'],
-      ['a non-string venue_id', { ...VALID_BODY, venue_id: 42 }, 'venue_id is required'],
       ['a missing perk', { ...VALID_BODY, perk_description: undefined }, 'perk_description is required'],
       ['a blank perk', { ...VALID_BODY, perk_description: '  ' }, 'perk_description is required'],
       [
@@ -171,7 +185,7 @@ describe('POST /api/insights/beacons contract', () => {
       ['a NaN duration', { ...VALID_BODY, duration_minutes: Number.NaN }, 'duration_minutes must be'],
       ['a too-short duration', { ...VALID_BODY, duration_minutes: 14 }, 'duration_minutes must be'],
       ['a too-long duration', { ...VALID_BODY, duration_minutes: 10081 }, 'duration_minutes must be'],
-    ])('returns 400 for %s', async (_label, body, message) => {
+    ])('returns 400 for %s', async (_label, body, message: string) => {
       const mock = setupSupabase();
 
       const res = await callRoute(body);

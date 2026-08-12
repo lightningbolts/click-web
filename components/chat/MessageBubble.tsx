@@ -220,60 +220,6 @@ export default function MessageBubble({
     isEncryptedMedia,
   });
 
-  if (message.message_type === 'call_log') {
-    const { text, missed } = callLogLabel(message.metadata);
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.18 }}
-        className="flex w-full justify-center px-2 py-2"
-      >
-        <div
-          className="inline-flex max-w-[90%] items-center gap-2 rounded-[20px] border border-zinc-700/60 bg-zinc-800/70 px-3.5 py-2 text-sm backdrop-blur-sm"
-          role="status"
-        >
-          <Phone className={`h-4 w-4 shrink-0 ${missed ? 'text-red-400' : 'text-zinc-400'}`} aria-hidden />
-          <span className={missed ? 'font-medium text-red-400' : 'font-medium text-zinc-300'}>{text}</span>
-          <span className="text-[10px] text-zinc-500">{formatMessageTimeLabel(message.time_created)}</span>
-        </div>
-      </motion.div>
-    );
-  }
-
-  const flatReactions: { emoji: string; count: number; iMine: boolean }[] = Object.entries(
-    message.reactions ?? {}
-  ).map(([emoji, users]) => ({
-    emoji,
-    count: (users as MessageReaction[]).length,
-    iMine: (users as MessageReaction[]).some((r) => r.user_id === currentUserId),
-  }));
-
-  const myReactions = flatReactions.filter((r) => r.iMine).map((r) => r.emoji);
-
-  const handleMouseEnter = () => {
-    cancelHide();
-    if (typeof document !== 'undefined') {
-      document.dispatchEvent(
-        new CustomEvent<{ messageId: string }>(ACTION_MENU_OPEN_EVENT, {
-          detail: { messageId: message.id },
-        }),
-      );
-    }
-    setShowActions(true);
-  };
-
-  const handleMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
-    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
-    scheduleHide();
-  };
-
-  const handlePortaledMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
-    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
-    scheduleHide();
-  };
-
   useLayoutEffect(() => {
     if (!showActions || typeof document === 'undefined') {
       setActionBarGeom(null);
@@ -351,6 +297,69 @@ export default function MessageBubble({
     return () => ro.disconnect();
   }, [showActions, actionBarGeom]);
 
+  const pickerToolbarDock = useMemo(() => {
+    if (!showActions || !actionBarGeom) return null;
+    return {
+      ...actionBarGeom,
+      gap: 16,
+      preferSide: isMine ? ('left' as const) : ('right' as const),
+    };
+  }, [isMine, showActions, actionBarGeom]);
+
+  if (message.message_type === 'call_log') {
+    const { text, missed } = callLogLabel(message.metadata);
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.18 }}
+        className="flex w-full justify-center px-2 py-2"
+      >
+        <div
+          className="inline-flex max-w-[90%] items-center gap-2 rounded-[20px] border border-zinc-700/60 bg-zinc-800/70 px-3.5 py-2 text-sm backdrop-blur-sm"
+          role="status"
+        >
+          <Phone className={`h-4 w-4 shrink-0 ${missed ? 'text-red-400' : 'text-zinc-400'}`} aria-hidden />
+          <span className={missed ? 'font-medium text-red-400' : 'font-medium text-zinc-300'}>{text}</span>
+          <span className="text-[10px] text-zinc-500">{formatMessageTimeLabel(message.time_created)}</span>
+        </div>
+      </motion.div>
+    );
+  }
+
+  const flatReactions: { emoji: string; count: number; iMine: boolean }[] = Object.entries(
+    message.reactions ?? {}
+  ).map(([emoji, users]) => ({
+    emoji,
+    count: (users as MessageReaction[]).length,
+    iMine: (users as MessageReaction[]).some((r) => r.user_id === currentUserId),
+  }));
+
+  const myReactions = flatReactions.filter((r) => r.iMine).map((r) => r.emoji);
+
+  const handleMouseEnter = () => {
+    cancelHide();
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(
+        new CustomEvent<{ messageId: string }>(ACTION_MENU_OPEN_EVENT, {
+          detail: { messageId: message.id },
+        }),
+      );
+    }
+    setShowActions(true);
+  };
+
+  const handleMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
+    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
+    scheduleHide();
+  };
+
+  const handlePortaledMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
+    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
+    scheduleHide();
+  };
+
   const timeLabel = formatMessageTimeLabel(message.time_created);
   const replyMeta = getReplyFromMetadata(message.metadata);
   const resolvedMediaUrl = secureMedia.src;
@@ -370,15 +379,6 @@ export default function MessageBubble({
   const textBubbleClass = isMine
     ? 'bg-primary text-on-primary rounded-br-sm'
     : 'border-2 border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
-
-  const pickerToolbarDock = useMemo(() => {
-    if (!showActions || !actionBarGeom) return null;
-    return {
-      ...actionBarGeom,
-      gap: 16,
-      preferSide: isMine ? ('left' as const) : ('right' as const),
-    };
-  }, [isMine, showActions, actionBarGeom]);
 
   return (
     <motion.div

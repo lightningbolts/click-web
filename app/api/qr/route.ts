@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import {
   deriveHeightCategoryFromRelativeAltitudeM,
   fetchTerrainElevationMeters,
@@ -18,6 +18,8 @@ import {
   applyLiveEventBeaconToEncounterRow,
   resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
+import { parseBody } from '@/lib/api/parseBody';
+import { qrScanBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * QR Code Connection API — Proximity Verification Layer 1
@@ -32,20 +34,6 @@ import {
  * Old format: click://connect/{userId}  (static, vulnerable to screenshots)
  * New format: JSON with { token, userId, exp } (single-use, expires)
  */
-
-// Helper: create an admin Supabase client (bypasses RLS for token ops)
-function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client',
-    );
-  }
-  return createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
 
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
 const OPEN_METEO_TIMEOUT_MS = 3_500;
@@ -404,8 +392,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthenticatedSupabase(request);
-    const rawBody = (await request.json()) as unknown;
-    const body = isRecord(rawBody) ? rawBody : {};
+    const parsed = await parseBody(request, qrScanBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as Record<string, unknown>;
 
     if (!user) {
       return NextResponse.json(

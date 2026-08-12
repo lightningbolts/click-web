@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assertHubGeofenceFromCoords } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 import { checkHubMessageCooldown } from '@/lib/hub/hubMessageCooldown';
+import { parseBody } from '@/lib/api/parseBody';
+import { hubMessagesBodySchema } from '@/lib/api/schemas/beacons';
 
 type HubMessageInsert = {
   hub_id: string;
@@ -25,23 +27,11 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (!auth.ok) return auth.response;
 
-  let payload: {
-    hub_id?: string;
-    hubId?: string;
-    body?: string;
-    user_lat?: number;
-    user_long?: number;
-    message_type?: string;
-    messageType?: string;
-    metadata?: unknown;
-  };
-  try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, hubMessagesBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const payload = parsed.data;
 
-  const hubId = String(payload.hub_id ?? payload.hubId ?? '').trim();
+  const hubId = String(payload.hub_id ?? '').trim();
   const bodyText = typeof payload.body === 'string' ? payload.body.trim() : '';
   const userLat = payload.user_lat;
   const userLong = payload.user_long;
@@ -106,8 +96,9 @@ export async function POST(request: NextRequest) {
   const messageType =
     typeof payload.message_type === 'string' && payload.message_type.trim()
       ? payload.message_type.trim()
-      : typeof payload.messageType === 'string' && payload.messageType.trim()
-        ? payload.messageType.trim()
+      : typeof (payload as Record<string, unknown>).messageType === 'string' &&
+          String((payload as Record<string, unknown>).messageType).trim()
+        ? String((payload as Record<string, unknown>).messageType).trim()
         : 'text';
 
   const metadata =

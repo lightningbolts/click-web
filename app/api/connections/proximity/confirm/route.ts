@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { confirmProximityHandshakeSelection } from '@/lib/server/proximity/confirmProximitySelection';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import type { ProximityConfirmSelectionRequest } from '@/types/supabase-json';
+import { parseBody } from '@/lib/api/parseBody';
+import { proximityConfirmBodySchema } from '@/lib/api/schemas/connections';
 
 /**
  * POST /api/connections/proximity/confirm
@@ -16,12 +18,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let body: ProximityConfirmSelectionRequest;
-    try {
-      body = (await request.json()) as ProximityConfirmSelectionRequest;
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, proximityConfirmBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data as ProximityConfirmSelectionRequest;
 
     const admin = createAdminClient();
     const result = await confirmProximityHandshakeSelection(admin, user.id, body);

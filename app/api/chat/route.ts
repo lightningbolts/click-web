@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatCreateBodySchema } from '@/lib/api/schemas/connections';
 
 async function getOrCreateChat(supabase: SupabaseClient<any>, connectionId: string) {
   // Try to find existing chat
@@ -83,11 +85,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const { connectionId } = body;
-  if (!connectionId) {
-    return NextResponse.json({ error: 'connectionId is required' }, { status: 400 });
-  }
+  const parsed = await parseBody(req, chatCreateBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const { connectionId } = parsed.data;
 
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

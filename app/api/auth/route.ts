@@ -1,18 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { parseBody } from '@/lib/api/parseBody';
+import { authBodySchema } from '@/lib/api/schemas/user';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password, action, first_name, last_name, birthday } = body as {
-      email?: string;
-      password?: string;
-      action?: string;
-      first_name?: string;
-      last_name?: string;
-      birthday?: string;
-    };
+    const parsed = await parseBody(request, authBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const { email, password, action, first_name, last_name, birthday } = parsed.data;
 
     const cookieStore = await cookies();
     const supabase = createServerClient(

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
+import { parseBody } from '@/lib/api/parseBody';
+import { collaborationSessionBodySchema } from '@/lib/api/schemas/connections';
 
 type RouteParams = { params: Promise<{ connectionId: string }> };
 
@@ -43,14 +45,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   let timezoneOffsetMinutes = 0;
-  try {
-    const body = (await request.json()) as { timezone_offset_minutes?: unknown };
-    if (typeof body.timezone_offset_minutes === 'number' && Number.isFinite(body.timezone_offset_minutes)) {
-      timezoneOffsetMinutes = Math.trunc(body.timezone_offset_minutes);
+  const parsed = await parseBody(request, collaborationSessionBodySchema);
+  if (parsed.ok) {
+    const raw = parsed.data.timezone_offset_minutes;
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      timezoneOffsetMinutes = Math.trunc(raw);
+    } else if (typeof raw === 'string') {
+      const n = Number(raw);
+      if (Number.isFinite(n)) timezoneOffsetMinutes = Math.trunc(n);
     }
-  } catch {
-    /* empty body is fine */
   }
+  // Empty / invalid JSON body: keep prior tolerance (default offset 0)
 
   const admin = createAdminClient();
   const created = await createCollaborationSessionForConnection(

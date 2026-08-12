@@ -9,6 +9,8 @@ import {
   parseEngagementTelemetryBody,
   resolveBeaconCoordinates,
 } from "@/lib/server/eventEngagement";
+import { parseBody } from "@/lib/api/parseBody";
+import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -170,12 +172,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown = null;
-    try {
-      body = await request.json();
-    } catch {
-      body = null;
-    }
+    const parsed = await parseBody(request, engagementTelemetryBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const telemetry = parseEngagementTelemetryBody(body);
 
     const admin = createAdminSupabaseClient();

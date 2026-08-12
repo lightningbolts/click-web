@@ -10,6 +10,8 @@ import {
   parseEngagementTelemetryBody,
   resolveCheckInRadiusMeters,
 } from "@/lib/server/eventEngagement";
+import { parseBody } from "@/lib/api/parseBody";
+import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 
 /**
  * GET — current user check-in status + public check_in_count.
@@ -79,12 +81,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown = null;
-    try {
-      body = await request.json();
-    } catch {
-      body = null;
-    }
+    const parsed = await parseBody(request, engagementTelemetryBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     const telemetry = parseEngagementTelemetryBody(body);
 
     const admin = createAdminSupabaseClient();

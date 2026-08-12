@@ -11,19 +11,13 @@ import {
   assertChatWritable,
   createChatGatekeeperAdmin,
 } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatIdBodySchema } from '@/lib/api/schemas/chat';
 
 export async function PATCH(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const chatId =
-    typeof body.chat_id === 'string'
-      ? body.chat_id.trim()
-      : typeof body.chatId === 'string'
-        ? body.chatId.trim()
-        : '';
-
-  if (!chatId) {
-    return NextResponse.json({ error: 'chat_id is required' }, { status: 400 });
-  }
+  const parsed = await parseBody(req, chatIdBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const chatId = parsed.data.chat_id.trim();
 
   const { user, authError } = await getSupabaseFromRouteRequest(req);
   if (authError || !user) {

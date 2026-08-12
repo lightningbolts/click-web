@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { parseBody } from '@/lib/api/parseBody';
+import { safetyBlockBodySchema } from '@/lib/api/schemas/connections';
 
 async function resolveAuthenticatedUser(
     request: NextRequest,
@@ -49,10 +51,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { blocked_id } = await request.json();
-        if (!blocked_id) {
-            return NextResponse.json({ error: 'blocked_id is required' }, { status: 400 });
-        }
+        const parsed = await parseBody(request, safetyBlockBodySchema);
+        if (!parsed.ok) return parsed.response;
+        const { blocked_id } = parsed.data;
 
         const { error } = await supabase
             .from('user_blocks')

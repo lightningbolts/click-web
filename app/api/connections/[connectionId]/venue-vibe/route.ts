@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/server/connectionWriteAuth";
+import { parseBody } from "@/lib/api/parseBody";
+import { parseParams } from "@/lib/api/parseParams";
+import { venueVibeBodySchema } from "@/lib/api/schemas/connections";
+import { connectionIdParamSchema } from "@/lib/api/schemas/common";
 
 const CATEGORIES = new Set([
   "music",
@@ -18,19 +22,6 @@ type VenueVibeCapture = {
   submittedAt: string;
   rating?: number;
 };
-
-function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client',
-    );
-  }
-  return createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
 
 function sentimentFromRating(rating: number | undefined): Sentiment {
   if (rating === undefined) {
@@ -54,12 +45,14 @@ export async function POST(
   { params }: { params: Promise<{ connectionId: string }> },
 ) {
   try {
-    const { connectionId } = await params;
-    if (!connectionId) {
-      return NextResponse.json({ error: "Missing connection id" }, { status: 400 });
-    }
+    const paramParsed = parseParams(await params, connectionIdParamSchema);
+    if (!paramParsed.ok) return paramParsed.response;
+    const connectionId = paramParsed.data.connectionId;
 
-    const body = await request.json().catch(() => ({}));
+    const parsed = await parseBody(request, venueVibeBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
+
     const rating =
       typeof body.rating === "number" && body.rating >= 1 && body.rating <= 5
         ? Math.round(body.rating)
@@ -69,13 +62,6 @@ export async function POST(
     const category = CATEGORIES.has(rawCat) ? rawCat : "general";
     const message =
       typeof body.message === "string" ? body.message.trim().slice(0, 500) : "";
-
-    if (rating === undefined && !message) {
-      return NextResponse.json(
-        { error: "Provide at least a 1–5 rating or a short message" },
-        { status: 400 },
-      );
-    }
 
     const authHeader = request.headers.get("authorization");
     const token = authHeader?.startsWith("Bearer ")

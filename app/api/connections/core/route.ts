@@ -5,8 +5,8 @@ import {
   requireConnectionParticipant,
 } from '@/lib/server/connectionWriteAuth';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
-
-type Body = { connection_id?: string };
+import { parseBody } from '@/lib/api/parseBody';
+import { connectionIdBodySchema } from '@/lib/api/schemas/connections';
 
 /** GET — list core connection IDs for the signed-in user. */
 export async function GET(request: NextRequest) {
@@ -43,14 +43,10 @@ export async function GET(request: NextRequest) {
 /** POST { connection_id } — mark connection as core for the signed-in user. */
 export async function POST(request: NextRequest) {
   try {
-    let body: Body;
-    try {
-      body = (await request.json()) as Body;
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, connectionIdBodySchema);
+    if (!parsed.ok) return parsed.response;
 
-    const gate = await requireConnectionParticipant(request, body.connection_id);
+    const gate = await requireConnectionParticipant(request, parsed.data.connection_id);
     if (!gate.ok) return gate.response;
 
     const { user, connectionId, admin } = gate;
@@ -81,12 +77,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** DELETE ?connection_id= — remove from core list. */
+/** DELETE ?connection_id= — remove from core list. JSON body fallback. */
 export async function DELETE(request: NextRequest) {
   try {
-    const connectionId =
-      request.nextUrl.searchParams.get('connection_id')?.trim() ??
-      (await request.json().catch(() => ({})) as Body).connection_id?.trim();
+    let connectionId = request.nextUrl.searchParams.get('connection_id')?.trim() ?? undefined;
+    if (!connectionId) {
+      const parsed = await parseBody(request, connectionIdBodySchema);
+      if (!parsed.ok) return parsed.response;
+      connectionId = parsed.data.connection_id;
+    }
 
     const gate = await requireConnectionParticipant(request, connectionId);
     if (!gate.ok) return gate.response;

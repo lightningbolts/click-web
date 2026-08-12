@@ -27,6 +27,8 @@ import {
   SQUAD_PIN_MULTIPLIER,
 } from "@/lib/collaboration/collaborationTtl";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
+import { parseBody } from "@/lib/api/parseBody";
+import { beaconCreateBodySchema } from "@/lib/api/schemas/beacons";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -220,15 +222,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!isRecord(body)) {
-      return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 });
-    }
+    const parsed = await parseBody(request, beaconCreateBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const kindRaw =
       (typeof body.kind === "string" && body.kind) ||

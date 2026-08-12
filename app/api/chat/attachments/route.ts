@@ -18,6 +18,8 @@ import {
   createChatGatekeeperAdmin,
   requireBearerUser,
 } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatAttachmentBodySchema } from '@/lib/api/schemas/chat';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -43,13 +45,6 @@ const ALLOWED_MIME_TYPES: ReadonlySet<string> = new Set([
   'text/csv',
   'application/csv',
 ]);
-
-interface ChatAttachmentUploadBody {
-  chat_id: string;
-  mime_type: string;
-  file_name: string;
-  file_b64: string;
-}
 
 function stripDataUriPrefix(raw: string): string {
   const trimmed = raw.trim();
@@ -81,26 +76,17 @@ export async function POST(request: NextRequest) {
     const auth = await requireBearerUser(request);
     if (!auth.ok) return auth.response;
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch (parseErr) {
-      const e = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
-      console.error('[chat/attachments] json parse failed', { message: e.message, name: e.name });
-      return NextResponse.json({ error: 'Expected valid application/json body' }, { status: 400 });
-    }
+    const parsedBody = await parseBody(request, chatAttachmentBodySchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
-    const parsed = body as Partial<ChatAttachmentUploadBody> | null;
-    const chatId = typeof parsed?.chat_id === 'string' ? parsed.chat_id.trim() : '';
-    const rawMime = typeof parsed?.mime_type === 'string' ? parsed.mime_type.trim().toLowerCase() : '';
+    const parsed = parsedBody.data;
+    const chatId = parsed.chat_id.trim();
+    const rawMime = typeof parsed.mime_type === 'string' ? parsed.mime_type.trim().toLowerCase() : '';
     const mimeType = rawMime.length > 0 ? rawMime : 'application/octet-stream';
-    const rawName = typeof parsed?.file_name === 'string' ? parsed.file_name : '';
-    const fileB64Raw = typeof parsed?.file_b64 === 'string' ? parsed.file_b64 : '';
+    const rawName = typeof parsed.file_name === 'string' ? parsed.file_name : '';
+    const fileB64Raw = parsed.file_b64;
     const fileB64 = stripDataUriPrefix(fileB64Raw);
 
-    if (!chatId) {
-      return NextResponse.json({ error: 'chat_id is required' }, { status: 400 });
-    }
     if (!fileB64) {
       return NextResponse.json({ error: 'file_b64 is required' }, { status: 400 });
     }

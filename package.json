@@ -8,7 +8,8 @@
     "build:worker": "opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy -- --keep-vars",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 250",
     "start": "next start",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -43,7 +44,8 @@
     "sonner": "^2.0.7",
     "stripe": "^21.0.1",
     "swr": "^2.3.7",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -57,6 +59,8 @@
     "@types/react-dom": "19.2.3",
     "babel-plugin-react-compiler": "1.0.0",
     "decode-ico": "^0.4.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",

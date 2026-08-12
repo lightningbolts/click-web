@@ -338,8 +338,23 @@ describe('POST /api/insights/[venueId]/beacons contract', () => {
     });
 
     it.each([
-      ['a missing uri', {}],
       ['a non-string uri', { spotify_playlist_uri: 12345 }],
+      ['a blank uri', { spotify_playlist_uri: '   ' }],
+    ])('rejects %s at the request schema', async (_label, body) => {
+      const mock = setupSupabase();
+
+      const res = await callPost(body);
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.code).toBe('validation_error');
+      // parseBody prefixes the offending field; the wording comes from zod.
+      expect(json.error).toMatch(/^spotify_playlist_uri: /);
+      expect(mock.from).not.toHaveBeenCalledWith('map_beacons');
+    });
+
+    it.each([
+      ['a missing uri', {}],
       ['a non-spotify uri', { spotify_playlist_uri: 'https://example.com/playlist' }],
       ['a spotify album uri', { spotify_playlist_uri: 'spotify:album:123' }],
       ['the bare prefix', { spotify_playlist_uri: 'spotify:playlist:' }],

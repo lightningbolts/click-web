@@ -461,6 +461,11 @@ describe("event engagement API contracts", () => {
         },
         beacon_attendees: {
           upsert: jest.fn().mockResolvedValue({ error: null }),
+          delete: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({ error: null }),
+            }),
+          }),
         },
         users: {
           select: jest.fn().mockReturnValue({

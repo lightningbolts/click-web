@@ -27,6 +27,8 @@ import {
 } from '@/lib/server/chatGatekeeper';
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatMessagePatchBodySchema, chatMessagePostBodySchema } from '@/lib/api/schemas/chat';
 
 const CHAT_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -202,14 +204,11 @@ function parsePostMessageType(raw: unknown): MessageType {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const chatId =
-    typeof body.chatId === 'string'
-      ? body.chatId
-      : typeof body.chat_id === 'string'
-        ? body.chat_id
-        : '';
-  const connectionId = typeof body.connectionId === 'string' ? body.connectionId : typeof body.connection_id === 'string' ? body.connection_id : '';
+  const parsed = await parseBody(req, chatMessagePostBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const chatId = typeof body.chat_id === 'string' ? body.chat_id : '';
+  const connectionId = typeof body.connection_id === 'string' ? body.connection_id : '';
   const { content, metadata } = body;
   const rawMessageType =
     (body as Record<string, unknown>).message_type ??
@@ -365,12 +364,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
+  const parsed = await parseBody(req, chatMessagePatchBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const messageId = typeof body.messageId === 'string' ? body.messageId : '';
-  const chatIdBody = typeof body.chatId === 'string' ? body.chatId : typeof body.chat_id === 'string' ? body.chat_id : '';
-  const { content } = body;
+  const chatIdBody = typeof body.chat_id === 'string' ? body.chat_id : '';
+  const content = typeof body.content === 'string' ? body.content : '';
 
-  if (!messageId || !content?.trim()) {
+  if (!messageId || !content.trim()) {
     return NextResponse.json({ error: 'messageId and content are required' }, { status: 400 });
   }
 
@@ -410,7 +411,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'chatId does not match message' }, { status: 400 });
   }
 
-  const wireContent = typeof content === 'string' && content.startsWith('e2e:') ? content : content.trim();
+  const wireContent = content.startsWith('e2e:') ? content : content.trim();
   const { data: message, error } = await admin
     .from('messages')
     .update({ content: wireContent, time_edited: Date.now() })

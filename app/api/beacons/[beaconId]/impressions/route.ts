@@ -6,6 +6,8 @@ import {
   loadEventBeaconOrResponse,
   parseEngagementTelemetryBody,
 } from "@/lib/server/eventEngagement";
+import { parseBody } from "@/lib/api/parseBody";
+import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 
 const recentViews = new Map<string, number>();
 const IMPRESSION_DEBOUNCE_MS = 2000;
@@ -24,13 +26,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown = null;
-    try {
-      body = await request.json();
-    } catch {
-      body = null;
-    }
-    const telemetry = parseEngagementTelemetryBody(body);
+    const parsed = await parseBody(request, engagementTelemetryBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const telemetry = parseEngagementTelemetryBody(parsed.data);
 
     const admin = createAdminSupabaseClient();
     const loaded = await loadEventBeaconOrResponse(admin, beaconId);

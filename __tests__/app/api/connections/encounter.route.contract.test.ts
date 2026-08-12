@@ -6,9 +6,22 @@ import { NextRequest } from 'next/server';
 import { POST as encounterPost } from '@/app/api/connections/encounter/route';
 
 const mockGetSupabaseFromRouteRequest = jest.fn();
+const mockCreateAdminClient = jest.fn();
 
 jest.mock('@/lib/server/supabaseRouteAuth', () => ({
   getSupabaseFromRouteRequest: (...args: unknown[]) => mockGetSupabaseFromRouteRequest(...args),
+}));
+
+jest.mock('@/lib/server/connectionWriteAuth', () => ({
+  createAdminClient: () => mockCreateAdminClient(),
+}));
+
+jest.mock('@/lib/server/resolveLiveEventBeaconAt', () => ({
+  resolveLiveEventBeaconForReportingUser: jest.fn().mockResolvedValue(null),
+  applyLiveEventBeaconToEncounterRow: (
+    insertRow: Record<string, unknown>,
+    _attachment: unknown,
+  ) => insertRow,
 }));
 
 describe('POST /api/connections/encounter contract', () => {
@@ -17,6 +30,8 @@ describe('POST /api/connections/encounter contract', () => {
 
   beforeEach(() => {
     mockGetSupabaseFromRouteRequest.mockReset();
+    mockCreateAdminClient.mockReset();
+    mockCreateAdminClient.mockReturnValue({ from: jest.fn(), rpc: jest.fn() });
   });
 
   it('inserts into connection_encounters without touching connections (mocked DB)', async () => {

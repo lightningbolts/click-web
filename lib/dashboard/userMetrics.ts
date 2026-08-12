@@ -19,7 +19,7 @@ export function computeConnectionStreak(connections: ConnectionRecord[]): number
   for (const c of connections) {
     days.add(dateKey(c.dateMet));
   }
-  let cursor = new Date(
+  const cursor = new Date(
     Math.max(...connections.map((c) => c.dateMet.getTime()))
   );
   cursor.setHours(12, 0, 0, 0);

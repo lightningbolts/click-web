@@ -9,18 +9,17 @@ import {
   createChatGatekeeperAdmin,
   requireBearerUser,
 } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatReactionBodySchema } from '@/lib/api/schemas/chat';
 
 export async function POST(req: NextRequest) {
   const jwt = await requireBearerUser(req);
   if (!jwt.ok) return jwt.response;
 
-  const body = await req.json().catch(() => ({}));
-  const messageId = String(body.messageId ?? '').trim();
-  const reactionType = String(body.reactionType ?? '').trim();
-
-  if (!messageId || !reactionType) {
-    return NextResponse.json({ error: 'messageId and reactionType are required' }, { status: 400 });
-  }
+  const parsed = await parseBody(req, chatReactionBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const messageId = parsed.data.messageId.trim();
+  const reactionType = parsed.data.reactionType.trim();
 
   const admin = createChatGatekeeperAdmin();
   const gate = await assertMessageInWritableChat(admin, jwt.user.id, messageId);
@@ -53,13 +52,10 @@ export async function DELETE(req: NextRequest) {
   const jwt = await requireBearerUser(req);
   if (!jwt.ok) return jwt.response;
 
-  const body = await req.json().catch(() => ({}));
-  const messageId = String(body.messageId ?? '').trim();
-  const reactionType = String(body.reactionType ?? '').trim();
-
-  if (!messageId || !reactionType) {
-    return NextResponse.json({ error: 'messageId and reactionType are required' }, { status: 400 });
-  }
+  const parsed = await parseBody(req, chatReactionBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const messageId = parsed.data.messageId.trim();
+  const reactionType = parsed.data.reactionType.trim();
 
   const admin = createChatGatekeeperAdmin();
   const gate = await assertMessageInWritableChat(admin, jwt.user.id, messageId);

@@ -14,6 +14,8 @@ import {
   applyLiveEventBeaconToEncounterRow,
   resolveLiveEventBeaconForReportingUser,
 } from '@/lib/server/resolveLiveEventBeaconAt';
+import { parseBody } from '@/lib/api/parseBody';
+import { encounterBodySchema } from '@/lib/api/schemas/connections';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -52,18 +54,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
-
-    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 });
-    }
-
-    const raw = body as Record<string, unknown>;
+    const parsed = await parseBody(request, encounterBodySchema);
+    if (!parsed.ok) return parsed.response;
+    const raw = parsed.data as Record<string, unknown>;
     const connectionIdDirect =
       typeof raw.connection_id === 'string' ? raw.connection_id.trim() : '';
     const userIdEarly = typeof raw.user_id === 'string' ? raw.user_id.trim() : '';
@@ -164,13 +157,16 @@ export async function POST(request: NextRequest) {
 
     const gpsLatPre = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
     const gpsLonPre = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
-    const admin = createAdminClient();
-    const liveEventAttachment = await resolveLiveEventBeaconForReportingUser(
-      admin,
-      gpsLatPre,
-      gpsLonPre,
-      userId,
-    );
+    // Skip admin client when there is no GPS — live-event attachment cannot resolve without coords.
+    const liveEventAttachment =
+      gpsLatPre != null && gpsLonPre != null
+        ? await resolveLiveEventBeaconForReportingUser(
+            createAdminClient(),
+            gpsLatPre,
+            gpsLonPre,
+            userId,
+          )
+        : null;
     Object.assign(insertRow, applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment));
 
     const { data: inserted, error: insErr } = await supabase

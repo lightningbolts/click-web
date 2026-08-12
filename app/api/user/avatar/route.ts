@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { parseBody } from '@/lib/api/parseBody';
+import { avatarJsonBodySchema } from '@/lib/api/schemas/user';
 
 const MAX_BYTES = 2_000_000;
 const AVATARS_BUCKET = 'avatars';
@@ -54,21 +56,11 @@ export async function POST(request: NextRequest) {
   let declaredMime = 'image/jpeg';
 
   if (!isMultipart) {
-    let parsedBody: AvatarUploadJsonBody | null = null;
-    try {
-      parsedBody = (await request.json()) as AvatarUploadJsonBody;
-    } catch (err) {
-      console.error('[user/avatar] json parse failed:', err);
-      return NextResponse.json(
-        {
-          error: 'Could not parse JSON upload body. Send application/json with file_b64 (base64 image).',
-          received_content_type: requestContentType || null,
-        },
-        { status: 400 },
-      );
-    }
+    const parsedJson = await parseBody(request, avatarJsonBodySchema);
+    if (!parsedJson.ok) return parsedJson.response;
+    const parsedBody = parsedJson.data;
 
-    const fileB64Raw = typeof parsedBody?.file_b64 === 'string' ? parsedBody.file_b64 : '';
+    const fileB64Raw = parsedBody.file_b64;
     const fileB64 = stripDataUriPrefix(fileB64Raw);
     if (!fileB64) {
       return NextResponse.json({ error: 'file_b64 is required' }, { status: 400 });
@@ -76,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     buffer = Buffer.from(fileB64, 'base64');
     declaredMime =
-      typeof parsedBody?.mime_type === 'string' && parsedBody.mime_type.trim().length > 0
+      typeof parsedBody.mime_type === 'string' && parsedBody.mime_type.trim().length > 0
         ? parsedBody.mime_type.trim()
         : 'image/jpeg';
   } else {

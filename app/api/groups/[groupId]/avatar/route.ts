@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { parseBody } from '@/lib/api/parseBody';
+import { groupAvatarBodySchema } from '@/lib/api/schemas/user';
 
 const MAX_BYTES = 2_000_000;
 const AVATARS_BUCKET = 'avatars';
@@ -79,18 +81,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  let parsedBody: AvatarUploadJsonBody | null = null;
-  try {
-    parsedBody = (await request.json()) as AvatarUploadJsonBody;
-  } catch {
-    return NextResponse.json({ error: 'Could not parse JSON upload body.' }, { status: 400 });
-  }
+  const parsedJson = await parseBody(request, groupAvatarBodySchema);
+  if (!parsedJson.ok) return parsedJson.response;
+  const parsedBody = parsedJson.data;
 
-  const fileB64 = stripDataUriPrefix(typeof parsedBody?.file_b64 === 'string' ? parsedBody.file_b64 : '');
+  const fileB64 = stripDataUriPrefix(parsedBody.file_b64);
   if (!fileB64) return NextResponse.json({ error: 'file_b64 is required' }, { status: 400 });
 
   const declaredMime =
-    typeof parsedBody?.mime_type === 'string' && parsedBody.mime_type.trim().length > 0
+    typeof parsedBody.mime_type === 'string' && parsedBody.mime_type.trim().length > 0
       ? parsedBody.mime_type.trim()
       : 'image/jpeg';
   if (!isAllowedImageMime(declaredMime)) {

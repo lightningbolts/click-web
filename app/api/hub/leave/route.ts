@@ -6,23 +6,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { hubLeaveBodySchema } from '@/lib/api/schemas/beacons';
 
 export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (!auth.ok) return auth.response;
 
-  let body: { hub_id?: unknown; hubId?: unknown };
-  try {
-    body = (await request.json()) as { hub_id?: unknown; hubId?: unknown };
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const hubIdRaw = typeof body.hub_id === 'string' ? body.hub_id : typeof body.hubId === 'string' ? body.hubId : '';
-  const hubId = hubIdRaw.trim();
-  if (!hubId) {
-    return NextResponse.json({ error: 'Hub id is required' }, { status: 400 });
-  }
+  const parsed = await parseBody(request, hubLeaveBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const hubId = parsed.data.hub_id.trim();
 
   const admin = createChatGatekeeperAdmin();
   const { error } = await admin

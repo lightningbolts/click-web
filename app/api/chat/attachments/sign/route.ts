@@ -14,6 +14,8 @@ import {
   createChatGatekeeperAdmin,
   requireBearerUser,
 } from '@/lib/server/chatGatekeeper';
+import { parseBody } from '@/lib/api/parseBody';
+import { chatAttachmentSignBodySchema } from '@/lib/api/schemas/chat';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -23,27 +25,15 @@ const SIGNED_URL_TTL_SECONDS = 60 * 10; // 10 minutes — just enough to downloa
 
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 
-interface SignRequestBody {
-  path: string;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireBearerUser(request);
     if (!auth.ok) return auth.response;
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Expected valid application/json body' }, { status: 400 });
-    }
+    const parsedBody = await parseBody(request, chatAttachmentSignBodySchema);
+    if (!parsedBody.ok) return parsedBody.response;
 
-    const parsed = body as Partial<SignRequestBody> | null;
-    const path = typeof parsed?.path === 'string' ? parsed.path.trim() : '';
-    if (!path) {
-      return NextResponse.json({ error: 'path is required' }, { status: 400 });
-    }
+    const path = parsedBody.data.path.trim();
     if (path.includes('..') || path.startsWith('/')) {
       return NextResponse.json({ error: 'Invalid attachment path' }, { status: 400 });
     }
