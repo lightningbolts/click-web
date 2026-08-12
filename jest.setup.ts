@@ -59,35 +59,52 @@ jest.mock('maplibre-gl', () => {
       NavigationControl: jest.fn(),
       Marker: jest.fn().mockImplementation(({ element }: { element?: HTMLElement } = {}) => {
         const el = element ?? document.createElement('div');
-        const api = {
-          setLngLat: jest.fn().mockReturnThis(),
-          addTo: jest.fn(() => {
-            document.body.appendChild(el);
-            return api;
-          }),
-          remove: jest.fn(() => {
-            el.remove();
-          }),
+        const api: {
+          setLngLat: jest.Mock;
+          addTo: jest.Mock;
+          remove: jest.Mock;
+          getElement: jest.Mock;
+        } = {
+          setLngLat: jest.fn(),
+          addTo: jest.fn(),
+          remove: jest.fn(),
           getElement: jest.fn(() => el),
         };
+        api.setLngLat.mockReturnValue(api);
+        api.addTo.mockImplementation(() => {
+          document.body.appendChild(el);
+          return api;
+        });
+        api.remove.mockImplementation(() => {
+          el.remove();
+        });
         return api;
       }),
       Popup: jest.fn().mockImplementation(() => {
         const host = document.createElement('div');
-        const api = {
-          setLngLat: jest.fn().mockReturnThis(),
-          setHTML: jest.fn((html: string) => {
-            host.innerHTML = html;
-            return api;
-          }),
-          addTo: jest.fn(() => {
-            document.body.appendChild(host);
-            return api;
-          }),
-          remove: jest.fn(() => {
-            host.remove();
-          }),
+        const api: {
+          setLngLat: jest.Mock;
+          setHTML: jest.Mock;
+          addTo: jest.Mock;
+          remove: jest.Mock;
+        } = {
+          setLngLat: jest.fn(),
+          setHTML: jest.fn(),
+          addTo: jest.fn(),
+          remove: jest.fn(),
         };
+        api.setLngLat.mockReturnValue(api);
+        api.setHTML.mockImplementation((html: string) => {
+          host.innerHTML = html;
+          return api;
+        });
+        api.addTo.mockImplementation(() => {
+          document.body.appendChild(host);
+          return api;
+        });
+        api.remove.mockImplementation(() => {
+          host.remove();
+        });
         return api;
       }),
       LngLatBounds: jest.fn().mockImplementation(() => ({
