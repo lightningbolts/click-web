@@ -10,9 +10,8 @@ export default function PrivacyPolicy() {
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 md:px-12 py-20">
         <motion.div
-          initial={{ y: 30, opacity: 0 }}
+          initial={false}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8 }}
         >
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             Privacy <span className="text-[#8338EC]">Policy</span>

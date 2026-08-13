@@ -210,9 +210,8 @@ export default function EnterprisePage() {
         {/* Hero */}
         <section className="mx-auto max-w-6xl px-6 pb-16 pt-12 md:px-12 md:pb-24 md:pt-16">
           <motion.div
-            initial={{ y: 24, opacity: 0 }}
+            initial={false}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.75 }}
             className="text-center"
           >
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border-hard bg-surface-container/60 px-4 py-2 text-sm text-on-surface-variant">

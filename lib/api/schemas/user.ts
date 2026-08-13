@@ -15,6 +15,9 @@ export const pushTokensBodySchema = z.object({
 export const preferencesBodySchema = z.object({
   message_push_enabled: z.boolean().optional(),
   call_push_enabled: z.boolean().optional(),
+  event_reminder_push_enabled: z.boolean().optional(),
+  availability_match_push_enabled: z.boolean().optional(),
+  hub_message_push_enabled: z.boolean().optional(),
 }).passthrough();
 
 export const availabilityBodySchema = z.object({

@@ -8,11 +8,23 @@ env:
 ---
 - runFlow:
     file: ../subflows/open_origin.yaml
-- openLink: ${BASE_URL}/about
-- assertVisible: "About"
-- openLink: ${BASE_URL}/privacy
-- assertVisible: "Privacy"
-- openLink: ${BASE_URL}/terms
-- assertVisible: "Terms of"
-- openLink: ${BASE_URL}/enterprise
-- assertVisible: "Student Affairs"
+- launchApp:
+    appId: ${BASE_URL}/about
+- extendedWaitUntil:
+    visible: "About Click"
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/privacy
+- extendedWaitUntil:
+    visible: "Our Privacy Promise"
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/terms
+- extendedWaitUntil:
+    visible: "Terms of"
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/enterprise
+- extendedWaitUntil:
+    visible: "Student Affairs"
+    timeout: 15000

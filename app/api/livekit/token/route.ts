@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 import { parseBody } from '@/lib/api/parseBody';
 import { livekitTokenBodySchema } from '@/lib/api/schemas/chat';
+import { readLiveKitEnv } from '@/lib/server/livekitEnv';
 
 /** Group voice/video rooms cap at eight participants (caller + up to seven others). */
 const MAX_GROUP_CALL_PARTICIPANTS = 8;
@@ -73,13 +74,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'room_name is required' }, { status: 400 });
   }
 
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const wsUrl = process.env.LIVEKIT_WS_URL || process.env.LIVEKIT_URL;
-
-  if (!apiKey || !apiSecret || !wsUrl) {
+  const livekit = readLiveKitEnv();
+  if (!livekit) {
     return NextResponse.json({ error: 'LiveKit environment is not configured' }, { status: 500 });
   }
+  const { apiKey, apiSecret, wsUrl } = livekit;
 
   const admin = createAdminClient();
 

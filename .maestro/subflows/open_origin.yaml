@@ -1,9 +1,13 @@
-# Navigate Chromium to BASE_URL.
+# Navigate the existing Chromium tab to BASE_URL.
 # `url:` stays a literal origin so Maestro 2.8 classifies this as a web flow.
 # Do not put ${BASE_URL} in `url:` and do not launchApp with clearState —
 # both left Chromium on data:.
+# Use launchApp (not openLink): openLink opens a second window, and Maestro's
+# CDP client reads listTargets().first() (the leftover blank tab), so
+# assertVisible fails even though screenshots show the real page.
 url: http://localhost:3000
 tags:
   - subflow
 ---
-- openLink: ${BASE_URL}
+- launchApp:
+    appId: ${BASE_URL}

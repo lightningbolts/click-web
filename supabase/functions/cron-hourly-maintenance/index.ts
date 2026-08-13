@@ -234,7 +234,7 @@ async function runFrictionIntentExpirations(
   return { logged: frictionRows.length };
 }
 
-async function runEventRemindersViaWeb(): Promise<{ scanned: number; pushAttempts: number }> {
+async function runClickWebCron(path: string, label: string): Promise<Record<string, unknown>> {
   const base = (
     Deno.env.get('CLICK_WEB_URL') ??
     Deno.env.get('CLICK_WEB_BASE_URL') ??
@@ -242,19 +242,31 @@ async function runEventRemindersViaWeb(): Promise<{ scanned: number; pushAttempt
   ).replace(/\/$/, '');
   const secret = CRON_SECRET;
   if (!secret) {
-    throw new Error('event-reminders: missing CRON_SECRET');
+    throw new Error(`${label}: missing CRON_SECRET`);
   }
-  const response = await fetch(`${base}/api/cron/event-reminders`, {
+  const response = await fetch(`${base}${path}`, {
     headers: { Authorization: `Bearer ${secret}` },
   });
   const body = await response.json().catch(() => ({ error: 'invalid json' }));
   if (!response.ok) {
     throw new Error(
-      `event-reminders web: ${response.status} ${typeof body === 'object' ? JSON.stringify(body) : String(body)}`,
+      `${label} web: ${response.status} ${typeof body === 'object' ? JSON.stringify(body) : String(body)}`,
     );
   }
-  const scanned = typeof body?.scanned === 'number' ? body.scanned : 0;
-  const pushAttempts = typeof body?.pushAttempts === 'number' ? body.pushAttempts : 0;
+  return typeof body === 'object' && body != null ? (body as Record<string, unknown>) : {};
+}
+
+async function runEventRemindersViaWeb(): Promise<{ scanned: number; pushAttempts: number }> {
+  const body = await runClickWebCron('/api/cron/event-reminders', 'event-reminders');
+  const scanned = typeof body.scanned === 'number' ? body.scanned : 0;
+  const pushAttempts = typeof body.pushAttempts === 'number' ? body.pushAttempts : 0;
+  return { scanned, pushAttempts };
+}
+
+async function runAvailabilityMatchesViaWeb(): Promise<{ scanned: number; pushAttempts: number }> {
+  const body = await runClickWebCron('/api/cron/availability-matches', 'availability-matches');
+  const scanned = typeof body.scanned === 'number' ? body.scanned : 0;
+  const pushAttempts = typeof body.pushAttempts === 'number' ? body.pushAttempts : 0;
   return { scanned, pushAttempts };
 }
 
@@ -306,9 +318,10 @@ Deno.serve(async (req: Request) => {
   try {
     const disposable = await runDisposableReveal(admin);
     const events = await runEventRemindersViaWeb();
+    const availability = await runAvailabilityMatchesViaWeb();
     const friction = await runFrictionIntentExpirations(admin);
     const pendingHandshakes = await runPendingHandshakesCleanup(admin);
-    const body = { ok: true, disposable, events, friction, pendingHandshakes };
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,

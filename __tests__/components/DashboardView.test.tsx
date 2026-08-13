@@ -97,10 +97,16 @@ jest.mock('@/lib/notifications/preferences', () => ({
   DEFAULT_NOTIFICATION_PREFERENCES: {
     messagePushEnabled: true,
     callPushEnabled: true,
+    eventReminderPushEnabled: true,
+    availabilityMatchPushEnabled: true,
+    hubMessagePushEnabled: true,
   },
   loadNotificationPreferences: jest.fn(async () => ({
     messagePushEnabled: true,
     callPushEnabled: true,
+    eventReminderPushEnabled: true,
+    availabilityMatchPushEnabled: true,
+    hubMessagePushEnabled: true,
   })),
   saveNotificationPreferences: jest.fn(async () => ({ success: true })),
 }));

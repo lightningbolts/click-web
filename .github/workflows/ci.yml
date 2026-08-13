@@ -17,6 +17,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Materialize build env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_LAUNCHED: ${{ secrets.NEXT_PUBLIC_APP_LAUNCHED }}
+          NEXT_PUBLIC_IOS_STORE_URL: ${{ secrets.NEXT_PUBLIC_IOS_STORE_URL }}
+          NEXT_PUBLIC_ANDROID_STORE_URL: ${{ secrets.NEXT_PUBLIC_ANDROID_STORE_URL }}
+          NEXT_PUBLIC_IOS_APP_ID: ${{ secrets.NEXT_PUBLIC_IOS_APP_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          LIVEKIT_WS_URL: ${{ secrets.LIVEKIT_WS_URL }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ENRICHMENT_WEBHOOK_SECRET: ${{ secrets.ENRICHMENT_WEBHOOK_SECRET }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          BUSINESS_INSIGHTS_DEV_EMAILS: ${{ secrets.BUSINESS_INSIGHTS_DEV_EMAILS }}
+        run: bash scripts/materialize-ci-env.sh
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -37,7 +62,55 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  # OpenNext worker is what Cloudflare Workers Builds deploys (wrangler main:
+  # .open-next/worker.js). Next `npm run build` alone does not prove that artifact.
+  build-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Materialize build env
         env:
-          # Build must succeed without real secrets; routes that need them degrade at runtime.
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_LAUNCHED: ${{ secrets.NEXT_PUBLIC_APP_LAUNCHED }}
+          NEXT_PUBLIC_IOS_STORE_URL: ${{ secrets.NEXT_PUBLIC_IOS_STORE_URL }}
+          NEXT_PUBLIC_ANDROID_STORE_URL: ${{ secrets.NEXT_PUBLIC_ANDROID_STORE_URL }}
+          NEXT_PUBLIC_IOS_APP_ID: ${{ secrets.NEXT_PUBLIC_IOS_APP_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          LIVEKIT_WS_URL: ${{ secrets.LIVEKIT_WS_URL }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ENRICHMENT_WEBHOOK_SECRET: ${{ secrets.ENRICHMENT_WEBHOOK_SECRET }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          BUSINESS_INSIGHTS_DEV_EMAILS: ${{ secrets.BUSINESS_INSIGHTS_DEV_EMAILS }}
+        run: bash scripts/materialize-ci-env.sh
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: OpenNext Cloudflare worker build
+        run: npm run build:worker
+
+      - name: Confirm worker artifact
+        run: |
+          test -f .open-next/worker.js
+          echo "OpenNext worker.js is present"

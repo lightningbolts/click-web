@@ -25,6 +25,18 @@ describe('runtimeEnv static key coverage', () => {
     expect(runtimeEnvPresent('SUPABASE_SERVICE_ROLE_KEY')).toBe(true);
   });
 
+  it('reads LIVEKIT keys via static access path', async () => {
+    process.env.LIVEKIT_API_KEY = 'lk-key';
+    process.env.LIVEKIT_API_SECRET = 'lk-secret';
+    process.env.LIVEKIT_URL = 'click-7e741h6f.livekit.cloud';
+    const { runtimeEnv, runtimeEnvPresent } = await import('@/lib/server/runtimeEnv');
+    expect(runtimeEnv('LIVEKIT_API_KEY')).toBe('lk-key');
+    expect(runtimeEnv('LIVEKIT_API_SECRET')).toBe('lk-secret');
+    expect(runtimeEnv('LIVEKIT_URL')).toBe('click-7e741h6f.livekit.cloud');
+    expect(runtimeEnvPresent('LIVEKIT_API_KEY')).toBe(true);
+    expect(runtimeEnvPresent('LIVEKIT_URL')).toBe(true);
+  });
+
   it('returns undefined when keys are missing', async () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;

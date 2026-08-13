@@ -14,6 +14,7 @@ import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatG
 import { checkHubMessageCooldown } from '@/lib/hub/hubMessageCooldown';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubMessagesBodySchema } from '@/lib/api/schemas/beacons';
+import { notifyHubMessageParticipants } from '@/lib/hub/notifyHubMessage';
 
 type HubMessageInsert = {
   hub_id: string;
@@ -117,6 +118,20 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error('[hub/messages] insert:', error.message);
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  const insertedId =
+    inserted && typeof inserted === 'object' && 'id' in inserted && typeof inserted.id === 'string'
+      ? inserted.id
+      : '';
+  if (insertedId) {
+    void notifyHubMessageParticipants({
+      admin,
+      hubId,
+      messageId: insertedId,
+      senderUserId: auth.user.id,
+      preview: bodyText,
+    });
   }
 
   return NextResponse.json({ message: inserted }, { status: 201 });
