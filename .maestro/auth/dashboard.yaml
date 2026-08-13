@@ -1,11 +1,13 @@
-url: ${BASE_URL}
+url: http://localhost:3000
 name: Authenticated dashboard chrome
 tags:
   - auth
   - web
+env:
+  BASE_URL: http://localhost:3000
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    file: ../subflows/open_origin.yaml
 - runFlow:
     file: ../subflows/login.yaml
 - extendedWaitUntil:

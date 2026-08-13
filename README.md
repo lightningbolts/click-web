@@ -110,6 +110,17 @@ Create **`.env.local`** in the `click-web` directory (never commit secrets). See
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
 | `LIVEKIT_WS_URL` or `LIVEKIT_URL` | WebSocket URL for the LiveKit server |
 
+Unauthenticated `POST /api/livekit/token` returns 401 and does **not** prove these vars are set. After deploy, probe with a real Supabase access token:
+
+```bash
+curl -i -X POST https://joinclick.co/api/livekit/token \
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"connection_id":"<id>","room_name":"click-<id>-x","participant_name":"probe"}'
+```
+
+`500 LiveKit environment is not configured` is a deployment config fix. `200` + JWT means minting works; remaining call failures are client-side.
+
 **Optional**
 
 | Variable | Purpose |
@@ -143,7 +154,9 @@ npm run dev   # or npm run build && npm start
 npm run test:e2e
 ```
 
-Override the origin with `-e BASE_URL=https://joinclick.co` (or a preview URL). Authenticated dashboard chrome:
+Flows set a **literal** `url: http://localhost:3000` (Maestro 2.8 leaves `${BASE_URL}` unexpanded in the `url:` field, which opens Chromium at `data:`). They then `openLink` to `BASE_URL`. Do not use `launchApp.clearState` on web — it wipes the tab back to `data:`.
+
+Override the origin after that with `-e BASE_URL=https://joinclick.co` (or a preview URL). Authenticated dashboard chrome:
 
 ```bash
 maestro test .maestro/auth --include-tags auth \
@@ -152,7 +165,7 @@ maestro test .maestro/auth --include-tags auth \
   -e TEST_PASSWORD=secret
 ```
 
-Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing, legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml).
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml). Do not Maestro LiveKit rooms.
 
 ---
 

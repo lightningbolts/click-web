@@ -1,0 +1,9 @@
+# Navigate Chromium to BASE_URL.
+# `url:` stays a literal origin so Maestro 2.8 classifies this as a web flow.
+# Do not put ${BASE_URL} in `url:` and do not launchApp with clearState —
+# both left Chromium on data:.
+url: http://localhost:3000
+tags:
+  - subflow
+---
+- openLink: ${BASE_URL}

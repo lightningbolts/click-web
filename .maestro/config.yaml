@@ -1,6 +1,10 @@
 # Maestro workspace for Click Web (Chromium). Web support is Beta.
-# Override BASE_URL: maestro test .maestro -e BASE_URL=https://joinclick.co
+#
+# `url` must be a literal http(s) origin — Maestro 2.8 does not expand
+# ${BASE_URL} in this config field, and an empty url opens Chromium at data:.
+# Override navigation with: maestro test .maestro -e BASE_URL=https://joinclick.co
 # Auth journeys live in auth/ and need TEST_EMAIL / TEST_PASSWORD.
+url: http://localhost:3000
 flows:
   - "smoke/*"
 env:

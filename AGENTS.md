@@ -17,7 +17,7 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 | Lint | `npm run lint` (ESLint `next/core-web-vitals`) |
 | Tests | `npm test` |
 | Watch tests | `npm run test:watch` |
-| Maestro E2E smoke | `npm run test:e2e` (CLI on PATH; app on `BASE_URL`, default `http://localhost:3000`) |
+| Maestro E2E smoke | `npm run test:e2e` (CLI on PATH; app on `BASE_URL`, default `http://localhost:3000`). Workspace `url:` is a literal origin — never `${BASE_URL}` — so Chromium does not open `data:`. |
 | Maestro E2E auth | `npm run test:e2e:auth` with `TEST_EMAIL` / `TEST_PASSWORD` |
 
 ### Non-obvious setup notes
@@ -26,7 +26,7 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 - **`@testing-library/dom`** is a required peer dependency of `@testing-library/react` and is listed in `devDependencies`. If tests fail with "Cannot find module '@testing-library/dom'", run `npm install`.
 - **No `.env.local` is committed.** The app starts and builds without Supabase credentials; the client returns `null` and API routes log a warning. Features requiring Supabase (auth, chat, connections, insights) will not function without valid credentials, but the landing page, about, privacy, terms, and enterprise pages all render.
 - **Root `/` must SSR marketing for anonymous requests.** `app/page.tsx` is a Server Component that chooses `LandingPage` vs `HomeAuthenticated` from the cookie session. Do not reintroduce a client `useAuth().loading` → `LoadingScreen` gate on the anonymous path — that hid all marketing copy from crawlers (issue #58 §1.4).
-- **LiveKit and Stripe** are optional external services. Calling and billing features require their respective env vars (see `README.md`).
+- **LiveKit and Stripe** are optional external services. Calling and billing features require their respective env vars (see `README.md`). Unauthenticated `POST /api/livekit/token` returning 401 does **not** prove LiveKit env is set — probe with a real Bearer token. Web `Room` options must stay `adaptiveStream: false`, `dynacast: false` to match mobile.
 - **Dashboard route (`/dashboard`) redirects to home** when there is no authenticated session, which is expected behavior without Supabase credentials.
 - **Turbopack root override** in `next.config.ts` (`turbopack.root: process.cwd()`) exists to prevent lockfile resolution issues. Do not remove it.
 - **React Compiler** is enabled (`reactCompiler: true` in `next.config.ts`). The `babel-plugin-react-compiler` dev dependency supports this.

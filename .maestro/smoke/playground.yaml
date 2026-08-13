@@ -1,11 +1,13 @@
-url: ${BASE_URL}
+url: http://localhost:3000
 name: Landing playground is reachable
 tags:
   - smoke
   - web
+env:
+  BASE_URL: http://localhost:3000
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    file: ../subflows/open_origin.yaml
 - scrollUntilVisible:
     element:
       css: "[data-testid='landing-playground']"

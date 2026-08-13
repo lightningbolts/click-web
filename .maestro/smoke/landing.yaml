@@ -1,12 +1,18 @@
-url: ${BASE_URL}
+url: http://localhost:3000
 name: Anonymous landing smoke
 tags:
   - smoke
   - web
+env:
+  BASE_URL: http://localhost:3000
 ---
-- launchApp:
-    clearState: true
+- runFlow:
+    file: ../subflows/open_origin.yaml
+- extendedWaitUntil:
+    visible: "from handshake to friendship"
+    timeout: 15000
 - assertVisible: "from handshake to friendship"
+- assertNotVisible: "Loading your connections"
 - assertVisible: "Join the Waitlist"
 - assertVisible:
     css: "[data-testid='waitlist-cta']"

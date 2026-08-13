@@ -688,7 +688,9 @@ export default function DashboardView({ user }: DashboardViewProps) {
         cameraEnabled: invite.videoEnabled,
       });
 
-      const room = new Room({ adaptiveStream: true, dynacast: true });
+      // Match Android/iOS: adaptiveStream+dynacast can pause layers when the
+      // video tile is briefly off-screen, which looks like "no remote video".
+      const room = new Room({ adaptiveStream: false, dynacast: false });
       roomRef.current = room;
       const speakingIds = new Set<string>();
 
