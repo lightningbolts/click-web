@@ -15,10 +15,11 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  // Cloudflare Workers Builds / `wrangler deploy` must run OpenNext first.
-  // `npm run build` (Next.js only) does not produce `.open-next/worker.js`.
+  // Local `wrangler deploy` runs this first. Workers Builds does *not* honor
+  // wrangler custom builds — dashboard `npm run build` uses WORKERS_CI=1 to
+  // run OpenNext (see scripts/ci-next-or-worker-build.sh).
   "build": {
-    "command": "npx opennextjs-cloudflare build"
+    "command": "bash scripts/materialize-ci-env.sh && npx opennextjs-cloudflare build"
   },
   // Non-secret public site URL. Supabase / LiveKit / Stripe stay in the
   // Workers dashboard so `deploy -- --keep-vars` does not wipe them.

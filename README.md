@@ -87,7 +87,7 @@ npm install
 
 ### Environment variables
 
-Create **`.env.local`** in the `click-web` directory (never commit secrets). See `.env.local.example` and `.env.example`.
+Create **`.env.local`** in the `click-web` directory (never commit secrets). **`.env.example`** and **`.env.local.example`** list every documented variable and are committed so GitHub Actions and Cloudflare Workers Builds can materialize a complete env (`scripts/materialize-ci-env.sh`) without empty keys. Overlay real values from repo/dashboard secrets when they are set.
 
 **Required (core app + Supabase client)**
 
@@ -170,7 +170,7 @@ maestro test .maestro/auth --include-tags auth \
   -e TEST_PASSWORD=secret
 ```
 
-Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) pins Chrome 131, wraps `/usr/bin/google-chrome` with **prepended** `--no-sandbox`, and runs `maestro test --headless`. Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms. Cloudflare deploys need `npm run build:worker` (GitHub `build-worker` job + `wrangler.jsonc` `build.command`).
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) pins Chrome 131, wraps `/usr/bin/google-chrome` with **prepended** `--no-sandbox`, and runs `maestro test --headless`. Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms. Cloudflare deploys need `npm run build:worker`. GitHub `build-worker` proves the artifact; Workers Builds `npm run build` switches to OpenNext when `WORKERS_CI=1`.
 
 ---
 
