@@ -170,7 +170,7 @@ maestro test .maestro/auth --include-tags auth \
   -e TEST_PASSWORD=secret
 ```
 
-Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) pins Chrome 151 to match Maestro's bundled ChromeDriver, wraps `/usr/bin/google-chrome` with **prepended** `--no-sandbox`, and runs `maestro test --headless`. Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms. Cloudflare deploys need `npm run build:worker`. GitHub `build-worker` proves the artifact; Workers Builds `npm run build` switches to OpenNext when `WORKERS_CI=1`.
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) pins Chrome 151 to match Maestro's bundled ChromeDriver, wraps `/usr/bin/google-chrome` with **prepended** `--no-sandbox`, and runs Maestro **headed under Xvfb** (`maestro test --headless` makes Chrome `--headless=new`, which leaves Maestro querying an empty CDP target). Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms. Cloudflare deploys need `npm run build:worker`. GitHub `build-worker` proves the artifact; Workers Builds `npm run build` switches to OpenNext when `WORKERS_CI=1`.
 
 ---
 

@@ -135,8 +135,15 @@ jobs:
           }
           echo "Homepage HTML contains marketing copy and playground test id"
 
+      - name: Install Xvfb
+        run: sudo apt-get update -y && sudo apt-get install -y xvfb
+
       - name: Maestro smoke
-        run: maestro test --headless .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
+        # Maestro --headless uses Chrome --headless=new. CDP listTargets().first()
+        # then hits a non-page target, so assertVisible fails while screenshots
+        # still show the real tab (maestro#2573). Headed Chrome under Xvfb keeps
+        # a single page target.
+        run: xvfb-run --auto-servernum maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
 
       - name: Upload Maestro artifacts
         if: success() || failure()
