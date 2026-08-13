@@ -90,6 +90,15 @@
   --radius-btn: 8px;
   --radius-card: 16px;
   --border-width: 1px;
+  /* Slightly under the rendered Navbar so the landing hero fills the first
+   * viewport without the next section’s heading peeking through the fold. */
+  --navbar-height: 4rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --navbar-height: 4.5rem;
+  }
 }
 
 body {

@@ -75,6 +75,8 @@ Defined in `components/DashboardView.tsx` → `buildIncomingCallPushPayload`:
 
 **Must stay aligned with** KMP `CallPushNotifier.kt` — changing keys requires mobile update.
 
+Incoming-call delivery groups tokens by `device_id`. iOS sends **VoIP first**, then standard APNs only if VoIP failed. Android tokens on that device still send. Dead tokens (APNs 410 / Unregistered / BadDeviceToken, FCM NOT_FOUND) are pruned.
+
 Web invokes:
 
 ```typescript

@@ -69,7 +69,7 @@ export default function LandingPage() {
   return (
     <>
       <div className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate">
-        <section className="relative z-10 flex min-h-[calc(100svh-88px)] flex-col items-center justify-center px-6 py-16 md:px-12">
+        <section className="relative z-10 flex min-h-[calc(100svh-var(--navbar-height))] flex-col items-center justify-center px-6 py-16 md:px-12">
           <motion.div
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -179,7 +179,7 @@ export default function LandingPage() {
           </div>
         )}
 
-        <section id="why" className="relative z-10 px-6 pb-8 md:px-12" aria-labelledby="why-heading">
+        <section id="why" className="relative z-10 px-6 pb-8 pt-16 md:px-12" aria-labelledby="why-heading">
           <div className="mx-auto max-w-5xl">
             <h2 id="why-heading" className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
               Why Click exists

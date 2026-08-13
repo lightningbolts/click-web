@@ -22,23 +22,23 @@ Vercel cron ──────────────┼──► /api/cron/hou
                                         │
                                         ▼
                               lib/cron/eventReminders.ts
-                              (shared logic with Edge)
+                              (canonical; Edge Function HTTP-calls this via /api/cron/event-reminders)
 ```
 
 Configured in `vercel.json` for Vercel paths; Supabase schedule in `20260607120000_pg_cron_hourly_maintenance.sql`.
 
 ### `eventReminders.ts`
 
-`runEventReminders(admin, pushUrl, authBearer, nowMs?)`:
+`runEventReminders(admin, pushUrl, authBearer, nowMs?)` — **canonical implementation**. The Edge Function does **not** duplicate this logic; `cron-hourly-maintenance` HTTP-GETs `/api/cron/event-reminders` with `CRON_SECRET`.
 
 1. Query `map_beacons` where `beacon_type = 'event'`
 2. Parse `metadata.event_start_at` / `event_end_at`
 3. Skip ended events
-4. Within **15-minute** windows:
-   - **day_of** — morning of event day
-   - **one_hour** — 60 minutes before start
+4. Due-by-timestamp (hourly sweep still catches `:30` starts):
+   - **day_of** — local calendar day of the event (`metadata.event_timezone`, else UTC)
+   - **thirty_min** — 30 minutes before start (also honors legacy `one_hour_notification_sent`)
 5. POST `send-push-notification` with `type: event_reminder`
-6. Set `day_of_notification_sent` / `one_hour_notification_sent` in beacon metadata
+6. Set `day_of_notification_sent` / `thirty_min_notification_sent` in beacon metadata
 
 ### Hourly maintenance (Edge + `/api/cron/hourly`)
 

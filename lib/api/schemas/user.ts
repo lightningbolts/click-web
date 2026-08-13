@@ -9,6 +9,7 @@ export const pushTokensBodySchema = z.object({
   token: nonEmptyString,
   platform: optionalNonEmptyString,
   token_type: optionalNonEmptyString,
+  device_id: optionalNonEmptyString,
 }).passthrough();
 
 export const preferencesBodySchema = z.object({
