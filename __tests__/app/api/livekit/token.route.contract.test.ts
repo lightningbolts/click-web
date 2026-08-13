@@ -42,7 +42,7 @@ describe('POST /api/livekit/token contract', () => {
   const originalKey = process.env.LIVEKIT_API_KEY;
   const originalSecret = process.env.LIVEKIT_API_SECRET;
   const originalWs = process.env.LIVEKIT_WS_URL;
-  const originalUrl = process.env.LIVEKIT_URL;
+  const originalUrl = process.env.LIVEKIT_URL; // pragma: allowlist secret
 
   beforeEach(() => {
     mockGetSupabaseFromRouteRequest.mockReset();
@@ -53,14 +53,14 @@ describe('POST /api/livekit/token contract', () => {
     delete process.env.LIVEKIT_API_KEY;
     delete process.env.LIVEKIT_API_SECRET;
     delete process.env.LIVEKIT_WS_URL;
-    delete process.env.LIVEKIT_URL;
+    delete process.env.LIVEKIT_URL; // pragma: allowlist secret
   });
 
   afterAll(() => {
     process.env.LIVEKIT_API_KEY = originalKey;
     process.env.LIVEKIT_API_SECRET = originalSecret;
     process.env.LIVEKIT_WS_URL = originalWs;
-    process.env.LIVEKIT_URL = originalUrl;
+    process.env.LIVEKIT_URL = originalUrl; // pragma: allowlist secret
   });
 
   it('returns 401 Unauthorized before checking LiveKit env', async () => {
@@ -229,6 +229,68 @@ describe('POST /api/livekit/token contract', () => {
       roomJoin: true,
       canPublish: true,
       canSubscribe: true,
+    });
+  });
+
+  it('mints a token when only LIVEKIT_URL (host, no scheme) is set', async () => { // pragma: allowlist secret
+    process.env.LIVEKIT_API_KEY = 'key';
+    process.env.LIVEKIT_API_SECRET = 'secret';
+    process.env.LIVEKIT_URL = 'click-7e741h6f.livekit.cloud'; // pragma: allowlist secret
+    mockGetSupabaseFromRouteRequest.mockResolvedValue({
+      supabase: { from: jest.fn() },
+      user: { id: userId, email: 'probe@example.com' },
+      authError: null,
+    });
+
+    const membershipMaybeSingle = jest.fn().mockResolvedValue({
+      data: { user_id: userId },
+      error: null,
+    });
+    const memberRows = {
+      data: [{ user_id: userId }, { user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }],
+      error: null,
+    };
+    const blockMaybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+    const from = jest.fn((table: string) => {
+      if (table === 'group_members') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({ maybeSingle: membershipMaybeSingle }),
+              then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+                Promise.resolve(memberRows).then(resolve, reject),
+            }),
+          }),
+        };
+      }
+      if (table === 'user_blocks') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                maybeSingle: blockMaybeSingle,
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+
+    const { POST } = await import('@/app/api/livekit/token/route');
+    const res = await POST(
+      postToken({
+        group_id: groupId,
+        room_name: `click-group-${groupId}-x`,
+        participant_name: 'probe',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      token: 'minted.livekit.jwt',
+      ws_url: 'wss://click-7e741h6f.livekit.cloud', // pragma: allowlist secret
     });
   });
 });

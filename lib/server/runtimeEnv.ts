@@ -38,6 +38,14 @@ function readStaticProcessEnv(name: string): string | undefined {
       return process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
     case 'GOOGLE_CLIENT_SECRET':
       return process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+    case 'LIVEKIT_API_KEY':
+      return process.env.LIVEKIT_API_KEY?.trim() || undefined;
+    case 'LIVEKIT_API_SECRET':
+      return process.env.LIVEKIT_API_SECRET?.trim() || undefined;
+    case 'LIVEKIT_WS_URL':
+      return process.env.LIVEKIT_WS_URL?.trim() || undefined;
+    case 'LIVEKIT_URL':
+      return process.env.LIVEKIT_URL?.trim() || undefined;
     default:
       return undefined;
   }

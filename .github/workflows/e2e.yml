@@ -36,6 +36,16 @@ jobs:
       - name: Set up Chrome
         uses: browser-actions/setup-chrome@v2
 
+      # Maestro cannot pass Chrome flags yet (mobile-dev-inc/maestro#2576).
+      # Without --no-sandbox, Chrome exits on ubuntu-latest; without --headless it needs a display.
+      - name: Wrap Chrome with --no-sandbox
+        run: |
+          sudo mv /usr/bin/google-chrome /usr/bin/google-chrome.original
+          printf '%s\n' '#!/bin/sh' \
+            'exec /usr/bin/google-chrome.original "$@" --no-sandbox --disable-dev-shm-usage --disable-gpu' \
+            | sudo tee /usr/bin/google-chrome >/dev/null
+          sudo chmod +x /usr/bin/google-chrome
+
       - name: Install dependencies
         run: npm ci
 
@@ -65,7 +75,7 @@ jobs:
           fi
 
       - name: Maestro smoke
-        run: maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
+        run: maestro test --headless .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
 
       - name: Upload Maestro artifacts
         if: success() || failure()

@@ -17,6 +17,7 @@ pg_cron (hourly) ──► cron-hourly-maintenance Edge Function
                            │
 Vercel cron ──────────────┼──► /api/cron/hourly
                            ├──► /api/cron/event-reminders
+                           ├──► /api/cron/availability-matches
                            ├──► /api/cron/disposable-reveal
                            └──► /api/cron/friction-intent-expirations
                                         │
@@ -76,7 +77,8 @@ Connection archive transitions are **not** implemented in `lib/cron` — they li
 | Path | Role |
 |------|------|
 | `app/api/cron/hourly/route.ts` | Vercel hourly bundle |
-| `app/api/cron/event-reminders/route.ts` | Event-only cron |
+| `app/api/cron/availability-matches/route.ts` | Availability-intent match pushes |
+| `lib/cron/availabilityMatches.ts` | Canonical match + `send-push-notification` |
 | `app/api/cron/disposable-reveal/route.ts` | Drops-only cron |
 | `app/api/cron/friction-intent-expirations/route.ts` | Friction-only cron |
 | `supabase/functions/cron-hourly-maintenance/index.ts` | Supabase primary scheduler |
@@ -101,7 +103,7 @@ Connection archive transitions are **not** implemented in `lib/cron` — they li
 - **Rate the vibe** — Unaffected.
 - **QR identity card** — Unaffected.
 - **Availability intents** — **Friction logging** when intent expires unused.
-- **Match alerts** — Independent scheduler (match-availability).
+- **Match alerts** — Hourly `availabilityMatches` cron; respects `availability_match_push_enabled`.
 - **Community Hubs** — Hub TTL is 24h fixed at create.
 - **Map beacons** — Event reminders **from cron**.
 - **Global search** — Unaffected.

@@ -108,9 +108,14 @@ Create **`.env.local`** in the `click-web` directory (never commit secrets). See
 |----------|---------|
 | `LIVEKIT_API_KEY` | LiveKit API key |
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
-| `LIVEKIT_WS_URL` or `LIVEKIT_URL` | WebSocket URL for the LiveKit server |
+| `LIVEKIT_WS_URL` or `LIVEKIT_URL` | WebSocket URL for the LiveKit server. Host-only values from the LiveKit Cloud dashboard (`click-….livekit.cloud`) are normalized to `wss://`. |
 
-Unauthenticated `POST /api/livekit/token` returns 401 and does **not** prove these vars are set. After deploy, probe with a real Supabase access token:
+These must be set on the **Cloudflare Worker** `click-web` (Workers dashboard → Settings → Variables and secrets), **not** GitHub Actions Variables. GitHub Actions env does not reach production. Deploy with `npm run deploy` (`opennextjs-cloudflare deploy -- --keep-vars`) so dashboard secrets are not wiped.
+
+Unauthenticated `POST /api/livekit/token` returns 401 and does **not** prove these vars are set. After deploy:
+
+1. `GET /api/health/env` — `keys.LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_WS_URL` should be `true` (presence only; values are never returned).
+2. Authenticated probe:
 
 ```bash
 curl -i -X POST https://joinclick.co/api/livekit/token \
@@ -119,7 +124,7 @@ curl -i -X POST https://joinclick.co/api/livekit/token \
   -d '{"connection_id":"<id>","room_name":"click-<id>-x","participant_name":"probe"}'
 ```
 
-`500 LiveKit environment is not configured` is a deployment config fix. `200` + JWT means minting works; remaining call failures are client-side.
+`500 LiveKit environment is not configured` means the Worker still cannot see the vars (wrong surface, or deploy without `--keep-vars`). `200` + JWT means minting works; remaining call failures are client-side.
 
 **Optional**
 
@@ -165,7 +170,7 @@ maestro test .maestro/auth --include-tags auth \
   -e TEST_PASSWORD=secret
 ```
 
-Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml). Do not Maestro LiveKit rooms.
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) runs `maestro test --headless` plus a Chrome wrapper with `--no-sandbox` (Maestro cannot pass Chrome flags yet; headed Chrome exits on `ubuntu-latest`). Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms.
 
 ---
 
@@ -222,7 +227,7 @@ The browser calls Supabase Edge Functions with `supabase.functions.invoke()`. **
 
 ## Deploy notes
 
-Production deployments (e.g. Vercel) must define the same environment variables as `.env.local`, using the host’s secret store. Ensure Supabase **Auth → URL configuration** (site URL, redirect URLs) includes your deployed web origin.
+Production is the Cloudflare Worker `click-web`. Set runtime variables on the **Workers dashboard** (not GitHub Actions Variables). `npm run deploy` uses `--keep-vars` so dashboard secrets survive the upload. Ensure Supabase **Auth → URL configuration** (site URL, redirect URLs) includes `https://joinclick.co`.
 
 ---
 

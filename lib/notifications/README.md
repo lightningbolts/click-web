@@ -6,7 +6,7 @@ Web notification **preferences** and integration patterns for **`send-push-notif
 
 ## Purpose
 
-- Persist per-user push preferences (message vs call)
+- Persist per-user push preferences (messages, calls, event reminders, availability matches, hub messages)
 - Align web-initiated pushes with KMP mobile handlers
 - Centralize localStorage fallback when `notification_preferences` table unavailable
 
@@ -30,7 +30,7 @@ FCM / APNs → Mobile app
 
 | Function | Role |
 |----------|------|
-| `DEFAULT_NOTIFICATION_PREFERENCES` | `{ messagePushEnabled: true, callPushEnabled: true }` |
+| `DEFAULT_NOTIFICATION_PREFERENCES` | `{ messagePushEnabled, callPushEnabled, eventReminderPushEnabled, availabilityMatchPushEnabled, hubMessagePushEnabled }` all default `true` |
 | `loadNotificationPreferences(supabase, userId)` | DB first, fallback localStorage |
 | `saveNotificationPreferences` | Dual-write DB + local |
 | `readLocalNotificationPreferences` | Offline / missing table fallback |
