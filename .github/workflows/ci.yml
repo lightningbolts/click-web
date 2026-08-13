@@ -107,6 +107,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Guard npm run build stays Next.js
+        run: |
+          node -e "const s=require('./package.json').scripts.build; if (s !== 'next build') { console.error('npm run build must stay \"next build\" (OpenNext calls it). Got:', s); process.exit(1) }"
+
       - name: OpenNext Cloudflare worker build
         run: npm run build:worker
 

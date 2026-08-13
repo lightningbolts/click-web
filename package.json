@@ -6,7 +6,7 @@
     "dev": "next dev",
     "prepare:env": "bash scripts/materialize-ci-env.sh",
     "postinstall": "bash scripts/maybe-materialize-ci-env.sh",
-    "build": "bash scripts/ci-next-or-worker-build.sh",
+    "build": "next build",
     "build:worker": "bash scripts/materialize-ci-env.sh && opennextjs-cloudflare build",
     "preview": "npm run build:worker && opennextjs-cloudflare preview",
     "deploy": "npm run build:worker && opennextjs-cloudflare deploy -- --keep-vars",
