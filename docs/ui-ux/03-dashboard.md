@@ -33,3 +33,5 @@ Theme is controlled from the **Navbar** toggle only. Settings does not duplicate
 ## Maps
 
 Basemap follows theme: light → Carto Positron; dark → Carto Dark Matter.
+
+The logged-out landing playground map does **not** use this Carto stack. It uses an inline client-only MapLibre style (`components/landing/playground/playgroundMapStyle.ts`) so the marketing demo never fetches tiles or `/api/*`.

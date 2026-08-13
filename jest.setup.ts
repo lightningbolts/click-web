@@ -46,6 +46,7 @@ jest.mock('maplibre-gl', () => {
     getSource: jest.fn(() => ({ setData: jest.fn() })),
     getLayer: jest.fn(() => true),
     setLayoutProperty: jest.fn(),
+    setPaintProperty: jest.fn(),
     fitBounds: jest.fn(),
     resize: jest.fn(),
     remove: jest.fn(),

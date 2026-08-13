@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import maplibregl from 'maplibre-gl';
 import LandingPlayground from '@/components/landing/playground';
+import ThemeToggle from '@/components/ThemeToggle';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 
 jest.mock('framer-motion', () => {
@@ -19,9 +21,21 @@ jest.mock('framer-motion', () => {
 function renderPlayground() {
   return render(
     <ThemeProvider>
+      <ThemeToggle />
       <LandingPlayground />
     </ThemeProvider>,
   );
+}
+
+async function openDashboardMap(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('tab', { name: 'Dashboard' }));
+  await user.click(screen.getByRole('tab', { name: 'Map' }));
+  await waitFor(() => {
+    expect(screen.getByTestId('playground-scene-map')).toBeInTheDocument();
+  });
+  await waitFor(() => {
+    expect(screen.getByLabelText('My Network')).toBeInTheDocument();
+  });
 }
 
 describe('LandingPlayground', () => {
@@ -45,11 +59,7 @@ describe('LandingPlayground', () => {
     await user.click(screen.getByRole('tab', { name: 'Dashboard' }));
     expect(screen.getByTestId('playground-scene-dashboard')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Map' }));
-    expect(screen.getByTestId('playground-scene-map')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByLabelText('My Network')).toBeInTheDocument();
-    });
+    await openDashboardMap(user);
     expect(screen.getByLabelText('Events')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByTestId('playground-pin-overlay')).toBeInTheDocument();
@@ -57,6 +67,39 @@ describe('LandingPlayground', () => {
     expect(screen.getAllByTestId('playground-map-pin').length).toBeGreaterThan(0);
     expect(screen.getByTestId('playground-pin-overlay')).toHaveTextContent('Campus Comedy Night');
     expect(screen.getByTestId('playground-pin-popup-card')).toHaveStyle({ background: '#18181b' });
+    expect(global.fetch).not.toHaveBeenCalled();
+    const mapOptions = (maplibregl.Map as unknown as jest.Mock).mock.calls[0][0] as {
+      style: unknown;
+    };
+    expect(typeof mapOptions.style).toBe('object');
+    expect(JSON.stringify(mapOptions.style)).not.toMatch(/https?:\/\//i);
+  });
+
+  it('keeps the map mounted and does not fetch when toggling theme', async () => {
+    const user = userEvent.setup();
+    renderPlayground();
+    await openDashboardMap(user);
+    await waitFor(() => {
+      expect(screen.getByTestId('playground-pin-overlay')).toBeInTheDocument();
+    });
+
+    const mapMock = maplibregl.Map as unknown as jest.Mock;
+    const constructed = mapMock.mock.calls.length;
+    const mapInstance = mapMock.mock.results[0]?.value as {
+      remove: jest.Mock;
+      setPaintProperty: jest.Mock;
+    };
+    const removeCalls = mapInstance.remove.mock.calls.length;
+
+    await user.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+
+    expect(mapMock).toHaveBeenCalledTimes(constructed);
+    expect(mapInstance.remove).toHaveBeenCalledTimes(removeCalls);
+    expect(mapInstance.setPaintProperty).toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(screen.getByTestId('playground-scene-map')).toBeInTheDocument();
+    expect(screen.getByTestId('playground-pin-overlay')).toHaveTextContent('Campus Comedy Night');
+    expect(screen.getByLabelText('My Network')).toBeInTheDocument();
   });
 
   it('opens chats from the app Clicks tab', async () => {

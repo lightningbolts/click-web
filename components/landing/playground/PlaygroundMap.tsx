@@ -6,12 +6,12 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Loader2, MapPin } from 'lucide-react';
 import { escapeHtml } from '@/lib/dashboard/connectionExtras';
 import { useTheme } from '@/lib/theme/ThemeProvider';
-import { mapStyleForTheme } from '@/lib/theme/mapStyles';
 import {
   applyPinStack,
   pinBorderForTheme,
   type OverlayPin,
 } from './PinStack';
+import { applyPlaygroundMapTheme, playgroundMapStyle } from './playgroundMapStyle';
 import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from './mockData';
 import type { PlaygroundActions, PlaygroundEvent, PlaygroundPerson, PlaygroundState } from './types';
 
@@ -150,6 +150,7 @@ export default function PlaygroundMap({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const actionsRef = useRef(actions);
+  const themeRef = useRef(theme);
   const initialFitDoneRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +174,13 @@ export default function PlaygroundMap({
   const pinBorder = pinBorderForTheme(theme);
 
   useEffect(() => {
+    themeRef.current = theme;
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    applyPlaygroundMapTheme(map, theme);
+  }, [theme, ready]);
+
+  useEffect(() => {
     const container = containerRef.current;
     if (!container || mapRef.current) return;
     let fallback: number | null = null;
@@ -180,10 +188,11 @@ export default function PlaygroundMap({
     try {
       const map = new maplibregl.Map({
         container,
-        style: mapStyleForTheme(theme),
+        style: playgroundMapStyle(themeRef.current),
         center: [-122.3085, 47.6554],
         zoom: 14.2,
         attributionControl: false,
+        fadeDuration: 0,
       });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -193,6 +202,7 @@ export default function PlaygroundMap({
       resizeObserver.observe(container);
       map.on('load', () => {
         map.resize();
+        applyPlaygroundMapTheme(map, themeRef.current);
         let revealed = false;
         const reveal = () => {
           if (revealed) return;
@@ -200,10 +210,10 @@ export default function PlaygroundMap({
           if (fallback != null) window.clearTimeout(fallback);
           setReady(true);
         };
-        fallback = window.setTimeout(reveal, 2800);
+        fallback = window.setTimeout(reveal, 400);
         map.once('idle', reveal);
       });
-      map.on('error', () => setError('Failed to load map tiles'));
+      map.on('error', () => setError('Failed to initialize map'));
     } catch {
       setError('Failed to initialize map');
     }
@@ -231,7 +241,9 @@ export default function PlaygroundMap({
       initialFitDoneRef.current = false;
       setReady(false);
     };
-  }, [theme]);
+    // Mount once. Theme retints via applyPlaygroundMapTheme — remounting would
+    // refetch nothing (local style) but still reset the camera and jump the page.
+  }, []);
 
   useEffect(() => {
     if (!ready || selectedId) return;

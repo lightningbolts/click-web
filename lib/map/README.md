@@ -84,6 +84,8 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 | Path | Role |
 |------|------|
 | `components/dashboard/ConnectionMap.tsx` | MapLibre UI + clustering config |
+| `components/landing/playground/PlaygroundMap.tsx` | Landing demo map — mock pins, **no APIs** |
+| `components/landing/playground/playgroundMapStyle.ts` | Inline GeoJSON style (no Carto / tile HTTP) |
 | `app/api/map/beacons/route.ts` | List beacons |
 | `app/api/map/beacons/[beaconId]/route.ts` | Single beacon |
 | `app/api/map/drop/route.ts` | Create beacon |
