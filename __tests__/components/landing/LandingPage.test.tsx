@@ -52,6 +52,7 @@ describe('LandingPage', () => {
     renderLanding();
 
     expect(screen.getByRole('heading', { name: /Try it/ })).toBeInTheDocument();
+    expect(screen.getByTestId('landing-playground-heading')).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground')).toBeInTheDocument();
     expect(
       screen.queryByAltText(/Click web — Personal dashboard/i),

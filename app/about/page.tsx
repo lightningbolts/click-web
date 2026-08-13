@@ -68,7 +68,11 @@ export default function About() {
           initial={false}
           animate={{ y: 0, opacity: 1 }}
         >
-          <h1 className="mb-6 text-center text-5xl font-bold md:text-6xl">
+          <h1
+            id="about-heading"
+            data-testid="about-heading"
+            className="mb-6 text-center text-5xl font-bold md:text-6xl"
+          >
             About <span className="text-[#630ed4]">Click</span>
           </h1>
           <p className="mx-auto mb-6 max-w-2xl text-center text-lg leading-relaxed text-on-surface-variant">

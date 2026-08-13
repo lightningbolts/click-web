@@ -256,7 +256,11 @@ export default function LandingPage() {
         >
           <div className="mx-auto max-w-6xl">
             <div className="mb-10 text-center">
-              <h2 id="how-it-works-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
+              <h2
+                id="how-it-works-heading"
+                data-testid="landing-playground-heading"
+                className="text-3xl font-bold tracking-tight sm:text-4xl"
+              >
                 Try it.
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-base text-on-surface-variant">

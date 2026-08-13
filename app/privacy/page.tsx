@@ -13,7 +13,7 @@ export default function PrivacyPolicy() {
           initial={false}
           animate={{ y: 0, opacity: 1 }}
         >
-          <h1 className="text-5xl md:text-6xl font-bold mb-6">
+          <h1 id="privacy-heading" data-testid="privacy-heading" className="text-5xl md:text-6xl font-bold mb-6">
             Privacy <span className="text-[#8338EC]">Policy</span>
           </h1>
           <p className="text-zinc-400 mb-12">Last updated: April 2026</p>

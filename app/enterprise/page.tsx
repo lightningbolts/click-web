@@ -214,7 +214,11 @@ export default function EnterprisePage() {
             animate={{ y: 0, opacity: 1 }}
             className="text-center"
           >
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border-hard bg-surface-container/60 px-4 py-2 text-sm text-on-surface-variant">
+            <div
+              id="enterprise-heading"
+              data-testid="enterprise-heading"
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-border-hard bg-surface-container/60 px-4 py-2 text-sm text-on-surface-variant"
+            >
               <GraduationCap className="h-4 w-4 text-primary" />
               <span>Higher ed &amp; Student Affairs</span>
             </div>

@@ -6,12 +6,15 @@ tags:
 env:
   BASE_URL: http://localhost:3000
 ---
+# The playground wrapper div is omitted from the AX tree (no accessible
+# name), so CSS [data-testid='landing-playground'] never matches. Scroll to
+# the section heading, which is a real text node.
 - runFlow:
     file: ../subflows/open_origin.yaml
 - scrollUntilVisible:
-    element:
-      css: "[data-testid='landing-playground']"
+    element: "Try it."
     direction: DOWN
     timeout: 20000
+- assertVisible: "Try it."
 - assertVisible:
-    css: "[data-testid='landing-playground']"
+    id: how-it-works-heading

@@ -133,7 +133,12 @@ jobs:
             echo "Homepage HTML is missing landing-playground test id"
             exit 1
           }
-          echo "Homepage HTML contains marketing copy and playground test id"
+          about=$(curl -sf http://localhost:3000/about)
+          echo "$about" | grep -q "about-heading" || {
+            echo "/about HTML is missing about-heading test id"
+            exit 1
+          }
+          echo "Homepage HTML contains marketing copy; /about exposes about-heading"
 
       - name: Install Xvfb
         run: sudo apt-get update -y && sudo apt-get install -y xvfb
@@ -143,6 +148,9 @@ jobs:
         # then hits a non-page target, so assertVisible fails while screenshots
         # still show the real tab (maestro#2573). Headed Chrome under Xvfb keeps
         # a single page target.
+        # Text asserts must match AX-tree nodes. Styled spans split "About Click"
+        # and the handshake tagline, so substring text checks fail even when the
+        # screenshot is correct. Smoke flows use unsplit copy and heading ids.
         run: xvfb-run --auto-servernum maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
 
       - name: Upload Maestro artifacts
