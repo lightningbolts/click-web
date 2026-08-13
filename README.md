@@ -170,7 +170,7 @@ maestro test .maestro/auth --include-tags auth \
   -e TEST_PASSWORD=secret
 ```
 
-Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) runs `maestro test --headless` plus a Chrome wrapper with `--no-sandbox` (Maestro cannot pass Chrome flags yet; headed Chrome exits on `ubuntu-latest`). Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms.
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) runs `maestro test --headless` plus a Chrome wrapper that **prepends** `--no-sandbox` (Maestro cannot pass Chrome flags yet; headed Chrome exits on `ubuntu-latest`; flags after `"$@"` become extra URLs). Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms.
 
 ---
 

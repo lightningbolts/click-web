@@ -38,13 +38,23 @@ jobs:
 
       # Maestro cannot pass Chrome flags yet (mobile-dev-inc/maestro#2576).
       # Without --no-sandbox, Chrome exits on ubuntu-latest; without --headless it needs a display.
+      # Flags MUST be prepended: Chrome treats the first non-flag arg as a URL and
+      # every later arg as another URL, so appending --no-sandbox opened blank tabs
+      # and Maestro asserted against those instead of the app.
       - name: Wrap Chrome with --no-sandbox
         run: |
-          sudo mv /usr/bin/google-chrome /usr/bin/google-chrome.original
-          printf '%s\n' '#!/bin/sh' \
-            'exec /usr/bin/google-chrome.original "$@" --no-sandbox --disable-dev-shm-usage --disable-gpu' \
-            | sudo tee /usr/bin/google-chrome >/dev/null
-          sudo chmod +x /usr/bin/google-chrome
+          wrap_chrome() {
+            src="$1"
+            [ -e "$src" ] || return 0
+            sudo mv "$src" "${src}.original"
+            printf '%s\n' '#!/bin/sh' \
+              'dir=$(mktemp -d /tmp/chrome-maestro-XXXXXX)' \
+              "exec ${src}.original --no-sandbox --disable-dev-shm-usage --user-data-dir=\"\$dir\" \"\$@\"" \
+              | sudo tee "$src" >/dev/null
+            sudo chmod +x "$src"
+          }
+          wrap_chrome /usr/bin/google-chrome
+          wrap_chrome /usr/bin/google-chrome-stable
 
       - name: Install dependencies
         run: npm ci
@@ -73,6 +83,20 @@ jobs:
             echo "Next.js did not become ready on :3000"
             exit 1
           fi
+
+      - name: Confirm homepage HTML is marketing copy
+        run: |
+          html=$(curl -sf http://localhost:3000)
+          echo "$html" | grep -q "from handshake to friendship" || {
+            echo "Homepage HTML is missing marketing copy (SSR regression)"
+            echo "$html" | head -c 4000
+            exit 1
+          }
+          echo "$html" | grep -q "landing-playground" || {
+            echo "Homepage HTML is missing landing-playground test id"
+            exit 1
+          }
+          echo "Homepage HTML contains marketing copy and playground test id"
 
       - name: Maestro smoke
         run: maestro test --headless .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
