@@ -65,9 +65,8 @@ export default function About() {
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-20 md:px-12">
         <motion.div
-          initial={{ y: 30, opacity: 0 }}
+          initial={false}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8 }}
         >
           <h1 className="mb-6 text-center text-5xl font-bold md:text-6xl">
             About <span className="text-[#630ed4]">Click</span>

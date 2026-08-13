@@ -13,13 +13,36 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder
       MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Materialize build env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_LAUNCHED: ${{ secrets.NEXT_PUBLIC_APP_LAUNCHED }}
+          NEXT_PUBLIC_IOS_STORE_URL: ${{ secrets.NEXT_PUBLIC_IOS_STORE_URL }}
+          NEXT_PUBLIC_ANDROID_STORE_URL: ${{ secrets.NEXT_PUBLIC_ANDROID_STORE_URL }}
+          NEXT_PUBLIC_IOS_APP_ID: ${{ secrets.NEXT_PUBLIC_IOS_APP_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          LIVEKIT_WS_URL: ${{ secrets.LIVEKIT_WS_URL }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ENRICHMENT_WEBHOOK_SECRET: ${{ secrets.ENRICHMENT_WEBHOOK_SECRET }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          BUSINESS_INSIGHTS_DEV_EMAILS: ${{ secrets.BUSINESS_INSIGHTS_DEV_EMAILS }}
+        run: bash scripts/materialize-ci-env.sh
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -33,28 +56,35 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Pin below current stable: Maestro's bundled Selenium only has CDP 147,
+      # and Chrome-for-Testing 152 (CDP 150) left Maestro unable to see the DOM.
       - name: Set up Chrome
+        id: chrome
         uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 131
+          install-dependencies: true
 
-      # Maestro cannot pass Chrome flags yet (mobile-dev-inc/maestro#2576).
-      # Without --no-sandbox, Chrome exits on ubuntu-latest; without --headless it needs a display.
-      # Flags MUST be prepended: Chrome treats the first non-flag arg as a URL and
-      # every later arg as another URL, so appending --no-sandbox opened blank tabs
-      # and Maestro asserted against those instead of the app.
+      # Maestro Selenium hardcodes binary: /usr/bin/google-chrome (maestro#2576).
+      # setup-chrome installs under /opt/hostedtoolcache, so wrapping only
+      # /usr/bin/google-chrome is a no-op when that path is missing. Point the
+      # hardcoded path at Chrome-for-Testing and prepend sandbox flags — extra
+      # args after "$@" are treated as more URLs (blank tabs).
       - name: Wrap Chrome with --no-sandbox
         run: |
-          wrap_chrome() {
-            src="$1"
-            [ -e "$src" ] || return 0
-            sudo mv "$src" "${src}.original"
-            printf '%s\n' '#!/bin/sh' \
-              'dir=$(mktemp -d /tmp/chrome-maestro-XXXXXX)' \
-              "exec ${src}.original --no-sandbox --disable-dev-shm-usage --user-data-dir=\"\$dir\" \"\$@\"" \
-              | sudo tee "$src" >/dev/null
-            sudo chmod +x "$src"
-          }
-          wrap_chrome /usr/bin/google-chrome
-          wrap_chrome /usr/bin/google-chrome-stable
+          real="${{ steps.chrome.outputs.chrome-path }}"
+          echo "Wrapping $real"
+          "$real" --version
+          if [ -e /usr/bin/google-chrome ] && [ ! -e /usr/bin/google-chrome.original ]; then
+            sudo mv /usr/bin/google-chrome /usr/bin/google-chrome.original
+          fi
+          sudo tee /usr/bin/google-chrome >/dev/null <<EOF
+          #!/bin/sh
+          dir=\$(mktemp -d /tmp/chrome-maestro-XXXXXX)
+          exec "$real" --no-sandbox --disable-dev-shm-usage --user-data-dir="\$dir" "\$@"
+          EOF
+          sudo chmod +x /usr/bin/google-chrome
+          /usr/bin/google-chrome --version
 
       - name: Install dependencies
         run: npm ci

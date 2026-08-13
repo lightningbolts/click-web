@@ -15,6 +15,16 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Cloudflare Workers Builds / `wrangler deploy` must run OpenNext first.
+  // `npm run build` (Next.js only) does not produce `.open-next/worker.js`.
+  "build": {
+    "command": "npx opennextjs-cloudflare build"
+  },
+  // Non-secret public site URL. Supabase / LiveKit / Stripe stay in the
+  // Workers dashboard so `deploy -- --keep-vars` does not wipe them.
+  "vars": {
+    "NEXT_PUBLIC_BASE_URL": "https://joinclick.co"
+  },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",

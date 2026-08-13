@@ -71,9 +71,8 @@ export default function LandingPage() {
       <div className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate">
         <section className="relative z-10 flex min-h-[calc(100svh-var(--navbar-height))] flex-col items-center justify-center px-6 py-16 md:px-12">
           <motion.div
-            initial={{ y: 16, opacity: 0 }}
+            initial={false}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5 }}
             className="flex flex-col items-center text-center"
           >
             <ClickLogo
