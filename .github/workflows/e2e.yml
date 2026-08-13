@@ -56,13 +56,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # Pin below current stable: Maestro's bundled Selenium only has CDP 147,
-      # and Chrome-for-Testing 152 (CDP 150) left Maestro unable to see the DOM.
+      # Maestro's bundled ChromeDriver must match Chrome's major version
+      # (session not created if they drift). Latest Maestro CLI ships
+      # ChromeDriver 151; 131 made the driver refuse to start. Pin both
+      # together if you bump Maestro.
       - name: Set up Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
-          chrome-version: 131
+          chrome-version: 151
           install-dependencies: true
 
       # Maestro Selenium hardcodes binary: /usr/bin/google-chrome (maestro#2576).
@@ -96,6 +98,8 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
 
       - name: Start Next.js
         run: |
