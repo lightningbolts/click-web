@@ -1,0 +1,16 @@
+url: ${BASE_URL}
+name: Legal and marketing pages
+tags:
+  - smoke
+  - web
+---
+- launchApp:
+    clearState: true
+- openLink: ${BASE_URL}/about
+- assertVisible: "About"
+- openLink: ${BASE_URL}/privacy
+- assertVisible: "Privacy"
+- openLink: ${BASE_URL}/terms
+- assertVisible: "Terms of"
+- openLink: ${BASE_URL}/enterprise
+- assertVisible: "Student Affairs"

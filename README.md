@@ -129,9 +129,30 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Tests
 
+Unit / component (Jest):
+
 ```bash
 npm test
 ```
+
+End-to-end UI ([Maestro](https://docs.maestro.dev/get-started/supported-platform/web-browser.md), Chromium; Beta). Install the CLI (Java 17+), start the app, then:
+
+```bash
+curl -fsSL "https://get.maestro.mobile.dev" | bash
+npm run dev   # or npm run build && npm start
+npm run test:e2e
+```
+
+Override the origin with `-e BASE_URL=https://joinclick.co` (or a preview URL). Authenticated dashboard chrome:
+
+```bash
+maestro test .maestro/auth --include-tags auth \
+  -e BASE_URL=http://localhost:3000 \
+  -e TEST_EMAIL=you@example.com \
+  -e TEST_PASSWORD=secret
+```
+
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing, legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml).
 
 ---
 

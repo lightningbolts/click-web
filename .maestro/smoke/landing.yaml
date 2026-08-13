@@ -1,0 +1,17 @@
+url: ${BASE_URL}
+name: Anonymous landing smoke
+tags:
+  - smoke
+  - web
+---
+- launchApp:
+    clearState: true
+- assertVisible: "from handshake to friendship"
+- assertVisible: "Join the Waitlist"
+- assertVisible:
+    css: "[data-testid='waitlist-cta']"
+- runFlow:
+    file: ../subflows/open_login.yaml
+- tapOn:
+    css: "[data-testid='login-modal-close']"
+- assertVisible: "from handshake to friendship"

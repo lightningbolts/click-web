@@ -1,0 +1,77 @@
+name: E2E
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: click-web-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maestro-web-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder
+      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Start Next.js
+        run: |
+          npm start -- --port 3000 &
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000 >/dev/null; then
+              echo "Next.js is ready"
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Next.js did not become ready on :3000"
+            exit 1
+          fi
+
+      - name: Maestro smoke
+        run: maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
+
+      - name: Upload Maestro artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-web-smoke
+          path: ~/.maestro
+          if-no-files-found: ignore
+          include-hidden-files: true

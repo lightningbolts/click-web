@@ -2701,7 +2701,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-on-surface">
+    <div className="min-h-screen bg-background text-on-surface" data-testid="dashboard-root">
       {/* Interest tagging onboarding overlay */}
       {needsTagging === true && (
         <InterestTagging
@@ -2747,6 +2747,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         <div
           className="sticky top-0 z-20 border-b border-border-hard bg-surface"
           style={{ backgroundColor: "var(--color-surface)" }}
+          data-testid="dashboard-chrome"
         >
           <div className="px-6 md:px-12 flex gap-1 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => {
@@ -2755,6 +2756,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
+                  data-testid={`dashboard-tab-${tab.id}`}
                   className={`relative py-4 px-4 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
                     ? 'text-primary'
                     : 'text-on-surface-variant hover:text-on-surface'

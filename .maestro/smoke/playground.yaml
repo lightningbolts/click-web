@@ -1,0 +1,15 @@
+url: ${BASE_URL}
+name: Landing playground is reachable
+tags:
+  - smoke
+  - web
+---
+- launchApp:
+    clearState: true
+- scrollUntilVisible:
+    element:
+      css: "[data-testid='landing-playground']"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    css: "[data-testid='landing-playground']"

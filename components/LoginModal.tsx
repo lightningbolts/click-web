@@ -225,6 +225,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
               role="dialog"
               aria-modal="true"
               aria-labelledby="login-modal-title"
+              data-testid="login-modal"
             >
               {/* Sticky chrome */}
               <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-border-hard bg-surface px-4 py-3 sm:px-6 sm:py-4">
@@ -250,6 +251,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                 <button
                   type="button"
                   onClick={onClose}
+                  data-testid="login-modal-close"
                   className="shrink-0 rounded-[8px] border border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
                   aria-label="Close"
                 >
@@ -371,6 +373,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                   <input
                     type="email"
                     id="email"
+                    data-testid="login-email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -402,6 +405,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                     <input
                       type="password"
                       id="password"
+                      data-testid="login-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -445,6 +449,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   type="submit"
+                  data-testid="login-submit"
                   disabled={isLoading}
                   className="fc-btn-primary w-full py-3 disabled:cursor-not-allowed disabled:opacity-50"
                 >

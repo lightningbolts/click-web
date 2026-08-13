@@ -1,0 +1,24 @@
+url: ${BASE_URL}
+name: Authenticated dashboard chrome
+tags:
+  - auth
+  - web
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    file: ../subflows/login.yaml
+- extendedWaitUntil:
+    visible:
+      css: "[data-testid='dashboard-root']"
+    timeout: 30000
+- assertVisible:
+    css: "[data-testid='dashboard-chrome']"
+- tapOn:
+    css: "[data-testid='dashboard-tab-map']"
+- tapOn:
+    css: "[data-testid='dashboard-tab-chat']"
+- tapOn:
+    css: "[data-testid='dashboard-tab-settings']"
+- tapOn:
+    css: "[data-testid='dashboard-tab-memory']"

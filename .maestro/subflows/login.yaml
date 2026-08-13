@@ -1,0 +1,13 @@
+tags:
+  - subflow
+---
+- runFlow:
+    file: open_login.yaml
+- tapOn:
+    css: "[data-testid='login-email']"
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    css: "[data-testid='login-password']"
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    css: "[data-testid='login-submit']"

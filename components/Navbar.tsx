@@ -120,6 +120,7 @@ export default function Navbar() {
                 </div>
                 <button
                   onClick={handleSignOut}
+                  data-testid="nav-sign-out"
                   className="fc-btn-secondary flex items-center gap-1 whitespace-nowrap px-2 py-2 text-xs hover:border-error hover:text-error md:gap-2 md:px-4 md:text-sm"
                 >
                   <LogOut className="h-3 w-3 md:h-4 md:w-4" />
@@ -156,6 +157,7 @@ export default function Navbar() {
                 ) : (
                   <button
                     onClick={() => setIsLoginOpen(true)}
+                    data-testid="nav-login"
                     className="fc-btn-secondary px-3 py-2 text-xs md:px-4 md:text-sm"
                   >
                     Login

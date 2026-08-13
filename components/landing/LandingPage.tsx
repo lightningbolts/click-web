@@ -93,6 +93,7 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={openWaitlist}
+              data-testid="waitlist-cta"
               className="fc-btn-primary mt-8 px-8 py-4 text-lg"
             >
               Join the Waitlist

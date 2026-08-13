@@ -17,6 +17,8 @@ Click Web is a Next.js 16 (App Router) dashboard for the Click social platform. 
 | Lint | `npm run lint` (ESLint `next/core-web-vitals`) |
 | Tests | `npm test` |
 | Watch tests | `npm run test:watch` |
+| Maestro E2E smoke | `npm run test:e2e` (CLI on PATH; app on `BASE_URL`, default `http://localhost:3000`) |
+| Maestro E2E auth | `npm run test:e2e:auth` with `TEST_EMAIL` / `TEST_PASSWORD` |
 
 ### Non-obvious setup notes
 

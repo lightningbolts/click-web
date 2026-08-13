@@ -1,0 +1,8 @@
+tags:
+  - subflow
+---
+- tapOn:
+    css: "[data-testid='nav-login']"
+- assertVisible:
+    css: "[data-testid='login-modal']"
+- assertVisible: "Welcome Back"
