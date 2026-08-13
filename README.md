@@ -159,7 +159,7 @@ npm run dev   # or npm run build && npm start
 npm run test:e2e
 ```
 
-Flows set a **literal** `url: http://localhost:3000` (Maestro 2.8 leaves `${BASE_URL}` unexpanded in the `url:` field, which opens Chromium at `data:`). They then `openLink` to `BASE_URL`. Do not use `launchApp.clearState` on web — it wipes the tab back to `data:`.
+Flows set a **literal** `url: http://localhost:3000` (Maestro 2.8 leaves `${BASE_URL}` unexpanded in the `url:` field, which opens Chromium at `data:`). They then `launchApp.appId=${BASE_URL}` (same-tab CDP navigation). Do not use `openLink` on web (second window; Maestro reads the leftover blank tab) or `launchApp.clearState` (wipes the tab back to `data:`).
 
 Override the origin after that with `-e BASE_URL=https://joinclick.co` (or a preview URL). Authenticated dashboard chrome:
 

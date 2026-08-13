@@ -71,7 +71,9 @@ jobs:
       # setup-chrome installs under /opt/hostedtoolcache, so wrapping only
       # /usr/bin/google-chrome is a no-op when that path is missing. Point the
       # hardcoded path at Chrome-for-Testing and prepend sandbox flags — extra
-      # args after "$@" are treated as more URLs (blank tabs).
+      # args after "$@" are treated as more URLs (blank tabs). Do not inject a
+      # second --user-data-dir; ChromeDriver already sets one, and a wrapper dir
+      # spawned extra windows that Maestro's CDP client never queried.
       - name: Wrap Chrome with --no-sandbox
         run: |
           real="${{ steps.chrome.outputs.chrome-path }}"
@@ -82,8 +84,7 @@ jobs:
           fi
           sudo tee /usr/bin/google-chrome >/dev/null <<EOF
           #!/bin/sh
-          dir=\$(mktemp -d /tmp/chrome-maestro-XXXXXX)
-          exec "$real" --no-sandbox --disable-dev-shm-usage --user-data-dir="\$dir" "\$@"
+          exec "$real" --no-sandbox --disable-dev-shm-usage "\$@"
           EOF
           sudo chmod +x /usr/bin/google-chrome
           /usr/bin/google-chrome --version
@@ -95,6 +96,8 @@ jobs:
         run: npm run build
 
       - name: Install Maestro CLI
+        env:
+          MAESTRO_VERSION: "2.8.0"
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
