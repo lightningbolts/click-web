@@ -25,10 +25,19 @@ describe('beaconPhotoObjectPath', () => {
   const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
   it('puts auth uid in the first path segment so avatars RLS allows INSERT', () => {
-    const path = beaconPhotoObjectPath(userId, 'jpg', 1_700_000_000_000);
-    expect(path).toBe(`${userId}/beacons/1700000000000.jpg`);
+    const unique = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const path = beaconPhotoObjectPath(userId, 'jpg', 1_700_000_000_000, unique);
+    expect(path).toBe(`${userId}/beacons/1700000000000-${unique}.jpg`);
     expect(path.split('/')[0]).toBe(userId);
     expect(isBeaconPhotoPathOwnedByUser(path, userId)).toBe(true);
+  });
+
+  it('does not collide for two uploads in the same millisecond', () => {
+    const a = beaconPhotoObjectPath(userId, 'jpg', 1_700_000_000_000);
+    const b = beaconPhotoObjectPath(userId, 'jpg', 1_700_000_000_000);
+    expect(a).not.toBe(b);
+    expect(a.startsWith(`${userId}/beacons/1700000000000-`)).toBe(true);
+    expect(b.startsWith(`${userId}/beacons/1700000000000-`)).toBe(true);
   });
 
   it('still recognizes the legacy beacons/{uid}/... layout', () => {

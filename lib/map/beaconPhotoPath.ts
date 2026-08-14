@@ -10,9 +10,11 @@ export function beaconPhotoObjectPath(
   userId: string,
   ext: string,
   nowMs: number = Date.now(),
+  unique: string = globalThis.crypto.randomUUID(),
 ): string {
   const safeExt = ext.replace(/[^a-z0-9]/gi, '') || 'jpg';
-  return `${userId}/beacons/${nowMs}.${safeExt}`;
+  const safeUnique = unique.replace(/[^a-z0-9-]/gi, '') || 'id';
+  return `${userId}/beacons/${nowMs}-${safeUnique}.${safeExt}`;
 }
 
 /** True when an object key is owned by [userId] under either current or legacy layout. */
