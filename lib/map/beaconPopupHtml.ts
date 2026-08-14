@@ -2,6 +2,7 @@
  * HTML for MapLibre beacon popups (dashboard Connection Map). Values come from `GET /api/beacons/:id`.
  */
 
+import { generateCardVisual, beaconPinShapeFor } from "@/lib/ui/generateCardVisual";
 import { escapeHtml } from "@/lib/dashboard/connectionExtras";
 import {
   displayTitleForBeacon,
@@ -49,7 +50,9 @@ export function isSafeBeaconImageUrl(uri: string): boolean {
       h.endsWith(".apple.com") ||
       h.endsWith(".scdn.co") ||
       h.endsWith(".spotifycdn.com") ||
-      h.endsWith(".ggpht.com")
+      h.endsWith(".ggpht.com") ||
+      h.includes("supabase.co") ||
+      h.includes("supabase.in")
     );
   } catch {
     return false;
@@ -91,7 +94,7 @@ export function formatBeaconPopupHtml(beacon: MapBeaconRecord): string {
       ? `<div style="font-size:11px;color:#a1a1aa;margin-top:4px;">${escapeHtml(album)}</div>`
       : "";
 
-  const artRaw = str(m, "album_art_url", "artworkUrl100", "artwork_url");
+  const artRaw = str(m, "album_art_url", "artworkUrl100", "artwork_url", "image_url", "cover_url");
   const art =
     artRaw && isSafeBeaconImageUrl(artRaw)
       ? `<img src="${escapeHtml(artRaw)}" alt="" width="240" height="240" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin:10px 0 0;display:block;" />`
@@ -113,14 +116,20 @@ export function formatBeaconPopupHtml(beacon: MapBeaconRecord): string {
     ? `<a href="${escapeHtml(listen)}" target="_blank" rel="noreferrer" style="display:inline-block;margin-top:12px;color:#67e8f9;font-size:12px;font-weight:600;">Open in music app →</a>`
     : "";
 
-  return `<div style="color:#fff;background:#18181b;padding:12px 14px;border-radius:12px;border:1px solid #27272a;max-width:280px;">
+  const visual = generateCardVisual(beacon.id, beaconPinShapeFor(beacon.beacon_type));
+  const gradient = visual.gradient.join(", ");
+
+  return `<div style="color:${visual.onContent};background:linear-gradient(135deg, ${gradient});padding:12px 14px;border-radius:12px;border:1px solid #27272a;max-width:280px;position:relative;">
+    <div style="position:absolute;inset:0;background:${visual.contentScrim};border-radius:12px;pointer-events:none;"></div>
+    <div style="position:relative;">
     ${art}
-    <div style="font-weight:600;color:#fafafa;font-size:14px;line-height:1.35;margin-top:${art ? "8px" : "0"};">${heading}</div>
-    <div style="font-size:11px;color:#a1a1aa;margin-top:4px;">${typeLine}</div>
+    <div style="font-weight:600;color:${visual.onContent};font-size:14px;line-height:1.35;margin-top:${art ? "8px" : "0"};">${heading}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.82);margin-top:4px;">${typeLine}</div>
     ${officialPill}
     ${albumLine}
     ${preview}
     ${listenBlock}
+    </div>
   </div>`;
 }
 

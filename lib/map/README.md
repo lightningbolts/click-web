@@ -36,8 +36,9 @@ ConnectionMap.tsx (MapLibre)
 | Property | Use |
 |----------|-----|
 | `beacon_type` | Cluster aggregation field |
-| `tint` | Pin color from `beaconTint()` |
+| `tint` | Pin color from `beaconTint()` / `generateCardVisual` |
 | `icon_char` | Unicode glyph per type |
+| `pin_shape` | Distinct silhouette per beacon type (mobile + popup identity) |
 | `title` | `displayTitleForBeacon()` |
 | `spotify` | Safe playlist URI for soundtrack beacons |
 
@@ -91,6 +92,7 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 | `app/api/map/beacons/[beaconId]/route.ts` | Single beacon |
 | `app/api/map/drop/route.ts` | Create beacon |
 | `app/api/beacons/route.ts` | Alternate list endpoint (+ venue scale on event create) |
+| `app/api/beacons/image/route.ts` | Unencrypted beacon photo upload (JWT, 2 MB) |
 | `app/api/beacons/[beaconId]/bookmark/route.ts` | Event bookmark |
 | `app/api/beacons/[beaconId]/check-in/route.ts` | Event check-in (geofenced) |
 | `app/api/beacons/[beaconId]/engagement/route.ts` | Bookmark + check-in state |
