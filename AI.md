@@ -15,6 +15,7 @@ This file is for **human developers** and **AI assistants** working in the Click
 ## 2. Cross-platform sync (web ↔ KMP mobile)
 
 - **Payloads and enums must match the mobile app** for any shared contract: push notification bodies, call invite metadata, Edge Function JSON shapes, and naming (`snake_case` in payloads where the app already uses it).
+- **Visual identity:** `lib/ui/generateCardVisual.ts` must stay aligned with KMP `ui/theme/CardVisual.kt` (FNV-1a, 5/8 purple-dominant, pin shapes). Beacon photos upload via `POST /api/beacons/image` (2 MB, unencrypted).
 - Before changing call or notification code, **locate the KMP source of truth** (e.g. comments in `DashboardView.tsx` reference `CallPushNotifier.kt` for `send-push-notification` / `incoming_call`).
 - **Do not “simplify” web-only field names** if mobile or Edge Functions expect specific keys; extend both sides together if the contract changes.
 - **Feature parity reference:** `README.md` § Cross-platform consistency, `lib/dashboard/README.md` § Cross-platform parity, `lib/connections/README.md` § Cross-platform parity. Mobile cannot be replaced for Tri-Factor initiation; web owns dashboard + B2B insights.

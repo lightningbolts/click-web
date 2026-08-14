@@ -23,7 +23,7 @@ Click Web is the **Next.js** companion to the **Kotlin Multiplatform (KMP)** mob
 |------|----------------|
 | **Web-based VoIP** | In-browser calling via **LiveKit**: short-lived token from `/api/livekit/token`, `livekit-client` rooms, payloads aligned with mobile push shapes. |
 | **Real-time chat** | Chat UI syncs with Supabase-backed data; API routes under `app/api/chat/` support messages, reactions, and related flows. |
-| **User profile** | Profile viewing and management via `app/api/users/` and shared UI (e.g. `UserProfileModal`). |
+| **Map beacons** | `GET/POST /api/beacons`, plus `POST /api/beacons/image` for unencrypted beacon photos (max 2 MB). Pin/popup identity uses `lib/ui/generateCardVisual.ts` (mirrors mobile). |
 | **Business insights & heatmaps** | Insights under `app/insights/` (heatmap, live metrics, vibe stream, tribes, social activity) with APIs under `app/api/insights/`. |
 | **Secure auth callbacks** | Email verification, PKCE, token-hash, and legacy hash flows—see `app/auth/callback/page.tsx` and `app/api/auth/callback/route.ts`. |
 
