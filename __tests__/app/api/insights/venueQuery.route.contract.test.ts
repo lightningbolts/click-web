@@ -150,6 +150,7 @@ describe('GET /api/insights/venue contract', () => {
         `venue_id.eq.${MOCK_VENUE_ID},location_id.eq.${MOCK_VENUE_ID}`,
       ]);
       expectFilter(connections, 'include_in_business_insights', true);
+      expectFilter(connections, 'source', 'handshake');
 
       const [gtColumn, gtValue] = filterCalls(connections, 'gt')[0];
       expect(gtColumn).toBe('created');

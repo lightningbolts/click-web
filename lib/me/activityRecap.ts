@@ -34,8 +34,9 @@ export async function loadActivityRecap(
 
   const { data: connectionRows, error: connErr } = await admin
     .from('connections')
-    .select('id, created')
-    .contains('user_ids', [userId]);
+    .select('id, created, source')
+    .contains('user_ids', [userId])
+    .eq('source', 'handshake');
   if (connErr) throw new Error(connErr.message);
 
   const connections = Array.isArray(connectionRows) ? connectionRows : [];
