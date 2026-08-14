@@ -106,3 +106,14 @@ export function gridRowSizes(participantCount: number): number[] {
     }
   }
 }
+
+export function gridChunks<T>(items: T[]): T[][] {
+  const sizes = gridRowSizes(items.length);
+  const rows: T[][] = [];
+  let index = 0;
+  for (const size of sizes) {
+    rows.push(items.slice(index, index + size));
+    index += size;
+  }
+  return rows;
+}

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import {
   formatCallDuration,
-  gridRowSizes,
+  gridChunks,
   initialsFor,
   pickActiveSpeaker,
   resolveCallLayoutMode,
@@ -284,9 +284,12 @@ function ActiveCallStage({
               },
             ];
     }
-    if (next.length > 0) lastRosterRef.current = next;
     return next.length > 0 ? next : lastRosterRef.current;
   }, [activeCall, title]);
+
+  useEffect(() => {
+    if (roster.length > 0) lastRosterRef.current = roster;
+  }, [roster]);
 
   const [manualOverride, setManualOverride] = useState<CallLayoutMode | null>(null);
   const [overrideAtCount, setOverrideAtCount] = useState(0);
@@ -307,13 +310,7 @@ function ActiveCallStage({
   const local = roster.find((p) => p.isLocal);
   const primary = activeSpeaker && !activeSpeaker.isLocal ? activeSpeaker : remotes[0];
   const otherRemotes = remotes.filter((p) => p.identity !== primary?.identity);
-  const rowSizes = gridRowSizes(roster.length);
-  let gridIndex = 0;
-  const gridRows = rowSizes.map((size) => {
-    const slice = roster.slice(gridIndex, gridIndex + size);
-    gridIndex += size;
-    return slice;
-  });
+  const gridRows = gridChunks(roster);
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[90] flex flex-col bg-[#101212] text-white">
@@ -424,8 +421,7 @@ export default function CallOverlay({
   const isVideo = invite?.videoEnabled === true;
   const showActive =
     activeCall.status === 'connected' ||
-    (overlayState.mode === 'ended' &&
-      (activeCall.status === 'ended' || activeCall.status === 'connected'));
+    (overlayState.mode === 'ended' && activeCall.status === 'ended');
   const showPreview = overlayState.mode !== 'idle' && !showActive;
 
   useEffect(() => {
