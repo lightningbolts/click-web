@@ -243,7 +243,6 @@ describe('POST /api/connections/prior/respond', () => {
           error: null,
         });
         (b.update as jest.Mock).mockReturnValue(b);
-        (b.eq as jest.Mock).mockResolvedValue({ data: null, error: null });
         return b;
       }
       if (table === 'chats') {

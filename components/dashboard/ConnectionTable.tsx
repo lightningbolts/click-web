@@ -18,6 +18,7 @@ import {
 import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
 import type { ConnectionDisplayStatus } from '@/lib/dashboard/connectionStatus';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
+import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
 import { PriorConnectionBadge } from '@/components/profile/PriorConnectionBadge';
 import { useAuth } from '@/lib/AuthContext';
 
