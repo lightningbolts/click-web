@@ -1,4 +1,9 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from "react";
 import { cn } from "@/lib/cn";
 
 export function FcCard({
@@ -56,6 +61,18 @@ export function FcInput({
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn("fc-input px-3 py-2", className)} {...props} />;
+}
+
+export function FcTextarea({
+  className,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      className={cn("fc-input fc-textarea px-3 py-2", className)}
+      {...props}
+    />
+  );
 }
 
 export function FcPageShell({

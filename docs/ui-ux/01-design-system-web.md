@@ -6,7 +6,7 @@
 **Primitives:** [`components/fc/`](../../components/fc/)  
 **Theme:** [`lib/theme/ThemeProvider.tsx`](../../lib/theme/ThemeProvider.tsx)
 
-Web border and secondary-accent tokens are **website-only**. Mobile Compose still uses 2px `#000` hard borders until a separate app plan.
+Mobile Compose now matches these quiet 1dp borders and secondary `#224CFF`. Reuse `components/fc/` (`FcCard`, `FcButton`, `FcInput`, `FcTextarea`, `FcChip`) instead of one-off chrome.
 
 ---
 
@@ -69,7 +69,8 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | `FcCard` | Opaque surface, 1px outline-variant border, 16px radius |
 | `FcButton` | Primary solid / secondary bordered |
 | `FcChip` | Solid container chip |
-| `FcInput` | Bordered field |
+| `FcInput` | 16px-radius field (matches search) |
+| `FcTextarea` | Same field chrome, top-aligned caret, 112px min height |
 | `FcPageShell` | Flat background page wrapper |
 | `FcSectionHeader` | Oversized headline + muted support line |
 | Call overlay | Full-screen Grid / Speaker (`components/chat/CallOverlay.tsx`) — `bg-[#101212]`, `border border-border-hard`, primary active border; layout policy in `lib/calls/callLayoutPolicy.ts` |

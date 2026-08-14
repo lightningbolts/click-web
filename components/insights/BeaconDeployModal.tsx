@@ -7,6 +7,7 @@ import { X, Radio, Sparkles } from "lucide-react";
 import type { VibeRadarCategoryTotal, VenuePopUpHubBeacon } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
 import { postInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
+import { FcTextarea } from "@/components/fc";
 
 const DEFAULT_CATEGORIES = [
   "Coffee",
@@ -205,14 +206,14 @@ export default function BeaconDeployModal({
                     <label htmlFor="beacon-perk" className="text-xs font-medium text-on-surface-variant block mb-1.5">
                       Perk or offer
                     </label>
-                    <textarea
+                    <FcTextarea
                       id="beacon-perk"
                       value={perk}
                       onChange={(e) => setPerk(e.target.value)}
                       rows={3}
                       maxLength={500}
                       placeholder="e.g. 10% off drinks for the next two hours"
-                      className="fc-input w-full rounded-xl px-3 py-2.5 text-sm resize-none"
+                      className="w-full resize-none"
                     />
                   </div>
 
