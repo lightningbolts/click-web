@@ -16,6 +16,7 @@ import {
   rawBeaconRowsFromApiPayload,
 } from '@/lib/map/mapBeacons';
 import { beaconPopupErrorHtml, formatBeaconPopupHtml } from '@/lib/map/beaconPopupHtml';
+import { accentColorForStableId } from '@/lib/ui/generateCardVisual';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { mapStyleForTheme } from '@/lib/theme/mapStyles';
 
@@ -305,6 +306,15 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     beaconAuthEpoch,
   ]);
 
+  /**
+   * Chat button fill. This is UI chrome, so it follows the 60/40–65/35 purple/blue accent ratio via
+   * [accentColorForStableId] rather than the wider content palette used for beacon popups.
+   */
+  const chatButtonBackground = (connectionId: string) => {
+    const accent = accentColorForStableId(connectionId);
+    return `linear-gradient(135deg, ${accent}, ${accent}cc)`;
+  };
+
   const buildConnectionPopupHtml = useCallback((connIdsCsv: string) => {
     const ids = connIdsCsv.split(',').filter(Boolean);
     const groupedConnections = ids
@@ -328,7 +338,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
           <span style="color:#a1a1aa; font-size:11px; display:block;">${escapeHtml(conn.location)}</span>
           <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${escapeHtml(date)}</span>
           ${ctx}${atm}
-          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:linear-gradient(135deg, #630ed4, #6520c0); color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
+          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:${chatButtonBackground(conn.id)}; color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
             Chat →
           </button>
         </div>`;
@@ -347,7 +357,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       <span style="color: #a1a1aa; font-size: 12px; display: block;">${escapeHtml(connection.location)}</span>
       <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${escapeHtml(singleDate)}</span>
       ${singleCtx}${singleAtm}
-      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #630ed4, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
+      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: ${chatButtonBackground(connection.id)}; color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
       : `<strong style="color:#630ed4; font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connections at this location</strong>${groupedRows}`}
     </div>`;
   }, []);

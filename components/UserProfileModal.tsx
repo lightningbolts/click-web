@@ -40,6 +40,7 @@ import {
 import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropReveal';
 import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
+import { CardVisualHero } from '@/components/ui/CardVisualSurface';
 import {
   originEncounter,
   parseConnectionEncounters,
@@ -991,6 +992,8 @@ export default function UserProfileModal({
   const [recommendationDismissed, setRecommendationDismissed] = useState(false);
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [beaconDetail, setBeaconDetail] = useState<{
+    /** Raw beacon id, so the panel header paints the same generated visual as the list row. */
+    beaconId: string;
     loading: boolean;
     error: string | null;
     title: string;
@@ -1003,6 +1006,7 @@ export default function UserProfileModal({
   const openBeaconDetail = useCallback(
     async (beaconId: string, fallback?: BeaconPreviewItem) => {
       setBeaconDetail({
+        beaconId,
         loading: true,
         error: null,
         title: fallback?.title ?? 'Event',
@@ -1018,6 +1022,7 @@ export default function UserProfileModal({
           // Fallback to chat metadata so expired / out-of-scope beacons still open.
           if (fallback) {
             setBeaconDetail({
+              beaconId,
               loading: false,
               error: null,
               title: fallback.title,
@@ -1040,6 +1045,7 @@ export default function UserProfileModal({
             ? (beacon.metadata as Record<string, unknown>)
             : null;
         setBeaconDetail({
+          beaconId,
           loading: false,
           error: null,
           title: metaString(meta, 'title', 'event_title', 'eventTitle', 'label', 'name') ?? fallback?.title ?? 'Event',
@@ -1053,6 +1059,7 @@ export default function UserProfileModal({
       } catch (e) {
         if (fallback) {
           setBeaconDetail({
+            beaconId,
             loading: false,
             error: null,
             title: fallback.title,
@@ -1063,6 +1070,7 @@ export default function UserProfileModal({
           return;
         }
         setBeaconDetail({
+          beaconId,
           loading: false,
           error: e instanceof Error ? e.message : 'Could not load beacon',
           title: 'Event',
@@ -1953,10 +1961,18 @@ export default function UserProfileModal({
                               <button
                                 type="button"
                                 onClick={() => void openBeaconDetail(b.beaconId, b)}
-                                className="flex w-full items-start gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5 text-left hover:border-primary"
+                                className="flex w-full items-stretch gap-3 overflow-hidden rounded-[12px] border border-border-hard bg-surface-container text-left hover:border-primary"
                               >
-                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                                <div className="min-w-0 flex-1">
+                                {/* Same generated identity the beacon carries on the map and on mobile. */}
+                                <CardVisualHero
+                                  id={b.beaconId}
+                                  className="flex w-12 shrink-0 items-center justify-center"
+                                >
+                                  <div className="flex h-full items-center justify-center px-3">
+                                    <MapPin className="h-4 w-4 text-white" aria-hidden />
+                                  </div>
+                                </CardVisualHero>
+                                <div className="min-w-0 flex-1 px-1 py-2.5 pr-3">
                                   <p className="truncate text-sm font-semibold text-on-surface">{b.title}</p>
                                   {(b.scheduleLabel || b.locationLabel) && (
                                     <p className="mt-0.5 text-[11px] text-on-surface-variant">
@@ -1976,41 +1992,49 @@ export default function UserProfileModal({
                       )}
 
                       {beaconDetail && (
-                        <div className="rounded-[16px] border border-border-hard bg-surface p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                                {beaconDetail.expired ? 'Past event' : 'Event'}
-                              </p>
-                              <p className="mt-1 text-base font-semibold text-on-surface">{beaconDetail.title}</p>
+                        <div className="overflow-hidden rounded-[16px] border border-border-hard bg-surface">
+                          {/*
+                            Decorative header: it carries the category chip only. Title, schedule, and
+                            location live in the structured block below, so putting them here too
+                            would print the same event name twice on one panel.
+                          */}
+                          <CardVisualHero
+                            id={beaconDetail.beaconId}
+                            className="h-16"
+                            chipLabel={beaconDetail.expired ? 'Past event' : 'Event'}
+                          >
+                            <div className="flex h-full items-start justify-end p-2.5">
+                              <button
+                                type="button"
+                                onClick={() => setBeaconDetail(null)}
+                                className="rounded-[8px] bg-black/40 p-1 text-white"
+                                aria-label="Close event detail"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setBeaconDetail(null)}
-                              className="rounded-[8px] border border-border-hard bg-surface-container p-1 text-on-surface"
-                              aria-label="Close event detail"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                          </CardVisualHero>
+                          <div className="p-4">
+                            <p className="text-base font-semibold text-on-surface">{beaconDetail.title}</p>
+                            {beaconDetail.loading ? (
+                              <p className="mt-3 text-sm text-on-surface-variant">Loading…</p>
+                            ) : beaconDetail.error ? (
+                              <p className="mt-3 text-sm text-error">{beaconDetail.error}</p>
+                            ) : (
+                              <div className="mt-3 space-y-2 text-sm text-on-surface">
+                                {beaconDetail.schedule && (
+                                  <p className="text-on-surface-variant">{beaconDetail.schedule}</p>
+                                )}
+                                {beaconDetail.location && (
+                                  <p className="flex items-start gap-2 text-on-surface-variant">
+                                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                                    <span>{beaconDetail.location}</span>
+                                  </p>
+                                )}
+                                {beaconDetail.description && <p>{beaconDetail.description}</p>}
+                              </div>
+                            )}
                           </div>
-                          {beaconDetail.loading ? (
-                            <p className="mt-3 text-sm text-on-surface-variant">Loading…</p>
-                          ) : beaconDetail.error ? (
-                            <p className="mt-3 text-sm text-error">{beaconDetail.error}</p>
-                          ) : (
-                            <div className="mt-3 space-y-2 text-sm text-on-surface">
-                              {beaconDetail.schedule && (
-                                <p className="text-on-surface-variant">{beaconDetail.schedule}</p>
-                              )}
-                              {beaconDetail.location && (
-                                <p className="flex items-start gap-2 text-on-surface-variant">
-                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                                  <span>{beaconDetail.location}</span>
-                                </p>
-                              )}
-                              {beaconDetail.description && <p>{beaconDetail.description}</p>}
-                            </div>
-                          )}
                         </div>
                       )}
                     </section>

@@ -802,7 +802,7 @@ export default function SettingsView({
           <div>
             <h3 className="text-xl font-bold">Personality</h3>
             <p className="text-on-surface-variant text-sm">
-              Pick exactly {PERSONALITY_REQUIRED_TAG_COUNT} traits. Optional for existing accounts.
+              Pick exactly {PERSONALITY_REQUIRED_TAG_COUNT} traits.
             </p>
           </div>
         </div>
