@@ -68,6 +68,9 @@ describe('GET /api/me/event-bookmarks', () => {
         {
           id: BEACON_ID,
           beacon_type: 'event',
+          creator_id: USER_ID,
+          created_at: '2026-07-01T10:00:00.000Z',
+          show_creator_name: true,
           metadata: {
             title: 'Campus Night',
             event_start_at: '2026-08-10T20:00:00.000Z',
@@ -79,11 +82,23 @@ describe('GET /api/me/event-bookmarks', () => {
       ],
       error: null,
     });
+    const userBuilder = chainSelect({
+      data: [
+        {
+          id: USER_ID,
+          name: null,
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+        },
+      ],
+      error: null,
+    });
 
     mockCreateAdminSupabaseClient.mockReturnValue({
       from: jest.fn((table: string) => {
         if (table === 'event_bookmarks') return bookmarkBuilder;
         if (table === 'map_beacons') return beaconBuilder;
+        if (table === 'users') return userBuilder;
         throw new Error(`unexpected table ${table}`);
       }),
     });
@@ -95,6 +110,10 @@ describe('GET /api/me/event-bookmarks', () => {
     expect(body.bookmarks[0]).toMatchObject({
       beacon_id: BEACON_ID,
       title: 'Campus Night',
+      creator_id: USER_ID,
+      creator_name: 'Ada Lovelace',
+      created_at: '2026-07-01T10:00:00.000Z',
+      show_creator_name: true,
     });
   });
 });

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
+import { FcTextarea } from '@/components/fc';
 import { ChatView, CreateVerifiedClickDialog, memberSetKeySorted } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import {
@@ -193,6 +194,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const outboundCallChannelsRef = useRef<Map<string, any>>(new Map());
   const activeInviteRef = useRef<WebCallInvite | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hangupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomRef = useRef<Room | null>(null);
   const remoteAudioElementsRef = useRef<HTMLElement[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -962,11 +964,23 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const endActiveCall = useCallback(async () => {
     const invite = activeInviteRef.current;
     stopRingtone();
+    setCallOverlayState({ mode: 'ended', invite, reason: 'Call ended' });
+    setActiveCallState((current) => ({
+      ...current,
+      status: 'ended',
+      reason: 'Call ended',
+    }));
     await notifyPeerCallEnded(invite, 'ended');
-    disconnectRoom();
-    activeInviteRef.current = null;
-    setCallOverlayState(IDLE_CALL_OVERLAY);
-    setActiveCallState(IDLE_ACTIVE_CALL);
+    if (hangupTimerRef.current) {
+      clearTimeout(hangupTimerRef.current);
+    }
+    hangupTimerRef.current = setTimeout(() => {
+      hangupTimerRef.current = null;
+      disconnectRoom('Call ended');
+      activeInviteRef.current = null;
+      setCallOverlayState(IDLE_CALL_OVERLAY);
+      setActiveCallState(IDLE_ACTIVE_CALL);
+    }, 280);
   }, [disconnectRoom, notifyPeerCallEnded, stopRingtone]);
 
   const toggleMicrophone = useCallback(async () => {
@@ -3580,11 +3594,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-base font-semibold text-on-surface">Edit group name</h3>
-              <textarea
+              <FcTextarea
                 value={chatListGroupRenameInput}
                 onChange={(e) => setChatListGroupRenameInput(e.target.value)}
                 rows={2}
-                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-[#630ed4]"
+                className="mt-3 w-full"
                 placeholder="Group name"
               />
               <div className="mt-5 flex justify-end gap-2">

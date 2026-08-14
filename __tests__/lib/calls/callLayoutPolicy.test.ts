@@ -1,6 +1,8 @@
 import {
   defaultCallLayoutMode,
   formatCallDuration,
+  gridChunks,
+  gridRowSizes,
   initialsFor,
   pickActiveSpeaker,
   resolveCallLayoutMode,
@@ -64,5 +66,25 @@ describe('callLayoutPolicy', () => {
     expect(formatCallDuration(0)).toBe('00:00');
     expect(formatCallDuration(45_000)).toBe('00:45');
     expect(formatCallDuration(12 * 60_000 + 46_000)).toBe('12:46');
+  });
+
+  it('uses FaceTime-style grid row sizes', () => {
+    expect(gridRowSizes(0)).toEqual([]);
+    expect(gridRowSizes(1)).toEqual([1]);
+    expect(gridRowSizes(2)).toEqual([2]);
+    expect(gridRowSizes(3)).toEqual([1, 2]);
+    expect(gridRowSizes(4)).toEqual([2, 2]);
+    expect(gridRowSizes(5)).toEqual([2, 3]);
+    expect(gridRowSizes(6)).toEqual([3, 3]);
+    expect(gridRowSizes(7)).toEqual([3, 2, 2]);
+    expect(gridRowSizes(8)).toEqual([3, 3, 2]);
+  });
+
+  it('chunks participants into FaceTime-style grid rows', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e'].map((identity) => participant({ identity }));
+    expect(gridChunks([])).toEqual([]);
+    expect(gridChunks(ids.slice(0, 1))).toEqual([ids.slice(0, 1)]);
+    expect(gridChunks(ids.slice(0, 3))).toEqual([ids.slice(0, 1), ids.slice(1, 3)]);
+    expect(gridChunks(ids)).toEqual([ids.slice(0, 2), ids.slice(2, 5)]);
   });
 });

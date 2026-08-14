@@ -88,6 +88,7 @@
   --inverse-primary: var(--color-inverse-primary);
   --error: var(--color-error);
   --radius-btn: 8px;
+  --radius-field: 16px;
   --radius-card: 16px;
   --border-width: 1px;
   /* Slightly under the rendered Navbar so the landing hero fills the first
@@ -157,13 +158,21 @@ body {
   background-color: var(--color-surface);
   color: var(--color-on-surface);
   border: var(--border-width) solid var(--color-border-hard);
-  border-radius: var(--radius-btn);
+  border-radius: var(--radius-field);
   font-size: 14px;
   line-height: 20px;
 }
 
 .fc-input::placeholder {
   color: var(--color-on-surface-variant);
+}
+
+.fc-textarea {
+  min-height: 112px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+  field-sizing: content;
 }
 
 .fc-chip {
