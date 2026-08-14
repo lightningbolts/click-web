@@ -5,6 +5,11 @@ import LandingPlayground from '@/components/landing/playground';
 import ThemeToggle from '@/components/ThemeToggle';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 
+jest.mock('@/components/landing/playground/PlaygroundMapLazy', () => ({
+  __esModule: true,
+  default: require('@/components/landing/playground/PlaygroundMap').default,
+}));
+
 jest.mock('framer-motion', () => {
   const React = require('react');
   const Forward = (tag: string) =>
@@ -70,9 +75,19 @@ describe('LandingPlayground', () => {
     expect(global.fetch).not.toHaveBeenCalled();
     const mapOptions = (maplibregl.Map as unknown as jest.Mock).mock.calls[0][0] as {
       style: unknown;
+      transformRequest: (url: string) => { url: string };
+      maxBounds: unknown;
+      pixelRatio: number;
     };
-    expect(typeof mapOptions.style).toBe('object');
-    expect(JSON.stringify(mapOptions.style)).not.toMatch(/https?:\/\//i);
+    expect(mapOptions.style).toBe('https://basemaps.cartocdn.com/gl/positron-gl-style/style.json');
+    expect(mapOptions.pixelRatio).toBe(1);
+    expect(mapOptions.maxBounds).toEqual([
+      [-122.38, 47.58],
+      [-122.25, 47.68],
+    ]);
+    expect(mapOptions.transformRequest(`${window.location.origin}/api/map/beacons`).url).toBe(
+      'about:blank',
+    );
   });
 
   it('keeps the map mounted and does not fetch when toggling theme', async () => {
@@ -87,7 +102,7 @@ describe('LandingPlayground', () => {
     const constructed = mapMock.mock.calls.length;
     const mapInstance = mapMock.mock.results[0]?.value as {
       remove: jest.Mock;
-      setPaintProperty: jest.Mock;
+      setStyle: jest.Mock;
     };
     const removeCalls = mapInstance.remove.mock.calls.length;
 
@@ -95,7 +110,10 @@ describe('LandingPlayground', () => {
 
     expect(mapMock).toHaveBeenCalledTimes(constructed);
     expect(mapInstance.remove).toHaveBeenCalledTimes(removeCalls);
-    expect(mapInstance.setPaintProperty).toHaveBeenCalled();
+    expect(mapInstance.setStyle).toHaveBeenCalledWith(
+      'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+      { diff: true },
+    );
     expect(global.fetch).not.toHaveBeenCalled();
     expect(screen.getByTestId('playground-scene-map')).toBeInTheDocument();
     expect(screen.getByTestId('playground-pin-overlay')).toHaveTextContent('Campus Comedy Night');

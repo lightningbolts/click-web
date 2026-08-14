@@ -1,7 +1,7 @@
 'use client';
 
 import { MapPin } from 'lucide-react';
-import PlaygroundMap from '../PlaygroundMap';
+import PlaygroundMap from '../PlaygroundMapLazy';
 import type { PlaygroundActions, PlaygroundState } from '../types';
 
 export default function MapScene({

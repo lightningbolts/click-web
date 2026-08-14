@@ -1,4 +1,4 @@
-/** Remote Carto styles for authenticated maps (ConnectionMap, insights). */
+/** Carto styles fetched by the browser from cartocdn.com (not the Cloudflare Worker). */
 export const MAP_STYLE_LIGHT =
   "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 export const MAP_STYLE_DARK =
@@ -6,8 +6,8 @@ export const MAP_STYLE_DARK =
 
 /**
  * Carto Positron / Dark Matter style URLs.
- * Do not use on the landing playground — that map is client-only
- * (`playgroundMapStyle`) and must not fetch tiles or style APIs.
+ * Landing playground uses these in the client with maxBounds + transformRequest
+ * so tiles never hit `/api/*` or the Worker. Do not proxy this URL through Next.
  */
 export function mapStyleForTheme(theme: "light" | "dark") {
   return theme === "dark" ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;

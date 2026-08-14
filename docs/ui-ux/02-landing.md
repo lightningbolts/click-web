@@ -22,7 +22,7 @@ Logo is the primary viewport (Circle-style splash), filling the remaining height
 
 1. **Why Click exists** (`#why`) — the follow-back void, handle handoff, name without a where, and apps built to scroll. Secondary `#224CFF` on the key line and event-related cards.
 2. **How it helps** — three columns: In person (Proximity Tap), Events (RSVP / show up), Context (memory capsule).
-3. **Try it** (`#how-it-works`) — interactive playground. App scenes: Connect (Add Click hub, real QR), Events (home/RSVP), Clicks (chat inbox), Map (MapLibre pin overlay), Settings (no theme toggle). Website companion mirrors the logged-in dashboard: Memory Box, MapLibre pins, Chat, QR Identity, with shared mock state (no network, no `/api/*`). Map is **client-only**: inline GeoJSON style in `playgroundMapStyle.ts` (no Carto/MapTiler/tile or style HTTP). Navbar light/dark retints paint properties in place so the camera, pins, and scroll position stay put — do not remount MapLibre on theme change. Pins: overlapping circular markers (purple connections, secondary event “E”) and a selected pin overlay (title, time/venue, You’re going, pin stack).
+3. **Try it** (`#how-it-works`) — interactive playground. App scenes: Connect (Add Click hub, real QR), Events (home/RSVP), Clicks (chat inbox), Map (MapLibre pin overlay), Settings (no theme toggle). Website companion mirrors the logged-in dashboard: Memory Box, MapLibre pins, Chat, QR Identity, with shared mock state (no `/api/*`). Map is **lazy-loaded** (`PlaygroundMapLazy`) so MapLibre is not in the anonymous `/` Worker JS. Basemap is Carto Positron / Dark Matter fetched **in the browser from cartocdn.com** (never proxied through the Worker; `transformRequest` drops same-origin URLs). Viewport is clamped to greater Seattle (UW + Pike Place) with `pixelRatio: 1` and a one-shot `fitBounds`. Navbar light/dark calls `setStyle({ diff: true })` in place and restores the camera — do not remount MapLibre. Pins: overlapping circular markers (purple connections, secondary event “E”) and a selected pin overlay (title, time/venue, You’re going, pin stack).
 4. **Mission** — “Built for the moment you put your phone down.”
 5. **Enterprise** — one sentence linking to `/enterprise`. Partner Insights live there, not on `/`.
 6. **Close** — waitlist card. Trust line: no ads, no feed, built at UW.
@@ -33,7 +33,7 @@ Navbar **How it works** scrolls to `#how-it-works`.
 
 ## Theme
 
-Must read correctly in light and dark via CSS tokens. Primary `#630ed4` for brand/CTAs; secondary `#224CFF` for events/map/link hover. Verify both after restyle. Toggling the Navbar theme while the playground map is open must not reload tiles, remount MapLibre, or `fitBounds` again.
+Must read correctly in light and dark via CSS tokens. Primary `#630ed4` for brand/CTAs; secondary `#224CFF` for events/map/link hover. Verify both after restyle. Toggling the Navbar theme while the playground map is open must not remount MapLibre or `fitBounds` again (Carto `setStyle` in place).
 
 ---
 
@@ -44,6 +44,6 @@ Must read correctly in light and dark via CSS tokens. Primary `#630ed4` for bran
 - [x] Primary CTAs use `#630ED4`
 - [x] Hero is brand-first / low-clutter (logo viewport)
 - [x] Screenshots replaced by playground
-- [x] Playground map is client-only (no tile/style API)
+- [x] Playground map shows real Seattle/UW Carto tiles (browser CDN, not Worker)
 - [x] Theme toggle does not remount the playground map
 - [x] Enterprise analytics not on `/`

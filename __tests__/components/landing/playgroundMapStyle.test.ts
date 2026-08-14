@@ -1,37 +1,47 @@
+import { MAP_STYLE_DARK, MAP_STYLE_LIGHT } from '@/lib/theme/mapStyles';
 import {
   applyPlaygroundMapTheme,
-  PLAYGROUND_MAP_PAINT,
+  isCartoBasemapStyle,
   playgroundMapStyle,
-  styleHasRemoteUrls,
+  playgroundTransformRequest,
 } from '@/components/landing/playground/playgroundMapStyle';
 
 describe('playgroundMapStyle', () => {
-  it('is a local MapLibre style with no remote urls for light and dark', () => {
-    const light = playgroundMapStyle('light');
-    const dark = playgroundMapStyle('dark');
-
-    expect(light.version).toBe(8);
-    expect(dark.version).toBe(8);
-    expect(styleHasRemoteUrls(light)).toBe(false);
-    expect(styleHasRemoteUrls(dark)).toBe(false);
-    expect(JSON.stringify(light)).not.toMatch(/https?:\/\//i);
-    expect(JSON.stringify(dark)).not.toMatch(/cartocdn|mapbox|api\//i);
+  it('uses Carto Positron / Dark Matter (browser CDN, not Click APIs)', () => {
+    expect(playgroundMapStyle('light')).toBe(MAP_STYLE_LIGHT);
+    expect(playgroundMapStyle('dark')).toBe(MAP_STYLE_DARK);
+    expect(isCartoBasemapStyle(playgroundMapStyle('light'))).toBe(true);
+    expect(playgroundMapStyle('light')).toContain('basemaps.cartocdn.com');
+    expect(playgroundMapStyle('dark')).not.toMatch(/joinclick|\/api\//);
   });
 
-  it('retints existing layers in place', () => {
-    const setPaintProperty = jest.fn();
-    const getLayer = jest.fn(() => true);
-    applyPlaygroundMapTheme({ getLayer, setPaintProperty }, 'dark');
+  it('swaps style in place and restores the camera', () => {
+    const jumpTo = jest.fn();
+    const setStyle = jest.fn();
+    const once = jest.fn((event: string, cb: () => void) => {
+      if (event === 'style.load') cb();
+    });
+    applyPlaygroundMapTheme(
+      {
+        getCenter: () => ({ lng: -122.3085, lat: 47.6554 }),
+        getZoom: () => 14.2,
+        setStyle,
+        once,
+        jumpTo,
+      },
+      'dark',
+    );
 
-    expect(setPaintProperty).toHaveBeenCalledWith(
-      'background',
-      'background-color',
-      PLAYGROUND_MAP_PAINT.dark.background,
-    );
-    expect(setPaintProperty).toHaveBeenCalledWith(
-      'water',
-      'fill-color',
-      PLAYGROUND_MAP_PAINT.dark.water,
-    );
+    expect(setStyle).toHaveBeenCalledWith(MAP_STYLE_DARK, { diff: true });
+    expect(jumpTo).toHaveBeenCalledWith({
+      center: { lng: -122.3085, lat: 47.6554 },
+      zoom: 14.2,
+    });
+  });
+
+  it('blocks same-origin tile requests so they never hit the Worker', () => {
+    const origin = window.location.origin;
+    expect(playgroundTransformRequest(`${origin}/api/map/beacons`).url).toBe('about:blank');
+    expect(playgroundTransformRequest(MAP_STYLE_LIGHT).url).toBe(MAP_STYLE_LIGHT);
   });
 });

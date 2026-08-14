@@ -15,7 +15,7 @@ import ClicksScene from './scenes/ClicksScene';
 import DashboardScene from './scenes/DashboardScene';
 import EventsScene from './scenes/EventsScene';
 import SettingsScene from './scenes/SettingsScene';
-import PlaygroundMap from './PlaygroundMap';
+import PlaygroundMap from './PlaygroundMapLazy';
 import type {
   ChatMessage,
   DashboardTab,

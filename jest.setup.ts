@@ -39,7 +39,7 @@ jest.mock('maplibre-gl', () => {
       if (event === 'load') cb();
     }),
     once: jest.fn((event: string, cb: () => void) => {
-      if (event === 'idle') cb();
+      if (event === 'idle' || event === 'style.load') cb();
     }),
     addSource: jest.fn(),
     addLayer: jest.fn(),
@@ -47,6 +47,10 @@ jest.mock('maplibre-gl', () => {
     getLayer: jest.fn(() => true),
     setLayoutProperty: jest.fn(),
     setPaintProperty: jest.fn(),
+    setStyle: jest.fn(),
+    getCenter: jest.fn(() => ({ lng: -122.3085, lat: 47.6554 })),
+    getZoom: jest.fn(() => 14.2),
+    jumpTo: jest.fn(),
     fitBounds: jest.fn(),
     resize: jest.fn(),
     remove: jest.fn(),

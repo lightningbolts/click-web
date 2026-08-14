@@ -11,7 +11,16 @@ import {
   pinBorderForTheme,
   type OverlayPin,
 } from './PinStack';
-import { applyPlaygroundMapTheme, playgroundMapStyle } from './playgroundMapStyle';
+import {
+  applyPlaygroundMapTheme,
+  PLAYGROUND_MAP_CENTER,
+  PLAYGROUND_MAP_MAX_ZOOM,
+  PLAYGROUND_MAP_MIN_ZOOM,
+  PLAYGROUND_MAP_ZOOM,
+  PLAYGROUND_MAX_BOUNDS,
+  playgroundMapStyle,
+  playgroundTransformRequest,
+} from './playgroundMapStyle';
 import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from './mockData';
 import type { PlaygroundActions, PlaygroundEvent, PlaygroundPerson, PlaygroundState } from './types';
 
@@ -151,6 +160,7 @@ export default function PlaygroundMap({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const actionsRef = useRef(actions);
   const themeRef = useRef(theme);
+  const appliedThemeRef = useRef(theme);
   const initialFitDoneRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +187,8 @@ export default function PlaygroundMap({
     themeRef.current = theme;
     const map = mapRef.current;
     if (!map || !ready) return;
+    if (appliedThemeRef.current === theme) return;
+    appliedThemeRef.current = theme;
     applyPlaygroundMapTheme(map, theme);
   }, [theme, ready]);
 
@@ -185,24 +197,37 @@ export default function PlaygroundMap({
     if (!container || mapRef.current) return;
     let fallback: number | null = null;
     let resizeObserver: ResizeObserver | null = null;
+    let resizeFrame = 0;
     try {
       const map = new maplibregl.Map({
         container,
         style: playgroundMapStyle(themeRef.current),
-        center: [-122.3085, 47.6554],
-        zoom: 14.2,
+        center: PLAYGROUND_MAP_CENTER,
+        zoom: PLAYGROUND_MAP_ZOOM,
+        minZoom: PLAYGROUND_MAP_MIN_ZOOM,
+        maxZoom: PLAYGROUND_MAP_MAX_ZOOM,
+        maxBounds: PLAYGROUND_MAX_BOUNDS,
         attributionControl: false,
         fadeDuration: 0,
+        renderWorldCopies: false,
+        maxPitch: 0,
+        pixelRatio: 1,
+        cooperativeGestures: true,
+        transformRequest: playgroundTransformRequest,
       });
       mapRef.current = map;
-      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      appliedThemeRef.current = themeRef.current;
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       resizeObserver = new ResizeObserver(() => {
-        map.resize();
+        if (resizeFrame) cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = 0;
+          map.resize();
+        });
       });
       resizeObserver.observe(container);
       map.on('load', () => {
         map.resize();
-        applyPlaygroundMapTheme(map, themeRef.current);
         let revealed = false;
         const reveal = () => {
           if (revealed) return;
@@ -210,10 +235,10 @@ export default function PlaygroundMap({
           if (fallback != null) window.clearTimeout(fallback);
           setReady(true);
         };
-        fallback = window.setTimeout(reveal, 400);
+        fallback = window.setTimeout(reveal, 2800);
         map.once('idle', reveal);
       });
-      map.on('error', () => setError('Failed to initialize map'));
+      map.on('error', () => setError('Failed to load map tiles'));
     } catch {
       setError('Failed to initialize map');
     }
@@ -230,6 +255,7 @@ export default function PlaygroundMap({
 
     return () => {
       if (fallback != null) window.clearTimeout(fallback);
+      if (resizeFrame) cancelAnimationFrame(resizeFrame);
       resizeObserver?.disconnect();
       container.removeEventListener('click', onPopupClick);
       popupRef.current?.remove();
@@ -241,8 +267,7 @@ export default function PlaygroundMap({
       initialFitDoneRef.current = false;
       setReady(false);
     };
-    // Mount once. Theme retints via applyPlaygroundMapTheme — remounting would
-    // refetch nothing (local style) but still reset the camera and jump the page.
+    // Mount once. Theme swaps Carto styles in place — remounting resets the camera.
   }, []);
 
   useEffect(() => {
@@ -253,7 +278,7 @@ export default function PlaygroundMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready) return;
+    if (!map || !ready || initialFitDoneRef.current) return;
     const bounds = new maplibregl.LngLatBounds();
     let count = 0;
     clusters.forEach((cluster) => {
@@ -264,7 +289,7 @@ export default function PlaygroundMap({
     map.fitBounds(bounds, {
       padding: 80,
       maxZoom: 14,
-      duration: initialFitDoneRef.current ? 400 : 0,
+      duration: 0,
     });
     initialFitDoneRef.current = true;
   }, [ready, clusters]);
