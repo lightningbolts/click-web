@@ -6,42 +6,23 @@ import {
   PRIOR_CONNECTION_SOURCE,
   type ConnectionSource,
 } from '@/lib/insights/analytics';
+import type { KnownSinceBucket } from '@/lib/connections/priorConnectionMeta';
 
 export { HANDSHAKE_CONNECTION_SOURCE, PRIOR_CONNECTION_SOURCE };
 export type { ConnectionSource };
+export {
+  KNOWN_SINCE_BUCKETS,
+  KNOWN_SINCE_LABELS,
+  PRIOR_CONNECTION_BADGE_LABEL,
+  isKnownSinceBucket,
+  knownSinceLabel,
+  type KnownSinceBucket,
+} from '@/lib/connections/priorConnectionMeta';
 
-export const KNOWN_SINCE_BUCKETS = [
-  'childhood',
-  'high_school',
-  'college',
-  'this_year',
-  'unspecified',
-] as const;
-
-export type KnownSinceBucket = (typeof KNOWN_SINCE_BUCKETS)[number];
-
-export const KNOWN_SINCE_LABELS: Record<KnownSinceBucket, string> = {
-  childhood: 'Childhood',
-  high_school: 'High School',
-  college: 'College',
-  this_year: 'This Year',
-  unspecified: 'Unspecified',
-};
-
-export const PRIOR_CONNECTION_BADGE_LABEL = 'Prior Connection · Self-Reported';
 export const PRIOR_REQUESTS_PER_DAY = 20;
 export const PRIOR_RATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const MAX_DISCOVER_HASHES = 1000;
 export const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
-
-export function isKnownSinceBucket(value: unknown): value is KnownSinceBucket {
-  return typeof value === 'string' && (KNOWN_SINCE_BUCKETS as readonly string[]).includes(value);
-}
-
-export function knownSinceLabel(bucket: unknown): string {
-  if (isKnownSinceBucket(bucket)) return KNOWN_SINCE_LABELS[bucket];
-  return KNOWN_SINCE_LABELS.unspecified;
-}
 
 /** SHA-256 hex of UTF-8 bytes — must match KMP `ContactDiscoveryHelper.hashUtf8`. */
 export function sha256HexUtf8(value: string): string {

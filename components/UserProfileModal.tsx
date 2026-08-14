@@ -71,9 +71,7 @@ import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 import { getSupabaseClient } from '@/lib/supabase';
 import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
 import { isPriorSource } from '@/lib/insights/analytics';
-import {
-  knownSinceLabel,
-} from '@/lib/connections/priorConnections';
+import { knownSinceLabel } from '@/lib/connections/priorConnectionMeta';
 import { createSecureMediaObjectUrl, type SecureMediaChatKey } from '@/lib/chat/useSecureMedia';
 import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';

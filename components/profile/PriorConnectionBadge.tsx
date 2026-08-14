@@ -1,6 +1,6 @@
 import { FcChip } from '@/components/fc';
 import { cn } from '@/lib/cn';
-import { PRIOR_CONNECTION_BADGE_LABEL } from '@/lib/connections/priorConnections';
+import { PRIOR_CONNECTION_BADGE_LABEL } from '@/lib/connections/priorConnectionMeta';
 
 /** Amber pill reused on profile header and connection list rows. */
 export function PriorConnectionBadge({ className }: { className?: string }) {
