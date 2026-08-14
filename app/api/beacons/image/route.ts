@@ -1,12 +1,14 @@
 /**
  * POST /api/beacons/image
  * Unencrypted public photo for a community beacon (not soundtrack-required).
- * Same 2 MB cap as avatars; stored under avatars/beacons/{userId}/...
+ * Same 2 MB cap as avatars; stored under avatars/{userId}/beacons/... so
+ * storage.objects RLS (first path segment = auth.uid()) allows the upload.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { parseBody } from '@/lib/api/parseBody';
 import { avatarJsonBodySchema } from '@/lib/api/schemas/user';
+import { beaconPhotoObjectPath } from '@/lib/map/beaconPhotoPath';
 
 const MAX_BYTES = 2_000_000;
 const AVATARS_BUCKET = 'avatars';
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
 
   const contentType = declaredMime.split(';')[0]?.trim() || 'image/jpeg';
   const ext = extensionFromMime(declaredMime);
-  const objectPath = `beacons/${user.id}/${Date.now()}.${ext}`;
+  const objectPath = beaconPhotoObjectPath(user.id, ext);
 
   const { error: uploadError } = await supabase.storage.from(AVATARS_BUCKET).upload(objectPath, buffer, {
     contentType,

@@ -92,7 +92,7 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 | `app/api/map/beacons/[beaconId]/route.ts` | Single beacon |
 | `app/api/map/drop/route.ts` | Create beacon |
 | `app/api/beacons/route.ts` | Alternate list endpoint (+ venue scale on event create) |
-| `app/api/beacons/image/route.ts` | Unencrypted beacon photo upload (JWT, 2 MB) |
+| `app/api/beacons/image/route.ts` | Unencrypted beacon photo upload (JWT, 2 MB) to `avatars/{userId}/beacons/...` (RLS-safe) |
 | `app/api/beacons/[beaconId]/bookmark/route.ts` | Event bookmark |
 | `app/api/beacons/[beaconId]/check-in/route.ts` | Event check-in (geofenced) |
 | `app/api/beacons/[beaconId]/engagement/route.ts` | Bookmark + check-in state |
