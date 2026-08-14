@@ -163,6 +163,7 @@ describe('GET /api/insights/[venueId] contract', () => {
         `venue_id.eq.${MOCK_VENUE_ID},location_id.eq.${MOCK_VENUE_ID}`,
       ]);
       expectFilter(connections, 'include_in_business_insights', true);
+      expectFilter(connections, 'source', 'handshake');
     });
 
     it('privacy check: strips user identifiers carried on the underlying rows', async () => {

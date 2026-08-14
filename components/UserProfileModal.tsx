@@ -41,6 +41,8 @@ import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropRevea
 import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
 import { CardVisualHero } from '@/components/ui/CardVisualSurface';
+import { PriorConnectionBadge } from '@/components/profile/PriorConnectionBadge';
+import { FcButton, FcChip } from '@/components/fc';
 import {
   originEncounter,
   parseConnectionEncounters,
@@ -68,6 +70,10 @@ import {
 import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 import { getSupabaseClient } from '@/lib/supabase';
 import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
+import { isPriorSource } from '@/lib/insights/analytics';
+import {
+  knownSinceLabel,
+} from '@/lib/connections/priorConnections';
 import { createSecureMediaObjectUrl, type SecureMediaChatKey } from '@/lib/chat/useSecureMedia';
 import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
@@ -699,6 +705,8 @@ export default function UserProfileModal({
   const [birthdaySaveError, setBirthdaySaveError] = useState<string | null>(null);
   const [birthdaySaving, setBirthdaySaving] = useState(false);
   const [rollStatus, setRollStatus] = useState<'idle' | 'opening' | 'uploading' | 'done' | 'error'>('idle');
+  const [priorRespondBusy, setPriorRespondBusy] = useState(false);
+  const [priorRespondError, setPriorRespondError] = useState<string | null>(null);
   const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
   const [groupMasterKey, setGroupMasterKey] = useState<ArrayBuffer | null>(null);
   const [cryptoUnlockError, setCryptoUnlockError] = useState<string | null>(null);
@@ -1420,6 +1428,52 @@ export default function UserProfileModal({
     return { rows, originId: origin?.id ?? null };
   }, [profileData?.sharedConnection]);
 
+  const sharedPayload = useMemo(
+    () => coerceSharedConnection(profileData?.sharedConnection),
+    [profileData?.sharedConnection],
+  );
+  const isPriorConnection = isPriorSource(sharedPayload?.source);
+  const priorSourceLabel =
+    sharedPayload?.connection_method === 'prior' || sharedPayload?.connection_method === 'contacts'
+      ? 'Added from Contacts'
+      : 'Added by Search';
+  const priorConfirmed =
+    sharedPayload?.confirmed_by_a === true && sharedPayload?.confirmed_by_b === true;
+  const canRespondPrior =
+    isPriorConnection &&
+    sharedPayload?.status === 'pending' &&
+    !!currentUserId &&
+    (sharedPayload.responder_id === currentUserId ||
+      (sharedPayload.initiator_id !== currentUserId &&
+        Array.isArray((profileData?.sharedConnection as Record<string, unknown> | null)?.user_ids) &&
+        ((profileData?.sharedConnection as Record<string, unknown>).user_ids as unknown[]).includes(
+          currentUserId,
+        )));
+
+  const respondToPrior = async (action: 'accept' | 'decline') => {
+    const connectionIdToRespond = sharedPayload?.id;
+    if (!connectionIdToRespond) return;
+    setPriorRespondBusy(true);
+    setPriorRespondError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/connections/prior/respond', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connection_id: connectionIdToRespond, action }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof json?.error === 'string' ? json.error : 'Could not update request');
+      }
+      if (profilePath) await mutate(profilePath);
+    } catch (err) {
+      setPriorRespondError(err instanceof Error ? err.message : 'Could not update request');
+    } finally {
+      setPriorRespondBusy(false);
+    }
+  };
+
   const blockingBirthday =
     forceOwnProfileBirthdayCompletion &&
     !!profileData &&
@@ -1581,9 +1635,35 @@ export default function UserProfileModal({
                       {profileData.user.email && (
                         <p className="mt-1 text-xs font-medium text-on-surface-variant">{profileData.user.email}</p>
                       )}
+                      {isPriorConnection ? (
+                        <div className="mt-2 flex justify-center">
+                          <PriorConnectionBadge />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
+                  {canRespondPrior && (
+                    <section className="grid grid-cols-2 gap-2" aria-label="Prior connection request">
+                      <FcButton
+                        variant="primary"
+                        disabled={priorRespondBusy}
+                        onClick={() => void respondToPrior('accept')}
+                      >
+                        Accept
+                      </FcButton>
+                      <FcButton
+                        variant="secondary"
+                        disabled={priorRespondBusy}
+                        onClick={() => void respondToPrior('decline')}
+                      >
+                        Decline
+                      </FcButton>
+                      {priorRespondError ? (
+                        <p className="col-span-2 text-sm text-error">{priorRespondError}</p>
+                      ) : null}
+                    </section>
+                  )}
                   {canOpenDisposableRoll && (
                     <section aria-label="Profile actions" className="grid grid-cols-1 gap-2">
                       <input
@@ -2045,9 +2125,35 @@ export default function UserProfileModal({
 
                   <section>
                     <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                      When you connected
+                      {isPriorConnection ? 'How you know them' : 'When you connected'}
                     </h3>
-                    {hasMoment && momentLines ? (
+                    {isPriorConnection ? (
+                      <div className="space-y-3 text-sm text-on-surface">
+                        <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Source</p>
+                            <p className="mt-0.5 leading-snug">{priorSourceLabel}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Status</p>
+                            <p className="mt-0.5 leading-snug">
+                              {priorConfirmed ? 'Confirmed by both' : 'Waiting for confirmation'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Known since</p>
+                            <p className="mt-0.5 leading-snug">{knownSinceLabel(sharedPayload?.known_since)}</p>
+                          </div>
+                        </div>
+                        {sharedPayload?.context_tag ? (
+                          <FcChip>{sharedPayload.context_tag}</FcChip>
+                        ) : null}
+                      </div>
+                    ) : hasMoment && momentLines ? (
                       <div className="space-y-3 text-sm text-on-surface">
                         {momentLines.context && (
                           <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
@@ -2171,7 +2277,9 @@ export default function UserProfileModal({
                     </p>
                     {!encounterTimeline || encounterTimeline.rows.length === 0 ? (
                       <p className="text-sm text-on-surface-variant">
-                        No crossing history on file yet.
+                        {isPriorConnection
+                          ? 'No shared physical encounters logged yet. Timeline begins upon your first real-world Handshake.'
+                          : 'No crossing history on file yet.'}
                       </p>
                     ) : (
                       <div className="relative pl-1">

@@ -18,7 +18,7 @@ import {
 import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
 import type { ConnectionDisplayStatus } from '@/lib/dashboard/connectionStatus';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
-import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
+import { PriorConnectionBadge } from '@/components/profile/PriorConnectionBadge';
 import { useAuth } from '@/lib/AuthContext';
 
 export interface ConnectionEncounterBrief {
@@ -85,6 +85,9 @@ export interface ConnectionRecord {
   encounters?: ConnectionEncounterBrief[];
   /** When viewer and peer share an active intent tag or timeframe */
   intentOverlapLabel?: string | null;
+  /** handshake (default) vs self-reported prior */
+  source?: 'handshake' | 'prior' | string | null;
+  knownSince?: string | null;
 }
 
 interface ConnectionTableProps {
@@ -416,6 +419,9 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                               >
                                 <Zap className="h-3 w-3 text-amber-800 dark:text-amber-300" aria-hidden />
                               </span>
+                            ) : null}
+                            {connection.source === 'prior' ? (
+                              <PriorConnectionBadge className="!px-1.5 !py-0.5 text-[10px]" />
                             ) : null}
                           </div>
                           {connection.chatPreview != null && connection.chatPreview.trim() !== '' ? (

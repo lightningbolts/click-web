@@ -1941,6 +1941,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 }))
               : undefined,
           intentOverlapLabel: overlapLabel,
+          source: typeof conn.source === 'string' ? conn.source : 'handshake',
+          knownSince: typeof conn.known_since === 'string' ? conn.known_since : null,
         };
       };
 

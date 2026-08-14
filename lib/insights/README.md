@@ -10,6 +10,7 @@ B2B analytics helpers for venue operators: **Vibe Radar** hexbins, **widget vibe
 |--------|------|
 | `vibeRadar.ts` | Parse `insights_vibe_radar_data` RPC — anonymized intent hexbins near a venue |
 | `widgetVibePayload.ts` | Lightweight “how busy is Click” widget for embeds |
+| `analytics.ts` | Handshake vs Prior Connection split — never mix into one vanity total |
 | `connectionEncounterClustering.ts` | Client-side centroid clustering of raw encounter GPS for maps |
 | `advancedMetrics.ts` | Types for VLC, AMS, ACR, CPR, WRI, PSV RPCs |
 | `microCommunities.ts` | Verified group faction analytics |
@@ -43,7 +44,7 @@ proxy.ts → userMayAccessBusinessInsights
 - `venueCenter`, `radiusMeters` (default ~160.934 m / 0.1 mi)
 - `trendingVibes[]` — beacon type density (managers only) via `insights_vibe_radar_beacon_density`
 
-**Privacy:** No user IDs in radar payloads — only anonymized `anonymized_cell_id` / hex aggregates from `availability_intents`.
+**Privacy:** No user IDs in radar payloads — only anonymized `anonymized_cell_id` / hex aggregates from `availability_intents`. Venue connection counts query `source = 'handshake'` (see `lib/insights/analytics.ts`); prior connections are never mixed into handshake vanity totals.
 
 ### Business insights billing / Stripe
 

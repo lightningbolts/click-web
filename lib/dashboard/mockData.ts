@@ -239,6 +239,8 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
     noiseSummary: extractNoiseSummary(raw),
     noiseCategory: normalizeNoiseCategory(raw),
     status: rawConnection.status || 'kept',
+    source: typeof rawConnection.source === 'string' ? rawConnection.source : 'handshake',
+    knownSince: typeof rawConnection.known_since === 'string' ? rawConnection.known_since : null,
     // Include geo_location from the connection schema
     geo_location: hasValidGeo
       ? {

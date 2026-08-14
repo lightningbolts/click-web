@@ -116,3 +116,32 @@ export const connectionsPatchBodySchema = z.object({
 export const connectionsCreateBodySchema = z.record(z.string(), z.unknown());
 
 export const qrScanBodySchema = z.record(z.string(), z.unknown());
+
+const sha256Hex = z
+  .string()
+  .trim()
+  .regex(/^[a-fA-F0-9]{64}$/, 'hashed_contacts must be SHA-256 hex');
+
+export const contactsDiscoverBodySchema = z.object({
+  hashed_contacts: z.array(sha256Hex).max(1000),
+});
+
+export const priorConnectionRequestBodySchema = z.preprocess(
+  withDualId('target_user_id', 'targetUserId'),
+  z.object({
+    target_user_id: nonEmptyString,
+    known_since: z
+      .enum(['childhood', 'high_school', 'college', 'this_year', 'unspecified'])
+      .optional()
+      .default('unspecified'),
+    context_tag: z.string().trim().max(80).optional().nullable(),
+  }),
+);
+
+export const priorConnectionRespondBodySchema = z.preprocess(
+  withDualId('connection_id', 'connectionId'),
+  z.object({
+    connection_id: nonEmptyString,
+    action: z.enum(['accept', 'decline']),
+  }),
+);

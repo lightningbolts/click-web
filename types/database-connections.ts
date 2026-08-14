@@ -70,5 +70,11 @@ export type ConnectionsApiRow = {
   context_tag_id?: string | null;
   weather_condition?: string | null;
   noise_level?: string | null;
+  source?: 'handshake' | 'prior' | string | null;
+  confirmed_by_a?: boolean | null;
+  confirmed_by_b?: boolean | null;
+  known_since?: string | null;
+  context_tag?: string | null;
+  connection_method?: string | null;
   [key: string]: unknown;
 };

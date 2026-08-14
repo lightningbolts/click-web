@@ -71,6 +71,7 @@ describe('GET /api/insights/widget-vibe contract', () => {
 
       // Without this filter the widget would count every user's connections.
       expectFilter(mock.builder('connections'), 'user_ids', [MOCK_USER_ID], 'contains');
+      expectFilter(mock.builder('connections'), 'source', 'handshake');
     });
 
     it('sets correct Cache-Control and Vary headers on successful response', async () => {

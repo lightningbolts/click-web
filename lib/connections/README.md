@@ -23,6 +23,7 @@ Proximity **matching algorithms** live in `lib/server/proximity/` and `supabase/
 | **Simulator mock** | `MockProximityManager` | `simulator_mock: true`, tokens `1234`/`5678` | **Dev/test only** — `bindProximityHandshake.ts`; seeds connections without hardware. |
 | **Manual encounter** | Reconnect flows | `POST /api/connections/encounter` | Parity for logging encounters with sensor JSON. |
 | **Insights opt-in** | `includeInInsightsEnabled` setting | `include_in_business_insights` on bind | Mobile setting drives B2B aggregate eligibility. |
+| **Prior Connections** | On-device SHA-256 contact hashes | `POST /api/contacts/discover`, `/api/connections/prior/*` | Optional skippable onboarding. `source=prior` never counts as a verified handshake. |
 
 Mobile calls web for QR issuance and redemption; Tri-Factor payloads typically hit the Edge Function from the app, with Next.js `bindProximityHandshake` as an alternate path. For local insights pilot testing without devices, use `simulator_mock` (documented in `lib/insights/README.md` § Real-world testing).
 
@@ -37,6 +38,8 @@ Mobile / Web
     ├─ GET  /api/qr                       ──► 90s single-use token
     ├─ POST /api/qr                       ──► redeem_qr_token RPC + encounter
     ├─ POST /api/connections              ──► create/restore pair (unique_user_pair)
+    ├─ POST /api/contacts/discover        ──► SHA-256 contact hash match (no plaintext)
+    ├─ POST /api/connections/prior/*      ──► request / accept prior (no encounters)
     ├─ POST /api/connections/encounter    ──► manual encounter + sensor payload
     └─ GET/POST /api/connections/core       ──► core connection pins
 ```
