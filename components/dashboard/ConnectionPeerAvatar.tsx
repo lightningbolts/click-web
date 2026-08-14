@@ -1,14 +1,7 @@
 'use client';
 
-function gradientForLabel(label: string): string {
-  const key = label.trim() || '?';
-  let h = 0;
-  for (let i = 0; i < key.length; i += 1) {
-    h = (h + key.charCodeAt(i) * 17) % 360;
-  }
-  const h2 = (h + 48) % 360;
-  return `linear-gradient(135deg, hsl(${h} 52% 42%), hsl(${h2} 48% 30%))`;
-}
+import { cardVisualStyle } from '@/lib/ui/cardVisualPattern';
+import { generateCardVisual } from '@/lib/ui/generateCardVisual';
 
 type Size = 'sm' | 'md' | 'lg';
 
@@ -19,7 +12,9 @@ const sizeClass: Record<Size, string> = {
 };
 
 /**
- * Rounded peer avatar for connection / chat lists: photo when available, else initials on a stable hue.
+ * Rounded peer avatar for connection / chat lists: photo when available, else initials on the
+ * person's generated card visual, so the fallback matches the palette used everywhere else instead
+ * of an unrelated HSL hash.
  */
 export function ConnectionPeerAvatar({
   label,
@@ -49,7 +44,7 @@ export function ConnectionPeerAvatar({
   ) : (
     <div
       className={`flex ${dim} items-center justify-center rounded-full font-semibold text-white shadow-inner`}
-      style={{ background: gradientForLabel(label) }}
+      style={cardVisualStyle(generateCardVisual(label.trim() || '?'))}
       aria-hidden
     >
       {initial}

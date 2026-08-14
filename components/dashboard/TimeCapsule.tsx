@@ -23,6 +23,8 @@ import {
 import type { ConnectionRecord } from './ConnectionTable';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
+import { CardVisualHero } from '@/components/ui/CardVisualSurface';
+import { generateCardVisual } from '@/lib/ui/generateCardVisual';
 
 export interface TimelineChapter {
   id: string;
@@ -159,18 +161,9 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
     return startStr === endStr ? startStr : `${startStr} - ${endStr}`;
   };
 
-  const getChapterColor = (index: number, customColor?: string) => {
-    if (customColor) return customColor;
-    const colors = [
-      'from-[#630ed4] to-[#630ed4]',
-      'from-[#FF6B6B] to-[#FFE66D]',
-      'from-[#06D6A0] to-[#118AB2]',
-      'from-[#EF476F] to-[#630ed4]',
-      'from-[#FFD93D] to-[#FF6B6B]',
-      'from-[#630ed4] to-[#06D6A0]',
-    ];
-    return colors[index % colors.length];
-  };
+  // Chapter colors come from the shared generator, seeded by chapter id, instead of a hand-rolled
+  // index-based palette: a chapter then keeps the same identity as it moves in the timeline.
+  const chapterVisual = (chapterId: string) => generateCardVisual(chapterId);
 
   return (
     <div className="space-y-4">
@@ -245,8 +238,13 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                 <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-4 z-10">
                   <motion.div
                     animate={{ scale: selectedChapter?.id === chapter.id ? 1.3 : 1 }}
-                    className={`w-4 h-4 rounded-full bg-gradient-to-br ${getChapterColor(index, chapter.color)} shadow-lg`}
-                    style={{ boxShadow: '0 0 12px rgba(131, 56, 236, 0.5)' }}
+                    className="w-4 h-4 rounded-full shadow-lg"
+                    style={{
+                      background:
+                        chapter.color ??
+                        `linear-gradient(135deg, ${chapterVisual(chapter.id).gradient.join(', ')})`,
+                      boxShadow: '0 0 12px rgba(131, 56, 236, 0.5)',
+                    }}
                   />
                 </div>
 
@@ -264,10 +262,9 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                       : 'border-border-hard hover:border-border-hard'}
                   `}
                 >
-                  {/* Gradient header — always light text on colored wash */}
-                  <div className={`relative h-24 bg-gradient-to-br p-4 ${getChapterColor(index, chapter.color)}`}>
-                    <div className="absolute inset-0 bg-black/35" />
-                    <div className="relative z-10">
+                  {/* Generated header — the scrim is contrast-searched, so bright hues stay legible */}
+                  <CardVisualHero id={chapter.id} className="h-24">
+                    <div className="h-full p-4">
                       <p className="mb-1 text-xs font-medium text-white/85">
                         {formatDateRange(chapter.dateRange.start, chapter.dateRange.end)}
                       </p>
@@ -275,14 +272,14 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                         {chapter.title}
                       </h4>
                     </div>
-                    
+
                     {/* Star badge for special chapters */}
                     {chapter.connectionCount >= 5 && (
-                      <div className="absolute top-3 right-3 z-10">
+                      <div className="absolute right-3 top-3">
                         <Star className="h-4 w-4 fill-yellow-300 text-yellow-300" />
                       </div>
                     )}
-                  </div>
+                  </CardVisualHero>
 
                   {/* Content */}
                   <div className="space-y-3 bg-surface p-4">

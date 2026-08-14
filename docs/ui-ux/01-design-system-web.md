@@ -94,8 +94,28 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 
 ---
 
+## Generated entity visuals (the one sanctioned gradient)
+
+Chrome has no gradients. **Content identity does**, and it is the single exception: every surface that represents a specific entity (map beacon popup, profile Beacons tab row and detail header, Time Capsule chapter, avatar fallback) paints a deterministic gradient + pattern derived from that entity's id.
+
+| Piece | Where |
+|-------|-------|
+| Generator (must mirror KMP `ui/theme/CardVisual.kt`) | `lib/ui/generateCardVisual.ts` |
+| Pattern CSS + inline-style helpers | `lib/ui/cardVisualPattern.ts` — `cardVisualStyle` (React) / `cardVisualStyleCss` (imperative popup HTML) |
+| Component | `components/ui/CardVisualSurface.tsx` — `CardVisualHero` |
+
+Rules:
+
+- **Seed with the raw entity id** (`beacon.id`), never a list-key prefix like `saved-${id}`, or the same beacon will look different in a list than on its pin.
+- **Never hand-roll a gradient** for an entity (no `hsl()` from a label hash, no hardcoded `linear-gradient(#630ed4, #224cff)`). Go through `cardVisualStyle` / `CardVisualHero` so the pattern layer and the contrast scrim come along.
+- The palette is **seven hue families** (purple, blue, teal, coral, gold, magenta, green) with purple as the heaviest bucket. It is *not* the chrome accent ratio; do not re-couple them.
+- `contentScrim` is chosen by a **WCAG 4.5:1 search** against every gradient stop. Always render it behind text on a generated surface.
+- **A hero band is decorative.** `CardVisualHero` renders at most a short `chipLabel`; title, date, and location belong to the structured content below, never both.
+
+---
+
 ## Do / don’t
 
-**Do:** use CSS variables and `Fc*` primitives; keep web density for tables/charts; switch MapLibre light/dark styles with theme; use `secondary` for events, map pins, and text-link hover.
+**Do:** use CSS variables and `Fc*` primitives; keep web density for tables/charts; switch MapLibre light/dark styles with theme; use `secondary` for events, map pins, and text-link hover; route entity gradients through `CardVisualHero` / `cardVisualStyle`.
 
-**Don’t:** reintroduce glass, neon glows, gradient text, or a second primary CTA color. Don’t fork mobile Compose tokens from this web border/accent change.
+**Don’t:** reintroduce glass, neon glows, gradient text, or a second primary CTA color. Don’t fork mobile Compose tokens from this web border/accent change. Don’t invent a per-component gradient for an entity, and don’t repeat a hero's title in the content below it.

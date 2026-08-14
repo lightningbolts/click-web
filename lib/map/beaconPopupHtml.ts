@@ -3,6 +3,7 @@
  */
 
 import { generateCardVisual, beaconPinShapeFor } from "@/lib/ui/generateCardVisual";
+import { cardVisualStyleCss } from "@/lib/ui/cardVisualPattern";
 import { escapeHtml } from "@/lib/dashboard/connectionExtras";
 import {
   displayTitleForBeacon,
@@ -117,9 +118,9 @@ export function formatBeaconPopupHtml(beacon: MapBeaconRecord): string {
     : "";
 
   const visual = generateCardVisual(beacon.id, beaconPinShapeFor(beacon.beacon_type));
-  const gradient = visual.gradient.join(", ");
 
-  return `<div style="color:${visual.onContent};background:linear-gradient(135deg, ${gradient});padding:12px 14px;border-radius:12px;border:1px solid #27272a;max-width:280px;position:relative;">
+  // Shared with the React surfaces so the popup and the in-page cards cannot drift.
+  return `<div style="${cardVisualStyleCss(visual)};padding:12px 14px;border-radius:12px;border:1px solid #27272a;max-width:280px;position:relative;">
     <div style="position:absolute;inset:0;background:${visual.contentScrim};border-radius:12px;pointer-events:none;"></div>
     <div style="position:relative;">
     ${art}
