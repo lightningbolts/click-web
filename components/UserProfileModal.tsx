@@ -41,6 +41,7 @@ import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropRevea
 import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
 import { CardVisualHero } from '@/components/ui/CardVisualSurface';
+import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
 import { PriorConnectionBadge } from '@/components/profile/PriorConnectionBadge';
 import { FcButton, FcChip } from '@/components/fc';
 import {
@@ -307,6 +308,7 @@ type BeaconPreviewItem = {
   description?: string;
   scheduleLabel?: string;
   locationLabel?: string;
+  imageUrl?: string | null;
 };
 
 type EventRecommendationPayload = {
@@ -579,6 +581,7 @@ function mapBeaconPreview(row: {
     locationLabel:
       metaString(meta, 'formatted_address', 'formattedAddress', 'location_name', 'locationName') ??
       undefined,
+    imageUrl: beaconHeroImageUrl(meta),
   };
 }
 
@@ -1007,6 +1010,7 @@ export default function UserProfileModal({
     location?: string;
     schedule?: string;
     expired?: boolean;
+    imageUrl?: string | null;
   } | null>(null);
 
   const openBeaconDetail = useCallback(
@@ -1019,6 +1023,7 @@ export default function UserProfileModal({
         description: fallback?.description,
         location: fallback?.locationLabel,
         schedule: fallback?.scheduleLabel,
+        imageUrl: fallback?.imageUrl,
       });
       try {
         const headers = await getAuthHeaders();
@@ -1035,6 +1040,7 @@ export default function UserProfileModal({
               description: fallback.description,
               location: fallback.locationLabel,
               schedule: fallback.scheduleLabel,
+              imageUrl: fallback.imageUrl,
             });
             return;
           }
@@ -1061,6 +1067,7 @@ export default function UserProfileModal({
             fallback?.locationLabel,
           schedule: metaString(meta, 'schedule_label', 'scheduleLabel') ?? fallback?.scheduleLabel,
           expired,
+          imageUrl: beaconHeroImageUrl(meta) ?? fallback?.imageUrl,
         });
       } catch (e) {
         if (fallback) {
@@ -1072,6 +1079,7 @@ export default function UserProfileModal({
             description: fallback.description,
             location: fallback.locationLabel,
             schedule: fallback.scheduleLabel,
+            imageUrl: fallback.imageUrl,
           });
           return;
         }
@@ -2044,6 +2052,7 @@ export default function UserProfileModal({
                                 {/* Same generated identity the beacon carries on the map and on mobile. */}
                                 <CardVisualHero
                                   id={b.beaconId}
+                                  imageUrl={b.imageUrl}
                                   className="flex w-12 shrink-0 items-center justify-center"
                                 >
                                   <div className="flex h-full items-center justify-center px-3">
@@ -2079,6 +2088,7 @@ export default function UserProfileModal({
                           <CardVisualHero
                             id={beaconDetail.beaconId}
                             className="h-16"
+                            imageUrl={beaconDetail.imageUrl}
                             chipLabel={beaconDetail.expired ? 'Past event' : 'Event'}
                           >
                             <div className="flex h-full items-start justify-end p-2.5">
