@@ -8,6 +8,7 @@ import {
   type CardHueFamily,
 } from '@/lib/ui/generateCardVisual';
 import { cardVisualStyle } from '@/lib/ui/cardVisualPattern';
+import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
 
 /** Black scrim at `alpha` over `hex`, as the browser composites it. */
 function compositeBlackOver(alpha: number, hex: string): string {
@@ -78,5 +79,20 @@ describe('cardVisualStyle', () => {
     // Pattern layer comes first so it paints on top of the gradient.
     expect(image.indexOf('linear-gradient(135deg')).toBeGreaterThan(0);
     expect(style.color).toBe(visual.onContent);
+  });
+});
+
+describe('beaconHeroImageUrl', () => {
+  it('prefers album art then uploaded image_url', () => {
+    expect(
+      beaconHeroImageUrl({
+        album_art_url: 'https://cdn.example/art.jpg',
+        image_url: 'https://cdn.example/upload.jpg',
+      }),
+    ).toBe('https://cdn.example/art.jpg');
+    expect(beaconHeroImageUrl({ image_url: 'https://cdn.example/upload.jpg' })).toBe(
+      'https://cdn.example/upload.jpg',
+    );
+    expect(beaconHeroImageUrl({})).toBeNull();
   });
 });
