@@ -58,6 +58,8 @@ interface MessageBubbleProps {
   mediaChatKey?: DerivedKeys | ArrayBuffer | null;
   /** Factory returning `Authorization: Bearer …` headers; used to sign attachment URLs. */
   getAuthHeaders?: () => Promise<HeadersInit>;
+  /** Transient search deep-link highlight. */
+  highlighted?: boolean;
 }
 
 function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
@@ -161,6 +163,7 @@ export default function MessageBubble({
   portalsBoundsRef,
   mediaChatKey,
   getAuthHeaders,
+  highlighted = false,
 }: MessageBubbleProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
@@ -382,11 +385,14 @@ export default function MessageBubble({
 
   return (
     <motion.div
+      data-message-id={message.id}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.18 }}
-      className={`flex items-end gap-2 group ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
+      className={`flex items-end gap-2 group rounded-2xl transition-[box-shadow,background-color] duration-700 ${
+        isMine ? 'flex-row-reverse' : 'flex-row'
+      } ${highlighted ? 'bg-primary/15 ring-2 ring-primary/50 shadow-[0_0_0_4px_rgba(99,14,212,0.12)]' : ''}`}
     >
       {/* Avatar */}
       {!isMine && (
