@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
-import { loadActivityRecap, type RecapWindow } from '@/lib/me/activityRecap';
+import { emptyActivityRecap, loadActivityRecap, type RecapWindow } from '@/lib/me/activityRecap';
 
 /**
  * GET /api/me/recap?window=day|week
- * Day/week activity rollup for Home.
+ * Day/week activity rollup for Home. Empty windows return `{ recap }` with zeros (200),
+ * not a 500 — archived/hidden connections and missing optional columns are skipped.
  */
 export async function GET(request: NextRequest) {
   const { user, authError } = await getSupabaseFromRouteRequest(request);
@@ -23,6 +24,12 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error('[me/recap]', message);
-    return NextResponse.json({ error: 'Failed to load recap' }, { status: 500 });
+    if (
+      message.includes('Missing NEXT_PUBLIC_SUPABASE') ||
+      message.includes('SUPABASE_SERVICE_ROLE')
+    ) {
+      return NextResponse.json({ error: 'Failed to load recap' }, { status: 500 });
+    }
+    return NextResponse.json({ recap: emptyActivityRecap(window) }, { status: 200 });
   }
 }

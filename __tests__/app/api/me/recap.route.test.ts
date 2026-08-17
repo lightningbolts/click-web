@@ -14,11 +14,23 @@ jest.mock('@/lib/server/supabaseRouteAuth', () => ({
 
 jest.mock('@/lib/server/connectionWriteAuth', () => ({
   createAdminClient: () => mockCreateAdminClient(),
+  isJunctionTableOptionalError: (error: { code?: string; message?: string }) => {
+    const msg = String(error.message || '').toLowerCase();
+    return (
+      error.code === 'PGRST205' ||
+      msg.includes('schema cache') ||
+      msg.includes('does not exist')
+    );
+  },
 }));
 
-jest.mock('@/lib/me/activityRecap', () => ({
-  loadActivityRecap: (...args: unknown[]) => mockLoadActivityRecap(...args),
-}));
+jest.mock('@/lib/me/activityRecap', () => {
+  const actual = jest.requireActual('@/lib/me/activityRecap') as typeof import('@/lib/me/activityRecap');
+  return {
+    ...actual,
+    loadActivityRecap: (...args: unknown[]) => mockLoadActivityRecap(...args),
+  };
+});
 
 describe('GET /api/me/recap', () => {
   beforeEach(() => {
@@ -57,6 +69,26 @@ describe('GET /api/me/recap', () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       recap: expect.objectContaining({ connections_formed: 2, events_saved: 3 }),
+    });
+  });
+
+  it('returns a 200 empty recap when the loader throws', async () => {
+    mockGetSupabaseFromRouteRequest.mockResolvedValue({
+      user: { id: 'user-1' },
+      authError: null,
+    });
+    mockCreateAdminClient.mockReturnValue({});
+    mockLoadActivityRecap.mockRejectedValue(new Error('column messages.created_at does not exist'));
+    const { GET } = await import('@/app/api/me/recap/route');
+    const res = await GET(new NextRequest('http://localhost/api/me/recap?window=week'));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      recap: expect.objectContaining({
+        window: 'week',
+        connections_formed: 0,
+        messages_sent: 0,
+        events_saved: 0,
+      }),
     });
   });
 });
