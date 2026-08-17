@@ -136,9 +136,9 @@ export async function GET(req: NextRequest) {
         .limit(Math.min(40, limit));
       if (newerErr) return NextResponse.json({ error: newerErr.message }, { status: 500 });
       const merged = mergeAroundTargetMessages(
-        (older ?? []) as Record<string, unknown>[],
-        (newer ?? []) as Record<string, unknown>[],
-        target as Record<string, unknown>,
+        (older ?? []) as Array<{ id: string; time_created: number }>,
+        (newer ?? []) as Array<{ id: string; time_created: number }>,
+        target as { id: string; time_created: number },
       );
       merged.sort((a, b) => Number(b.time_created) - Number(a.time_created));
       messages = merged;
