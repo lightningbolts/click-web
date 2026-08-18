@@ -24,6 +24,7 @@ import {
   Volume2,
   Mountain,
   Star,
+  Search,
 } from 'lucide-react';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -44,6 +45,8 @@ import {
   renameCliqueRpc,
 } from '@/lib/chat/createVerifiedClick';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
+import { searchDecryptedRecentMessages } from '@/lib/chat/clientMessageSearch';
+import { mergeChatSearchHits, type ChatSearchHit } from '@/lib/chat/searchSnippet';
 
 // Digital Memory Box components
 import {
@@ -170,6 +173,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   /** The connection whose chat is currently open, or null */
   const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
   const [chatListTab, setChatListTab] = useState<'active' | 'archived'>('active');
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [chatSearchHits, setChatSearchHits] = useState<ChatSearchHit[]>([]);
+  const [chatSearchBusy, setChatSearchBusy] = useState(false);
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
   const [archivedConnectionIds, setArchivedConnectionIds] = useState<Set<string>>(new Set());
   const [coreConnectionIds, setCoreConnectionIds] = useState<Set<string>>(new Set());
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
@@ -2093,10 +2100,70 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, [connectionRecords, user]);
 
   // Shared handler: open chat for a specific connection
-  const handleOpenChat = useCallback((conn: ConnectionRecord) => {
+  const handleOpenChat = useCallback((conn: ConnectionRecord, messageId?: string | null) => {
     setSelectedConnection(conn);
+    setTargetMessageId(messageId?.trim() ? messageId.trim() : null);
     setActiveTab('chat');
   }, []);
+
+  useEffect(() => {
+    const q = chatSearchQuery.trim();
+    if (q.length < 2 || !user?.id) {
+      setChatSearchHits([]);
+      setChatSearchBusy(false);
+      return;
+    }
+    let cancelled = false;
+    setChatSearchBusy(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch(`/api/chat/search?q=${encodeURIComponent(q)}`, { headers });
+          const json = (await res.json().catch(() => ({}))) as { hits?: ChatSearchHit[] };
+          const serverHits = Array.isArray(json.hits) ? json.hits.filter((hit) => !hit.isHub) : [];
+
+          const connectionToChatId = new Map<string, string>();
+          for (const [chatId, connectionId] of chatConnectionMapRef.current) {
+            connectionToChatId.set(connectionId, chatId);
+          }
+          const scopes = [...connectionRecords, ...groupCliqueRecords].flatMap((c) => {
+            const chatId =
+              c.chatKind === 'group_clique' ? c.groupChatId : connectionToChatId.get(c.id);
+            if (!chatId) return [];
+            return [
+              {
+                connectionId: c.id,
+                chatId,
+                name: c.name,
+                isGroup: c.chatKind === 'group_clique',
+                userIds: c.userIds,
+                currentUserId: user.id as string,
+              },
+            ];
+          });
+
+          const clientHits = await searchDecryptedRecentMessages({
+            query: q,
+            getAuthHeaders,
+            scopes,
+            derivePairwiseKeys: deriveKeysForConnection,
+          });
+          if (!cancelled) {
+            setChatSearchHits(mergeChatSearchHits(serverHits, clientHits).slice(0, 24));
+          }
+        } catch {
+          if (!cancelled) setChatSearchHits([]);
+        } finally {
+          if (!cancelled) setChatSearchBusy(false);
+        }
+      })();
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [chatSearchQuery, connectionRecords, getAuthHeaders, groupCliqueRecords, user?.id]);
 
   const connectionRecordsWithChatPreview = useMemo(
     () =>
@@ -2962,7 +3029,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         onBlock={() => blockUser(selectedConnection)}
                         onUnblock={() => unblockUser(selectedConnection)}
                         onStartCall={(videoEnabled) => startOutgoingCall(selectedConnection, videoEnabled)}
-                        onClose={() => setSelectedConnection(null)}
+                        onClose={() => {
+                          setSelectedConnection(null);
+                          setTargetMessageId(null);
+                        }}
                         onOpenProfile={(id) => {
                           setProfileConnectionId(selectedConnection?.id ?? null);
                           setProfileUserId(id);
@@ -2971,6 +3041,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                           setGroupClicksReloadNonce((n) => n + 1);
                         }}
                         onMessagesSnapshot={setChatMessagesSnapshot}
+                        targetMessageId={targetMessageId}
                       />
                     </motion.div>
                   ) : (
@@ -3001,6 +3072,54 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         New click
                       </button>
                     </div>
+
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+                      <input
+                        type="search"
+                        value={chatSearchQuery}
+                        onChange={(e) => setChatSearchQuery(e.target.value)}
+                        placeholder="Search messages in your chats…"
+                        className="w-full rounded-xl border border-border-hard bg-surface-container/50 py-3 pl-10 pr-4 text-sm text-on-surface focus:border-primary focus:outline-none"
+                        aria-label="Search messages"
+                      />
+                    </div>
+                    {chatSearchQuery.trim().length >= 2 ? (
+                      <div className="fc-card overflow-hidden rounded-[16px] border border-border-hard">
+                        <div className="border-b border-border-hard px-4 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                          {chatSearchBusy ? 'Searching messages…' : `Message matches (${chatSearchHits.length})`}
+                        </div>
+                        {chatSearchHits.length === 0 && !chatSearchBusy ? (
+                          <p className="px-4 py-6 text-sm text-on-surface-variant">
+                            No messages matched “{chatSearchQuery.trim()}”.
+                          </p>
+                        ) : (
+                          <ul className="divide-y divide-border-hard/70">
+                            {chatSearchHits.map((hit) => (
+                              <li key={hit.messageId}>
+                                <button
+                                  type="button"
+                                  className="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left hover:bg-surface-container/60"
+                                  onClick={() => {
+                                    const conn = [...connectionRecords, ...groupCliqueRecords].find(
+                                      (c) =>
+                                        c.id === hit.connectionId ||
+                                        c.id === hit.conversationId ||
+                                        c.groupChatId === hit.chatId,
+                                    );
+                                    if (!conn) return;
+                                    handleOpenChat(conn, hit.messageId);
+                                  }}
+                                >
+                                  <span className="text-sm font-semibold text-on-surface">{hit.chatName}</span>
+                                  <span className="line-clamp-2 text-sm text-on-surface-variant">{hit.snippet}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ) : null}
 
                     <div className="inline-flex items-center gap-1.5 rounded-2xl border border-border-hard/80 bg-surface-container/70 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                       <motion.button

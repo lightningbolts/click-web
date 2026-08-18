@@ -35,6 +35,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { authFailureMessage, getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { normalizeDbMessage, notifyMessagesDelivered } from '@/lib/chat/messages';
+import { CHAT_SEARCH_FOCUS_MS } from '@/lib/chat/searchSnippet';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import {
   uploadChatAttachmentBlob,
@@ -105,6 +106,8 @@ interface ChatViewProps {
   /** Reports the current locally-decrypted messages so the parent can feed them
    *  into the profile sheet's Media / Links / Files tabs (E2EE content). */
   onMessagesSnapshot?: (messages: Message[]) => void;
+  /** Global-search deep link: scroll this message into view and pulse-highlight it. */
+  targetMessageId?: string | null;
 }
 
 type ChatTimelineEntry =
@@ -200,6 +203,7 @@ export default function ChatView({
   onOpenProfile,
   onGroupChatChanged,
   onMessagesSnapshot,
+  targetMessageId = null,
 }: ChatViewProps) {
   const { onlineUserIds } = useAuth();
   const isGroupClique = connection.chatKind === 'group_clique';
@@ -250,6 +254,8 @@ export default function ChatView({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
   const [sharedInterestTags, setSharedInterestTags] = useState<string[]>([]);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const searchFocusConsumedRef = useRef<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -679,8 +685,9 @@ export default function ChatView({
 
   /** Must run in layout phase so it executes before the snap below on the same paint. */
   useLayoutEffect(() => {
-    snapScrollToLatestOnOpenRef.current = true;
-  }, [connection.id, connection.groupChatId, isGroupClique]);
+    snapScrollToLatestOnOpenRef.current = !targetMessageId?.trim();
+    searchFocusConsumedRef.current = null;
+  }, [connection.id, connection.groupChatId, isGroupClique, targetMessageId]);
 
   /** Scroll the messages scroller to the true bottom (dimension-safe; avoids document scroll). */
   const snapThreadViewportToBottom = useCallback(() => {
@@ -786,9 +793,10 @@ export default function ChatView({
 
   // ─────────────────────────── load messages ───────────────────────────────
 
-  const fetchMessages = useCallback(async (id: string, cursor?: number) => {
+  const fetchMessages = useCallback(async (id: string, cursor?: number, aroundMessageId?: string) => {
     const params = new URLSearchParams({ chatId: id, limit: String(PAGE_SIZE) });
     if (cursor) params.set('cursor', String(cursor));
+    if (aroundMessageId) params.set('aroundMessageId', aroundMessageId);
 
     const headers = await getAuthHeaders();
     const res = await fetch(`/api/chat/messages?${params}`, { headers });
@@ -838,7 +846,8 @@ export default function ChatView({
 
     const load = async () => {
       try {
-        const msgs = await fetchMessages(chatId);
+        const around = targetMessageId?.trim() || undefined;
+        const msgs = await fetchMessages(chatId, undefined, around);
         setMessages(msgs);
         const ackIds = msgs
           .filter((m) => m.user_id !== currentUserId && (m.delivered_at == null || m.delivered_at === undefined))
@@ -863,6 +872,7 @@ export default function ChatView({
     groupMasterKey,
     isGroupClique,
     firePeerDeliveredAck,
+    targetMessageId,
   ]);
 
   // ─────────────────────────── load older messages ─────────────────────────
@@ -901,6 +911,22 @@ export default function ChatView({
       setLoadingMore(false);
     }
   }, [chatId, currentUserId, fetchMessages, firePeerDeliveredAck, hasMore, loadingMore, messages]);
+
+  useEffect(() => {
+    const id = targetMessageId?.trim();
+    if (!id || loading) return;
+    if (searchFocusConsumedRef.current === id) return;
+    const el = scrollContainerRef.current?.querySelector(`[data-message-id="${CSS.escape(id)}"]`);
+    if (!el) return;
+    searchFocusConsumedRef.current = id;
+    snapScrollToLatestOnOpenRef.current = false;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setHighlightedMessageId(id);
+    const timeout = window.setTimeout(() => {
+      setHighlightedMessageId((cur) => (cur === id ? null : cur));
+    }, CHAT_SEARCH_FOCUS_MS);
+    return () => window.clearTimeout(timeout);
+  }, [targetMessageId, loading, messages]);
 
   // ─────────────────────────── realtime subscription ───────────────────────
 
@@ -2321,6 +2347,7 @@ export default function ChatView({
                   currentUserId={currentUserId}
                   mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
                   getAuthHeaders={getAuthHeaders}
+                  highlighted={highlightedMessageId === entry.message.id}
                   senderInitial={otherInitial}
                   senderLabel={
                     isGroupClique && entry.message.user_id !== currentUserId

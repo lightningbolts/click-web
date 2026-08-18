@@ -12,6 +12,10 @@
 - Tabs: memory, map, chat, identity, settings.
 - Active tab: solid primary underline or primary-container chip.
 
+### Chat tab — message search
+
+The Messages list includes a search field. Querying `GET /api/chat/search?q=` plus a decrypted recent-page client search returns hits with `messageId`, `conversationId` / `connectionId`, `senderId`, timestamp, and snippet. Selecting a hit opens `ChatView` with `targetMessageId`, which loads `GET /api/chat/messages?aroundMessageId=` if needed, scrolls the bubble into view, and pulse-highlights it for ~1.8s.
+
 ---
 
 ## Modules

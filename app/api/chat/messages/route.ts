@@ -1,6 +1,7 @@
 /**
- * GET  /api/chat/messages?chatId=<uuid>&cursor=<time_created>&limit=<n>
+ * GET  /api/chat/messages?chatId=<uuid>&cursor=<time_created>&limit=<n>&aroundMessageId=<uuid>
  * Returns paginated messages (newest first) with their reactions.
+ * `aroundMessageId` loads a window centered on that row for search deep-links.
  *
  * POST /api/chat/messages
  * Body: { chatId?: string; connectionId?: string; content: string; message_type?: string;
@@ -19,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { buildMessageInsertRow, normalizeDbMessage, parseLocalSentAtMs } from '@/lib/chat/messages';
+import { mergeAroundTargetMessages } from '@/lib/chat/aroundMessage';
 import type { MessageType } from '@/lib/chat/types';
 import {
   assertChatWritable,
@@ -91,6 +93,7 @@ const DEFAULT_LIMIT = 40;
 export async function GET(req: NextRequest) {
   const chatId = req.nextUrl.searchParams.get('chatId');
   const cursor = req.nextUrl.searchParams.get('cursor'); // time_created of oldest loaded msg
+  const aroundMessageId = req.nextUrl.searchParams.get('aroundMessageId')?.trim() || null;
   const limit = parseInt(req.nextUrl.searchParams.get('limit') ?? String(DEFAULT_LIMIT), 10);
 
   if (!chatId) {
@@ -105,20 +108,59 @@ export async function GET(req: NextRequest) {
   const denied = await assertChatWritable(admin, user.id, chatId);
   if (denied) return denied;
 
-  // Build message query with optional cursor-based pagination
-  let query = supabase
-    .from('messages')
-    .select('*')
-    .eq('chat_id', chatId)
-    .order('time_created', { ascending: false })
-    .limit(limit);
+  let messages: Record<string, unknown>[] | null = null;
 
-  if (cursor) {
-    query = query.lt('time_created', parseInt(cursor, 10));
+  if (aroundMessageId) {
+    const { data: target, error: targetErr } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .eq('id', aroundMessageId)
+      .maybeSingle();
+    if (targetErr) return NextResponse.json({ error: targetErr.message }, { status: 500 });
+    if (target && typeof target.time_created === 'number') {
+      const { data: older, error: olderErr } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .lte('time_created', target.time_created)
+        .order('time_created', { ascending: false })
+        .limit(limit);
+      if (olderErr) return NextResponse.json({ error: olderErr.message }, { status: 500 });
+      const { data: newer, error: newerErr } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .gt('time_created', target.time_created)
+        .order('time_created', { ascending: true })
+        .limit(Math.min(40, limit));
+      if (newerErr) return NextResponse.json({ error: newerErr.message }, { status: 500 });
+      const merged = mergeAroundTargetMessages(
+        (older ?? []) as Array<{ id: string; time_created: number }>,
+        (newer ?? []) as Array<{ id: string; time_created: number }>,
+        target as { id: string; time_created: number },
+      );
+      merged.sort((a, b) => Number(b.time_created) - Number(a.time_created));
+      messages = merged;
+    }
   }
 
-  const { data: messages, error: msgErr } = await query;
-  if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
+  if (!messages) {
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('time_created', { ascending: false })
+      .limit(limit);
+
+    if (cursor) {
+      query = query.lt('time_created', parseInt(cursor, 10));
+    }
+
+    const { data, error: msgErr } = await query;
+    if (msgErr) return NextResponse.json({ error: msgErr.message }, { status: 500 });
+    messages = (data ?? []) as Record<string, unknown>[];
+  }
 
   if (!messages || messages.length === 0) {
     return NextResponse.json({ messages: [] });
