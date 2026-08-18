@@ -51,7 +51,7 @@ Matches mobile `verify-hub-proximity` Edge Function semantics (geofence; that fu
 | `/api/hub/[id]` | GET | Hub metadata + participant counts |
 | `/api/hub/[id]/participants/me` | GET/PATCH | Self participant row |
 | `/api/hub/messages` | GET | `hubId` + optional `aroundMessageId` — participant-gated timeline + `participant_ids` |
-| `/api/hub/messages` | POST | Text message (geofence required) |
+| `/api/hub/messages` | POST | Text message (geofence required). No per-send timed cooldown. |
 | `/api/hub/media` | POST | Media attachment (geofence required) |
 | `/api/hub/leave` | POST | Leave hub |
 
