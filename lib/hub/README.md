@@ -23,6 +23,7 @@ POST /api/hub/create
 hub_venues + hub_participants
     │
     ├─ GET  /api/hub/nearby        (discover within radius)
+    ├─ GET  /api/hub/messages      (participant-gated thread + participant_ids)
     ├─ POST /api/hub/messages      (assertHubGeofenceFromCoords)
     ├─ POST /api/hub/media         (geofenced uploads)
     ├─ POST /api/hub/leave
@@ -49,6 +50,7 @@ Matches mobile `verify-hub-proximity` Edge Function semantics (geofence; that fu
 | `/api/hub/nearby` | GET | Query lat/lng/radius — list hubs (`expires_at` null or future) |
 | `/api/hub/[id]` | GET | Hub metadata + participant counts |
 | `/api/hub/[id]/participants/me` | GET/PATCH | Self participant row |
+| `/api/hub/messages` | GET | `hubId` + optional `aroundMessageId` — participant-gated timeline + `participant_ids` |
 | `/api/hub/messages` | POST | Text message (geofence required) |
 | `/api/hub/media` | POST | Media attachment (geofence required) |
 | `/api/hub/leave` | POST | Leave hub |
@@ -70,9 +72,10 @@ Auth: `requireBearerUser` from `chatGatekeeper` (JWT validation only; hub writes
 | Path | Role |
 |------|------|
 | `lib/server/hubGatekeeper.ts` | Geofence enforcement |
+| `lib/hub/hubThread.ts` | Timeline normalize + around-window merge |
 | `app/api/hub/create/route.ts` | Hub creation |
 | `app/api/hub/nearby/route.ts` | Discovery |
-| `app/api/hub/messages/route.ts` | Messaging |
+| `app/api/hub/messages/route.ts` | GET hydrate / POST send |
 | `app/api/hub/media/route.ts` | Media |
 | `app/api/hub/leave/route.ts` | Leave |
 | `supabase/migrations/20260511120000_hub_ephemeral_participants_and_users_aura.sql` | Schema |

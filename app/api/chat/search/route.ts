@@ -2,26 +2,20 @@
  * GET /api/chat/search?q=<query>
  * Message hits across 1:1 chats, group cliques, and hub rooms the caller can access.
  * Encrypted 1:1/group bodies will not match server-side; the dashboard also searches
- * a decrypted recent page per conversation.
+ * a decrypted recent page per conversation. Mobile uses this as the primary remote
+ * message scan so unified search does not N+1 PostgREST per conversation.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { createChatGatekeeperAdmin } from '@/lib/server/chatGatekeeper';
-import { escapeIlikePattern, highlightedMessageSnippet, type ChatSearchHit } from '@/lib/chat/searchSnippet';
+import { escapeIlikePattern, type ChatSearchHit } from '@/lib/chat/searchSnippet';
+import { selectInChunks } from '@/lib/chat/postgrestInChunks';
+import { toDirectChatSearchHit, toHubChatSearchHit, type ChatRow } from '@/lib/chat/serverMessageSearch';
 
 const MIN_QUERY = 2;
 const MAX_CHAT_HITS = 40;
 const MAX_HUB_HITS = 20;
-
-function hubCreatedAtToMs(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const ms = Date.parse(value);
-    if (Number.isFinite(ms)) return ms;
-  }
-  return 0;
-}
 
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') ?? '').trim();
@@ -58,43 +52,47 @@ export async function GET(req: NextRequest) {
       .map((row) => (typeof row.group_id === 'string' ? row.group_id : ''))
       .filter(Boolean);
 
-    const chatRows: { id: string; connection_id: string | null; group_id: string | null }[] = [];
+    const chatRows: ChatRow[] = [];
+    const pushChat = (row: { id?: unknown; connection_id?: unknown; group_id?: unknown }) => {
+      if (typeof row.id !== 'string') return;
+      chatRows.push({
+        id: row.id,
+        connection_id: typeof row.connection_id === 'string' ? row.connection_id : null,
+        group_id: typeof row.group_id === 'string' ? row.group_id : null,
+      });
+    };
+
     if (connectionIds.length > 0) {
-      const { data, error } = await supabase
-        .from('chats')
-        .select('id, connection_id, group_id')
-        .in('connection_id', connectionIds);
-      if (error) {
-        console.error('[chat/search] chats by connection:', error.message);
-      } else {
-        for (const row of data ?? []) {
-          if (typeof row.id === 'string') {
-            chatRows.push({
-              id: row.id,
-              connection_id: typeof row.connection_id === 'string' ? row.connection_id : null,
-              group_id: typeof row.group_id === 'string' ? row.group_id : null,
-            });
-          }
+      const rows = await selectInChunks(connectionIds, async (chunk) => {
+        const { data, error } = await supabase
+          .from('chats')
+          .select('id, connection_id, group_id')
+          .in('connection_id', chunk);
+        if (error) {
+          console.error('[chat/search] chats by connection:', error.message);
+          return [];
         }
-      }
+        return data ?? [];
+      });
+      for (const row of rows) pushChat(row);
     }
     if (groupIds.length > 0) {
-      const { data, error } = await supabase
-        .from('chats')
-        .select('id, connection_id, group_id')
-        .in('group_id', groupIds);
-      if (error) {
-        console.error('[chat/search] chats by group:', error.message);
-      } else {
-        const seen = new Set(chatRows.map((c) => c.id));
-        for (const row of data ?? []) {
-          if (typeof row.id === 'string' && !seen.has(row.id)) {
-            chatRows.push({
-              id: row.id,
-              connection_id: typeof row.connection_id === 'string' ? row.connection_id : null,
-              group_id: typeof row.group_id === 'string' ? row.group_id : null,
-            });
-          }
+      const seen = new Set(chatRows.map((c) => c.id));
+      const rows = await selectInChunks(groupIds, async (chunk) => {
+        const { data, error } = await supabase
+          .from('chats')
+          .select('id, connection_id, group_id')
+          .in('group_id', chunk);
+        if (error) {
+          console.error('[chat/search] chats by group:', error.message);
+          return [];
+        }
+        return data ?? [];
+      });
+      for (const row of rows) {
+        if (typeof row.id === 'string' && !seen.has(row.id)) {
+          seen.add(row.id);
+          pushChat(row);
         }
       }
     }
@@ -102,50 +100,57 @@ export async function GET(req: NextRequest) {
     const chatById = new Map(chatRows.map((c) => [c.id, c]));
     const chatIds = chatRows.map((c) => c.id);
     if (chatIds.length > 0) {
-      const { data: messages, error: msgErr } = await supabase
-        .from('messages')
-        .select('id, chat_id, user_id, content, time_created')
-        .in('chat_id', chatIds)
-        .ilike('content', pattern)
-        .order('time_created', { ascending: false })
-        .limit(MAX_CHAT_HITS);
-      if (msgErr) {
-        console.error('[chat/search] messages:', msgErr.message);
-      } else {
-        const groupNameIds = [
-          ...new Set(
-            chatRows
-              .map((c) => c.group_id)
-              .filter((id): id is string => typeof id === 'string' && id.length > 0),
-          ),
-        ];
-        const groupNames = new Map<string, string>();
-        if (groupNameIds.length > 0) {
-          const { data: groups } = await supabase.from('groups').select('id, name').in('id', groupNameIds);
-          for (const g of groups ?? []) {
-            if (typeof g.id === 'string' && typeof g.name === 'string') {
-              groupNames.set(g.id, g.name);
-            }
+      const messages = await selectInChunks(chatIds, async (chunk) => {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('id, chat_id, user_id, content, time_created')
+          .in('chat_id', chunk)
+          .ilike('content', pattern)
+          .order('time_created', { ascending: false })
+          .limit(MAX_CHAT_HITS);
+        if (error) {
+          console.error('[chat/search] messages:', error.message);
+          return [];
+        }
+        return data ?? [];
+      });
+      messages.sort((a, b) => Number(b.time_created) - Number(a.time_created));
+      const bounded = messages.slice(0, MAX_CHAT_HITS);
+      const groupNameIds = [
+        ...new Set(
+          chatRows
+            .map((c) => c.group_id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      ];
+      const groupNames = new Map<string, string>();
+      if (groupNameIds.length > 0) {
+        const groups = await selectInChunks(groupNameIds, async (chunk) => {
+          const { data } = await supabase.from('groups').select('id, name').in('id', chunk);
+          return data ?? [];
+        });
+        for (const g of groups) {
+          if (typeof g.id === 'string' && typeof g.name === 'string') {
+            groupNames.set(g.id, g.name);
           }
         }
-        for (const row of messages ?? []) {
-          const chatId = typeof row.chat_id === 'string' ? row.chat_id : '';
-          const chat = chatById.get(chatId);
-          if (!chat) continue;
-          const content = typeof row.content === 'string' ? row.content : '';
-          const conversationId = chat.group_id ?? chat.connection_id ?? chatId;
-          hits.push({
+      }
+      for (const row of bounded) {
+        const chatId = typeof row.chat_id === 'string' ? row.chat_id : '';
+        const chat = chatById.get(chatId);
+        if (!chat) continue;
+        const content = typeof row.content === 'string' ? row.content : '';
+        hits.push(
+          toDirectChatSearchHit({
             messageId: String(row.id),
-            chatId,
-            conversationId,
-            connectionId: chat.connection_id ?? chat.group_id ?? chatId,
+            chat,
             senderId: typeof row.user_id === 'string' ? row.user_id : '',
             timestamp: Number(row.time_created) || 0,
-            snippet: highlightedMessageSnippet(content, q),
+            content,
+            query: q,
             chatName: chat.group_id ? (groupNames.get(chat.group_id) ?? 'Clique') : 'Chat',
-            isHub: false,
-          });
-        }
+          }),
+        );
       }
     }
 
@@ -162,42 +167,49 @@ export async function GET(req: NextRequest) {
           .map((row) => (typeof row.hub_id === 'string' ? row.hub_id : ''))
           .filter(Boolean);
         if (hubIds.length > 0) {
-          const { data: hubMsgs, error: hubErr } = await admin
-            .from('hub_messages')
-            .select('id, hub_id, user_id, body, created_at')
-            .in('hub_id', hubIds)
-            .ilike('body', pattern)
-            .order('created_at', { ascending: false })
-            .limit(MAX_HUB_HITS);
-          if (hubErr) {
-            console.error('[chat/search] hub_messages:', hubErr.message);
-          } else {
-            const { data: venues } = await admin
-              .from('hub_venues')
-              .select('id, name')
-              .in('id', hubIds);
-            const hubNames = new Map<string, string>();
-            for (const v of venues ?? []) {
-              if (typeof v.id === 'string' && typeof v.name === 'string') {
-                hubNames.set(v.id, v.name);
-              }
+          const hubMsgs = await selectInChunks(hubIds, async (chunk) => {
+            const { data, error } = await admin
+              .from('hub_messages')
+              .select('id, hub_id, user_id, body, created_at')
+              .in('hub_id', chunk)
+              .ilike('body', pattern)
+              .order('created_at', { ascending: false })
+              .limit(MAX_HUB_HITS);
+            if (error) {
+              console.error('[chat/search] hub_messages:', error.message);
+              return [];
             }
-            for (const row of hubMsgs ?? []) {
-              const hubId = typeof row.hub_id === 'string' ? row.hub_id : '';
-              const body = typeof row.body === 'string' ? row.body : '';
-              hits.push({
+            return data ?? [];
+          });
+          hubMsgs.sort((a, b) => {
+            const tb = Date.parse(typeof b.created_at === 'string' ? b.created_at : '') || 0;
+            const ta = Date.parse(typeof a.created_at === 'string' ? a.created_at : '') || 0;
+            return tb - ta;
+          });
+          const venues = await selectInChunks(hubIds, async (chunk) => {
+            const { data } = await admin.from('hub_venues').select('id, name').in('id', chunk);
+            return data ?? [];
+          });
+          const hubNames = new Map<string, string>();
+          for (const v of venues) {
+            if (typeof v.id === 'string' && typeof v.name === 'string') {
+              hubNames.set(v.id, v.name);
+            }
+          }
+          for (const row of hubMsgs.slice(0, MAX_HUB_HITS)) {
+            const hubId = typeof row.hub_id === 'string' ? row.hub_id : '';
+            const body = typeof row.body === 'string' ? row.body : '';
+            hits.push(
+              toHubChatSearchHit({
                 messageId: String(row.id),
-                chatId: hubId,
-                conversationId: hubId,
-                connectionId: hubId,
-                senderId: typeof row.user_id === 'string' ? row.user_id : '',
-                timestamp: hubCreatedAtToMs(row.created_at),
-                snippet: highlightedMessageSnippet(body, q),
-                chatName: hubNames.get(hubId) ?? 'Hub',
-                isHub: true,
                 hubId,
-              });
-            }
+                senderId: typeof row.user_id === 'string' ? row.user_id : '',
+                createdAt: row.created_at,
+                body,
+                query: q,
+                chatName: hubNames.get(hubId) ?? 'Hub',
+              }),
+            );
           }
         }
       }
