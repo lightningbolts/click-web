@@ -1,5 +1,5 @@
 import { chunkIds, selectInChunks } from '@/lib/chat/postgrestInChunks';
-import { toDirectChatSearchHit, toHubChatSearchHit } from '@/lib/chat/serverMessageSearch';
+import { toDirectChatSearchHit, toHubChatSearchHit, isSearchablePlaintextBody } from '@/lib/chat/serverMessageSearch';
 
 describe('chunkIds', () => {
   it('drops blanks and chunks unique ids', () => {
@@ -54,5 +54,12 @@ describe('server message search hits', () => {
     expect(hit.hubId).toBe('hub_abc');
     expect(hit.hubRealtimeChannel).toBe('hub:hub_abc');
     expect(hit.snippet.toLowerCase()).toContain('lobby');
+  });
+
+  it('rejects e2e wire bodies as search plaintext', () => {
+    expect(isSearchablePlaintextBody('welcome to the lobby')).toBe(true);
+    expect(isSearchablePlaintextBody('e2e:AAAA')).toBe(false);
+    expect(isSearchablePlaintextBody('e2e_grp:BBBB')).toBe(false);
+    expect(isSearchablePlaintextBody('   ')).toBe(false);
   });
 });
