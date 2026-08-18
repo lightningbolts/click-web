@@ -35,6 +35,7 @@ export type ChatSearchHit = {
   chatName: string;
   isHub: boolean;
   hubId?: string;
+  hubRealtimeChannel?: string;
 };
 
 export function mergeChatSearchHits(...lists: ChatSearchHit[][]): ChatSearchHit[] {
