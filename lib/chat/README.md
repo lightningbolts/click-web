@@ -114,7 +114,7 @@ Collaboration session TTL (local “Squad window”) is separate — computed in
 | Path | Role |
 |------|------|
 | `lib/server/chatGatekeeper.ts` | Write authorization |
-| `app/api/chat/search/route.ts` | GET message search across 1:1, cliques, and hubs |
+| `app/api/chat/search/route.ts` | GET message search across 1:1, cliques, and hubs; skips `e2e:` / `e2e_grp:` bodies |
 | `app/api/chat/messages/route.ts` | POST messages + push on new message |
 | `app/api/chat/messages/read/route.ts` | Read receipts |
 | `app/api/chat/messages/delivered/route.ts` | Delivery receipts |

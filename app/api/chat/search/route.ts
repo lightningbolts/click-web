@@ -11,7 +11,7 @@ import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { createChatGatekeeperAdmin } from '@/lib/server/chatGatekeeper';
 import { escapeIlikePattern, type ChatSearchHit } from '@/lib/chat/searchSnippet';
 import { selectInChunks } from '@/lib/chat/postgrestInChunks';
-import { toDirectChatSearchHit, toHubChatSearchHit, type ChatRow } from '@/lib/chat/serverMessageSearch';
+import { toDirectChatSearchHit, toHubChatSearchHit, isSearchablePlaintextBody, type ChatRow } from '@/lib/chat/serverMessageSearch';
 
 const MIN_QUERY = 2;
 const MAX_CHAT_HITS = 40;
@@ -105,6 +105,8 @@ export async function GET(req: NextRequest) {
           .from('messages')
           .select('id, chat_id, user_id, content, time_created')
           .in('chat_id', chunk)
+          .not('content', 'like', 'e2e:%')
+          .not('content', 'like', 'e2e_grp:%')
           .ilike('content', pattern)
           .order('time_created', { ascending: false })
           .limit(MAX_CHAT_HITS);
@@ -140,6 +142,7 @@ export async function GET(req: NextRequest) {
         const chat = chatById.get(chatId);
         if (!chat) continue;
         const content = typeof row.content === 'string' ? row.content : '';
+        if (!isSearchablePlaintextBody(content)) continue;
         hits.push(
           toDirectChatSearchHit({
             messageId: String(row.id),
@@ -172,6 +175,8 @@ export async function GET(req: NextRequest) {
               .from('hub_messages')
               .select('id, hub_id, user_id, body, created_at')
               .in('hub_id', chunk)
+              .not('body', 'like', 'e2e:%')
+              .not('body', 'like', 'e2e_grp:%')
               .ilike('body', pattern)
               .order('created_at', { ascending: false })
               .limit(MAX_HUB_HITS);
@@ -199,6 +204,7 @@ export async function GET(req: NextRequest) {
           for (const row of hubMsgs.slice(0, MAX_HUB_HITS)) {
             const hubId = typeof row.hub_id === 'string' ? row.hub_id : '';
             const body = typeof row.body === 'string' ? row.body : '';
+            if (!isSearchablePlaintextBody(body)) continue;
             hits.push(
               toHubChatSearchHit({
                 messageId: String(row.id),

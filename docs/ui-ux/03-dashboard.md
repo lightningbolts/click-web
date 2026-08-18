@@ -14,7 +14,7 @@
 
 ### Chat tab — message search
 
-The Messages list includes a search field. Querying `GET /api/chat/search?q=` plus a decrypted recent-page client search returns hits with `messageId`, `conversationId` / `connectionId`, `senderId`, timestamp, snippet, and hub `hubRealtimeChannel` when `isHub`. Large membership lists are queried in PostgREST `.in()` chunks so search cannot fail closed with zero hits. Selecting a hit opens `ChatView` with `targetMessageId`, which loads `GET /api/chat/messages?aroundMessageId=` if needed, scrolls the bubble into view, and pulse-highlights it for ~1.8s.
+The Messages list includes a search field. Querying `GET /api/chat/search?q=` plus a decrypted recent-page client search returns hits with `messageId`, `conversationId` / `connectionId`, `senderId`, timestamp, snippet, and hub `hubRealtimeChannel` when `isHub`. Large membership lists are queried in PostgREST `.in()` chunks so search cannot fail closed with zero hits. Encrypted `e2e:` / `e2e_grp:` bodies are excluded so coincidental Base64 matches cannot appear as hash snippets. Selecting a hit opens `ChatView` with `targetMessageId`, which loads `GET /api/chat/messages?aroundMessageId=` if needed, scrolls the bubble into view, and pulse-highlights it for ~1.8s.
 
 Mobile unified search uses the same `GET /api/chat/search` as the remote message scan (local name/beacon/intent matching still runs on-device). Hub chat init hydrates through `GET /api/hub/messages?hubId=` (messages + `participant_ids`) so the pulsing logo cannot wait on Realtime subscribe alone.
 

@@ -1,4 +1,5 @@
 import { highlightedMessageSnippet, type ChatSearchHit } from '@/lib/chat/searchSnippet';
+import { isAnyE2eeWireContent } from '@/lib/chat/crypto';
 import { hubCreatedAtToMs, hubRealtimeChannel } from '@/lib/hub/hubThread';
 
 export type ChatRow = {
@@ -9,6 +10,11 @@ export type ChatRow = {
 
 export function hubCreatedAtToSearchMs(value: unknown): number {
   return hubCreatedAtToMs(value);
+}
+
+/** Ciphertext must not be ILIKE-indexed or shown as a search snippet. */
+export function isSearchablePlaintextBody(content: string): boolean {
+  return content.trim().length > 0 && !isAnyE2eeWireContent(content.trim());
 }
 
 export function toDirectChatSearchHit(args: {
