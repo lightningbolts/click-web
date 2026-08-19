@@ -17,7 +17,7 @@ function msg(id: string, timeCreated: number): Message {
     read_at: null,
     delivered_at: null,
     message_type: 'text',
-    metadata: null,
+    metadata: {},
     reactions: {},
   } as Message;
 }
