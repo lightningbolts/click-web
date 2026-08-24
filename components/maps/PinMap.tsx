@@ -45,10 +45,12 @@ export default function PinMap({
   markers,
   className = '',
   testId = 'pin-map',
+  maxBounds,
 }: {
   markers: PinMapMarker[];
   className?: string;
   testId?: string;
+  maxBounds?: maplibregl.LngLatBoundsLike;
 }) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +87,7 @@ export default function PinMap({
       pixelRatio: 1,
       cooperativeGestures: true,
       transformRequest: dropSameOriginMapRequest,
+      ...(maxBounds ? { maxBounds } : {}),
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.on('load', () => {
@@ -100,7 +103,7 @@ export default function PinMap({
       map.remove();
       mapRef.current = null;
     };
-  }, [markerKey, markers]);
+  }, [markerKey, maxBounds]);
 
   useEffect(() => {
     const map = mapRef.current;

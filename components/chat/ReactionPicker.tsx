@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic';
 import data from '@emoji-mart/data';
 import { motion, AnimatePresence } from 'framer-motion';
 import { REACTION_EMOJIS } from '@/lib/chat/types';
+import { useTheme } from '@/lib/theme/ThemeProvider';
 import { clampBarLeftToBubble, clampLeftEdge, clampTop } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
 
@@ -348,6 +349,7 @@ export default function ReactionPicker({
   hoverGroupId,
   onPortaledPointerChange,
 }: ReactionPickerProps) {
+  const { theme } = useTheme();
   const [showFull, setShowFull] = useState(false);
   const quickBarRef = useRef<HTMLDivElement>(null);
   const fullPanelRef = useRef<HTMLDivElement>(null);
@@ -529,7 +531,7 @@ export default function ReactionPicker({
                   >
                     <Picker
                       data={data}
-                      theme="dark"
+                      theme={theme}
                       dynamicWidth
                       previewPosition="none"
                       skinTonePosition="search"

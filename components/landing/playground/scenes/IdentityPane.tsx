@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Check, Clock, Copy, QrCode, Share2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import DemoQr from '../DemoQr';
@@ -11,6 +11,7 @@ const TOKEN_TTL_S = 90;
 export default function IdentityPane() {
   const [copied, setCopied] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(72);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -48,7 +49,7 @@ export default function IdentityPane() {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={reduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       className="relative mx-auto max-w-sm overflow-hidden rounded-[16px]"
     >

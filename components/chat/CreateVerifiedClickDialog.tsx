@@ -172,7 +172,7 @@ export default function CreateVerifiedClickDialog({
             style={{ willChange: 'transform, opacity' }}
           >
             <div className="shrink-0">
-              <h2 id="create-click-title" className="text-lg font-semibold text-white">
+              <h2 id="create-click-title" className="text-lg font-semibold text-on-surface">
                 Create verified click
               </h2>
               <p className="mt-2 text-sm text-on-surface-variant">
@@ -211,7 +211,7 @@ export default function CreateVerifiedClickDialog({
                         disabled={!enabled}
                         onChange={() => toggle(f.userId)}
                       />
-                      <span className="text-sm text-white">{f.name}</span>
+                      <span className="text-sm text-on-surface">{f.name}</span>
                     </label>
                   );
                 })

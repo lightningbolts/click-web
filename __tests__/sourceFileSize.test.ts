@@ -20,7 +20,11 @@ describe("source file size", () => {
     const files = walk(ROOT);
     const oversized = files
       .map((file) => {
-        const lines = fs.readFileSync(file, "utf8").split("\n").length;
+        const source = fs.readFileSync(file, "utf8");
+        const lines =
+          source === ""
+            ? 0
+            : source.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n").length;
         return { file: path.relative(ROOT, file), lines };
       })
       .filter((row) => row.lines > MAX_LINES);

@@ -21,6 +21,7 @@ export default function PinMapLazy(props: {
   markers: PinMapMarker[];
   className?: string;
   testId?: string;
+  maxBounds?: import('maplibre-gl').LngLatBoundsLike;
 }) {
   return <PinMap {...props} />;
 }

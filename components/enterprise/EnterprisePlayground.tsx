@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { WebChrome } from '@/components/landing/playground/DeviceChrome';
 import PinMapLazy from '@/components/maps/PinMapLazy';
 import { fadePresence, fadeTransition } from '@/lib/motion';
+import { PLAYGROUND_MAX_BOUNDS } from '@/components/landing/playground/playgroundMapStyle';
 import { DEMO_EVENTS, DEMO_PULSE, DEMO_ROOMS } from './enterpriseMock';
 
 const TABS = [
@@ -100,6 +101,7 @@ function FloorScene() {
   return (
     <PinMapLazy
       testId="enterprise-floor-map"
+      maxBounds={PLAYGROUND_MAX_BOUNDS}
       markers={DEMO_ROOMS.map((room) => ({
         id: room.id,
         lat: room.lat,

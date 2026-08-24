@@ -74,7 +74,7 @@ export function ChatDialogs({
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
               className="w-[92%] max-w-sm rounded-2xl border border-border-hard bg-surface p-5"
             >
-              <h3 className="text-base font-semibold text-white">Delete message?</h3>
+              <h3 className="text-base font-semibold text-on-surface">Delete message?</h3>
               <p className="mt-2 text-sm text-on-surface-variant">This message will be removed permanently.</p>
               <div className="mt-5 flex justify-end gap-2">
                 <button
@@ -112,13 +112,13 @@ export function ChatDialogs({
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
               className="w-[92%] max-w-md rounded-2xl border border-border-hard bg-surface p-5"
             >
-              <h3 className="text-base font-semibold text-white">Report connection</h3>
+              <h3 className="text-base font-semibold text-on-surface">Report connection</h3>
               <p className="mt-2 text-sm text-on-surface-variant">Describe what happened. This helps moderation review quickly.</p>
               <textarea
                 value={reportReason}
                 onChange={(event) => setReportReason(event.target.value)}
                 rows={4}
-                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
+                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Reason for report"
               />
               <div className="mt-5 flex justify-end gap-2">
@@ -172,12 +172,12 @@ export function ChatDialogs({
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
               className="w-[92%] max-w-sm rounded-2xl border border-border-hard bg-surface p-5"
             >
-              <h3 className="text-base font-semibold text-white">Rename group</h3>
+              <h3 className="text-base font-semibold text-on-surface">Rename group</h3>
               <textarea
                 value={renameGroupInput}
                 onChange={(e) => setRenameGroupInput(e.target.value)}
                 rows={2}
-                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
+                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Group name"
               />
               <div className="mt-5 flex justify-end gap-2">
@@ -209,7 +209,7 @@ export function ChatDialogs({
                       });
                     }
                   }}
-                  className="px-3 py-2 rounded-xl bg-primary text-white hover:opacity-90 disabled:opacity-40"
+                  className="px-3 py-2 rounded-xl bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
                 >
                   Save
                 </button>
@@ -238,13 +238,13 @@ export function ChatDialogs({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-white">Members</h3>
+                  <h3 className="text-base font-semibold text-on-surface">Members</h3>
                   <p className="mt-1 text-xs text-on-surface-variant">Choose someone to view their profile.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowGroupMemberPicker(false)}
-                  className="rounded-lg p-1.5 text-on-surface-variant hover:bg-white/5 hover:text-white"
+                  className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
@@ -255,7 +255,7 @@ export function ChatDialogs({
                   <li key={row.userId}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface-container"
                       onClick={() => {
                         onOpenProfile?.(row.userId);
                         setShowGroupMemberPicker(false);

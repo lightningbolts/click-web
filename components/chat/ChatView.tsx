@@ -543,7 +543,7 @@ export default function ChatView({
                 <div className="relative h-6 w-6 shrink-0">
                   <div
                     className="flex h-full w-full items-center justify-center rounded-full bg-primary
-                    text-[10px] font-bold"
+                    text-[10px] font-bold text-on-primary"
                   >
                     {isGroupClique ? '⋯' : otherInitial}
                   </div>
@@ -583,7 +583,7 @@ export default function ChatView({
               className="absolute right-5 bottom-20 bg-primary/90 
                 rounded-full p-2.5 shadow-lg hover:bg-primary transition-colors z-10 "
             >
-              <ChevronDown className="w-4 h-4 text-white" />
+              <ChevronDown className="w-4 h-4 text-on-primary" />
             </motion.button>
           )}
         </AnimatePresence>

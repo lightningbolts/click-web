@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle, X } from 'lucide-react';
 import { fadePresence, fadeTransition } from '@/lib/motion';
@@ -20,6 +20,13 @@ export default function WaitlistModal({
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (open) return;
+    setEmail('');
+    setStatus('idle');
+    setMessage('');
+  }, [open]);
 
   const submit = async () => {
     if (!email.includes('@')) {

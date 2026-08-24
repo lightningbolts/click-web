@@ -185,7 +185,7 @@ export function ChatHeader({
         >
           {isGroupClique ? (
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-sm font-bold ">
-              <Users className="h-5 w-5 text-white" aria-hidden />
+              <Users className="h-5 w-5 text-on-primary" aria-hidden />
             </div>
           ) : (
             <ConnectionPeerAvatar
@@ -275,7 +275,7 @@ export function ChatHeader({
                         setShowCallMenu(false);
                         onStartCall(false);
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-surface-container"
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container"
                     >
                       <Phone className="h-4 w-4" />
                       {isGroupClique ? 'Group voice call' : 'Voice call'}
@@ -285,7 +285,7 @@ export function ChatHeader({
                         setShowCallMenu(false);
                         onStartCall(true);
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-surface-container"
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container"
                     >
                       <Video className="h-4 w-4" />
                       {isGroupClique ? 'Group video call' : 'Video call'}

@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   BookOpen,
   Calendar,
@@ -40,6 +40,7 @@ export default function DashboardScene({
   const connected = PLAYGROUND_PEOPLE.filter((p) => state.connectedIds.has(p.id));
   const rsvps = PLAYGROUND_EVENTS.filter((e) => state.rsvpIds.has(e.id));
   const [query, setQuery] = useState('');
+  const reduceMotion = useReducedMotion();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -319,10 +320,10 @@ export default function DashboardScene({
           {state.dashboardTab === 'identity' ? (
             <motion.div
               key="identity"
-              initial={{ opacity: 0, y: 20 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              exit={reduceMotion ? undefined : { opacity: 0, y: -20 }}
+              transition={{ duration: reduceMotion ? 0 : 0.3 }}
             >
               <IdentityPane />
             </motion.div>
