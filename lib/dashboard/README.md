@@ -37,7 +37,7 @@ lib/dashboard/*
 
 ### `DashboardView` orchestrator
 
-`components/DashboardView.tsx` (~3.6k lines) coordinates:
+`components/DashboardView.tsx` (shell; heavy logic lives in `components/dashboard/use*` hooks) coordinates:
 
 - Auth via `useAuth()`
 - Fetch `/api/connections` (active + archived)

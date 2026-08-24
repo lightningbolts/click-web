@@ -96,6 +96,7 @@ Used by middleware and insights API routes.
 | `lib/server/admin/supabaseAdmin.ts` | Admin dashboard data |
 | `lib/server/insightsVenueAugmentation.ts` | Venue API enrichment |
 | `lib/server/terrainElevation.ts` | Open-Elevation for encounters |
+| `lib/server/connections/` | `/api/connections` helpers: viewer redaction, geo/proximity scoring, encounter enrichment, query executors |
 | `lib/server/stripe.ts` | Stripe SDK |
 | `proxy.ts` | Middleware using eligibility + admin |
 

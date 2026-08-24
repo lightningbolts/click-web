@@ -5,250 +5,48 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
   X,
-  Download,
-  ExternalLink,
   Loader2,
-  Sparkles,
   MapPin,
-  Clock,
-  Cloud,
-  Volume2,
-  Mountain,
-  Thermometer,
-  Sun,
-  Moon,
-  Battery,
-  Compass,
-  Activity,
-  Wind,
-  Gauge,
   Image as ImageIcon,
   Link as LinkIcon,
-  Maximize2,
   Paperclip,
   History,
-  FileText,
-  type LucideIcon,
 } from 'lucide-react';
-import {
-  buildProfileConnectionLines,
-  normalizeWeatherSnapshot,
-  prettyElevationCategoryKey,
-  prettyNoiseCategoryKey,
-  type SharedConnectionPayload,
-} from '@/lib/userProfile/formatSharedConnection';
+import { buildProfileConnectionLines } from '@/lib/userProfile/formatSharedConnection';
 import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropReveal';
-import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
-import CurrentAvailabilitySection from '@/components/dashboard/CurrentAvailabilitySection';
-import { CardVisualHero } from '@/components/ui/CardVisualSurface';
 import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
 import { PriorConnectionBadge } from '@/components/profile/PriorConnectionBadge';
-import { FcButton, FcChip } from '@/components/fc';
-import {
-  originEncounter,
-  parseConnectionEncounters,
-  type ConnectionEncounterRow,
-} from '@/lib/dashboard/connectionEncounters';
+import { FcButton } from '@/components/fc';
+import { originEncounter, parseConnectionEncounters } from '@/lib/dashboard/connectionEncounters';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 import useSWR, { useSWRConfig } from 'swr';
 import Image from 'next/image';
-import { coerceMessageType } from '@/lib/chat/messages';
-import {
-  decodeFileMasterKeyBase64,
-  decryptFileBytes,
-  sha256Base64,
-  tryDecodeEnvelope,
-  type AttachmentEnvelope,
-} from '@/lib/chat/attachmentCrypto';
-import {
-  decryptContent,
-  decryptGroupMessageContent,
-  deriveKeysForConnection,
-  isEncrypted,
-  isGroupMessageEncrypted,
-  type DerivedKeys,
-} from '@/lib/chat/crypto';
-import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
-import { getSupabaseClient } from '@/lib/supabase';
 import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
 import { isPriorSource } from '@/lib/insights/analytics';
-import { knownSinceLabel } from '@/lib/connections/priorConnectionMeta';
-import { createSecureMediaObjectUrl, type SecureMediaChatKey } from '@/lib/chat/useSecureMedia';
-import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
 import { stableKeysForStringList } from '@/lib/react/stableKeysForStringList';
+import type {
+  BeaconPreviewItem,
+  CollaborationSessionResponse,
+  DecryptedProfileMessage,
+  UserProfilePayload,
+} from '@/lib/userProfile/profileModalTypes';
+import {
+  ageFromBirthday,
+  coerceSharedConnection,
+  displayName,
+} from '@/lib/userProfile/profileDisplay';
+import { metaString } from '@/lib/userProfile/profileMediaItems';
+import { ProfileLoadingSkeleton } from '@/components/userProfile/ProfileModalPrimitives';
+import { useProfileTabsData } from '@/components/userProfile/useProfileTabsData';
+import { MediaTab } from '@/components/userProfile/MediaTab';
+import { LinksTab } from '@/components/userProfile/LinksTab';
+import { FilesTab } from '@/components/userProfile/FilesTab';
+import { BeaconsTab, type BeaconDetailState } from '@/components/userProfile/BeaconsTab';
+import { TimelineTab } from '@/components/userProfile/TimelineTab';
 
 export type { AvailabilityIntentRow };
-
-export type UserProfilePayload = {
-  user: {
-    id: string;
-    first_name?: string | null;
-    last_name?: string | null;
-    name?: string | null;
-    full_name?: string | null;
-    birthday?: string | null;
-    image?: string | null;
-    email?: string | null;
-  };
-  tags: string[];
-  availability: {
-    is_free_this_week?: boolean;
-    available_days?: string[];
-    preferred_activities?: string[];
-    custom_status?: string | null;
-  } | null;
-  /** Non-expired rows from `availability_intents` (when API can read them). */
-  availabilityIntents?: AvailabilityIntentRow[];
-  /** Logged-in viewer’s tags (for client-side use; API also sends `sharedInterestTags`). */
-  viewerInterestTags?: string[];
-  sharedInterestTags?: string[];
-  /** Mutual `connections` row for viewer + profile user. */
-  sharedConnection?: SharedConnectionPayload | null;
-};
-
-function displayName(u: UserProfilePayload['user']): string {
-  const fn = u.first_name?.trim();
-  const ln = u.last_name?.trim();
-  if (fn || ln) return [fn, ln].filter(Boolean).join(' ');
-  return u.full_name?.trim() || u.name?.trim() || 'Member';
-}
-
-function coerceSharedConnection(raw: unknown): SharedConnectionPayload | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const o = raw as Record<string, unknown>;
-  const id = o.id;
-  if (typeof id !== 'string') return null;
-  const cr = o.created;
-  const created = typeof cr === 'number' && Number.isFinite(cr) ? cr : 0;
-  return { ...(o as object), id, created } as SharedConnectionPayload;
-}
-
-function formatEncounterWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(d);
-}
-
-function encounterMetricPills(enc: ConnectionEncounterRow): { metricKey: string; Icon: LucideIcon; label: string }[] {
-  const out: { metricKey: string; Icon: LucideIcon; label: string }[] = [];
-  const ws = normalizeWeatherSnapshot(enc.weatherSnapshot);
-  if (ws) {
-    const cond =
-      typeof ws.condition === 'string' && ws.condition.trim()
-        ? ws.condition.trim()
-        : typeof ws.iconCode === 'string' && ws.iconCode.trim()
-          ? ws.iconCode.trim().replace(/^./, (c) => c.toUpperCase())
-          : null;
-    if (cond) out.push({ metricKey: 'wx-cond', Icon: Cloud, label: cond });
-
-    const temp = typeof ws.temperatureCelsius === 'number' && Number.isFinite(ws.temperatureCelsius)
-      ? ws.temperatureCelsius
-      : null;
-    if (temp != null) {
-      const f = Math.round((temp * 9) / 5 + 32);
-      out.push({ metricKey: 'temp', Icon: Thermometer, label: `${f}°F (${Math.round(temp)}°C)` });
-    }
-    const windKph =
-      typeof ws.windSpeedKph === 'number' && Number.isFinite(ws.windSpeedKph) ? ws.windSpeedKph : null;
-    if (windKph != null) {
-      const degRaw = ws.windDirectionDegrees;
-      const deg =
-        typeof degRaw === 'number' && Number.isFinite(degRaw)
-          ? degRaw
-          : typeof degRaw === 'string' && degRaw.trim()
-            ? Number(degRaw.trim())
-            : NaN;
-      let suffix = '';
-      if (Number.isFinite(deg) && deg >= 0 && deg <= 359) {
-        const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-        const x = ((deg % 360) + 360) % 360;
-        const idx = (Math.floor((x + 22.5) / 45) % 8 + 8) % 8;
-        suffix = ` ${dirs[idx]}`;
-      }
-      out.push({ metricKey: 'wind', Icon: Wind, label: `${Math.round(windKph)} km/h${suffix}` });
-    }
-    const p = typeof ws.pressureMslHpa === 'number' && Number.isFinite(ws.pressureMslHpa) ? ws.pressureMslHpa : null;
-    if (p != null) {
-      out.push({ metricKey: 'hpa', Icon: Gauge, label: `${Math.round(p)} hPa` });
-    }
-  }
-  const noiseCat = enc.noiseLevel?.trim();
-  if (noiseCat) {
-    out.push({ metricKey: 'noise-cat', Icon: Volume2, label: prettyNoiseCategoryKey(noiseCat) });
-  }
-  const dbRaw = enc.exactNoiseLevelDb;
-  if (dbRaw !== null && dbRaw !== undefined && typeof dbRaw === 'number' && Number.isFinite(dbRaw)) {
-    out.push({ metricKey: 'db', Icon: Volume2, label: `${Math.round(dbRaw)} dB` });
-  }
-  const elCat = enc.elevationCategory?.trim();
-  if (elCat) {
-    out.push({ metricKey: 'el-cat', Icon: Mountain, label: prettyElevationCategoryKey(elCat) });
-  }
-  const elRaw =
-    enc.relativeAltitudeM !== null &&
-    enc.relativeAltitudeM !== undefined &&
-    typeof enc.relativeAltitudeM === 'number' &&
-    Number.isFinite(enc.relativeAltitudeM)
-      ? enc.relativeAltitudeM
-      : enc.exactBarometricElevationM;
-  if (elRaw !== null && elRaw !== undefined && typeof elRaw === 'number' && Number.isFinite(elRaw)) {
-    out.push({ metricKey: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
-  }
-  const luxRaw = enc.luxLevel;
-  if (luxRaw !== null && luxRaw !== undefined && typeof luxRaw === 'number' && Number.isFinite(luxRaw) && luxRaw >= 0) {
-    const I = luxRaw < 15 ? Moon : Sun;
-    out.push({ metricKey: 'lux', Icon: I, label: `${Math.round(luxRaw)} lx` });
-  }
-  const bat = enc.batteryLevel;
-  if (bat !== null && bat !== undefined && typeof bat === 'number' && Number.isFinite(bat) && bat >= 0 && bat <= 100) {
-    out.push({ metricKey: 'bat', Icon: Battery, label: `${Math.round(bat)}%` });
-  }
-  const az = enc.compassAzimuth;
-  if (az !== null && az !== undefined && typeof az === 'number' && Number.isFinite(az)) {
-    const d = Math.round(((az % 360) + 360) % 360);
-    out.push({ metricKey: 'az', Icon: Compass, label: `${d}°` });
-  }
-  const mv = enc.motionVariance;
-  if (mv !== null && mv !== undefined && typeof mv === 'number' && Number.isFinite(mv) && mv >= 0) {
-    out.push({ metricKey: 'mv', Icon: Activity, label: mv.toFixed(2) });
-  }
-  return out;
-}
-
-function ageFromBirthday(birthday?: string | null): number | null {
-  if (!birthday?.trim()) return null;
-  const d = new Date(birthday.slice(0, 10));
-  if (Number.isNaN(d.getTime())) return null;
-  const t = new Date();
-  let age = t.getFullYear() - d.getFullYear();
-  const md = t.getMonth() - d.getMonth();
-  if (md < 0 || (md === 0 && t.getDate() < d.getDate())) age--;
-  return age >= 0 && age < 130 ? age : null;
-}
-
-/**
- * Locally-decrypted chat messages used to populate the Media / Files / Links
- * subtabs. Message content is E2EE on the wire, so the BFF cannot parse it —
- * clients scan their already-decrypted state.
- */
-export type DecryptedProfileMessage = {
-  id: string;
-  content: string;
-  /** Human-readable timestamp already formatted by the caller. */
-  timestamp: string;
-  /** Message type (e.g. 'text', 'image', 'audio', 'file'). Defaults to 'text'. */
-  messageType?: string;
-  /** Parsed metadata JSON for media/file messages. */
-  metadata?: Record<string, unknown> | null;
-};
+export type { UserProfilePayload, DecryptedProfileMessage } from '@/lib/userProfile/profileModalTypes';
 
 type UserProfileModalProps = {
   userId: string | null;
@@ -276,417 +74,6 @@ type UserProfileModalProps = {
 
 type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files' | 'beacons';
 
-type ConnectionTabsPayload = {
-  chatId: string | null;
-  media: Array<{
-    id: string;
-    content: string;
-    time_created: number | string;
-    message_type: string;
-    metadata: Record<string, unknown> | null;
-  }>;
-  files: Array<{
-    id: string;
-    content: string;
-    time_created: number | string;
-    message_type: string;
-    metadata: Record<string, unknown> | null;
-  }>;
-  beacons?: Array<{
-    id: string;
-    content: string;
-    time_created: number | string;
-    message_type: string;
-    metadata: Record<string, unknown> | null;
-  }>;
-};
-
-type BeaconPreviewItem = {
-  id: string;
-  beaconId: string;
-  title: string;
-  description?: string;
-  scheduleLabel?: string;
-  locationLabel?: string;
-  imageUrl?: string | null;
-};
-
-type EventRecommendationPayload = {
-  recommendation: {
-    beacon_id: string;
-    title: string;
-    peer_name?: string;
-    event_start_at?: string | null;
-    location_name?: string | null;
-  } | null;
-};
-
-type ChatMessagesPayload = {
-  messages: Array<{
-    id: string;
-    content: string;
-    time_created: number;
-    message_type: string;
-    metadata: Record<string, unknown> | null;
-  }>;
-};
-
-type CollaborationSessionResponse = {
-  encounter_id?: unknown;
-  collaboration_ttl?: unknown;
-};
-
-type MediaItem = {
-  id: string;
-  mediaType: 'image' | 'audio';
-  sourceUrl: string | null;
-  storagePath: string | null;
-  caption: string | null;
-  mimeType: string | null;
-  isEncrypted: boolean;
-};
-type FileItem = {
-  id: string;
-  fileName: string;
-  sizeBytes: number;
-  mimeType: string;
-  timestamp: string;
-  downloadUrl: string | null;
-  storagePath: string | null;
-  envelope: AttachmentEnvelope | null;
-};
-type LinkItem = { id: string; url: string; timestamp: string };
-
-function pickString(meta: Record<string, unknown> | null | undefined, keys: string[]): string | null {
-  if (!meta) return null;
-  for (const k of keys) {
-    const v = meta[k];
-    if (typeof v === 'string' && v.trim()) return v.trim();
-  }
-  return null;
-}
-
-function pickNumber(meta: Record<string, unknown> | null | undefined, keys: string[]): number | null {
-  if (!meta) return null;
-  for (const k of keys) {
-    const v = meta[k];
-    if (typeof v === 'number' && Number.isFinite(v)) return v;
-    if (typeof v === 'string' && v.trim()) {
-      const n = Number(v);
-      if (Number.isFinite(n)) return n;
-    }
-  }
-  return null;
-}
-
-function pickBoolean(meta: Record<string, unknown> | null | undefined, keys: string[]): boolean | null {
-  if (!meta) return null;
-  for (const k of keys) {
-    const v = meta[k];
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'string') {
-      const lowered = v.trim().toLowerCase();
-      if (lowered === 'true') return true;
-      if (lowered === 'false') return false;
-    }
-    if (typeof v === 'number') {
-      if (v === 1) return true;
-      if (v === 0) return false;
-    }
-  }
-  return null;
-}
-
-function formatTimestamp(raw: number | string | undefined, fallback: string): string {
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    return new Date(raw).toISOString();
-  }
-  if (typeof raw === 'string' && raw.trim()) return raw.trim();
-  return fallback;
-}
-
-function mapMediaFromRow(row: {
-  id: string;
-  content: string;
-  message_type: string;
-  metadata: Record<string, unknown> | null;
-}): MediaItem | null {
-  const mediaType = coerceMessageType(row.message_type);
-  if (mediaType !== 'image' && mediaType !== 'audio') return null;
-  const sourceUrl = pickString(row.metadata, [
-    'signed_url',
-    'public_url',
-    'url',
-    'storage_url',
-    'image_url',
-    'media_url',
-  ]);
-  const storagePath = pickString(row.metadata, ['path', 'storage_path', 'object_path', 'media_path']);
-  const mimeType = pickString(row.metadata, ['original_mime_type', 'mime_type', 'content_type']);
-  const isEncrypted =
-    pickBoolean(row.metadata, ['is_encrypted_media', 'encrypted_media']) ??
-    false;
-  const caption = row.content && !row.content.startsWith('ccx:v1:') ? row.content : null;
-  return {
-    id: row.id,
-    mediaType,
-    sourceUrl,
-    storagePath,
-    caption,
-    mimeType,
-    isEncrypted,
-  };
-}
-
-function mapFilesFromRow(row: {
-  id: string;
-  content: string;
-  time_created?: number | string;
-  message_type: string;
-  metadata: Record<string, unknown> | null;
-}): FileItem {
-  const envelope = tryDecodeEnvelope(row.content);
-  const fileName =
-    pickString(row.metadata, ['attachment_name', 'file_name', 'filename', 'name']) ??
-    envelope?.name ??
-    (row.content && !row.content.startsWith('e2e:') && !row.content.startsWith('ccx:v1:')
-      ? maskEncryptedSnippet(row.content)
-      : 'Attachment');
-  const sizeBytes = pickNumber(row.metadata, ['attachment_size', 'file_size', 'size_bytes', 'size']) ?? envelope?.size ?? 0;
-  const mimeType =
-    pickString(row.metadata, ['attachment_mime', 'original_mime_type', 'mime_type', 'content_type']) ??
-    envelope?.mime ??
-    'application/octet-stream';
-  const downloadUrl = pickString(row.metadata, [
-    'signed_url',
-    'public_url',
-    'url',
-    'storage_url',
-    'media_url',
-    'attachment_url',
-  ]);
-  const storagePath =
-    pickString(row.metadata, ['attachment_path', 'path', 'storage_path', 'object_path', 'media_path']) ??
-    envelope?.path ??
-    null;
-  return {
-    id: row.id,
-    fileName,
-    sizeBytes,
-    mimeType,
-    timestamp: formatTimestamp(row.time_created, ''),
-    downloadUrl,
-    storagePath,
-    envelope,
-  };
-}
-
-function mapMedia(rows: ConnectionTabsPayload['media']): MediaItem[] {
-  return rows
-    .map((row) => mapMediaFromRow(row))
-    .filter((row): row is MediaItem => row != null);
-}
-
-function mapFiles(rows: ConnectionTabsPayload['files']): FileItem[] {
-  return rows.map((row) => mapFilesFromRow(row));
-}
-
-function mergeMediaItems(localItems: MediaItem[], bffItems: MediaItem[]): MediaItem[] {
-  const merged = new Map<string, MediaItem>();
-  for (const item of bffItems) merged.set(item.id, item);
-  for (const item of localItems) {
-    const prev = merged.get(item.id);
-    if (!prev) {
-      merged.set(item.id, item);
-      continue;
-    }
-    merged.set(item.id, {
-      ...prev,
-      ...item,
-      sourceUrl: item.sourceUrl ?? prev.sourceUrl,
-      storagePath: item.storagePath ?? prev.storagePath,
-      caption: item.caption ?? prev.caption,
-      mimeType: item.mimeType ?? prev.mimeType,
-      isEncrypted: item.isEncrypted || prev.isEncrypted,
-    });
-  }
-  return Array.from(merged.values());
-}
-
-function mergeFileItems(localItems: FileItem[], bffItems: FileItem[]): FileItem[] {
-  const merged = new Map<string, FileItem>();
-  for (const item of bffItems) merged.set(item.id, item);
-  for (const item of localItems) {
-    const prev = merged.get(item.id);
-    if (!prev) {
-      merged.set(item.id, item);
-      continue;
-    }
-    merged.set(item.id, {
-      ...prev,
-      ...item,
-      fileName: item.fileName !== 'Attachment' ? item.fileName : prev.fileName,
-      sizeBytes: item.sizeBytes > 0 ? item.sizeBytes : prev.sizeBytes,
-      mimeType: item.mimeType !== 'application/octet-stream' ? item.mimeType : prev.mimeType,
-      downloadUrl: item.downloadUrl ?? prev.downloadUrl,
-      storagePath: item.storagePath ?? prev.storagePath,
-      envelope: item.envelope ?? prev.envelope,
-      timestamp: item.timestamp || prev.timestamp,
-    });
-  }
-  return Array.from(merged.values());
-}
-
-function mergeLinkItems(primary: LinkItem[], fallback: LinkItem[]): LinkItem[] {
-  const merged = new Map<string, LinkItem>();
-  for (const item of [...fallback, ...primary]) {
-    if (!merged.has(item.url)) merged.set(item.url, item);
-  }
-  return Array.from(merged.values());
-}
-
-function metaString(meta: Record<string, unknown> | null | undefined, ...keys: string[]): string | null {
-  if (!meta) return null;
-  for (const key of keys) {
-    const v = meta[key];
-    if (typeof v === 'string' && v.trim()) {
-      const t = v.trim();
-      if (t.toLowerCase() === 'current location') return null;
-      return t;
-    }
-  }
-  return null;
-}
-
-function mapBeaconPreview(row: {
-  id: string;
-  content: string;
-  message_type?: string;
-  metadata: Record<string, unknown> | null;
-}): BeaconPreviewItem | null {
-  const meta = row.metadata;
-  const beaconId =
-    metaString(meta, 'beacon_id', 'beaconId') ??
-    (typeof meta?.id === 'string' ? meta.id.trim() : null);
-  if (!beaconId) return null;
-  const title =
-    metaString(meta, 'title', 'event_title', 'eventTitle', 'label', 'name') ??
-    (row.content.replace(/^Beacon:\s*/i, '').trim() || 'Beacon');
-  return {
-    id: row.id,
-    beaconId,
-    title,
-    description: metaString(meta, 'description', 'body', 'subtitle') ?? undefined,
-    scheduleLabel: metaString(meta, 'schedule_label', 'scheduleLabel') ?? undefined,
-    locationLabel:
-      metaString(meta, 'formatted_address', 'formattedAddress', 'location_name', 'locationName') ??
-      undefined,
-    imageUrl: beaconHeroImageUrl(meta),
-  };
-}
-
-function mergeBeaconItems(localItems: BeaconPreviewItem[], bffItems: BeaconPreviewItem[]): BeaconPreviewItem[] {
-  const merged = new Map<string, BeaconPreviewItem>();
-  for (const item of [...bffItems, ...localItems]) {
-    if (!merged.has(item.beaconId)) merged.set(item.beaconId, item);
-  }
-  return Array.from(merged.values());
-}
-
-const URL_REGEX = /https?:\/\/\S+/gi;
-const ENCRYPTED_ATTACHMENT_SNIPPET = /ccx:v1:[^\s]+/gi;
-
-function extractLinks(messages: DecryptedProfileMessage[]): LinkItem[] {
-  if (!messages.length) return [];
-  const seen = new Set<string>();
-  const out: LinkItem[] = [];
-  for (const m of messages) {
-    const matches = m.content.matchAll(URL_REGEX);
-    for (const match of matches) {
-      const url = match[0].replace(/[.,)\]};:]+$/g, '');
-      if (!url || seen.has(url)) continue;
-      seen.add(url);
-      out.push({ id: `${m.id}:${url}`, url, timestamp: m.timestamp });
-    }
-  }
-  return out;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${((bytes / (1024 * 1024)) * 10 >> 0) / 10} MB`;
-}
-
-function maskEncryptedSnippet(value: string): string {
-  return value.replace(ENCRYPTED_ATTACHMENT_SNIPPET, '[encrypted attachment]');
-}
-
-function sanitizeDownloadName(name: string): string {
-  const cleaned = name.trim().replace(/[\\/:*?"<>|]+/g, '_');
-  return cleaned || 'Attachment';
-}
-
-function extensionFromMime(mimeType: string | null | undefined): string {
-  const mt = (mimeType ?? '').toLowerCase();
-  if (mt.includes('jpeg')) return 'jpg';
-  if (mt.includes('png')) return 'png';
-  if (mt.includes('webp')) return 'webp';
-  if (mt.includes('gif')) return 'gif';
-  if (mt.includes('mp3')) return 'mp3';
-  if (mt.includes('wav')) return 'wav';
-  if (mt.includes('webm')) return 'webm';
-  if (mt.includes('ogg')) return 'ogg';
-  if (mt.includes('mpeg') || mt.includes('m4a') || mt.includes('mp4')) return 'm4a';
-  return 'bin';
-}
-
-function triggerBlobDownload(bytes: Uint8Array, fileName: string, mimeType: string): void {
-  const buffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buffer).set(bytes);
-  const blob = new Blob([buffer], { type: mimeType || 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  try {
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = sanitizeDownloadName(fileName);
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  }
-}
-
-function ProfileLoadingSkeleton() {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-      className="space-y-5 py-1"
-      aria-busy
-      aria-label="Loading profile"
-    >
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-24 w-24 rounded-full border border-border-hard bg-surface-container animate-pulse" />
-        <div className="h-5 w-40 rounded-[8px] bg-surface-container animate-pulse" />
-        <div className="h-3 w-28 rounded-[8px] bg-surface-container animate-pulse" />
-      </div>
-      <div className="space-y-2">
-        <div className="h-3 w-24 rounded bg-surface-container animate-pulse" />
-        <div className="h-9 w-full rounded-[8px] bg-surface-container animate-pulse" />
-        <div className="h-9 w-[80%] rounded-[8px] bg-surface-container animate-pulse" />
-      </div>
-      <div className="space-y-2">
-        <div className="h-3 w-20 rounded bg-surface-container animate-pulse" />
-        <div className="h-16 w-full rounded-[8px] bg-surface-container animate-pulse" />
-      </div>
-    </motion.div>
-  );
-}
-
 export default function UserProfileModal({
   userId,
   getAuthHeaders,
@@ -708,11 +95,6 @@ export default function UserProfileModal({
   const [rollStatus, setRollStatus] = useState<'idle' | 'opening' | 'uploading' | 'done' | 'error'>('idle');
   const [priorRespondBusy, setPriorRespondBusy] = useState(false);
   const [priorRespondError, setPriorRespondError] = useState<string | null>(null);
-  const [derivedKeys, setDerivedKeys] = useState<DerivedKeys | null>(null);
-  const [groupMasterKey, setGroupMasterKey] = useState<ArrayBuffer | null>(null);
-  const [cryptoUnlockError, setCryptoUnlockError] = useState<string | null>(null);
-  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
-  const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
   const profileConnectionQuery = connectionId?.trim()
     ? `?connectionId=${encodeURIComponent(connectionId.trim())}`
     : '';
@@ -766,69 +148,6 @@ export default function UserProfileModal({
     return fromProp || null;
   }, [connectionId, profileData?.sharedConnection]);
 
-  const tabsPath = (() => {
-    const paramId = (chatId?.trim() || effectiveConnectionId || groupId?.trim() || '').trim();
-    if (!paramId) return null;
-    const base = `/api/connections/${encodeURIComponent(paramId)}/tabs?limit=200`;
-    const explicitChat = chatId?.trim();
-    if (explicitChat && explicitChat !== paramId) {
-      return `${base}&chatId=${encodeURIComponent(explicitChat)}`;
-    }
-    if (explicitChat) {
-      return `${base}&chatId=${encodeURIComponent(explicitChat)}`;
-    }
-    return base;
-  })();
-  const { data: tabsPayload, isLoading: tabsLoading } = useSWR<ConnectionTabsPayload>(
-    tabsPath,
-    async (path: string) => {
-      const headers = await getAuthHeaders();
-      const res = await fetch(path, { headers });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          authFailureMessage(
-            res.status,
-            typeof json?.error === 'string' && json.error.trim()
-              ? json.error
-              : res.statusText || 'Failed to load profile tabs',
-          ),
-        );
-      }
-      return json as ConnectionTabsPayload;
-    },
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60_000,
-      keepPreviousData: false,
-    },
-  );
-
-  const chatMessagesPath = tabsPayload?.chatId
-    ? `/api/chat/messages?chatId=${encodeURIComponent(tabsPayload.chatId)}&limit=200`
-    : null;
-  const { data: chatMessagesPayload, isLoading: chatMessagesLoading } = useSWR<ChatMessagesPayload>(
-    chatMessagesPath,
-    async (path: string) => {
-      const headers = await getAuthHeaders();
-      const res = await fetch(path, { headers });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          typeof json?.error === 'string' && json.error.trim()
-            ? json.error
-            : res.statusText || 'Failed to load chat messages',
-        );
-      }
-      return json as ChatMessagesPayload;
-    },
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60_000,
-      keepPreviousData: false,
-    },
-  );
-
   const connectionUserIds = useMemo(() => {
     const raw = (profileData?.sharedConnection as Record<string, unknown> | null)?.user_ids;
     if (!Array.isArray(raw)) return [];
@@ -836,182 +155,37 @@ export default function UserProfileModal({
       .map((v) => (typeof v === 'string' ? v.trim() : ''))
       .filter((v) => v.length > 0);
   }, [profileData?.sharedConnection]);
-  const connectionUserIdsKey = connectionUserIds.join(':');
 
-  useEffect(() => {
-    let cancelled = false;
-    setDerivedKeys(null);
-    setGroupMasterKey(null);
-    setCryptoUnlockError(null);
+  const {
+    tabsLoading,
+    chatMessagesLoading,
+    cryptoUnlockError,
+    mediaItems,
+    imageItems,
+    audioItems,
+    fileItems,
+    beaconItems,
+    linkItems,
+    resolvedMediaUrls,
+    recommendationPayload,
+    openMediaItem,
+    downloadMediaItem,
+    openFileItem,
+    downloadFileItem,
+  } = useProfileTabsData({
+    getAuthHeaders,
+    currentUserId,
+    requestedUserId,
+    chatId,
+    groupId,
+    effectiveConnectionId,
+    connectionUserIds,
+    decryptedMessages,
+  });
 
-    const gid = groupId?.trim();
-    if (gid && currentUserId) {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        setCryptoUnlockError('Could not unlock group encryption for this device.');
-        return;
-      }
-      void unwrapGroupMasterKeyBytes(supabase, {
-        groupId: gid,
-        viewerUserId: currentUserId,
-      })
-        .then((master) => {
-          if (cancelled) return;
-          if (master) {
-            setGroupMasterKey(master);
-          } else {
-            setCryptoUnlockError('Could not unlock group encryption for this device.');
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setCryptoUnlockError('Could not unlock group encryption for this device.');
-          }
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (!effectiveConnectionId || connectionUserIds.length < 2) return;
-
-    void deriveKeysForConnection(effectiveConnectionId, connectionUserIds)
-      .then((keys) => {
-        if (!cancelled) setDerivedKeys(keys);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDerivedKeys(null);
-          setCryptoUnlockError('Could not derive chat keys for media decryption.');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveConnectionId, connectionUserIdsKey, groupId, currentUserId]);
-
-  const mediaChatKey: SecureMediaChatKey | null = groupMasterKey ?? derivedKeys;
-
-  const localMediaItems = useMemo(() => {
-    return decryptedMessages
-      .map((m) =>
-        mapMediaFromRow({
-          id: m.id,
-          content: m.content,
-          message_type: coerceMessageType(m.messageType),
-          metadata: m.metadata ?? null,
-        }),
-      )
-      .filter((row): row is MediaItem => row != null);
-  }, [decryptedMessages]);
-
-  const bffMediaItems = useMemo(() => mapMedia(tabsPayload?.media ?? []), [tabsPayload]);
-  const mediaItems = useMemo(
-    () => mergeMediaItems(localMediaItems, bffMediaItems),
-    [localMediaItems, bffMediaItems],
-  );
-  const imageItems = useMemo(() => mediaItems.filter((m) => m.mediaType === 'image'), [mediaItems]);
-  const audioItems = useMemo(() => mediaItems.filter((m) => m.mediaType === 'audio'), [mediaItems]);
-
-  const localFileItems = useMemo(() => {
-    const fileMessages = decryptedMessages.filter(
-      (m) =>
-        coerceMessageType(m.messageType) === 'file' ||
-        (m.metadata != null &&
-          (typeof m.metadata['attachment_v'] === 'number' ||
-            typeof m.metadata['attachment_v'] === 'string' ||
-            typeof m.metadata['attachment_path'] === 'string' ||
-            typeof m.metadata['attachment_name'] === 'string' ||
-            typeof m.metadata['file_name'] === 'string' ||
-            typeof m.metadata['filename'] === 'string')),
-    );
-    return fileMessages.map((m): FileItem =>
-      mapFilesFromRow({
-        id: m.id,
-        content: m.content,
-        message_type: coerceMessageType(m.messageType),
-        metadata: m.metadata ?? null,
-        time_created: m.timestamp,
-      }),
-    );
-  }, [decryptedMessages]);
-  const bffFileItems = useMemo(() => mapFiles(tabsPayload?.files ?? []), [tabsPayload]);
-  const fileItems = useMemo(
-    () => mergeFileItems(localFileItems, bffFileItems),
-    [localFileItems, bffFileItems],
-  );
-
-  const localBeaconItems = useMemo(() => {
-    return decryptedMessages
-      .filter((m) => coerceMessageType(m.messageType) === 'beacon')
-      .map((m) =>
-        mapBeaconPreview({
-          id: m.id,
-          content: m.content,
-          message_type: coerceMessageType(m.messageType),
-          metadata: m.metadata ?? null,
-        }),
-      )
-      .filter((row): row is BeaconPreviewItem => row != null);
-  }, [decryptedMessages]);
-
-  const bffBeaconItems = useMemo(() => {
-    return (tabsPayload?.beacons ?? [])
-      .map((row) =>
-        mapBeaconPreview({
-          id: row.id,
-          content: row.content,
-          message_type: row.message_type,
-          metadata: row.metadata,
-        }),
-      )
-      .filter((row): row is BeaconPreviewItem => row != null);
-  }, [tabsPayload]);
-
-  const beaconItems = useMemo(
-    () => mergeBeaconItems(localBeaconItems, bffBeaconItems),
-    [localBeaconItems, bffBeaconItems],
-  );
-
-  const recommendationPath = effectiveConnectionId
-    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/event-recommendation`
-    : null;
-  const { data: recommendationPayload } = useSWR<EventRecommendationPayload>(
-    recommendationPath,
-    async (path: string) => {
-      const headers = await getAuthHeaders();
-      const res = await fetch(path, { headers });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          typeof json?.error === 'string' && json.error.trim()
-            ? json.error
-            : res.statusText || 'Failed to load recommendation',
-        );
-      }
-      return json as EventRecommendationPayload;
-    },
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60_000,
-      keepPreviousData: false,
-    },
-  );
   const [recommendationDismissed, setRecommendationDismissed] = useState(false);
   const [rsvpBusy, setRsvpBusy] = useState(false);
-  const [beaconDetail, setBeaconDetail] = useState<{
-    /** Raw beacon id, so the panel header paints the same generated visual as the list row. */
-    beaconId: string;
-    loading: boolean;
-    error: string | null;
-    title: string;
-    description?: string;
-    location?: string;
-    schedule?: string;
-    expired?: boolean;
-    imageUrl?: string | null;
-  } | null>(null);
+  const [beaconDetail, setBeaconDetail] = useState<BeaconDetailState | null>(null);
 
   const openBeaconDetail = useCallback(
     async (beaconId: string, fallback?: BeaconPreviewItem) => {
@@ -1094,220 +268,6 @@ export default function UserProfileModal({
     [getAuthHeaders],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    const objectUrls: string[] = [];
-    setResolvedMediaUrls({});
-
-    const resolveAll = async () => {
-      const next: Record<string, string> = {};
-      for (const item of mediaItems) {
-        try {
-          let sourceUrl = item.sourceUrl;
-          if (!sourceUrl && item.storagePath) {
-            sourceUrl = await signChatAttachmentUrl(item.storagePath, getAuthHeaders);
-          }
-          if (!sourceUrl) continue;
-
-          if (item.isEncrypted) {
-            if (!mediaChatKey) {
-              if (!cancelled) {
-                setCryptoUnlockError((prev) =>
-                  prev ?? 'Encrypted media could not be unlocked for this profile.',
-                );
-              }
-              continue;
-            }
-            const objectUrl = await createSecureMediaObjectUrl({
-              storageUrl: sourceUrl,
-              chatKey: mediaChatKey,
-              mimeType: item.mimeType ?? undefined,
-            });
-            objectUrls.push(objectUrl);
-            next[item.id] = objectUrl;
-          } else {
-            next[item.id] = sourceUrl;
-          }
-        } catch {
-          // Keep this media tile hidden when we cannot resolve/decrypt its source.
-        }
-      }
-      if (!cancelled) setResolvedMediaUrls(next);
-    };
-
-    void resolveAll();
-    return () => {
-      cancelled = true;
-      for (const url of objectUrls) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, [mediaChatKey, getAuthHeaders, mediaItems]);
-
-  const localLinkItems = useMemo(
-    () =>
-      extractLinks(
-        decryptedMessages.filter(
-          (m) =>
-            coerceMessageType(m.messageType) === 'text' &&
-            (m.content.includes('http://') || m.content.includes('https://')),
-        ),
-      ),
-    [decryptedMessages],
-  );
-  const [fallbackLinkItems, setFallbackLinkItems] = useState<LinkItem[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const sourceRows = chatMessagesPayload?.messages ?? [];
-    if (sourceRows.length === 0) {
-      setFallbackLinkItems([]);
-      return;
-    }
-
-    const hydrate = async () => {
-      const decryptedRows: DecryptedProfileMessage[] = [];
-      for (const row of sourceRows) {
-        if (coerceMessageType(row.message_type) !== 'text') continue;
-
-        let content = row.content;
-        if (isGroupMessageEncrypted(content) && groupMasterKey) {
-          content = await decryptGroupMessageContent(content, groupMasterKey);
-        } else if (isEncrypted(content) && derivedKeys) {
-          content = await decryptContent(content, derivedKeys);
-        }
-
-        decryptedRows.push({
-          id: row.id,
-          content,
-          timestamp: new Date(row.time_created).toISOString(),
-          messageType: row.message_type,
-          metadata: row.metadata,
-        });
-      }
-
-      if (!cancelled) {
-        setFallbackLinkItems(extractLinks(decryptedRows));
-      }
-    };
-
-    void hydrate();
-    return () => {
-      cancelled = true;
-    };
-  }, [chatMessagesPayload?.messages, derivedKeys, groupMasterKey, localLinkItems.length]);
-
-  const linkItems = useMemo(
-    () => mergeLinkItems(localLinkItems, fallbackLinkItems),
-    [localLinkItems, fallbackLinkItems],
-  );
-
-  const downloadUrl = useCallback(async (url: string, filename: string) => {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`download failed (${res.status})`);
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objUrl;
-      anchor.download = sanitizeDownloadName(filename);
-      anchor.rel = 'noopener noreferrer';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(objUrl);
-      return;
-    } catch {
-      // Fallback: trigger a direct navigation/download via anchor (popup-safe).
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = sanitizeDownloadName(filename);
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-    }
-  }, []);
-
-  const openMediaItem = useCallback(
-    (item: MediaItem) => {
-      const url = resolvedMediaUrls[item.id];
-      if (!url) return;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    },
-    [resolvedMediaUrls],
-  );
-
-  const downloadMediaItem = useCallback(
-    async (item: MediaItem) => {
-      const url = resolvedMediaUrls[item.id];
-      if (!url) return;
-      const ext = extensionFromMime(item.mimeType);
-      await downloadUrl(url, `${item.mediaType}-${item.id}.${ext}`);
-    },
-    [downloadUrl, resolvedMediaUrls],
-  );
-
-  const resolveFileUrl = useCallback(
-    async (item: FileItem): Promise<string | null> => {
-      if (item.downloadUrl) return item.downloadUrl;
-      const cached = signedFileUrls[item.id];
-      if (cached) return cached;
-      if (!item.storagePath) return null;
-      try {
-        const signed = await signChatAttachmentUrl(item.storagePath, getAuthHeaders);
-        setSignedFileUrls((prev) => ({ ...prev, [item.id]: signed }));
-        return signed;
-      } catch {
-        return null;
-      }
-    },
-    [getAuthHeaders, signedFileUrls],
-  );
-
-  const openFileItem = useCallback(
-    async (item: FileItem) => {
-      const popup = window.open('', '_blank', 'noopener,noreferrer');
-      const url = await resolveFileUrl(item);
-      if (!url) {
-        popup?.close();
-        return;
-      }
-      if (popup) {
-        popup.location.href = url;
-      } else {
-        window.location.assign(url);
-      }
-    },
-    [resolveFileUrl],
-  );
-
-  const downloadFileItem = useCallback(
-    async (item: FileItem) => {
-      const url = await resolveFileUrl(item);
-      if (!url) return;
-      if (item.envelope) {
-        try {
-          const ciphertext = await downloadAttachmentCiphertext(url);
-          const fileKey = decodeFileMasterKeyBase64(item.envelope.key);
-          const plaintext = await decryptFileBytes(ciphertext, fileKey);
-          const digest = await sha256Base64(plaintext);
-          if (digest !== item.envelope.sha256) {
-            throw new Error('Attachment integrity check failed (SHA-256 mismatch)');
-          }
-          triggerBlobDownload(plaintext, item.fileName, item.mimeType);
-          return;
-        } catch {
-          // If decryption fails, fall back to raw download path for legacy/non-envelope rows.
-        }
-      }
-      await downloadUrl(url, item.fileName);
-    },
-    [downloadUrl, resolveFileUrl],
-  );
-
   const jsonHeaders = useCallback(async () => {
     const headers = new Headers(await getAuthHeaders());
     headers.set('Content-Type', 'application/json');
@@ -1388,9 +348,6 @@ export default function UserProfileModal({
     // Reset derived state whenever the sheet opens for a new user.
     if (!requestedUserId) return;
     setActiveTab('timeline');
-    setResolvedMediaUrls({});
-    setSignedFileUrls({});
-    setFallbackLinkItems([]);
     setBirthdayDraft('');
     setBirthdaySaveError(null);
     setBirthdaySaving(false);
@@ -1408,6 +365,7 @@ export default function UserProfileModal({
     } else {
       setBirthdayDraft('');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceOwnProfileBirthdayCompletion, profileData?.user?.birthday, profileData?.user?.id]);
 
   const open = !!requestedUserId;
@@ -1747,627 +705,60 @@ export default function UserProfileModal({
                   </nav>
 
                   {activeTab === 'media' && (
-                    <section role="tabpanel" aria-label="Media">
-                      {cryptoUnlockError ? (
-                        <p className="mb-3 rounded-[10px] border border-border-hard bg-surface-container px-3 py-2 text-xs text-error">
-                          {cryptoUnlockError}
-                        </p>
-                      ) : null}
-                      {mediaItems.length === 0 && tabsLoading ? (
-                        <EmptyTabState
-                          Icon={ImageIcon}
-                          title="Loading shared media"
-                          body="Pulling image and audio history for this conversation."
-                        />
-                      ) : mediaItems.length === 0 ? (
-                        <EmptyTabState
-                          Icon={ImageIcon}
-                          title="No shared media"
-                          body="Photos and voice notes you exchange in chat will appear here."
-                        />
-                      ) : (
-                        <div className="space-y-4">
-                          {imageItems.length > 0 && (
-                            <div className="grid grid-cols-3 gap-2">
-                              {imageItems.map((m) => (
-                                <div key={m.id} className="group relative">
-                                  {resolvedMediaUrls[m.id] ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => openMediaItem(m)}
-                                        className="block w-full"
-                                        aria-label="Expand image"
-                                      >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                          src={resolvedMediaUrls[m.id]}
-                                          alt={m.caption ?? ''}
-                                          width={400}
-                                          height={112}
-                                          decoding="async"
-                                          className="h-28 w-full rounded-[8px] border border-border-hard object-cover"
-                                        />
-                                      </button>
-                                      <div className="pointer-events-none absolute inset-0 rounded-[8px] bg-black/0 transition group-hover:bg-black/30" />
-                                      <div className="absolute bottom-1 right-1 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
-                                        <button
-                                          type="button"
-                                          onClick={() => openMediaItem(m)}
-                                          className="pointer-events-auto rounded-[8px] border border-border-hard bg-surface p-1 text-on-surface hover:bg-surface-container"
-                                          aria-label="Open image"
-                                        >
-                                          <Maximize2 className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => downloadMediaItem(m)}
-                                          className="pointer-events-auto rounded-[8px] border border-border-hard bg-surface p-1 text-on-surface hover:bg-surface-container"
-                                          aria-label="Download image"
-                                        >
-                                          <Download className="h-3.5 w-3.5" />
-                                        </button>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="flex h-28 w-full items-center justify-center rounded-[8px] border border-border-hard bg-surface-container text-[11px] font-medium text-on-surface-variant">
-                                      Secured image
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {audioItems.length > 0 && (
-                            <ul className="flex flex-col gap-2">
-                              {audioItems.map((m) => {
-                                const audioUrl = resolvedMediaUrls[m.id];
-                                return (
-                                  <li key={m.id} className="rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <p className="text-xs font-semibold text-on-surface">Voice note</p>
-                                      <div className="flex items-center gap-1">
-                                        {audioUrl && (
-                                          <>
-                                            <button
-                                              type="button"
-                                              onClick={() => openMediaItem(m)}
-                                              className="rounded-[8px] p-1 text-on-surface-variant hover:bg-surface hover:text-on-surface"
-                                              aria-label="Open audio"
-                                            >
-                                              <ExternalLink className="h-3.5 w-3.5" />
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => downloadMediaItem(m)}
-                                              className="rounded-[8px] p-1 text-on-surface-variant hover:bg-surface hover:text-on-surface"
-                                              aria-label="Download audio"
-                                            >
-                                              <Download className="h-3.5 w-3.5" />
-                                            </button>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {audioUrl ? (
-                                      <audio controls preload="metadata" src={audioUrl} className="mt-2 w-full" />
-                                    ) : (
-                                      <div className="mt-2 rounded-[8px] border border-border-hard bg-surface px-3 py-2 text-xs text-on-surface-variant">
-                                        Secured audio
-                                      </div>
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                      )}
-                    </section>
+                    <MediaTab
+                      cryptoUnlockError={cryptoUnlockError}
+                      mediaItems={mediaItems}
+                      imageItems={imageItems}
+                      audioItems={audioItems}
+                      tabsLoading={tabsLoading}
+                      resolvedMediaUrls={resolvedMediaUrls}
+                      openMediaItem={openMediaItem}
+                      downloadMediaItem={downloadMediaItem}
+                    />
                   )}
 
                   {activeTab === 'links' && (
-                    <section role="tabpanel" aria-label="Links">
-                      {linkItems.length === 0 && chatMessagesLoading ? (
-                        <EmptyTabState
-                          Icon={LinkIcon}
-                          title="Loading shared links"
-                          body="Scanning chat history for URLs."
-                        />
-                      ) : linkItems.length === 0 ? (
-                        <EmptyTabState
-                          Icon={LinkIcon}
-                          title="No shared links"
-                          body="URLs shared in chat show up here."
-                        />
-                      ) : (
-                        <ul className="flex flex-col gap-2">
-                          {linkItems.map((l) => (
-                            <li key={l.id}>
-                              <a
-                                href={l.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-start gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5 text-sm text-on-surface hover:border-primary"
-                              >
-                                <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate font-medium text-primary">{l.url}</p>
-                                  <p className="mt-0.5 text-[11px] text-on-surface-variant">{l.timestamp}</p>
-                                </div>
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </section>
+                    <LinksTab linkItems={linkItems} chatMessagesLoading={chatMessagesLoading} />
                   )}
 
                   {activeTab === 'files' && (
-                    <section role="tabpanel" aria-label="Files">
-                      {fileItems.length === 0 && tabsLoading ? (
-                        <EmptyTabState
-                          Icon={Paperclip}
-                          title="Loading shared files"
-                          body="Fetching attachment metadata for this chat."
-                        />
-                      ) : fileItems.length === 0 ? (
-                        <EmptyTabState
-                          Icon={Paperclip}
-                          title="No shared files"
-                          body="Attachments sent in chat will appear here."
-                        />
-                      ) : (
-                        <ul className="flex flex-col gap-2">
-                          {fileItems.map((f) => (
-                            <li key={f.id}>
-                              <div className="flex w-full items-start gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5 text-left hover:border-primary">
-                                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-semibold text-on-surface">{f.fileName}</p>
-                                  <p className="mt-0.5 text-[11px] text-on-surface-variant">
-                                    {formatFileSize(f.sizeBytes)} · {f.mimeType}
-                                  </p>
-                                  <p className="text-[11px] text-on-surface-variant">{f.timestamp}</p>
-                                </div>
-                                <div className="flex shrink-0 items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      void openFileItem(f);
-                                    }}
-                                    className="rounded-[8px] p-1.5 text-on-surface-variant hover:bg-surface hover:text-on-surface"
-                                    aria-label="Open file"
-                                  >
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      void downloadFileItem(f);
-                                    }}
-                                    className="rounded-[8px] p-1.5 text-on-surface-variant hover:bg-surface hover:text-on-surface"
-                                    aria-label="Download file"
-                                  >
-                                    <Download className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </section>
+                    <FilesTab
+                      fileItems={fileItems}
+                      tabsLoading={tabsLoading}
+                      openFileItem={openFileItem}
+                      downloadFileItem={downloadFileItem}
+                    />
                   )}
 
                   {activeTab === 'beacons' && (
-                    <section role="tabpanel" aria-label="Beacons" className="space-y-3">
-                      {recommendationPayload?.recommendation && !recommendationDismissed && (
-                        <div className="rounded-[16px] border border-border-hard bg-surface-container p-4">
-                          <p className="text-xs font-bold uppercase tracking-wide text-primary">Go together?</p>
-                          <p className="mt-1 text-sm font-semibold text-on-surface">
-                            {(recommendationPayload.recommendation.peer_name ?? 'They')} are going to{' '}
-                            {recommendationPayload.recommendation.title}
-                          </p>
-                          {(recommendationPayload.recommendation.event_start_at ||
-                            recommendationPayload.recommendation.location_name) && (
-                            <p className="mt-1 text-xs text-on-surface-variant">
-                              {[
-                                recommendationPayload.recommendation.event_start_at
-                                  ?.slice(0, 16)
-                                  ?.replace('T', ' '),
-                                recommendationPayload.recommendation.location_name
-                                  ?.trim()
-                                  .toLowerCase() === 'current location'
-                                  ? null
-                                  : recommendationPayload.recommendation.location_name?.trim(),
-                              ]
-                                .filter(Boolean)
-                                .join(' · ')}
-                            </p>
-                          )}
-                          <div className="mt-3 flex gap-2">
-                            <button
-                              type="button"
-                              disabled={rsvpBusy}
-                              onClick={() => {
-                                const beaconId = recommendationPayload.recommendation?.beacon_id;
-                                if (!beaconId) return;
-                                setRsvpBusy(true);
-                                void (async () => {
-                                  try {
-                                    const headers = await getAuthHeaders();
-                                    await fetch(`/api/beacons/${encodeURIComponent(beaconId)}/rsvp`, {
-                                      method: 'POST',
-                                      headers: {
-                                        ...headers,
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: '{}',
-                                    });
-                                    setRecommendationDismissed(true);
-                                    void openBeaconDetail(beaconId);
-                                  } finally {
-                                    setRsvpBusy(false);
-                                  }
-                                })();
-                              }}
-                              className="flex-1 rounded-[10px] border border-border-hard bg-primary px-3 py-2 text-sm font-semibold text-on-primary disabled:opacity-60"
-                            >
-                              {rsvpBusy ? 'RSVPing…' : 'RSVP'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRecommendationDismissed(true)}
-                              className="rounded-[10px] border border-border-hard bg-surface px-3 py-2 text-sm font-semibold text-on-surface"
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {beaconItems.length === 0 && tabsLoading ? (
-                        <EmptyTabState
-                          Icon={MapPin}
-                          title="Loading shared beacons"
-                          body="Pulling events shared in this conversation."
-                        />
-                      ) : beaconItems.length === 0 ? (
-                        <EmptyTabState
-                          Icon={MapPin}
-                          title="No shared beacons"
-                          body="Events and map pins shared in this chat show up here."
-                        />
-                      ) : (
-                        <ul className="flex flex-col gap-2">
-                          {beaconItems.map((b) => (
-                            <li key={b.beaconId}>
-                              <button
-                                type="button"
-                                onClick={() => void openBeaconDetail(b.beaconId, b)}
-                                className="flex w-full items-stretch gap-3 overflow-hidden rounded-[12px] border border-border-hard bg-surface-container text-left hover:border-primary"
-                              >
-                                {/* Same generated identity the beacon carries on the map and on mobile. */}
-                                <CardVisualHero
-                                  id={b.beaconId}
-                                  imageUrl={b.imageUrl}
-                                  className="flex w-12 shrink-0 items-center justify-center"
-                                >
-                                  <div className="flex h-full items-center justify-center px-3">
-                                    <MapPin className="h-4 w-4 text-white" aria-hidden />
-                                  </div>
-                                </CardVisualHero>
-                                <div className="min-w-0 flex-1 px-1 py-2.5 pr-3">
-                                  <p className="truncate text-sm font-semibold text-on-surface">{b.title}</p>
-                                  {(b.scheduleLabel || b.locationLabel) && (
-                                    <p className="mt-0.5 text-[11px] text-on-surface-variant">
-                                      {[b.scheduleLabel, b.locationLabel].filter(Boolean).join(' · ')}
-                                    </p>
-                                  )}
-                                  {b.description && (
-                                    <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">
-                                      {b.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      {beaconDetail && (
-                        <div className="overflow-hidden rounded-[16px] border border-border-hard bg-surface">
-                          {/*
-                            Decorative header: it carries the category chip only. Title, schedule, and
-                            location live in the structured block below, so putting them here too
-                            would print the same event name twice on one panel.
-                          */}
-                          <CardVisualHero
-                            id={beaconDetail.beaconId}
-                            className="h-16"
-                            imageUrl={beaconDetail.imageUrl}
-                            chipLabel={beaconDetail.expired ? 'Past event' : 'Event'}
-                          >
-                            <div className="flex h-full items-start justify-end p-2.5">
-                              <button
-                                type="button"
-                                onClick={() => setBeaconDetail(null)}
-                                className="rounded-[8px] bg-black/40 p-1 text-white"
-                                aria-label="Close event detail"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </CardVisualHero>
-                          <div className="p-4">
-                            <p className="text-base font-semibold text-on-surface">{beaconDetail.title}</p>
-                            {beaconDetail.loading ? (
-                              <p className="mt-3 text-sm text-on-surface-variant">Loading…</p>
-                            ) : beaconDetail.error ? (
-                              <p className="mt-3 text-sm text-error">{beaconDetail.error}</p>
-                            ) : (
-                              <div className="mt-3 space-y-2 text-sm text-on-surface">
-                                {beaconDetail.schedule && (
-                                  <p className="text-on-surface-variant">{beaconDetail.schedule}</p>
-                                )}
-                                {beaconDetail.location && (
-                                  <p className="flex items-start gap-2 text-on-surface-variant">
-                                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                                    <span>{beaconDetail.location}</span>
-                                  </p>
-                                )}
-                                {beaconDetail.description && <p>{beaconDetail.description}</p>}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </section>
+                    <BeaconsTab
+                      recommendationPayload={recommendationPayload}
+                      recommendationDismissed={recommendationDismissed}
+                      setRecommendationDismissed={setRecommendationDismissed}
+                      rsvpBusy={rsvpBusy}
+                      setRsvpBusy={setRsvpBusy}
+                      getAuthHeaders={getAuthHeaders}
+                      beaconItems={beaconItems}
+                      tabsLoading={tabsLoading}
+                      openBeaconDetail={openBeaconDetail}
+                      beaconDetail={beaconDetail}
+                      setBeaconDetail={setBeaconDetail}
+                    />
                   )}
 
                   {activeTab === 'timeline' && (
-                  <>
-
-                  <section>
-                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                      {isPriorConnection ? 'How you know them' : 'When you connected'}
-                    </h3>
-                    {isPriorConnection ? (
-                      <div className="space-y-3 text-sm text-on-surface">
-                        <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Source</p>
-                            <p className="mt-0.5 leading-snug">{priorSourceLabel}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Status</p>
-                            <p className="mt-0.5 leading-snug">
-                              {priorConfirmed ? 'Confirmed by both' : 'Waiting for confirmation'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Known since</p>
-                            <p className="mt-0.5 leading-snug">{knownSinceLabel(sharedPayload?.known_since)}</p>
-                          </div>
-                        </div>
-                        {sharedPayload?.context_tag ? (
-                          <FcChip>{sharedPayload.context_tag}</FcChip>
-                        ) : null}
-                      </div>
-                    ) : hasMoment && momentLines ? (
-                      <div className="space-y-3 text-sm text-on-surface">
-                        {momentLines.context && (
-                          <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Moment</p>
-                              <p className="mt-0.5 leading-snug">{momentLines.context}</p>
-                            </div>
-                          </div>
-                        )}
-                        {(momentLines.place || momentLines.addressDetail) && (
-                          <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Place</p>
-                              <p className="mt-0.5 leading-snug">
-                                {[momentLines.place, momentLines.addressDetail].filter(Boolean).join(' · ')}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {momentLines.when && (
-                          <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Time</p>
-                              <p className="mt-0.5 leading-snug">{momentLines.when}</p>
-                            </div>
-                          </div>
-                        )}
-                        {momentLines.weather && (
-                          <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                            <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Weather</p>
-                              <p className="mt-0.5 leading-snug">{momentLines.weather}</p>
-                            </div>
-                          </div>
-                        )}
-                        {momentLines.noise && (
-                          <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                            <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Ambience</p>
-                              <p className="mt-0.5 leading-snug">{momentLines.noise}</p>
-                            </div>
-                          </div>
-                        )}
-                        {momentLines.elevation && (
-                          <div className="flex gap-3 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2.5">
-                            <Mountain className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Elevation</p>
-                              <p className="mt-0.5 leading-snug">{momentLines.elevation}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-on-surface-variant">
-                        No place or moment details on file for this connection yet.
-                      </p>
-                    )}
-                  </section>
-
-                  <section>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Interests</h3>
-                    {profileData.tags.length === 0 ? (
-                      <p className="text-sm text-on-surface-variant">No interests shared yet</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {profileData.tags.map((t, i) => (
-                          <span
-                            key={interestTagKeys[i]}
-                            className="fc-chip text-xs"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-
-                  {!!profileData.sharedInterestTags?.length && (
-                    <section>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                        Shared interests
-                      </h3>
-                      <p className="mb-2 text-[11px] text-on-surface-variant">
-                        Conversation starters you both listed
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {(profileData.sharedInterestTags ?? []).map((t, i) => (
-                          <span
-                            key={sharedInterestTagKeys[i]}
-                            className="inline-flex items-center rounded-full border border-border-hard bg-surface-container px-3 py-1 text-xs font-semibold text-on-surface"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  <section>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                      Availability
-                    </h3>
-                    <CurrentAvailabilitySection
-                      availability={profileData.availability}
-                      availabilityIntents={profileData.availabilityIntents}
+                    <TimelineTab
+                      profileData={profileData}
+                      isPriorConnection={isPriorConnection}
+                      priorSourceLabel={priorSourceLabel}
+                      priorConfirmed={priorConfirmed}
+                      sharedPayload={sharedPayload}
+                      hasMoment={hasMoment}
+                      momentLines={momentLines}
+                      encounterTimeline={encounterTimeline}
+                      interestTagKeys={interestTagKeys}
+                      sharedInterestTagKeys={sharedInterestTagKeys}
                     />
-                  </section>
-
-                  <section className="relative">
-                    <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                      Our timeline
-                    </h3>
-                    <p className="mb-4 text-[11px] text-on-surface-variant">
-                      Every time and place you’ve crossed paths
-                    </p>
-                    {!encounterTimeline || encounterTimeline.rows.length === 0 ? (
-                      <p className="text-sm text-on-surface-variant">
-                        {isPriorConnection
-                          ? 'No shared physical encounters logged yet. Timeline begins upon your first real-world Handshake.'
-                          : 'No crossing history on file yet.'}
-                      </p>
-                    ) : (
-                      <div className="relative pl-1">
-                        <div
-                          className="pointer-events-none absolute bottom-3 left-[15px] top-2 w-0.5 bg-border-hard transform-gpu translate-z-0"
-                          aria-hidden
-                        />
-                        <ul className="space-y-0">
-                          {encounterTimeline.rows.map((enc) => {
-                            const isOrigin = enc.id === encounterTimeline.originId;
-                            const pills = encounterMetricPills(enc);
-                            const place =
-                              formatDetailedEncounterLocation({
-                                locationName: enc.locationName,
-                                displayLocation: enc.displayLocation,
-                                semanticLocation: enc.semanticLocation,
-                              }) ?? 'A new location';
-                            const momentTags = Array.from(
-                              new Set(
-                                (enc.contextTags ?? [])
-                                  .map((t) => (typeof t === 'string' ? t.trim() : ''))
-                                  .filter(Boolean),
-                              ),
-                            );
-                            return (
-                              <li key={enc.id} className="relative pb-9 last:pb-1">
-                                <div
-                                  className="absolute left-[10px] top-[7px] z-[1] h-3 w-3 rounded-full border border-border-hard bg-primary transform-gpu translate-z-0"
-                                  aria-hidden
-                                />
-                                <div className="pl-8">
-                                  {isOrigin && (
-                                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-primary">
-                                      Where it started
-                                    </p>
-                                  )}
-                                  <p className="text-xs tabular-nums text-on-surface-variant">
-                                    {formatEncounterWhen(enc.encounteredAt)}
-                                  </p>
-                                  <p className="mt-1 text-sm font-bold leading-snug text-on-surface">
-                                    {place}
-                                  </p>
-                                  {momentTags.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                      {momentTags.map((tag) => (
-                                        <span
-                                          key={`${enc.id}-${tag}`}
-                                          className="fc-chip !gap-1 !px-2.5 !py-0.5 text-[11px]"
-                                        >
-                                          <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
-                                          {tag}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {pills.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                      {pills.map(({ metricKey, Icon, label }) => (
-                                        <span
-                                          key={`${enc.id}-${metricKey}`}
-                                          className="inline-flex items-center gap-1 rounded-full border border-border-hard bg-surface-container px-2.5 py-0.5 text-[11px] font-medium text-on-surface"
-                                        >
-                                          <Icon
-                                            className="h-3 w-3 shrink-0 text-on-surface-variant"
-                                            aria-hidden
-                                          />
-                                          {label}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                  </section>
-                  </>
                   )}
                 </motion.div>
               )}
@@ -2376,23 +767,5 @@ export default function UserProfileModal({
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-function EmptyTabState({
-  Icon,
-  title,
-  body,
-}: {
-  Icon: LucideIcon;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-[12px] border border-border-hard bg-surface-container px-6 py-12 text-center">
-      <Icon className="h-10 w-10 text-on-surface-variant" aria-hidden />
-      <p className="mt-3 text-sm font-bold text-on-surface">{title}</p>
-      <p className="mt-1 text-xs text-on-surface-variant">{body}</p>
-    </div>
   );
 }
