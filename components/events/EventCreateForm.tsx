@@ -38,7 +38,7 @@ export default function EventCreateForm({
   defaultLocationName = null,
 }: EventCreateFormProps) {
   const router = useRouter();
-  const initialWindow = useMemo(defaultWindow, []);
+  const initialWindow = useMemo(() => defaultWindow(), []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startLocal, setStartLocal] = useState(initialWindow.start);

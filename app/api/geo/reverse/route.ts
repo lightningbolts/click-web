@@ -3,6 +3,9 @@ import { isRateLimited, READ_HEAVY_RATE_LIMIT_BINDING } from "@/lib/server/rateL
 import { clientIpFromRequest } from "@/lib/events/eventMetadata";
 import { reverseNominatimPlace } from "@/lib/server/nominatim";
 
+/** Unauthenticated Nominatim reverse proxy; IP-rate-limited below. */
+export const publicRoute = true;
+
 export async function GET(request: NextRequest) {
   const lat = Number(request.nextUrl.searchParams.get("lat"));
   const lng = Number(request.nextUrl.searchParams.get("lng"));

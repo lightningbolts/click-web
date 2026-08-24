@@ -3,6 +3,9 @@ import { isRateLimited, READ_HEAVY_RATE_LIMIT_BINDING } from "@/lib/server/rateL
 import { clientIpFromRequest } from "@/lib/events/eventMetadata";
 import { searchNominatimPlaces } from "@/lib/server/nominatim";
 
+/** Unauthenticated Nominatim proxy; IP-rate-limited below. */
+export const publicRoute = true;
+
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) {
