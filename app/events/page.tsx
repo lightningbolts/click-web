@@ -14,7 +14,7 @@ export default async function PublicEventsPage() {
 
   return (
     <FcPageShell className="px-4 py-10 md:px-8">
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-4xl">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <FcSectionHeader
             className="mb-0"
@@ -36,7 +36,7 @@ export default async function PublicEventsPage() {
             </Link>
           </FcCard>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-3">
             {events.map((event) => (
               <EventListCard key={event.beacon_id} event={event} />
             ))}

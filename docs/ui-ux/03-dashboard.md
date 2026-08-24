@@ -8,10 +8,11 @@
 
 ## Shell
 
-- Flat `background`; sticky tab bar = opaque `surface` + 1px outline-variant border (no backdrop-blur).
-- Tabs: memory, events, map, chat, identity, settings.
-- Events tab: My events, RSVPs, primary **Create event** (`DashboardEventsModule` + `EventCreateForm`).
-- Active tab: solid primary underline or primary-container chip.
+- [`ProductAppShell`](../../components/shell/ProductAppShell.tsx): full-height sidebar on desktop, hamburger drawer on mobile. Flat `background`; opaque `surface` + 1px `border-hard` (no backdrop-blur).
+- Nav items: memory, events, map, chat, identity, settings (`data-testid="dashboard-tab-{id}"`).
+- Events item: My events, RSVPs, primary **Create event** (`DashboardEventsModule` + `EventCreateForm`) as a dense date-rail list.
+- Active item: `bg-primary-container text-on-primary-container`.
+- Marketing Navbar is hidden while this shell is mounted.
 
 ### Chat tab — message search
 

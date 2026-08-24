@@ -29,23 +29,23 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
   
   // Score color based on value
   const getScoreColor = (s: number) => {
-    if (s >= 80) return '#22c55e'; // green
-    if (s >= 60) return '#630ed4'; // purple
-    if (s >= 40) return '#f59e0b'; // amber
-    return '#ef4444'; // red
+    if (s >= 80) return chart.primary;
+    if (s >= 60) return chart.primary;
+    if (s >= 40) return chart.axis;
+    return 'var(--color-error)';
   };
   
   const scoreColor = getScoreColor(score);
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-on-surface-variant';
+  const trendColor = trend === 'up' ? 'text-secondary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
 
   return (
-    <GlassPanel className="p-6" glow="purple">
+    <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-            <Sparkles className="w-4 h-4 text-[#630ed4]" />
+          <div className="p-2 bg-primary/20 rounded-lg">
+            <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <span className="text-sm font-medium text-on-surface-variant">Social Sticky Score</span>
         </div>
@@ -82,7 +82,7 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
               transition={{ duration: 1.5, ease: 'easeOut' }}
               style={{
                 strokeDasharray: `${circumference} ${circumference}`,
-                filter: `drop-shadow(0 0 8px ${scoreColor}50)`,
+                
               }}
             />
           </svg>
@@ -136,17 +136,17 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
   const { value, totalArea, activeZones, trend } = data;
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-on-surface-variant';
+  const trendColor = trend === 'up' ? 'text-secondary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
   
   // Visual density indicator
   const densityLevel = Math.min(Math.floor(value / 2), 10);
   
   return (
-    <GlassPanel className="p-6" glow="blue">
+    <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-            <Link2 className="w-4 h-4 text-[#630ed4]" />
+          <div className="p-2 bg-primary/20 rounded-lg">
+            <Link2 className="w-4 h-4 text-primary" />
           </div>
           <span className="text-sm font-medium text-on-surface-variant">Connection Density</span>
         </div>
@@ -176,11 +176,11 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
             transition={{ delay: i * 0.05, duration: 0.3 }}
             className={`flex-1 h-8 rounded-sm origin-bottom ${
               i < densityLevel 
-                ? 'bg-gradient-to-t from-[#630ed4] to-[#630ed4]/50' 
+                ? 'bg-primary' 
                 : 'bg-surface-container-high'
             }`}
             style={{
-              boxShadow: i < densityLevel ? '0 0 10px rgba(58, 134, 255, 0.3)' : 'none',
+              boxShadow: "none",
             }}
           />
         ))}
@@ -209,26 +209,26 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
   
   // Color based on capacity
   const getCapacityColor = (pct: number) => {
-    if (pct >= 90) return '#ef4444'; // red - near capacity
-    if (pct >= 70) return '#f59e0b'; // amber - getting busy
-    if (pct >= 40) return '#22c55e'; // green - good
-    return '#630ed4'; // blue - light
+    if (pct >= 90) return 'var(--color-error)';
+    if (pct >= 70) return chart.axis;
+    if (pct >= 40) return chart.primary;
+    return chart.primary;
   };
   
   const capacityColor = getCapacityColor(fillPercentage);
 
   return (
-    <GlassPanel className="p-6" glow="green">
+    <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-green-500/20 rounded-lg">
-            <Users className="w-4 h-4 text-green-500" />
+          <div className="p-2 bg-secondary/20 rounded-lg">
+            <Users className="w-4 h-4 text-secondary" />
           </div>
           <span className="text-sm font-medium text-on-surface-variant">Live Count</span>
         </div>
         <div className="flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-secondary opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
         </div>
       </div>
       
@@ -254,7 +254,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
           className="h-full rounded-full"
           style={{ 
             backgroundColor: capacityColor,
-            boxShadow: `0 0 10px ${capacityColor}50`,
+            
           }}
         />
       </div>

@@ -22,6 +22,7 @@ jest.mock('@/components/dashboard/DashboardEventsModule', () => ({
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  usePathname: () => '/',
 }));
 
 jest.mock('livekit-client', () => ({
@@ -198,14 +199,14 @@ describe('DashboardView', () => {
 
   it('displays the user name in the welcome header', async () => {
     await renderDashboard();
-    expect(await screen.findByText(/Alice Smith/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Alice Smith/)).length).toBeGreaterThan(0);
   });
 
   it('falls back to the email prefix when full_name is absent', async () => {
     await renderDashboard(
       buildMockUser({ user_metadata: {}, email: 'bob@example.com' }),
     );
-    expect(await screen.findByText(/bob/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/bob/)).length).toBeGreaterThan(0);
   });
 
   it('prefers first_name and last_name in user_metadata over full_name', async () => {
@@ -218,7 +219,7 @@ describe('DashboardView', () => {
         },
       }),
     );
-    expect(await screen.findByText(/Pat Lee/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Pat Lee/)).length).toBeGreaterThan(0);
   });
 
   it('renders all six navigation tabs', async () => {

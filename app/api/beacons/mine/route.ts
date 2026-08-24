@@ -12,12 +12,14 @@ import {
   eventTitleFromMetadata,
   isRecord,
   parseBeaconMetadata,
+  rsvpEnabledFromMetadata,
 } from "@/lib/events/eventMetadata";
-import { countEventRsvps } from "@/lib/events/publicEvent";
+import { countEventRsvpsByBeaconIds } from "@/lib/events/publicEvent";
 
 type MineEvent = {
   beacon_id: string;
   title: string | null;
+  description: string | null;
   image_url: string | null;
   event_start_at: string | null;
   event_end_at: string | null;
@@ -25,6 +27,7 @@ type MineEvent = {
   latitude: number | null;
   longitude: number | null;
   rsvp_count: number;
+  rsvp_enabled: boolean;
   role: "creator" | "rsvp";
 };
 
@@ -73,13 +76,19 @@ export async function GET(request: NextRequest) {
     }
 
     const byId = new Map<string, MineEvent>();
+    const createdRows = Array.isArray(created) ? created : [];
+    const rsvpCountById = await countEventRsvpsByBeaconIds(
+      admin,
+      [...createdRows, ...rsvpBeacons]
+        .map((row) => (isRecord(row) && typeof row.id === "string" ? row.id : null))
+        .filter((id): id is string => id != null),
+    );
 
-    const toItem = async (row: unknown, role: "creator" | "rsvp"): Promise<void> => {
+    const toItem = (row: unknown, role: "creator" | "rsvp"): void => {
       if (!isRecord(row) || typeof row.id !== "string") return;
       if (byId.has(row.id) && role === "rsvp") return;
       const meta = parseBeaconMetadata(row.metadata);
       const coords = parseLatLngFromLocationField(row.location, Number.NaN, Number.NaN);
-      const rsvpCount = await countEventRsvps(admin, row.id);
       byId.set(row.id, {
         beacon_id: row.id,
         title: eventDisplayTitle(
@@ -87,22 +96,24 @@ export async function GET(request: NextRequest) {
           eventLocationNameFromMetadata(meta),
           eventDescriptionFromMetadata(meta),
         ),
+        description: eventDescriptionFromMetadata(meta),
         image_url: eventImageFromMetadata(meta),
         event_start_at: eventStartAtFromMetadata(meta),
         event_end_at: eventEndAtFromMetadata(meta),
         location_name: eventLocationNameFromMetadata(meta),
         latitude: Number.isFinite(coords.lat) ? coords.lat : null,
         longitude: Number.isFinite(coords.lng) ? coords.lng : null,
-        rsvp_count: rsvpCount,
+        rsvp_count: rsvpCountById.get(row.id) ?? 0,
+        rsvp_enabled: rsvpEnabledFromMetadata(meta),
         role: byId.get(row.id)?.role === "creator" ? "creator" : role,
       });
     };
 
-    for (const row of Array.isArray(created) ? created : []) {
-      await toItem(row, "creator");
+    for (const row of createdRows) {
+      toItem(row, "creator");
     }
     for (const row of rsvpBeacons) {
-      await toItem(row, "rsvp");
+      toItem(row, "rsvp");
     }
 
     const events = [...byId.values()].sort((a, b) => {

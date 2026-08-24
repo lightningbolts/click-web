@@ -76,42 +76,39 @@ export default function DashboardScene({
         </motion.div>
       </div>
 
-      <div
-        className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-border-hard bg-surface px-2 md:px-4"
-        role="tablist"
-        aria-label="Dashboard tabs"
-      >
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
-          const selected = state.dashboardTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => {
-                actions.setDashboardTab(tab.id);
-                if (tab.id !== 'chat') actions.setOpenChatId(null);
-              }}
-              className={`relative flex items-center gap-2 whitespace-nowrap px-3 py-3 text-sm ${
-                selected ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
-              {selected ? (
-                <motion.div
-                  layoutId="playground-activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-                />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      <div className="flex min-h-[28rem]">
+        <nav
+          className="flex w-28 shrink-0 flex-col gap-1 border-r border-border-hard bg-surface p-2 sm:w-40"
+          role="tablist"
+          aria-label="Dashboard tabs"
+        >
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const selected = state.dashboardTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => {
+                  actions.setDashboardTab(tab.id);
+                  if (tab.id !== 'chat') actions.setOpenChatId(null);
+                }}
+                className={`flex items-center gap-2 rounded-[8px] px-2 py-2 text-left text-xs font-semibold sm:px-3 sm:text-sm ${
+                  selected
+                    ? 'bg-primary-container text-on-primary-container'
+                    : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-      <div className="px-4 py-5 md:px-6">
+        <div className="min-w-0 flex-1 px-4 py-5 md:px-6">
         <AnimatePresence mode="wait">
           {state.dashboardTab === 'memory' ? (
             <motion.div
@@ -133,8 +130,8 @@ export default function DashboardScene({
             >
               <StatCard icon={Users} label="Total Connections" value={connected.length} trend="+2" />
               <StatCard icon={Calendar} label="This Month" value={connected.length} />
-              <StatCard icon={Flame} label="Connection Streak" value="4 days" accent="text-orange-500" />
-              <StatCard icon={Heart} label="Retention Rate" value="100%" accent="text-pink-500" />
+              <StatCard icon={Flame} label="Connection Streak" value="4 days" accent="text-secondary" />
+              <StatCard icon={Heart} label="Retention Rate" value="100%" accent="text-primary" />
             </motion.div>
 
             <div className="rounded-[16px] border border-border-hard bg-surface p-4">
@@ -331,6 +328,7 @@ export default function DashboardScene({
             </motion.div>
           ) : null}
         </AnimatePresence>
+        </div>
       </div>
     </div>
   );

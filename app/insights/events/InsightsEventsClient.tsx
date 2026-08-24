@@ -74,7 +74,11 @@ export default function InsightsEventsClient() {
                 No events at this venue yet. Create one with the form on the left.
               </FcCard>
             ) : (
-              events.map((event) => <EventListCard key={event.beacon_id} event={event} />)
+              <div className="space-y-3">
+                {events.map((event) => (
+                  <EventListCard key={event.beacon_id} event={event} />
+                ))}
+              </div>
             )}
           </div>
         </div>
