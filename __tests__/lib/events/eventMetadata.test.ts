@@ -1,6 +1,7 @@
 import {
   eventDisplayTitle,
   eventStartAtFromMetadata,
+  eventTimezoneFromMetadata,
   normalizeGuestContact,
   rsvpEnabledFromMetadata,
 } from "@/lib/events/eventMetadata";
@@ -27,5 +28,13 @@ describe("eventMetadata helpers", () => {
 
   it("parses numeric event timestamps", () => {
     expect(eventStartAtFromMetadata({ event_start_at: 1_724_457_600_000 })).toBe("2024-08-24T00:00:00.000Z");
+  });
+
+  it("reads IANA timezone from metadata aliases", () => {
+    expect(eventTimezoneFromMetadata({ event_timezone: "America/Los_Angeles" })).toBe(
+      "America/Los_Angeles",
+    );
+    expect(eventTimezoneFromMetadata({ eventTimezone: "America/New_York" })).toBe("America/New_York");
+    expect(eventTimezoneFromMetadata({})).toBeNull();
   });
 });

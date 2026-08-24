@@ -56,7 +56,7 @@ Connection status normalization uses `lib/dashboard/connectionStatus.ts` (`isAct
 
 `assertEventCheckInGeofence(admin, beacon, lat, lng)` (`eventCheckInGeofence.ts`) — haversine vs event metadata `check_in_radius_meters` / `venue_scale` (intimate 75 · neighborhood 250 · venue 750 · campus 2500; clamp 25–5000). Missing/(0,0) → 400; outside → 403.
 
-Engagement helpers: `lib/server/eventEngagement.ts` (venue scale, live window + 15m early grace, append-only `event_engagement_events` inserts).
+Engagement helpers: `lib/server/eventEngagement.ts` (venue scale, live window + 15m early grace, append-only `event_engagement_events` inserts). New unused tables (`event_participation`, `beacon_share_tokens`, `event_beacon_daily_stats`) are service-role / unused until `docs/event-schema-scaling-followups.md`.
 
 ### `adminRole`
 

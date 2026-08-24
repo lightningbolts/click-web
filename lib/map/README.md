@@ -56,7 +56,7 @@ ConnectionMap.tsx (MapLibre)
 
 - Every `MapBeaconRecord` has `expires_at` ISO timestamp
 - PostGIS RPC / API filter `expires_at > now()`
-- Event beacons additionally use `metadata.event_end_at` for reminders (`lib/map/eventSchedule.ts`)
+- Event beacons additionally use `metadata.event_end_at` for reminders (`lib/map/eventSchedule.ts`). `map_beacons.starts_at` / `ends_at` exist but are unused until dual-write.
 
 ### Beacon types
 
