@@ -57,3 +57,7 @@ Shown only when the visitor has a Click session **and** `GET /api/beacons/{id}/m
 | GET | `/api/insights/{venueId}/network-health-trend` | venue manager |
 
 Recap and network-health both call [`lib/events/eventRecap.ts`](../../lib/events/eventRecap.ts) and count unique `connection_id` values on `connection_encounters.event_beacon_id`.
+
+## Schema (additive)
+
+Postgres now has first-class `map_beacons.starts_at` / `ends_at` / `event_timezone`, a Click-account `event_participation` table, optional `series_id` / `owner_org_id`, and unused funnel tables (`beacon_share_tokens`, `event_beacon_daily_stats`). **The app does not read or write them yet.** Create still sends `metadata.event_start_at` / `event_end_at` only. Guests still write `event_guest_rsvps`. Organizer auth is still `creator_id` or `venue_managers`, not `owner_org_id`. See [`event-schema-scaling-followups.md`](../event-schema-scaling-followups.md).

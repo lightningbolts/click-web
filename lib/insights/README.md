@@ -152,16 +152,20 @@ Advanced RPCs (types in `advancedMetrics.ts`):
 
 ## Event engagement (bookmarks, RSVP, check-ins, impressions)
 
-Raw capture (service-role inserts into `event_engagement_events` via `lib/server/eventEngagement.ts`). Current-state tables: `event_bookmarks`, `event_check_ins`. Migration: `supabase/migrations/20260718140000_event_engagement.sql`.
+Raw capture (service-role inserts into `event_engagement_events` via `lib/server/eventEngagement.ts`). Current-state tables: `event_bookmarks`, `event_check_ins`. Migration: `supabase/migrations/20260718140000_event_engagement.sql`. Additive unused tables: `event_participation`, `event_beacon_daily_stats`, `beacon_share_tokens` — see [`docs/event-schema-scaling-followups.md`](../../docs/event-schema-scaling-followups.md).
 
 | `event_type` | Meaning |
 |--------------|---------|
-| `event_view` | Impression (detail open; 2s debounce) |
+| `event_view` | Detail / microsite open (`POST /api/beacons/{id}/impressions`, 2s debounce). Live “view” signal. |
+| `impression` | Schema-accepted card-render type. **Unused** until a follow-up PR. |
 | `bookmark_set` / `bookmark_unset` | Saved interest |
 | `rsvp_set` / `rsvp_unset` | Attendance intent |
 | `check_in` / `check_out` | On-site presence |
 | `check_in_rejected` | Friction (`no_location`, `out_of_bounds`, `not_live`, …) |
-| `share` | Optional / future |
+| `share` | Share tap (`POST /api/beacons/{id}/share`) |
+| `link_click` | Schema-accepted shared-link open. **Unused** until share tokens are wired. |
+
+`user_id` is nullable. `anonymous_session_id` exists for logged-out de-dupe and is unused until follow-up.
 
 ### KPI catalog (operator charts)
 
@@ -177,7 +181,7 @@ Raw capture (service-role inserts into `event_engagement_events` via `lib/server
 
 **Website charts:** `/insights/event-engagement?venue_id=…` — funnel bars, arrival histogram, reject breakdown, dwell p50/p90. Aggregates only (no user ids / raw coords). Demo mocks: `mockEventEngagement` in `mockData.ts`. Nav: `BusinessInsightsShell`.
 
-**Mobile:** captures telemetry; does **not** show operator charts. Handoff: `click/docs/handoff/event-engagement-api.md`.
+**Mobile:** captures telemetry; does **not** show operator charts. Shipped handoff (archive): `click/docs/archive/handoff/event-engagement-api.md`. Schema follow-ups: `click-web/docs/event-schema-scaling-followups.md`.
 
 ---
 

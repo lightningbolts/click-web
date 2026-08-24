@@ -60,6 +60,11 @@ export function eventEndAtFromMetadata(meta: Record<string, unknown>): string | 
   return instantToIso(meta.event_end_at) ?? instantToIso(meta.eventEndAt) ?? instantToIso(meta.end_at);
 }
 
+/** IANA name from metadata only (not map_beacons.event_timezone until dual-write). */
+export function eventTimezoneFromMetadata(meta: Record<string, unknown>): string | null {
+  return metaString(meta, "event_timezone", "eventTimezone");
+}
+
 export function eventDisplayTitle(
   title: string | null | undefined,
   locationName?: string | null,
