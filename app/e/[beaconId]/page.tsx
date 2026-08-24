@@ -18,6 +18,8 @@ import GuestRsvpForm from "@/components/events/GuestRsvpForm";
 import MutualAttendeesTeaser from "@/components/events/MutualAttendeesTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
 
+export const dynamic = "force-dynamic";
+
 function isUuidLike(v: string): boolean {
   return EVENT_BEACON_UUID_RE.test(v);
 }

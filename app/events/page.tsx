@@ -4,7 +4,9 @@ import { loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
 import { FcButton, FcCard, FcPageShell, FcSectionHeader } from "@/components/fc";
 import { EventListCard } from "@/components/events/EventListCard";
 
-export const revalidate = 60;
+// Request-time only: listing uses the service-role client, which is optional
+// for `next build` (see .env.example) and present on the Worker at runtime.
+export const dynamic = "force-dynamic";
 
 export default async function PublicEventsPage() {
   const admin = createAdminSupabaseClient();
