@@ -25,6 +25,7 @@ Click Web is the **Next.js** companion to the **Kotlin Multiplatform (KMP)** mob
 | **Real-time chat** | Chat UI syncs with Supabase-backed data; API routes under `app/api/chat/` support messages, reactions, and related flows. |
 | **Home recap** | `GET /api/me/recap?window=day\|week` returns a zeroed 200 payload when the caller has no active handshake records in the window (archived / hidden connections and missing columns do not 500). |
 | **Map beacons** | `GET/POST /api/beacons`, plus `POST /api/beacons/image` for unencrypted beacon photos (max 2 MB; **optional**, as on mobile). Pin/popup and card identity uses `lib/ui/generateCardVisual.ts` + `components/ui/CardVisualSurface.tsx` (mirrors mobile). |
+| **Events** | Public `/events` directory and `/e/{id}` microsite (guest RSVP, no account). Create from dashboard Events tab, `/events/new`, or Insights Events (not Vibe Radar deploy). |
 | **Business insights & heatmaps** | Insights under `app/insights/` (heatmap, live metrics, vibe stream, tribes, social activity) with APIs under `app/api/insights/`. |
 | **Secure auth callbacks** | Email verification, PKCE, token-hash, and legacy hash flows—see `app/auth/callback/page.tsx` and `app/api/auth/callback/route.ts`. |
 

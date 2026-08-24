@@ -62,7 +62,8 @@ async function fetchAll<T extends Record<string, unknown>>(
   while (true) {
     const { data, error } = await supabase.from(table).select(columns).range(offset, offset + PAGE - 1);
     if (error) throw new Error(`${table}: ${error.message}`);
-    const rows = (data ?? []) as T[];
+    // Untyped `.from(table: string)` infers GenericStringError[]; rows are table records after a successful query.
+    const rows = (Array.isArray(data) ? data : []) as unknown as T[];
     out.push(...rows);
     if (rows.length < PAGE) break;
     offset += rows.length;

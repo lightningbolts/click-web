@@ -16,11 +16,9 @@ These migrations are **already applied** on the live Click Supabase project (`lr
 | `20260824050000` | `event_attendee_count_and_moderation` |
 | `20260824060000` | `event_analytics_partitioned_shells` |
 
-On 2026-08-24, click-web `main` was reset to `382158d` (hub cooldown) so [PR #32](https://github.com/lightningbolts/click-web/pull/32) (Reallyrealistic / Andrew Lu, split files over 1000 lines) could merge without conflicts. That rewind dropped the public event microsite / guest-RSVP **application** commits (`bbbcd35`, `94c2741`). The SQL files are restored here so the repo matches the live database.
+On 2026-08-24, click-web `main` was reset to `382158d` so [PR #32](https://github.com/lightningbolts/click-web/pull/32) (Reallyrealistic / Andrew Lu) could merge without conflicts. The public event microsite / guest-RSVP **application** is re-landed on `feature/event-microsite` on top of that split-file tree. Original commits remain on `backup/event-microsite-20260823`.
 
-Microsite application code is preserved on `backup/event-microsite-20260823` (`94c2741`). Re-land it only after rebasing onto the split-file tree.
-
-Guest RSVP / public event helpers such as `lib/events/publicEvent.ts` are **not** on `main` after the rewind. Keep counting RSVPs from `beacon_attendees` until that app work is re-landed.
+Guest RSVP / public event helpers (`lib/events/publicEvent.ts`) count RSVPs from `beacon_attendees` + `event_guest_rsvps`. First-class time columns and `event_participation` stay unused until the dual-write PRs below.
 
 ## Dual-write `event_participation` (after P0 backfill is verified)
 
@@ -34,7 +32,7 @@ Any write to a legacy table also upserts `event_participation`:
 | `beacon_attendees` delete | clear `rsvpd_at`; demote unless still checked in / bookmarked |
 | `event_check_ins` insert/update | `checked_in`; set `checked_in_at` / `checked_out_at` |
 
-Guest RSVPs stay in `event_guest_rsvps` only. When the microsite app is re-landed, `countEventRsvps` in `lib/events/publicEvent.ts` should keep summing `beacon_attendees` + `event_guest_rsvps`.
+Guest RSVPs stay in `event_guest_rsvps` only. `countEventRsvps` in `lib/events/publicEvent.ts` keeps summing `beacon_attendees` + `event_guest_rsvps`.
 
 Only after a full deploy cycle of verified dual-writes should a **future**, separate migration consider deprecating the legacy tables.
 
@@ -72,7 +70,7 @@ Do not query `event_engagement_events` from the organizer network-health dashboa
 - Add `GET /api/cron/event-daily-stats` with `Authorization: Bearer $CRON_SECRET`.
 - Upsert `event_beacon_daily_stats`.
 - Hook into `cron-hourly-maintenance` and `/api/cron/hourly` (see `lib/cron/README.md`).
-- Network-health from the reverted microsite work (`/api/beacons/{id}/network-health`, recap on `backup/event-microsite-20260823`) can later read this table instead of scanning raw telemetry.
+- Network-health (`/api/beacons/{id}/network-health`, recap) can later read this table instead of scanning raw telemetry.
 
 ## Partition cutover (P3.3 is shells only)
 

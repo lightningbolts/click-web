@@ -354,6 +354,25 @@ export async function POST(request: NextRequest) {
 
     const visibilityAudience = parseVisibilityAudienceFromBody(body);
 
+    let venueId: string | null = null;
+    const venueIdRaw =
+      (typeof body.venue_id === "string" && body.venue_id.trim()) ||
+      (typeof body.venueId === "string" && body.venueId.trim()) ||
+      "";
+    if (venueIdRaw.length > 0) {
+      const adminForVenue = createAdminSupabaseClient();
+      const { data: membership } = await adminForVenue
+        .from("venue_managers")
+        .select("id")
+        .eq("venue_id", venueIdRaw)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!membership) {
+        return NextResponse.json({ error: "Not a manager for this venue" }, { status: 403 });
+      }
+      venueId = venueIdRaw;
+    }
+
     if (beacon_type === "soundtrack") {
       const musicUrl =
         (typeof metadata.original_url === "string" && metadata.original_url.trim()) ||
@@ -388,7 +407,7 @@ export async function POST(request: NextRequest) {
       .from("map_beacons")
       .insert({
         creator_id: user.id,
-        venue_id: null,
+        venue_id: venueId,
         beacon_type,
         show_creator_name: showCreatorName,
         visibility_audience: visibilityAudience,

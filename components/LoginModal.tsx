@@ -21,9 +21,16 @@ interface LoginModalProps {
   onClose: () => void;
   /** Open directly in sign-up mode (default: false = sign-in mode) */
   initialIsSignup?: boolean;
+  /** After OAuth, send the user here instead of /dashboard. */
+  nextPath?: string;
 }
 
-export default function LoginModal({ isOpen, onClose, initialIsSignup = false }: LoginModalProps) {
+export default function LoginModal({
+  isOpen,
+  onClose,
+  initialIsSignup = false,
+  nextPath = "/dashboard",
+}: LoginModalProps) {
   const router = useRouter();
   const [isSignup, setIsSignup] = useState(initialIsSignup);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -71,7 +78,7 @@ export default function LoginModal({ isOpen, onClose, initialIsSignup = false }:
       const { error: oauthError } = await startOAuth(supabase, {
         provider,
         origin: window.location.origin,
-        next: '/dashboard',
+        next: nextPath,
       });
       if (oauthError) {
         setError(oauthError);

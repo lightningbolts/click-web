@@ -61,6 +61,12 @@ const navItems = [
     exact: false,
   },
   {
+    href: "/insights/events",
+    label: "Events",
+    icon: CalendarDays,
+    exact: false,
+  },
+  {
     href: "/insights/event-engagement",
     label: "Event engagement",
     icon: CalendarDays,

@@ -6,7 +6,7 @@ type EventBeaconRow = {
   metadata: Record<string, unknown> | null;
 };
 
-export type ReminderKind = 'day_of' | 'thirty_min';
+export type ReminderKind = 'day_of' | 'thirty_min' | 'recap_ready';
 
 const THIRTY_MIN_MS = 30 * 60 * 1000;
 
@@ -59,7 +59,10 @@ export function dueReminderKinds(args: {
   metadata: Record<string, unknown>;
 }): ReminderKind[] {
   const { nowMs, startMs, endMs, metadata } = args;
-  if (endMs <= nowMs) return [];
+  if (endMs <= nowMs) {
+    if (!metadataFlag(metadata, 'recap_notification_sent')) return ['recap_ready'];
+    return [];
+  }
 
   const kinds: ReminderKind[] = [];
   const tz = reminderTimeZone(metadata);
@@ -76,7 +79,30 @@ export function dueReminderKinds(args: {
 }
 
 function sentKeyForKind(kind: ReminderKind): string {
-  return kind === 'day_of' ? 'day_of_notification_sent' : 'thirty_min_notification_sent';
+  if (kind === 'day_of') return 'day_of_notification_sent';
+  if (kind === 'thirty_min') return 'thirty_min_notification_sent';
+  return 'recap_notification_sent';
+}
+
+async function recipientIdsForKind(
+  admin: SupabaseClient,
+  beaconId: string,
+  kind: ReminderKind,
+  creatorId: string,
+): Promise<string[]> {
+  if (kind !== 'recap_ready') return [creatorId];
+  const [{ data: rsvps }, { data: checkIns }] = await Promise.all([
+    admin.from('beacon_attendees').select('user_id').eq('beacon_id', beaconId),
+    admin.from('event_check_ins').select('user_id').eq('beacon_id', beaconId),
+  ]);
+  const ids = new Set<string>();
+  for (const row of [...(rsvps ?? []), ...(checkIns ?? [])]) {
+    if (row && typeof row === 'object' && 'user_id' in row && typeof row.user_id === 'string') {
+      ids.add(row.user_id);
+    }
+  }
+  if (ids.size === 0) ids.add(creatorId);
+  return [...ids];
 }
 
 /** Hourly sweep: event beacons → day-of and 30-minutes-before push notifications. */
@@ -116,38 +142,48 @@ export async function runEventReminders(
       const creatorId = row.creator_id?.trim();
       if (!creatorId || !pushUrl) continue;
 
-      const title = kind === 'day_of' ? 'Event today' : 'Event starting soon';
+      const title =
+        kind === 'day_of' ? 'Event today' : kind === 'thirty_min' ? 'Event starting soon' : 'Your event recap is ready';
       const body =
         kind === 'day_of'
           ? `${description.slice(0, 80)} starts today — tap to view on the map.`
-          : `${description.slice(0, 80)} starts in about 30 minutes.`;
+          : kind === 'thirty_min'
+            ? `${description.slice(0, 80)} starts in about 30 minutes.`
+            : `See who you met at ${description.slice(0, 80)}.`;
 
-      try {
-        const response = await fetch(pushUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${authBearer}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            recipient_user_id: creatorId,
-            title,
-            body,
-            data: {
-              type: 'event_reminder',
-              beacon_id: row.id,
-              reminder_kind: kind,
+      const recipients = await recipientIdsForKind(admin, row.id, kind, creatorId);
+      let anyOk = false;
+      for (const recipientId of recipients) {
+        try {
+          const response = await fetch(pushUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${authBearer}`,
+              'Content-Type': 'application/json',
             },
-          }),
-        });
-        if (response.ok) {
-          pushAttempts += 1;
-          const sentKey = sentKeyForKind(kind);
-          nextMeta = { ...nextMeta, [sentKey]: true };
-          await admin.from('map_beacons').update({ metadata: nextMeta }).eq('id', row.id);
+            body: JSON.stringify({
+              recipient_user_id: recipientId,
+              title,
+              body,
+              data: {
+                type: kind === 'recap_ready' ? 'event_recap' : 'event_reminder',
+                beacon_id: row.id,
+                reminder_kind: kind,
+              },
+            }),
+          });
+          if (response.ok) {
+            pushAttempts += 1;
+            anyOk = true;
+          }
+        } catch (e) {
+          console.warn('[event-reminders] push error:', row.id, kind, e);
         }
-      } catch (e) {
-        console.warn('[event-reminders] push error:', row.id, kind, e);
+      }
+      if (anyOk) {
+        const sentKey = sentKeyForKind(kind);
+        nextMeta = { ...nextMeta, [sentKey]: true };
+        await admin.from('map_beacons').update({ metadata: nextMeta }).eq('id', row.id);
       }
     }
   }

@@ -15,6 +15,11 @@ jest.mock('@/lib/supabase', () => ({
   getSupabaseClient: () => null,
 }));
 
+jest.mock('@/components/dashboard/DashboardEventsModule', () => ({
+  __esModule: true,
+  default: () => <div data-testid="dashboard-events-module" />,
+}));
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
 }));
@@ -216,10 +221,10 @@ describe('DashboardView', () => {
     expect(await screen.findByText(/Pat Lee/)).toBeInTheDocument();
   });
 
-  it('renders all five navigation tabs', async () => {
+  it('renders all six navigation tabs', async () => {
     await renderDashboard();
 
-    const expectedLabels = ['Memory Box', 'Map', 'Chat', 'QR Identity', 'Settings'];
+    const expectedLabels = ['Memory Box', 'Events', 'Map', 'Chat', 'QR Identity', 'Settings'];
     for (const label of expectedLabels) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }

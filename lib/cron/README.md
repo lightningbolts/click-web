@@ -33,11 +33,12 @@ Configured in `vercel.json` for Vercel paths; Supabase schedule in `202606071200
 `runEventReminders(admin, pushUrl, authBearer, nowMs?)` — **canonical implementation**. The Edge Function does **not** duplicate this logic; `cron-hourly-maintenance` HTTP-GETs `/api/cron/event-reminders` with `CRON_SECRET`.
 
 1. Query `map_beacons` where `beacon_type = 'event'`
-2. Parse `metadata.event_start_at` / `event_end_at`
+2. Parse `metadata.event_start_at` / `event_end_at` (first-class `starts_at` / `ends_at` / `event_timezone` columns exist but cron does **not** use them yet; see `docs/event-schema-scaling-followups.md`)
 3. Skip ended events
 4. Due-by-timestamp (hourly sweep still catches `:30` starts):
    - **day_of** — local calendar day of the event (`metadata.event_timezone`, else UTC)
    - **thirty_min** — 30 minutes before start (also honors legacy `one_hour_notification_sent`)
+   - **recap_ready** — after `event_end_at` (`recap_notification_sent`), push to Click RSVPs/check-ins
 5. POST `send-push-notification` with `type: event_reminder`
 6. Set `day_of_notification_sent` / `thirty_min_notification_sent` in beacon metadata
 
@@ -50,6 +51,7 @@ Bundled jobs:
 | Disposable reveal | Sessions past `collaboration_ttl` with revealed disposable messages → push |
 | Event reminders | Same as `eventReminders.ts` |
 | Friction expirations | Expired `availability_intents` without encounter → `system_friction_logs` |
+| Event daily stats | **Not scheduled.** Future `GET /api/cron/event-daily-stats` will upsert `event_beacon_daily_stats` (schema exists, unused). |
 
 ### Friction intent expirations
 

@@ -155,12 +155,21 @@ body {
 }
 
 .fc-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   background-color: var(--color-surface);
   color: var(--color-on-surface);
   border: var(--border-width) solid var(--color-border-hard);
   border-radius: var(--radius-field);
   font-size: 14px;
   line-height: 20px;
+  color-scheme: light;
+}
+
+.dark .fc-input {
+  color-scheme: dark;
 }
 
 .fc-input::placeholder {

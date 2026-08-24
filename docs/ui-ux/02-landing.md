@@ -13,6 +13,7 @@ Logo is the primary viewport (Circle-style splash), filling the remaining height
 - Tagline: “Stop scrolling. Start living.”
 - One primary CTA (`Join the Waitlist`) + **About** text link.
 - Login / signup live in the Navbar — not duplicated in the hero.
+- Navbar also links **Events** (`/events`, public) and **Create event** (`/events/new`). The landing playground Events scene can deep-link to `/events`.
 
 **Remove:** giant typeset headlines, screenshot frames, waitlist + create-account + sign-in stacks.
 
