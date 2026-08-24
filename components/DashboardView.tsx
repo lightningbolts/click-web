@@ -12,10 +12,13 @@ import {
   QrCode,
   BookOpen,
   CalendarDays,
-  Sparkles,
   MessageCircle,
+  BarChart2,
 } from 'lucide-react';
+import useSWR from 'swr';
 import DashboardEventsModule from '@/components/dashboard/DashboardEventsModule';
+import ProductAppShell from '@/components/shell/ProductAppShell';
+import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
 import { CreateVerifiedClickDialog } from '@/components/chat';
@@ -65,6 +68,11 @@ import { ChatTabSection } from '@/components/dashboard/ChatTabSection';
 import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModals';
 
 type DashboardTab = 'memory' | 'events' | 'map' | 'chat' | 'identity' | 'settings';
+
+type InsightsAccessPayload = { insightsAllowed: boolean };
+
+const insightsAccessFetcher = (url: string) =>
+  fetchInsightsApiJson<InsightsAccessPayload>(url);
 
 interface DashboardViewProps {
   user: any;
@@ -355,6 +363,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
 
+  const { data: insightsAccess } = useSWR(
+    user ? '/api/user/insights-access' : null,
+    insightsAccessFetcher,
+  );
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   useEffect(() => {
     const id = setInterval(() => setArchiveCountdownTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
@@ -496,8 +517,33 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-on-surface" data-testid="dashboard-root">
-      {/* Interest tagging onboarding overlay */}
+    <ProductAppShell
+      productLabel="Click"
+      productHref="/"
+      items={tabs.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        icon: tab.icon,
+      }))}
+      activeId={activeTab}
+      onSelect={(id) => setActiveTab(id as DashboardTab)}
+      title={
+        <>
+          Welcome back, <span className="text-primary">{userName}</span>
+        </>
+      }
+      subtitle="Your digital memory box"
+      extraNav={
+        insightsAccess?.insightsAllowed
+          ? [{ href: '/insights', label: 'Insights', icon: BarChart2 }]
+          : []
+      }
+      userLabel={userName}
+      onSignOut={handleSignOut}
+      rootTestId="dashboard-root"
+      chromeTestId="dashboard-chrome"
+      itemTestIdPrefix="dashboard-tab"
+    >
       {needsTagging === true && (
         <InterestTagging
           onComplete={handleTagsComplete}
@@ -519,60 +565,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         />
       ) : null}
 
-      {/* Main content */}
-      <div className="relative z-10">
-        {/* Welcome header */}
-        <div className="px-6 md:px-12 pt-6 pb-4">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-3"
-          >
-            <Sparkles className="w-5 h-5 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">
-                Welcome back, <span className="text-primary">{userName}</span>
-              </h1>
-              <p className="text-sm text-on-surface-variant">Your digital memory box</p>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Tabs */}
-        <div
-          className="sticky top-0 z-20 border-b border-border-hard bg-surface"
-          style={{ backgroundColor: "var(--color-surface)" }}
-          data-testid="dashboard-chrome"
-        >
-          <div className="px-6 md:px-12 flex gap-1 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  data-testid={`dashboard-tab-${tab.id}`}
-                  className={`relative py-4 px-4 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
-                    ? 'text-primary'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  {activeTab === tab.id && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="px-6 md:px-12 py-8">
           <AnimatePresence mode="wait">
             {/* Memory Box Tab */}
             {activeTab === 'memory' && (
@@ -721,7 +713,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="h-[calc(100dvh-180px)] min-h-0 overflow-visible"
+                className="h-[calc(100dvh-12rem)] min-h-0 overflow-visible"
               >
                 <ChatTabSection
                   user={user}
@@ -778,18 +770,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
               </motion.div>
             )}
 
-            {activeTab === 'events' && (
-              <motion.div
-                key="events"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <DashboardEventsModule />
-              </motion.div>
-            )}
-
             {/* QR Identity Tab */}
             {activeTab === 'identity' && (
               <motion.div
@@ -824,8 +804,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      </div>
 
       <CallOverlay
         currentUserId={user.id}
@@ -903,6 +881,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         />
       ) : null}
 
-    </div>
+    </ProductAppShell>
   );
 }

@@ -3,7 +3,7 @@ import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
-import { countEventRsvps } from "@/lib/events/publicEvent";
+import { countEventRsvpsByBeaconIds } from "@/lib/events/publicEvent";
 import {
   eventDescriptionFromMetadata,
   eventDisplayTitle,
@@ -14,6 +14,7 @@ import {
   eventTitleFromMetadata,
   isRecord,
   parseBeaconMetadata,
+  rsvpEnabledFromMetadata,
 } from "@/lib/events/eventMetadata";
 
 /**
@@ -56,8 +57,13 @@ export async function GET(
       return NextResponse.json({ error: "Failed to load events" }, { status: 500 });
     }
 
+    const rows = Array.isArray(data) ? data : [];
+    const rsvpCountById = await countEventRsvpsByBeaconIds(
+      admin,
+      rows.map((row) => (isRecord(row) && typeof row.id === "string" ? row.id : "")).filter(Boolean),
+    );
     const events = [];
-    for (const row of Array.isArray(data) ? data : []) {
+    for (const row of rows) {
       if (!isRecord(row) || typeof row.id !== "string") continue;
       const meta = parseBeaconMetadata(row.metadata);
       const coords = parseLatLngFromLocationField(row.location, Number.NaN, Number.NaN);
@@ -68,13 +74,15 @@ export async function GET(
           eventLocationNameFromMetadata(meta),
           eventDescriptionFromMetadata(meta),
         ),
+        description: eventDescriptionFromMetadata(meta),
         image_url: eventImageFromMetadata(meta),
         event_start_at: eventStartAtFromMetadata(meta),
         event_end_at: eventEndAtFromMetadata(meta),
         location_name: eventLocationNameFromMetadata(meta),
         latitude: Number.isFinite(coords.lat) ? coords.lat : null,
         longitude: Number.isFinite(coords.lng) ? coords.lng : null,
-        rsvp_count: await countEventRsvps(admin, row.id),
+        rsvp_count: rsvpCountById.get(row.id) ?? 0,
+        rsvp_enabled: rsvpEnabledFromMetadata(meta),
       });
     }
     return NextResponse.json({ events });

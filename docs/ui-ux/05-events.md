@@ -18,7 +18,7 @@ Success navigates to `/e/{id}` and the form can copy that link.
 
 | Route | Who | Notes |
 |-------|-----|--------|
-| `/events` | Public | Upcoming events with `visibility_audience = 'everyone'` only |
+| `/events` | Public | Dense date-rail list (`max-w-4xl`, `space-y-3`) of upcoming events with `visibility_audience = 'everyone'` only. Each [`EventListCard`](../../components/events/EventListCard.tsx) shows month/day, title, 2-line description, host (when `show_creator_name`), when, location, RSVP count, and a square thumb. |
 | `/e/[beaconId]` | Public share link | Cover, when/where, description, host, guest RSVP, Open in Click. Connections-only events stay reachable via this URL. |
 | `/e/[beaconId]/manage` | Creator or venue manager | Guest list + network-health metrics |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
