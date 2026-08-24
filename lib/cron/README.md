@@ -38,6 +38,7 @@ Configured in `vercel.json` for Vercel paths; Supabase schedule in `202606071200
 4. Due-by-timestamp (hourly sweep still catches `:30` starts):
    - **day_of** — local calendar day of the event (`metadata.event_timezone`, else UTC)
    - **thirty_min** — 30 minutes before start (also honors legacy `one_hour_notification_sent`)
+   - **recap_ready** — after `event_end_at` (`recap_notification_sent`), push to Click RSVPs/check-ins
 5. POST `send-push-notification` with `type: event_reminder`
 6. Set `day_of_notification_sent` / `thirty_min_notification_sent` in beacon metadata
 

@@ -11,9 +11,11 @@ import {
   Users,
   QrCode,
   BookOpen,
+  CalendarDays,
   Sparkles,
   MessageCircle,
 } from 'lucide-react';
+import DashboardEventsModule from '@/components/dashboard/DashboardEventsModule';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
 import { CreateVerifiedClickDialog } from '@/components/chat';
@@ -62,7 +64,7 @@ import { useConnectionLifecycle } from '@/components/dashboard/useConnectionLife
 import { ChatTabSection } from '@/components/dashboard/ChatTabSection';
 import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModals';
 
-type DashboardTab = 'memory' | 'map' | 'chat' | 'identity' | 'settings';
+type DashboardTab = 'memory' | 'events' | 'map' | 'chat' | 'identity' | 'settings';
 
 interface DashboardViewProps {
   user: any;
@@ -482,6 +484,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const tabs: { id: DashboardTab; label: string; icon: any }[] = [
     { id: 'memory', label: 'Memory Box', icon: BookOpen },
+    { id: 'events', label: 'Events', icon: CalendarDays },
     { id: 'map', label: 'Map', icon: MapPin },
     { id: 'chat', label: 'Chat', icon: MessageCircle },
     { id: 'identity', label: 'QR Identity', icon: QrCode },
@@ -674,6 +677,19 @@ export default function DashboardView({ user }: DashboardViewProps) {
               </motion.div>
             )}
 
+            {/* Events Tab */}
+            {activeTab === 'events' && (
+              <motion.div
+                key="events"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <DashboardEventsModule />
+              </motion.div>
+            )}
+
             {/* Map Tab */}
             {activeTab === 'map' && (
               <motion.div
@@ -759,6 +775,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
                   chatListGroupActionBusyId={chatListGroupActionBusyId}
                   setChatListGroupActionBusyId={setChatListGroupActionBusyId}
                 />
+              </motion.div>
+            )}
+
+            {activeTab === 'events' && (
+              <motion.div
+                key="events"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <DashboardEventsModule />
               </motion.div>
             )}
 

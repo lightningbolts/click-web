@@ -21,6 +21,7 @@ const AUTH_MARKERS = [
   'getSupabaseFromRouteRequest',
   'getAuthenticatedSupabase',
   'requireConnectionParticipant',
+  'requireEventManager',
   'createAdminClient',
   'createAdminSupabaseClient',
   'createServerClient',

@@ -32,6 +32,7 @@ Request
 | `createSupabaseServerClient()` | Anon + cookies | Server Components / Actions |
 | `createSupabaseServiceRoleClient()` | `SUPABASE_SERVICE_ROLE_KEY` | Webhooks, trusted jobs |
 | `getSupabaseFromRouteRequest(request)` | Anon + Bearer/cookies | API route handlers |
+| Event helpers | `lib/events/` | Guest RSVP, `userMayManageBeacon`, recap aggregation |
 | `getAuthenticatedSupabase(request)` (`supabaseAuth.ts`) | Delegates to route auth | Thin wrapper for chat/profile routes — never treat SSR cookie blob as a JWT |
 | `resolveChatForTabsParam` | Anon client lookups | Profile tabs resolve chat by id, connection id, or **group id** |
 | `createChatGatekeeperAdmin()` | Service role (fallback anon) | Chat/hub membership checks |
@@ -55,7 +56,7 @@ Connection status normalization uses `lib/dashboard/connectionStatus.ts` (`isAct
 
 `assertEventCheckInGeofence(admin, beacon, lat, lng)` (`eventCheckInGeofence.ts`) — haversine vs event metadata `check_in_radius_meters` / `venue_scale` (intimate 75 · neighborhood 250 · venue 750 · campus 2500; clamp 25–5000). Missing/(0,0) → 400; outside → 403.
 
-Engagement helpers: `lib/server/eventEngagement.ts` (venue scale, live window + 15m early grace, append-only `event_engagement_events` inserts).
+Engagement helpers: `lib/server/eventEngagement.ts` (venue scale, live window + 15m early grace, append-only `event_engagement_events` inserts). New unused tables (`event_participation`, `beacon_share_tokens`, `event_beacon_daily_stats`) are service-role / unused until `docs/event-schema-scaling-followups.md`.
 
 ### `adminRole`
 

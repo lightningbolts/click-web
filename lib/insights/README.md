@@ -28,7 +28,9 @@ proxy.ts → userMayAccessBusinessInsights
     │
     ├─ /insights/heatmap          → connectionEncounterClustering
     ├─ /insights/vibe-stream      → Vibe Radar live
+    ├─ /insights/events            → create/list event beacons (not BeaconDeployModal)
     ├─ /insights/event-engagement → funnel / arrival / rejects / dwell
+    ├─ GET /api/insights/[venueId]/network-health-trend → recap-summary per completed event
     ├─ app/api/insights/[venueId] → venue metrics + augmentation
     ├─ app/api/insights/[venueId]/event-engagement → aggregates from event_engagement_events
     ├─ app/api/insights/widget-vibe → widgetVibePayload
@@ -105,7 +107,8 @@ Advanced RPCs (types in `advancedMetrics.ts`):
 | `app/api/insights/intents/route.ts` | Intent analytics |
 | `lib/server/eventEngagement.ts` | Telemetry insert + venue scale helpers |
 | `components/insights/VibeRadarMap.tsx` | Hexbin map UI |
-| `components/insights/BusinessInsightsShell.tsx` | Shell layout (includes Event engagement nav) |
+| `components/insights/BusinessInsightsShell.tsx` | Shell layout (Events + Event engagement nav) |
+| `app/insights/events/page.tsx` | Venue event create/list + network-health trend |
 | `app/insights/heatmap/page.tsx` | Heatmap page |
 | `app/insights/event-engagement/page.tsx` | Event engagement charts |
 

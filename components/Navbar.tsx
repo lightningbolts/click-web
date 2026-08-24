@@ -112,6 +112,18 @@ export default function Navbar() {
                     <span className="hidden sm:inline">Insights</span>
                   </Link>
                 ) : null}
+                <Link
+                  href="/events"
+                  className="hidden text-sm font-semibold text-on-surface hover:text-secondary sm:inline"
+                >
+                  Events
+                </Link>
+                <Link
+                  href="/events/new"
+                  className="fc-btn-secondary whitespace-nowrap px-2 py-2 text-xs md:px-4 md:text-sm"
+                >
+                  Create event
+                </Link>
                 <div className="hidden items-center gap-2 text-sm font-medium text-on-surface-variant sm:flex">
                   <User className="h-4 w-4 shrink-0" />
                   <span className="max-w-[200px] truncate">
@@ -131,6 +143,18 @@ export default function Navbar() {
               <>
                 {/* Desktop links */}
                 <div className="hidden items-center gap-4 md:flex">
+                  <Link
+                    href="/events"
+                    className="text-sm font-semibold text-on-surface hover:text-secondary"
+                  >
+                    Events
+                  </Link>
+                  <Link
+                    href="/events/new"
+                    className="text-sm font-semibold text-on-surface hover:text-secondary"
+                  >
+                    Create event
+                  </Link>
                   <button
                     type="button"
                     onClick={scrollToHowItWorks}
@@ -177,6 +201,20 @@ export default function Navbar() {
                   </button>
                   {mobileOpen ? (
                     <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-[12px] border border-border-hard bg-surface p-2 shadow-lg">
+                      <Link
+                        href="/events"
+                        onClick={() => setMobileOpen(false)}
+                        className="block rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container"
+                      >
+                        Events
+                      </Link>
+                      <Link
+                        href="/events/new"
+                        onClick={() => setMobileOpen(false)}
+                        className="block rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container"
+                      >
+                        Create event
+                      </Link>
                       <button
                         type="button"
                         onClick={scrollToHowItWorks}

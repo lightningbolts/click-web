@@ -135,3 +135,7 @@ export const insightsBeaconCreateBodySchema = z.object({
 export const insightsVenueBeaconBodySchema = z.object({
   spotify_playlist_uri: optionalNonEmptyString,
 }).passthrough();
+
+export const ghostModeBodySchema = z.object({
+  enabled: z.boolean(),
+});
