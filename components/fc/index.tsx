@@ -60,7 +60,9 @@ export function FcInput({
   className,
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn("fc-input px-3 py-2", className)} {...props} />;
+  return (
+    <input className={cn("fc-input min-h-11 w-full px-3 py-2.5", className)} {...props} />
+  );
 }
 
 export function FcTextarea({
@@ -69,9 +71,26 @@ export function FcTextarea({
 }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={cn("fc-input fc-textarea px-3 py-2", className)}
+      className={cn("fc-input fc-textarea w-full px-3 py-2.5", className)}
       {...props}
     />
+  );
+}
+
+export function FcField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={cn("flex w-full min-w-0 flex-col gap-1.5", className)}>
+      <span className="text-sm font-semibold text-on-surface">{label}</span>
+      {children}
+    </label>
   );
 }
 

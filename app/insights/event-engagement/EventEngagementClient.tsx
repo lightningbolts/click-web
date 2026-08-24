@@ -21,6 +21,7 @@ import { useInsightsDemo } from '@/components/insights/InsightsDemoContext';
 import { useAuth } from '@/lib/AuthContext';
 import { mockEventEngagement } from '@/lib/insights/mockData';
 import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';
+import { FcPageShell, FcSectionHeader } from '@/components/fc';
 
 type EventEngagementResponse = typeof mockEventEngagement & {
   status?: string;
@@ -87,14 +88,11 @@ export default function EventEngagementPage() {
       initial="hidden"
       animate="visible"
     >
-      <motion.div variants={itemVariants} className="flex items-center gap-3">
-        <CalendarDays className="h-6 w-6 text-primary" />
-        <div>
-          <h1 className="text-xl font-semibold text-on-surface">Event engagement</h1>
-          <p className="text-sm text-on-surface-variant">
-            Impression → bookmark → share → RSVP → check-in funnel for venue-linked events
-          </p>
-        </div>
+      <motion.div variants={itemVariants}>
+        <FcSectionHeader
+          title="Event engagement"
+          subtitle="Impression → bookmark → share → RSVP → check-in funnel for venue-linked events"
+        />
       </motion.div>
 
       {!payload && isLoading && (

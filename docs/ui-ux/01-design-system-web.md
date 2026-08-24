@@ -4,7 +4,8 @@
 **Mobile source of truth:** [`click/docs/design-assets/functional_clarity/DESIGN.md`](../../../click/docs/design-assets/functional_clarity/DESIGN.md), [`Color.kt`](../../../click/composeApp/src/commonMain/kotlin/compose/project/click/click/ui/theme/Color.kt)  
 **Web tokens:** [`app/globals.css`](../../app/globals.css) — use `@theme` (not `@theme inline`) so light/dark can override `--color-*` at runtime.  
 **Primitives:** [`components/fc/`](../../components/fc/)  
-**Theme:** [`lib/theme/ThemeProvider.tsx`](../../lib/theme/ThemeProvider.tsx)
+**Theme:** [`lib/theme/ThemeProvider.tsx`](../../lib/theme/ThemeProvider.tsx)  
+**Surfaces:** [02 landing](./02-landing.md) · [03 dashboard](./03-dashboard.md) · [04 insights](./04-insights.md) · [05 events](./05-events.md)
 
 Mobile Compose now matches these quiet 1dp borders and secondary `#224CFF`. Reuse `components/fc/` (`FcCard`, `FcButton`, `FcInput`, `FcTextarea`, `FcChip`) instead of one-off chrome.
 

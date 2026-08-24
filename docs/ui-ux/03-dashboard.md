@@ -9,7 +9,8 @@
 ## Shell
 
 - Flat `background`; sticky tab bar = opaque `surface` + 1px outline-variant border (no backdrop-blur).
-- Tabs: memory, map, chat, identity, settings.
+- Tabs: memory, events, map, chat, identity, settings.
+- Events tab: My events, RSVPs, primary **Create event** (`DashboardEventsModule` + `EventCreateForm`).
 - Active tab: solid primary underline or primary-container chip.
 
 ### Chat tab — message search

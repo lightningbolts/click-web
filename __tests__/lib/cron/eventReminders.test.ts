@@ -29,9 +29,21 @@ describe('dueReminderKinds', () => {
     ).toEqual(['day_of']);
   });
 
-  it('skips ended events', () => {
+  it('skips day_of and thirty_min after the event ends, and queues recap_ready', () => {
     const nowMs = Date.parse('2026-08-12T17:00:00.000Z');
-    expect(dueReminderKinds({ nowMs, startMs, endMs, metadata: {} })).toEqual([]);
+    expect(dueReminderKinds({ nowMs, startMs, endMs, metadata: {} })).toEqual(['recap_ready']);
+  });
+
+  it('does not re-send recap_ready after recap_notification_sent', () => {
+    const nowMs = Date.parse('2026-08-12T17:00:00.000Z');
+    expect(
+      dueReminderKinds({
+        nowMs,
+        startMs,
+        endMs,
+        metadata: { recap_notification_sent: true },
+      }),
+    ).toEqual([]);
   });
 
   it('day_of uses event timezone, not a UTC-midnight slice', () => {

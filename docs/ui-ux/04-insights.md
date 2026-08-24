@@ -8,7 +8,7 @@
 ## Shell
 
 - Opaque header with hard border; no blur orbs or glass icon wells.
-- Nav tabs: bordered / selected solid states.
+- Nav tabs: bordered / selected solid states. Include **Events** (create/list via `EventCreateForm`, not Vibe Radar `BeaconDeployModal`) plus **Event engagement** (funnel analytics) and later network-health trend.
 - Include `ThemeToggle` in header actions (Navbar is hidden on `/insights`).
 
 ---

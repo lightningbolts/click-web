@@ -68,7 +68,7 @@ ConnectionMap.tsx (MapLibre)
 
 ### Event engagement (related APIs)
 
-Event beacons support server-backed bookmarks / check-ins / impressions (not MapLibre layers). Routes under `app/api/beacons/[beaconId]/{bookmark,check-in,engagement,impressions}` plus `GET /api/me/event-bookmarks`. Create/edit may set `metadata.venue_scale` + `check_in_radius_meters`. See `lib/server/eventEngagement.ts` and `click/docs/handoff/event-engagement-api.md`.
+Event beacons support server-backed bookmarks / check-ins / impressions (not MapLibre layers). Routes under `app/api/beacons/[beaconId]/{bookmark,check-in,engagement,impressions}` plus `GET /api/me/event-bookmarks`. Public directory: `GET /api/beacons/public-events`. Share landing: `GET /api/beacons/[beaconId]/public` (selects `creator_id`, cover, description, `rsvp_count`). Guest RSVP: `POST /api/beacons/[beaconId]/rsvp/guest`. Create/edit may set `metadata.venue_scale` + `check_in_radius_meters`. See `lib/server/eventEngagement.ts`, `lib/events/`, and `docs/ui-ux/05-events.md`.
 
 ---
 

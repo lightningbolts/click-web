@@ -32,6 +32,7 @@ Request
 | `createSupabaseServerClient()` | Anon + cookies | Server Components / Actions |
 | `createSupabaseServiceRoleClient()` | `SUPABASE_SERVICE_ROLE_KEY` | Webhooks, trusted jobs |
 | `getSupabaseFromRouteRequest(request)` | Anon + Bearer/cookies | API route handlers |
+| Event helpers | `lib/events/` | Guest RSVP, `userMayManageBeacon`, recap aggregation |
 | `getAuthenticatedSupabase(request)` (`supabaseAuth.ts`) | Delegates to route auth | Thin wrapper for chat/profile routes — never treat SSR cookie blob as a JWT |
 | `resolveChatForTabsParam` | Anon client lookups | Profile tabs resolve chat by id, connection id, or **group id** |
 | `createChatGatekeeperAdmin()` | Service role (fallback anon) | Chat/hub membership checks |
