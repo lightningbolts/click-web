@@ -6,6 +6,7 @@ import {
   eventImageFromMetadata,
   eventLocationNameFromMetadata,
   eventStartAtFromMetadata,
+  eventTimezoneFromMetadata,
   eventTitleFromMetadata,
   isRecord,
   isUpcomingEvent,
@@ -28,6 +29,8 @@ export type PublicEventPayload = {
   rsvp_count: number;
   rsvp_enabled: boolean;
   expires_at: string | null;
+  created_at: string | null;
+  timezone: string | null;
 };
 
 export async function countEventRsvps(
@@ -98,7 +101,7 @@ export async function loadPublicEventPayload(
   const { data, error } = await admin
     .from("map_beacons")
     .select(
-      "id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience",
+      "id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at",
     )
     .eq("id", beaconId)
     .maybeSingle();
@@ -139,6 +142,8 @@ export async function loadPublicEventPayload(
     rsvp_count: rsvpCount,
     rsvp_enabled: rsvpEnabledFromMetadata(meta),
     expires_at: typeof data.expires_at === "string" ? data.expires_at : null,
+    created_at: typeof data.created_at === "string" ? data.created_at : null,
+    timezone: eventTimezoneFromMetadata(meta),
   };
 }
 

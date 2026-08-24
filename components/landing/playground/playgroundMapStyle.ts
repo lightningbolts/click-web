@@ -1,3 +1,4 @@
+import { dropSameOriginMapRequest } from '@/lib/map/dropSameOriginMapRequest';
 import { MAP_STYLE_DARK, MAP_STYLE_LIGHT, mapStyleForTheme } from '@/lib/theme/mapStyles';
 
 export const PLAYGROUND_MAP_CENTER: [number, number] = [-122.3085, 47.6554];
@@ -39,16 +40,7 @@ export function applyPlaygroundMapTheme(map: ThemeableMap, theme: 'light' | 'dar
 
 /** Drop same-origin URLs so MapLibre cannot proxy tiles through the Cloudflare Worker. */
 export function playgroundTransformRequest(url: string): { url: string } {
-  if (typeof window === 'undefined') return { url };
-  try {
-    const parsed = new URL(url, window.location.href);
-    if (parsed.origin === window.location.origin) {
-      return { url: 'about:blank' };
-    }
-  } catch {
-    /* keep the original url */
-  }
-  return { url };
+  return dropSameOriginMapRequest(url);
 }
 
 export function isCartoBasemapStyle(style: string): boolean {

@@ -1,7 +1,6 @@
 'use client';
 
 import { type Dispatch, type RefObject, type SetStateAction } from 'react';
-import { motion } from 'framer-motion';
 import { Send, Loader2, ImagePlus, Paperclip, Mic, Square, X } from 'lucide-react';
 import type { Message } from '@/lib/chat/types';
 import { ATTACHMENT_ACCEPT_STRING } from '@/lib/chat/attachmentValidator';
@@ -174,19 +173,16 @@ export function ChatComposer({
             style={{ minHeight: '24px', maxHeight: '120px' }}
           />
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
+          type="button"
           onClick={sendMessage}
           disabled={!inputText.trim() || mediaBusy || isRecording}
-          className="p-3 rounded-xl bg-gradient-to-br from-[#8338EC] to-[#6520c0]
-            hover:from-[#9b4dff] hover:to-[#7b30e0] disabled:opacity-30
-            disabled:cursor-not-allowed transition-all shrink-0 glow-violet"
+          className="shrink-0 rounded-xl bg-primary p-3 text-on-primary transition-colors disabled:cursor-not-allowed disabled:opacity-30"
         >
-          <Send className="w-4 h-4" />
-        </motion.button>
+          <Send className="h-4 w-4" />
+        </button>
       </div>
-      <p className="text-[10px] text-zinc-600 mt-1 text-left hidden sm:block">
+      <p className="text-[10px] text-on-surface-variant mt-1 text-left hidden sm:block">
         Press Enter to send · Shift+Enter for new line
       </p>
     </div>

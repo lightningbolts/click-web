@@ -164,7 +164,7 @@ export default function CreateVerifiedClickDialog({
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-click-title"
-            className="flex max-h-[min(420px,calc(100dvh-9rem))] w-full max-w-md flex-col rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl sm:max-h-[min(480px,calc(100dvh-10rem))]"
+            className="flex max-h-[min(420px,calc(100dvh-9rem))] w-full max-w-md flex-col rounded-2xl border border-border-hard bg-background p-5 shadow-2xl sm:max-h-[min(480px,calc(100dvh-10rem))]"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 56 }}
@@ -175,11 +175,11 @@ export default function CreateVerifiedClickDialog({
               <h2 id="create-click-title" className="text-lg font-semibold text-white">
                 Create verified click
               </h2>
-              <p className="mt-2 text-sm text-zinc-400">
+              <p className="mt-2 text-sm text-on-surface-variant">
                 Pick friends who are pairwise connected (active or kept). Server verifies every edge.
               </p>
               <p
-                className={`mt-2 min-h-[1.25rem] text-xs text-[#8338EC] ${
+                className={`mt-2 min-h-[1.25rem] text-xs text-primary ${
                   !eligibilityReady && friends.length > 0 ? 'visible' : 'invisible'
                 }`}
                 aria-live="polite"
@@ -192,7 +192,7 @@ export default function CreateVerifiedClickDialog({
             </div>
             <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {friends.length === 0 ? (
-                <p className="text-sm text-zinc-500">No active 1:1 connections yet.</p>
+                <p className="text-sm text-on-surface-variant">No active 1:1 connections yet.</p>
               ) : (
                 friends.map((f) => {
                   const checked = selected.has(f.userId);
@@ -200,13 +200,13 @@ export default function CreateVerifiedClickDialog({
                   return (
                     <label
                       key={f.connectionId}
-                      className={`flex items-center gap-3 rounded-xl border border-zinc-800/80 px-3 py-2 ${
-                        enabled ? 'cursor-pointer bg-zinc-900/60' : 'cursor-default opacity-40'
+                      className={`flex items-center gap-3 rounded-xl border border-border-hard px-3 py-2 ${
+                        enabled ? 'cursor-pointer bg-surface-container' : 'cursor-default opacity-40'
                       }`}
                     >
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-[#8338EC]"
+                        className="h-4 w-4 accent-primary"
                         checked={checked}
                         disabled={!enabled}
                         onChange={() => toggle(f.userId)}
@@ -221,7 +221,7 @@ export default function CreateVerifiedClickDialog({
             <div className="mt-5 flex shrink-0 justify-end gap-2">
               <button
                 type="button"
-                className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                className="rounded-xl px-4 py-2 text-sm text-on-surface hover:bg-surface-container"
                 onClick={() => onOpenChange(false)}
                 disabled={busy}
               >
@@ -229,7 +229,7 @@ export default function CreateVerifiedClickDialog({
               </button>
               <button
                 type="button"
-                className="rounded-xl bg-[#8338EC] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 disabled={
                   busy ||
                   selected.size === 0 ||

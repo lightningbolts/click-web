@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 export default function TermsOfService() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-on-surface">
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 md:px-12 py-20">
@@ -14,11 +14,11 @@ export default function TermsOfService() {
           animate={{ y: 0, opacity: 1 }}
         >
           <h1 id="terms-heading" data-testid="terms-heading" className="text-5xl md:text-6xl font-bold mb-6">
-            Terms of <span className="text-[#8338EC]">Service</span>
+            Terms of <span className="text-primary">Service</span>
           </h1>
-          <p className="text-zinc-400 mb-12">Last updated: April 2026</p>
+          <p className="text-on-surface-variant mb-12">Last updated: April 2026</p>
 
-          <div className="space-y-8 text-zinc-300 leading-relaxed">
+          <div className="space-y-8 text-on-surface leading-relaxed">
             <section>
               <h2 className="text-2xl font-bold text-white mb-4">Welcome to Click</h2>
               <p>
@@ -157,25 +157,25 @@ export default function TermsOfService() {
               <p>Questions about these terms? Reach out:</p>
               <div className="mt-4 space-y-2">
                 <p>
-                  <a href="mailto:mepsht@uw.edu" className="text-[#8338EC] hover:underline">
+                  <a href="mailto:mepsht@uw.edu" className="text-primary hover:underline">
                     mepsht@uw.edu
                   </a>
                 </p>
                 <p>
-                  <a href="mailto:kcheng29@uw.edu" className="text-[#8338EC] hover:underline">
+                  <a href="mailto:kcheng29@uw.edu" className="text-primary hover:underline">
                     kcheng29@uw.edu
                   </a>
                 </p>
                 <p>
-                  <a href="mailto:rayanr@uw.edu" className="text-[#8338EC] hover:underline">
+                  <a href="mailto:rayanr@uw.edu" className="text-primary hover:underline">
                     rayanr@uw.edu
                   </a>
                 </p>
               </div>
             </section>
 
-            <section className="border-t border-zinc-800 pt-8 mt-8">
-              <p className="text-zinc-500 text-sm">
+            <section className="border-t border-border-hard pt-8 mt-8">
+              <p className="text-on-surface-variant text-sm">
                 By using Click, you acknowledge that you've read, understood, and agree to be
                 bound by these Terms of Service and our Privacy Policy.
               </p>

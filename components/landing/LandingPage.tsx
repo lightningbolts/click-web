@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { CheckCircle, MapPin, Smartphone, X } from 'lucide-react';
+import { CheckCircle, MapPin, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/AuthContext';
 import HomeAuthenticated from '@/components/HomeAuthenticated';
 import ClickLogo from '@/components/ClickLogo';
 import LandingPlayground from '@/components/landing/playground';
+import WaitlistModal from '@/components/marketing/WaitlistModal';
 
 /**
  * Marketing homepage. Never gates on auth `loading` so SSR/crawlers receive
@@ -18,9 +19,6 @@ export default function LandingPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [showWaitlist, setShowWaitlist] = useState(false);
-  const [waitlistEmail, setWaitlistEmail] = useState('');
-  const [waitlistStatus, setWaitlistStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [waitlistMessage, setWaitlistMessage] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -34,36 +32,6 @@ export default function LandingPage() {
 
   const openWaitlist = () => {
     setShowWaitlist(true);
-    setWaitlistStatus('idle');
-    setWaitlistMessage('');
-  };
-
-  const submitWaitlist = async () => {
-    if (!waitlistEmail.includes('@')) {
-      setWaitlistStatus('error');
-      setWaitlistMessage('Enter a valid email address.');
-      return;
-    }
-
-    setWaitlistStatus('loading');
-    try {
-      const response = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: waitlistEmail, source: 'homepage_hero' }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setWaitlistStatus('success');
-        setWaitlistMessage(data.message || "You're on the list! We'll be in touch.");
-        return;
-      }
-      setWaitlistStatus('error');
-      setWaitlistMessage(data.error || 'Something went wrong.');
-    } catch {
-      setWaitlistStatus('error');
-      setWaitlistMessage('Network error. Please try again.');
-    }
   };
 
   return (
@@ -106,78 +74,11 @@ export default function LandingPage() {
           </motion.div>
         </section>
 
-        {showWaitlist && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-            onClick={() => setShowWaitlist(false)}
-            role="presentation"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="fc-card w-full max-w-md p-6"
-              style={{ backgroundColor: 'var(--color-surface)' }}
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="waitlist-title"
-            >
-              <div className="mb-6 flex items-start justify-between gap-4">
-                <div>
-                  <h2 id="waitlist-title" className="text-2xl font-bold text-on-surface">
-                    Join the Waitlist
-                  </h2>
-                  <p className="mt-2 text-sm text-on-surface-variant">
-                    Leave your email and we&apos;ll reach out when we&apos;re ready.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowWaitlist(false)}
-                  className="rounded-full border border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
-                  aria-label="Close waitlist modal"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {waitlistStatus === 'success' ? (
-                <div className="rounded-2xl border border-border-hard bg-secondary-container p-5 text-center">
-                  <CheckCircle className="mx-auto mb-3 h-10 w-10 text-secondary" />
-                  <p className="font-medium text-on-secondary-container">
-                    You&apos;re on the list! We&apos;ll be in touch.
-                  </p>
-                  <p className="mt-2 text-sm text-on-surface-variant">{waitlistMessage}</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <input
-                    type="email"
-                    value={waitlistEmail}
-                    onChange={(event) => {
-                      setWaitlistEmail(event.target.value);
-                      if (waitlistStatus === 'error') {
-                        setWaitlistStatus('idle');
-                        setWaitlistMessage('');
-                      }
-                    }}
-                    placeholder="you@example.com"
-                    className="fc-input w-full px-4 py-3"
-                  />
-                  {waitlistStatus === 'error' && (
-                    <p className="text-sm text-red-700 dark:text-red-400">{waitlistMessage}</p>
-                  )}
-                  <button
-                    onClick={submitWaitlist}
-                    disabled={waitlistStatus === 'loading'}
-                    className="fc-btn-primary w-full px-4 py-3 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {waitlistStatus === 'loading' ? 'Joining...' : 'Submit'}
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
+        <WaitlistModal
+          open={showWaitlist}
+          onClose={() => setShowWaitlist(false)}
+          source="homepage_hero"
+        />
 
         <section id="why" className="relative z-10 px-6 pb-8 pt-16 md:px-12" aria-labelledby="why-heading">
           <div className="mx-auto max-w-5xl">

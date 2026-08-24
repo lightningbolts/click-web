@@ -104,8 +104,8 @@ export default function PersonalitySection() {
   return (
     <div className="fc-card p-8 rounded-[16px] border border-border-hard">
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
-          <Sparkles className="w-6 h-6 text-[#630ed4]" />
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Sparkles className="w-6 h-6 text-primary" />
         </div>
         <div>
           <h3 className="text-xl font-bold">Personality</h3>
@@ -129,7 +129,7 @@ export default function PersonalitySection() {
               onClick={() => togglePersonality(trait)}
               className={`rounded-full border px-3 py-1.5 text-sm ${
                 selected
-                  ? 'border-[#630ed4] bg-[#630ed4]/15 text-[#630ed4]'
+                  ? 'border-primary bg-primary/15 text-primary'
                   : 'border-border-hard text-on-surface hover:bg-surface-container disabled:opacity-40'
               }`}
             >
@@ -149,7 +149,7 @@ export default function PersonalitySection() {
       <button
         onClick={() => { void handleSavePersonality(); }}
         disabled={personalityLoading || !personalityDirty || personalityTags.length !== PERSONALITY_REQUIRED_TAG_COUNT}
-        className="mt-4 flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
+        className="mt-4 flex items-center gap-2 px-6 py-3 bg-primary hover:brightness-110 rounded-xl font-semibold transition-colors disabled:opacity-50"
       >
         {personalityLoading ? 'Saving...' : (
           <>

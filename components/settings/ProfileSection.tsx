@@ -189,7 +189,7 @@ export default function ProfileSection({
               {profileImageUrl ? (
                 <img src={profileImageUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#630ed4] to-purple-600 text-lg font-bold text-on-surface">
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary to-primary-container text-lg font-bold text-on-surface">
                   {(accountDisplayName || user?.email || 'U').trim().slice(0, 2).toUpperCase() || 'U'}
                 </div>
               )}
@@ -256,7 +256,7 @@ export default function ProfileSection({
         <button
           type="submit"
           disabled={profileLoading}
-          className="flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-6 py-3 bg-primary hover:brightness-110 rounded-xl font-semibold transition-colors disabled:opacity-50"
         >
           {profileLoading ? (
             'Saving...'

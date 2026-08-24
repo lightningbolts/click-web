@@ -118,20 +118,20 @@ function MineDeliveryTicks({ message }: { message: Message }) {
   );
 
   if (state === 'read') {
-    return pair('text-[#8338EC]', 'Read');
+    return pair('text-primary', 'Read');
   }
   if (state === 'delivered') {
-    return pair('text-zinc-500', 'Delivered');
+    return pair('text-on-surface-variant', 'Delivered');
   }
   if (state === 'sent') {
     return (
-      <span className="inline-flex text-zinc-500" title="Sent">
+      <span className="inline-flex text-on-surface-variant" title="Sent">
         <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
       </span>
     );
   }
   return (
-    <span className="inline-flex h-3 w-3 rounded-full border border-zinc-600/80 opacity-70" title="Sending…" aria-hidden />
+    <span className="inline-flex h-3 w-3 rounded-full border border-border-hard opacity-70" title="Sending…" aria-hidden />
   );
 }
 
@@ -320,12 +320,12 @@ export default function MessageBubble({
         className="flex w-full justify-center px-2 py-2"
       >
         <div
-          className="inline-flex max-w-[90%] items-center gap-2 rounded-[20px] border border-zinc-700/60 bg-zinc-800/70 px-3.5 py-2 text-sm backdrop-blur-sm"
+          className="inline-flex max-w-[90%] items-center gap-2 rounded-[20px] border border-border-hard bg-surface-container px-3.5 py-2 text-sm "
           role="status"
         >
-          <Phone className={`h-4 w-4 shrink-0 ${missed ? 'text-red-400' : 'text-zinc-400'}`} aria-hidden />
-          <span className={missed ? 'font-medium text-red-400' : 'font-medium text-zinc-300'}>{text}</span>
-          <span className="text-[10px] text-zinc-500">{formatMessageTimeLabel(message.time_created)}</span>
+          <Phone className={`h-4 w-4 shrink-0 ${missed ? 'text-red-400' : 'text-on-surface-variant'}`} aria-hidden />
+          <span className={missed ? 'font-medium text-red-400' : 'font-medium text-on-surface'}>{text}</span>
+          <span className="text-[10px] text-on-surface-variant">{formatMessageTimeLabel(message.time_created)}</span>
         </div>
       </motion.div>
     );
@@ -398,14 +398,14 @@ export default function MessageBubble({
       {!isMine && (
         <div className="relative w-8 h-8 shrink-0 mb-1">
           <div
-            className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
+            className="flex h-full w-full items-center justify-center rounded-full bg-primary
             text-xs font-bold text-on-primary"
           >
             {senderLabel ?? senderInitial}
           </div>
           {showSenderOnline && (
             <span
-              className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
+              className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background"
               aria-hidden
             />
           )}
@@ -491,7 +491,7 @@ export default function MessageBubble({
               <>
                 {secureMedia.isLoading ? (
                   <div
-                    className="h-56 w-[min(100%,20rem)] animate-pulse rounded-2xl border border-zinc-700/60 bg-zinc-900/60"
+                    className="h-56 w-[min(100%,20rem)] animate-pulse rounded-2xl border border-border-hard bg-surface-container"
                     aria-busy
                     aria-label="Decrypting photo"
                   />
@@ -500,7 +500,7 @@ export default function MessageBubble({
                     className={`max-w-full overflow-hidden rounded-2xl ${
                       isMine
                         ? 'shadow-[0_10px_40px_rgba(131,56,236,0.38)] ring-1 ring-white/30'
-                        : 'border border-zinc-600/55 shadow-[0_8px_28px_rgba(0,0,0,0.35)] ring-1 ring-black/30'
+                        : 'border border-border-hard shadow-[0_8px_28px_rgba(0,0,0,0.35)] ring-1 ring-black/30'
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs are dynamic per project */}
@@ -512,7 +512,7 @@ export default function MessageBubble({
                     />
                   </div>
                 ) : (
-                  <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                  <p className={`text-xs ${isMine ? 'text-on-surface' : 'text-on-surface-variant'}`}>
                     {isEncryptedMedia || secureMedia.error ? 'Encrypted photo unavailable' : 'Photo unavailable'}
                   </p>
                 )}
@@ -524,7 +524,7 @@ export default function MessageBubble({
                 {secureMedia.isLoading ? (
                   <div
                     className={`h-[60px] min-w-[220px] max-w-[min(100%,300px)] animate-pulse rounded-2xl border ${
-                      isMine ? 'border-white/20 bg-white/10' : 'border-zinc-700/60 bg-zinc-900/60'
+                      isMine ? 'border-white/20 bg-white/10' : 'border-border-hard bg-surface-container'
                     }`}
                     aria-busy
                     aria-label="Decrypting voice message"
@@ -536,7 +536,7 @@ export default function MessageBubble({
                     durationHint={audioDuration}
                   />
                 ) : (
-                  <p className={`text-xs ${isMine ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                  <p className={`text-xs ${isMine ? 'text-on-surface' : 'text-on-surface-variant'}`}>
                     {isEncryptedMedia || secureMedia.error
                       ? 'Encrypted voice message unavailable'
                       : 'Voice message unavailable'}
@@ -621,7 +621,7 @@ export default function MessageBubble({
               <button
                 type="button"
                 onClick={() => setShowPicker((p) => !p)}
-                className="shrink-0 p-1 rounded-full hover:bg-[#8338EC]/20 text-zinc-400 hover:text-[#8338EC] transition-colors"
+                className="shrink-0 p-1 rounded-full hover:bg-primary/20 text-on-surface-variant hover:text-primary transition-colors"
                 title="React"
               >
                 <SmilePlus className="w-3.5 h-3.5" />
@@ -633,7 +633,7 @@ export default function MessageBubble({
                     onReply(message);
                     setShowActions(false);
                   }}
-                  className="shrink-0 p-1 rounded-full hover:bg-zinc-600/30 text-zinc-400 hover:text-zinc-100 transition-colors text-[11px] font-semibold px-2"
+                  className="shrink-0 p-1 rounded-full hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors text-[11px] font-semibold px-2"
                   title="Reply"
                 >
                   Reply
@@ -643,7 +643,7 @@ export default function MessageBubble({
                 <button
                   type="button"
                   onClick={() => onEdit(message.id, message.content)}
-                  className="shrink-0 p-1 rounded-full hover:bg-[#3A86FF]/20 text-zinc-400 hover:text-[#3A86FF] transition-colors"
+                  className="shrink-0 p-1 rounded-full hover:bg-secondary/20 text-on-surface-variant hover:text-secondary transition-colors"
                   title="Edit"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -653,7 +653,7 @@ export default function MessageBubble({
                 <button
                   type="button"
                   onClick={() => onDelete(message.id)}
-                  className="shrink-0 p-1 rounded-full hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
+                  className="shrink-0 p-1 rounded-full hover:bg-red-500/20 text-on-surface-variant hover:text-red-400 transition-colors"
                   title="Delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -674,8 +674,8 @@ export default function MessageBubble({
                 className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full 
                   border transition-colors
                   ${active
-                    ? 'bg-[#8338EC]/20 border-[#8338EC]/50 text-[#8338EC]'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                    ? 'bg-primary/20 border-primary/50 text-primary'
+                    : 'bg-surface-container border-border-hard text-on-surface-variant hover:border-outline'
                   }`}
               >
                 <span>{emoji}</span>

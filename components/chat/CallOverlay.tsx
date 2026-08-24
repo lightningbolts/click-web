@@ -505,7 +505,7 @@ export default function CallOverlay({
                   {overlayState.mode === 'ended' && 'Call ended'}
                 </p>
                 <h3 className="relative mt-2 text-2xl font-semibold text-white">{name}</h3>
-                <p className="relative mt-2 text-sm text-zinc-400">
+                <p className="relative mt-2 text-sm text-on-surface-variant">
                   {overlayState.mode === 'ended'
                     ? overlayState.reason
                     : isVideo
@@ -514,7 +514,7 @@ export default function CallOverlay({
                 </p>
 
                 {overlayState.mode === 'connecting' ? (
-                  <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-zinc-300">
+                  <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-on-surface">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Connecting…
                   </div>

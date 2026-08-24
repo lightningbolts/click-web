@@ -89,17 +89,17 @@ export default function ChatThemeAudioPlayer({
   const shell =
     variant === 'mine'
       ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.06] border border-white/25 shadow-[0_4px_24px_rgba(131,56,236,0.25)]'
-      : 'bg-zinc-900/85 border border-zinc-600/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]';
+      : 'bg-surface border border-border-hard';
 
   const timeClass =
-    variant === 'mine' ? 'text-white/75 tabular-nums' : 'text-zinc-400 tabular-nums';
-  const barTrack = variant === 'mine' ? 'bg-black/25' : 'bg-zinc-950/80';
-  const barFill = variant === 'mine' ? 'bg-white/90' : 'bg-gradient-to-r from-[#8338EC] to-[#3A86FF]';
+    variant === 'mine' ? 'text-white/75 tabular-nums' : 'text-on-surface-variant tabular-nums';
+  const barTrack = variant === 'mine' ? 'bg-black/25' : 'bg-background/80';
+  const barFill = variant === 'mine' ? 'bg-white/90' : 'bg-primary';
 
   const playBtn =
     variant === 'mine'
       ? 'bg-white/20 text-white hover:bg-white/30 ring-1 ring-white/30'
-      : 'bg-[#8338EC]/25 text-[#c4a8ff] hover:bg-[#8338EC]/35 ring-1 ring-[#8338EC]/35';
+      : 'bg-primary/25 text-primary hover:bg-primary/35 ring-1 ring-primary/35';
 
   return (
     <div

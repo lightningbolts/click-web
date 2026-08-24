@@ -39,6 +39,10 @@ type ProductAppShellProps = {
   rootTestId?: string;
   chromeTestId?: string;
   itemTestIdPrefix?: string;
+  /** Lock the main pane to remaining viewport height (chat / full-bleed maps). */
+  fillViewport?: boolean;
+  /** Skip the welcome title row so a child (e.g. chat) can use the full pane. */
+  hideHeader?: boolean;
   children: ReactNode;
 };
 
@@ -70,6 +74,8 @@ export default function ProductAppShell({
   rootTestId,
   chromeTestId,
   itemTestIdPrefix,
+  fillViewport = false,
+  hideHeader = false,
   children,
 }: ProductAppShellProps) {
   const pathname = usePathname();
@@ -190,8 +196,12 @@ export default function ProductAppShell({
 
   return (
     <div
-      className="min-h-screen bg-background text-on-surface"
+      className={cn(
+        "flex flex-col bg-background text-on-surface",
+        fillViewport ? "h-dvh overflow-hidden" : "min-h-dvh md:h-dvh md:overflow-hidden",
+      )}
       data-testid={rootTestId}
+      data-fill-viewport={fillViewport ? "true" : undefined}
     >
       <header
         data-navbar-root="true"
@@ -230,25 +240,34 @@ export default function ProductAppShell({
         </div>
       ) : null}
 
-      <div className="md:flex md:min-h-screen">
+      <div className="flex min-h-0 flex-1 md:flex">
         <aside
           data-testid={chromeTestId}
-          className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-border-hard bg-surface md:block"
+          className="hidden h-full w-64 shrink-0 overflow-y-auto border-r border-border-hard bg-surface md:block"
           style={{ backgroundColor: "var(--color-surface)" }}
         >
           {sidebar()}
         </aside>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-4 px-4 py-6 md:px-8">
-            <div>
-              <h1 className="text-2xl font-bold text-on-surface">{title}</h1>
-              {subtitle ? (
-                <p className="mt-1 text-sm text-on-surface-variant">{subtitle}</p>
-              ) : null}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {hideHeader ? null : (
+            <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 px-4 py-6 md:px-8">
+              <div>
+                <h1 className="text-2xl font-bold text-on-surface">{title}</h1>
+                {subtitle ? (
+                  <p className="mt-1 text-sm text-on-surface-variant">{subtitle}</p>
+                ) : null}
+              </div>
+              {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
             </div>
-            {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+          )}
+          <div
+            className={cn(
+              "min-h-0 min-w-0 flex-1 px-4 md:px-8",
+              fillViewport ? "flex flex-col overflow-hidden pb-0" : "overflow-y-auto pb-8",
+            )}
+          >
+            {children}
           </div>
-          <div className="px-4 pb-8 md:px-8">{children}</div>
         </div>
       </div>
     </div>

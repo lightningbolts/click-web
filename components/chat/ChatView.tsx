@@ -8,7 +8,6 @@ import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { notifyMessagesDelivered } from '@/lib/chat/messages';
 import MessageBubble from './MessageBubble';
-import { ChatAmbientMeshBackdrop } from './ChatAmbientMeshBackdrop';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { useAuth } from '@/lib/AuthContext';
 import { bubbleStableListKey } from '@/lib/chat/clientOptimistic';
@@ -337,20 +336,19 @@ export default function ChatView({
 
   return (
     <div
-      className="flex flex-col h-full min-h-0 overflow-visible relative"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden"
       onDragOver={onAttachmentDragOver}
       onDragLeave={onAttachmentDragLeave}
       onDrop={onAttachmentDrop}
     >
-      <ChatAmbientMeshBackdrop connection={connection} isGroupClique={isGroupClique} />
       {isDraggingAttachment && (
         <div
-          className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#8338EC] bg-[#8338EC]/10 text-[#8338EC] backdrop-blur-sm"
+          className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-primary/10 text-primary "
           aria-hidden="true"
         >
           <Paperclip className="w-7 h-7 mb-1.5" />
           <span className="text-sm font-medium">Drop to encrypt and send</span>
-          <span className="text-xs text-[#8338EC]/80">2 MB max · E2EE per-file key</span>
+          <span className="text-xs text-primary/80">2 MB max · E2EE per-file key</span>
         </div>
       )}
       {/* ── Header (safe-area only; IME resizes the message column in the parent layout) ── */}
@@ -401,12 +399,6 @@ export default function ChatView({
         ref={messagesPanelRef}
         className="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-[16px] border border-border-hard bg-surface"
       >
-        {/* Subtle gradient glow behind messages */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#8338EC] rounded-full blur-[160px] opacity-[0.04]" />
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#3A86FF] rounded-full blur-[160px] opacity-[0.04]" />
-        </div>
-
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
@@ -415,26 +407,26 @@ export default function ChatView({
           {/* Load-more indicator */}
           {loadingMore && (
             <div className="flex justify-center py-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800/60 border border-zinc-700/50">
-                <Loader2 className="w-3.5 h-3.5 text-[#8338EC] animate-spin" />
-                <span className="text-xs text-zinc-500">Loading older messages…</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container border border-border-hard">
+                <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                <span className="text-xs text-on-surface-variant">Loading older messages…</span>
               </div>
             </div>
           )}
 
           {/* Initial load */}
           {loading && (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-500">
-              <div className="p-4 rounded-2xl bg-[#8338EC]/5 border border-[#8338EC]/10">
-                <Loader2 className="w-6 h-6 animate-spin text-[#8338EC]" />
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-on-surface-variant">
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
               <p className="text-sm">Loading messages…</p>
             </div>
           )}
 
           {error && (
-            <div className="flex flex-col items-center gap-3 text-red-400 text-sm py-8">
-              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20">
+            <div className="flex flex-col items-center gap-3 text-sm text-error py-8">
+              <div className="p-3 rounded-2xl border border-error/20 bg-error/10">
                 <AlertCircle className="w-5 h-5" />
               </div>
               <p>{error}</p>
@@ -444,8 +436,7 @@ export default function ChatView({
           {/* Empty state */}
           {!loading && !error && messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center py-16 gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#8338EC]/20 to-[#3A86FF]/20
-                border border-[#8338EC]/20 flex items-center justify-center text-3xl glow-violet">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/20 text-3xl">
                 👋
               </div>
               <div>
@@ -551,14 +542,14 @@ export default function ChatView({
               >
                 <div className="relative h-6 w-6 shrink-0">
                   <div
-                    className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF]
+                    className="flex h-full w-full items-center justify-center rounded-full bg-primary
                     text-[10px] font-bold"
                   >
                     {isGroupClique ? '⋯' : otherInitial}
                   </div>
                   {!isGroupClique && peerIsOnline && (
                     <span
-                      className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
+                      className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-background"
                       aria-hidden
                     />
                   )}
@@ -589,8 +580,8 @@ export default function ChatView({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={() => scrollToBottom()}
-              className="absolute right-5 bottom-20 bg-[#8338EC]/90 backdrop-blur-sm
-                rounded-full p-2.5 shadow-lg hover:bg-[#8338EC] transition-colors z-10 glow-violet"
+              className="absolute right-5 bottom-20 bg-primary/90 
+                rounded-full p-2.5 shadow-lg hover:bg-primary transition-colors z-10 "
             >
               <ChevronDown className="w-4 h-4 text-white" />
             </motion.button>

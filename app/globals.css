@@ -327,3 +327,10 @@ body {
   touch-action: pan-y;
   box-shadow: none !important;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-fade {
+    animation: none !important;
+    transition: none !important;
+  }
+}

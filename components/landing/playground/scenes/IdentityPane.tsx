@@ -48,8 +48,8 @@ export default function IdentityPane() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       className="relative mx-auto max-w-sm overflow-hidden rounded-[16px]"
     >
       <div className="absolute inset-0 bg-primary/20" />
@@ -68,7 +68,7 @@ export default function IdentityPane() {
           <button
             type="button"
             onClick={() => void share()}
-            className="rounded-lg p-2 text-on-surface-variant hover:bg-white/5"
+            className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container"
             title="Share"
           >
             <Share2 className="h-4 w-4" />
@@ -77,8 +77,7 @@ export default function IdentityPane() {
 
         <div className="flex justify-center">
           <div className="relative">
-            <div className="absolute inset-0 bg-primary/30 blur-xl" />
-            <div className="relative rounded-2xl border border-border-hard bg-[#121212] p-4">
+            <div className="relative rounded-2xl border border-border-hard bg-[#101212] p-4">
               <DemoQr size={200} />
             </div>
           </div>
@@ -100,7 +99,7 @@ export default function IdentityPane() {
             <button
               type="button"
               onClick={() => void copy()}
-              className="rounded-xl bg-zinc-800 p-2 hover:bg-zinc-700"
+              className="rounded-xl border border-border-hard bg-surface-container p-2 hover:bg-surface-container-high"
               aria-label="Copy Click ID"
             >
               {copied ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5 text-on-surface-variant" />}

@@ -49,8 +49,8 @@ export default function PasswordSection() {
   return (
     <div className="fc-card p-8 rounded-[16px] border border-border-hard">
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
-          <Lock className="w-6 h-6 text-[#630ed4]" />
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Lock className="w-6 h-6 text-primary" />
         </div>
         <div>
           <h3 className="text-xl font-bold">Security</h3>
@@ -94,7 +94,7 @@ export default function PasswordSection() {
         <button
           type="submit"
           disabled={passwordLoading}
-          className="flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-6 py-3 bg-primary hover:brightness-110 rounded-xl font-semibold transition-colors disabled:opacity-50"
         >
           {passwordLoading ? (
             'Updating...'

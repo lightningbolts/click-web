@@ -1,3 +1,5 @@
+import { beaconHeroImageUrl } from "@/lib/ui/beaconHeroImageUrl";
+
 export function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
@@ -45,7 +47,10 @@ export function eventDescriptionFromMetadata(meta: Record<string, unknown>): str
 }
 
 export function eventImageFromMetadata(meta: Record<string, unknown>): string | null {
-  return metaString(meta, "image_url", "cover_url", "album_art_url", "artworkUrl100", "image");
+  return (
+    beaconHeroImageUrl(meta) ??
+    metaString(meta, "image_url", "cover_url", "album_art_url", "artworkUrl100", "image")
+  );
 }
 
 export function eventStartAtFromMetadata(meta: Record<string, unknown>): string | null {

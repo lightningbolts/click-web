@@ -39,8 +39,8 @@ export default function LocationPrefsSection() {
   return (
     <div className="fc-card p-8 rounded-[16px] border border-border-hard">
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
-          <Shield className="w-6 h-6 text-[#630ed4]" />
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Shield className="w-6 h-6 text-primary" />
         </div>
         <div>
           <h3 className="text-xl font-bold">Your Data</h3>
@@ -50,7 +50,7 @@ export default function LocationPrefsSection() {
 
       <div className="space-y-4">
         <LocationPrefToggleRow
-          icon={<MapPin className="w-4 h-4 text-[#630ed4]" />}
+          icon={<MapPin className="w-4 h-4 text-primary" />}
           title="Connection location snap"
           description="Records GPS at the moment you tap (not continuous tracking)"
           checked={locationPrefs.location_connection_snap_enabled}
@@ -70,7 +70,7 @@ export default function LocationPrefsSection() {
           }}
         />
         <LocationPrefToggleRow
-          icon={<Map className="w-4 h-4 text-[#630ed4]" />}
+          icon={<Map className="w-4 h-4 text-primary" />}
           title="Show on my Memory Map"
           description="Personal only, never shared with others"
           checked={locationPrefs.location_show_on_map_enabled}
@@ -90,7 +90,7 @@ export default function LocationPrefsSection() {
           }}
         />
         <LocationPrefToggleRow
-          icon={<Shield className="w-4 h-4 text-[#630ed4]" />}
+          icon={<Shield className="w-4 h-4 text-primary" />}
           title="Include in business insights"
           description="Anonymous venue/campus trends are on by default. Turn this off if you do not want to be included."
           checked={locationPrefs.location_include_in_insights_enabled}

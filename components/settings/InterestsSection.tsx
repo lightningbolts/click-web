@@ -127,8 +127,8 @@ export default function InterestsSection() {
   return (
     <div className="fc-card p-8 rounded-[16px] border border-border-hard">
       <div className="flex items-center gap-4 mb-2">
-        <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
-          <Tag className="w-6 h-6 text-[#630ed4]" />
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Tag className="w-6 h-6 text-primary" />
         </div>
         <div>
           <h3 className="text-xl font-bold">My Interests</h3>
@@ -144,7 +144,7 @@ export default function InterestsSection() {
           {tags.map((tag) => (
             <span
               key={tag}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[#630ed4]/15 border border-[#630ed4]/30 text-[#630ed4]"
+              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/15 border border-primary/30 text-primary"
             >
               {tag}
             </span>
@@ -178,7 +178,7 @@ export default function InterestsSection() {
           <button
             onClick={addCustomInterest}
             disabled={customInterestInput.trim().length === 0}
-            className="inline-flex items-center gap-1 rounded-lg border border-[#630ed4]/40 px-3 py-2 text-sm text-primary hover:bg-[#630ed4]/15 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 rounded-lg border border-primary/40 px-3 py-2 text-sm text-primary hover:bg-primary/15 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" /> Add
           </button>
@@ -189,7 +189,7 @@ export default function InterestsSection() {
             {customSelectedTags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 rounded-lg border border-[#3A86FF]/35 bg-[#3A86FF]/10 px-2 py-1 text-xs text-primary"
+                className="inline-flex items-center gap-1 rounded-lg border border-secondary/35 bg-secondary/10 px-2 py-1 text-xs text-primary"
               >
                 {tag}
                 <button
@@ -217,7 +217,7 @@ export default function InterestsSection() {
       <button
         onClick={handleSaveTags}
         disabled={tagsLoading || !tagsDirty}
-        className="mt-4 flex items-center gap-2 px-6 py-3 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl font-semibold transition-colors disabled:opacity-50"
+        className="mt-4 flex items-center gap-2 px-6 py-3 bg-primary hover:brightness-110 rounded-xl font-semibold transition-colors disabled:opacity-50"
       >
         {tagsLoading ? (
           'Saving...'

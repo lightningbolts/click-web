@@ -543,6 +543,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
       rootTestId="dashboard-root"
       chromeTestId="dashboard-chrome"
       itemTestIdPrefix="dashboard-tab"
+      fillViewport={activeTab === 'chat'}
+      hideHeader={activeTab === 'chat'}
     >
       {needsTagging === true && (
         <InterestTagging
@@ -713,7 +715,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="h-[calc(100dvh-12rem)] min-h-0 overflow-visible"
+                className="flex h-full min-h-0 flex-col overflow-hidden"
               >
                 <ChatTabSection
                   user={user}
