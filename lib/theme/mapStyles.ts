@@ -15,3 +15,5 @@ export function mapStyleForTheme(theme: "light" | "dark") {
 
 /** Brand primary used for pins / chart series */
 export const FC_PRIMARY = "#630ed4";
+/** Brand secondary used for event / map emphasis */
+export const FC_SECONDARY = "#224cff";

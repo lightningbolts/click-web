@@ -498,14 +498,14 @@ export default function CallOverlay({
                 <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border border-border-hard bg-primary text-3xl font-bold text-on-primary">
                   {initialsFor(name)}
                 </div>
-                <p className="relative text-sm font-medium uppercase tracking-[0.18em] text-on-primary-container">
+                <p className="relative text-sm font-medium uppercase tracking-[0.18em] text-white/80">
                   {overlayState.mode === 'outgoing' && (isVideo ? 'Starting video ring' : 'Starting voice ring')}
                   {overlayState.mode === 'incoming' && (isVideo ? 'Incoming video call' : 'Incoming voice call')}
                   {overlayState.mode === 'connecting' && (isVideo ? 'Joining video call' : 'Joining voice call')}
                   {overlayState.mode === 'ended' && 'Call ended'}
                 </p>
                 <h3 className="relative mt-2 text-2xl font-semibold text-white">{name}</h3>
-                <p className="relative mt-2 text-sm text-zinc-400">
+                <p className="relative mt-2 text-sm text-white/70">
                   {overlayState.mode === 'ended'
                     ? overlayState.reason
                     : isVideo
@@ -514,7 +514,7 @@ export default function CallOverlay({
                 </p>
 
                 {overlayState.mode === 'connecting' ? (
-                  <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-zinc-300">
+                  <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-white">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Connecting…
                   </div>

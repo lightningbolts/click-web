@@ -231,9 +231,9 @@ export default function LandingPlayground() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="flex min-w-0 flex-1"
+            className="flex min-h-0 min-w-0 flex-1 self-stretch"
           >
-            <WebChrome label="Website companion">
+            <WebChrome label="Website companion" lockScroll>
               <DashboardScene state={state} actions={actions} />
             </WebChrome>
           </motion.div>

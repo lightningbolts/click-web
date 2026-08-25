@@ -105,6 +105,7 @@ export default function ChatPane({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          className={compact ? 'flex h-full min-h-0 flex-col overflow-y-auto' : undefined}
         >
           <div className="mb-4">
             <h3 className="text-lg font-bold text-on-surface">{compact ? 'Clicks' : 'Messages'}</h3>
@@ -162,7 +163,7 @@ export default function ChatPane({
                             actions.setOpenChatId(person.id);
                             if (compact) actions.setDashboardTab('chat');
                           }}
-                          data-testid={compact ? `playground-clicks-chat-${person.id}` : `playground-chat-${person.id}`}
+                          data-testid={`playground-chat-${person.id}`}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-container"
                         >
                           <PlaygroundAvatar initials={person.initials} online={person.online} />

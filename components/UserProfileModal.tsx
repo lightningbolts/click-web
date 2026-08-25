@@ -74,6 +74,8 @@ type UserProfileModalProps = {
 
 type ProfileTabKey = 'timeline' | 'media' | 'links' | 'files' | 'beacons';
 
+const EMPTY_DECRYPTED_MESSAGES: DecryptedProfileMessage[] = [];
+
 export default function UserProfileModal({
   userId,
   getAuthHeaders,
@@ -83,7 +85,7 @@ export default function UserProfileModal({
   connectionId = null,
   chatId = null,
   groupId = null,
-  decryptedMessages = [],
+  decryptedMessages = EMPTY_DECRYPTED_MESSAGES,
 }: UserProfileModalProps) {
   const { mutate } = useSWRConfig();
   const rollInputRef = useRef<HTMLInputElement>(null);

@@ -82,7 +82,7 @@ export const PLAYGROUND_EVENTS: PlaygroundEvent[] = [
     venue: 'Kane Hall',
     when: 'Tonight · 7:00–10:00 PM',
     host: 'ASUW',
-    description: 'Orientation week mixer. Bring a Click — the room is built for same-room intros.',
+    description: 'Orientation week mixer. Bring a Click. The room is built for same-room intros.',
     attendeeIds: ['maya'],
     geo: { lat: 47.6566, lng: -122.3091 },
   },

@@ -306,10 +306,21 @@ export function useProfileTabsData({
     },
   );
 
+  const mediaItemsFingerprint = useMemo(
+    () => mediaItems.map((item) => `${item.id}:${item.sourceUrl ?? ""}:${item.storagePath ?? ""}`).join("|"),
+    [mediaItems],
+  );
+
   useEffect(() => {
+    if (!requestedUserId) return;
+
     let cancelled = false;
     const objectUrls: string[] = [];
-    setResolvedMediaUrls({});
+
+    if (mediaItems.length === 0) {
+      setResolvedMediaUrls((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      return;
+    }
 
     const resolveAll = async () => {
       const next: Record<string, string> = {};
@@ -354,7 +365,8 @@ export function useProfileTabsData({
         URL.revokeObjectURL(url);
       }
     };
-  }, [mediaChatKey, getAuthHeaders, mediaItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mediaItemsFingerprint is the identity key
+  }, [requestedUserId, mediaChatKey, getAuthHeaders, mediaItemsFingerprint]);
 
   const localLinkItems = useMemo(
     () =>

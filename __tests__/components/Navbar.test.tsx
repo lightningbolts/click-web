@@ -59,8 +59,34 @@ describe("Navbar", () => {
 
   it("shows a login CTA when logged out on marketing pages", () => {
     renderNav();
-    expect(screen.getByTestId("nav-login")).toBeInTheDocument();
+    const logo = screen.getByRole("link", { name: /lick/i });
+    const login = screen.getByTestId("nav-login");
+    expect(login).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Events" })).toHaveAttribute("href", "/events");
+    expect(logo.compareDocumentPosition(login) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("treats page links as text, not a second primary button", () => {
+    navState.pathname = "/events";
+    renderNav();
+    const events = screen.getByRole("link", { name: "Events" });
+    expect(events).toHaveClass("text-primary");
+    expect(events).not.toHaveClass("bg-primary-container");
+    expect(events).not.toHaveClass("fc-btn-primary");
+    expect(screen.getByRole("button", { name: "How it works" })).not.toHaveClass("fc-btn-primary");
+    expect(screen.getByTestId("nav-login")).toHaveClass("fc-btn-primary");
+  });
+
+  it("keeps signed-in actions as one CTA plus matching icon controls", () => {
+    navState.pathname = "/events";
+    navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
+    renderNav();
+    const create = screen.getByRole("link", { name: "Create event" });
+    expect(create).toHaveClass("fc-btn-primary");
+    expect(create).toHaveClass("h-9");
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveClass("fc-btn-primary");
+    expect(screen.getByRole("button", { name: /Ada Lovelace/i })).toHaveClass("h-9");
   });
 
   it("opens a user menu with dashboard and sign out", async () => {

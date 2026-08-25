@@ -66,23 +66,23 @@ export function ChatDialogs({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 "
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-[92%] max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5"
+              className="w-[92%] max-w-sm rounded-2xl border border-border-hard bg-surface p-5"
             >
-              <h3 className="text-base font-semibold text-white">Delete message?</h3>
-              <p className="mt-2 text-sm text-zinc-400">This message will be removed permanently.</p>
+              <h3 className="text-base font-semibold text-on-surface">Delete message?</h3>
+              <p className="mt-2 text-sm text-on-surface-variant">This message will be removed permanently.</p>
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     setPendingDeleteMessageId(null);
                   }}
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface hover:bg-surface-container"
                 >
                   Cancel
                 </button>
@@ -104,21 +104,21 @@ export function ChatDialogs({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 "
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-[92%] max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-5"
+              className="w-[92%] max-w-md rounded-2xl border border-border-hard bg-surface p-5"
             >
-              <h3 className="text-base font-semibold text-white">Report connection</h3>
-              <p className="mt-2 text-sm text-zinc-400">Describe what happened. This helps moderation review quickly.</p>
+              <h3 className="text-base font-semibold text-on-surface">Report connection</h3>
+              <p className="mt-2 text-sm text-on-surface-variant">Describe what happened. This helps moderation review quickly.</p>
               <textarea
                 value={reportReason}
                 onChange={(event) => setReportReason(event.target.value)}
                 rows={4}
-                className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Reason for report"
               />
               <div className="mt-5 flex justify-end gap-2">
@@ -127,7 +127,7 @@ export function ChatDialogs({
                     setShowReportDialog(false);
                     setReportReason('');
                   }}
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface hover:bg-surface-container"
                 >
                   Cancel
                 </button>
@@ -164,27 +164,27 @@ export function ChatDialogs({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 "
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-[92%] max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5"
+              className="w-[92%] max-w-sm rounded-2xl border border-border-hard bg-surface p-5"
             >
-              <h3 className="text-base font-semibold text-white">Rename group</h3>
+              <h3 className="text-base font-semibold text-on-surface">Rename group</h3>
               <textarea
                 value={renameGroupInput}
                 onChange={(e) => setRenameGroupInput(e.target.value)}
                 rows={2}
-                className="mt-3 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#8338EC]"
+                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                 placeholder="Group name"
               />
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowRenameGroupModal(false)}
-                  className="px-3 py-2 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface hover:bg-surface-container"
                 >
                   Cancel
                 </button>
@@ -209,7 +209,7 @@ export function ChatDialogs({
                       });
                     }
                   }}
-                  className="px-3 py-2 rounded-xl bg-[#8338EC] text-white hover:opacity-90 disabled:opacity-40"
+                  className="px-3 py-2 rounded-xl bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
                 >
                   Save
                 </button>
@@ -225,7 +225,7 @@ export function ChatDialogs({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50  p-4"
             onClick={() => setShowGroupMemberPicker(false)}
             role="presentation"
           >
@@ -233,18 +233,18 @@ export function ChatDialogs({
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+              className="w-full max-w-sm rounded-2xl border border-border-hard bg-surface p-5 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-semibold text-white">Members</h3>
-                  <p className="mt-1 text-xs text-zinc-400">Choose someone to view their profile.</p>
+                  <h3 className="text-base font-semibold text-on-surface">Members</h3>
+                  <p className="mt-1 text-xs text-on-surface-variant">Choose someone to view their profile.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowGroupMemberPicker(false)}
-                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white"
+                  className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
@@ -255,7 +255,7 @@ export function ChatDialogs({
                   <li key={row.userId}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white hover:bg-white/5"
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface-container"
                       onClick={() => {
                         onOpenProfile?.(row.userId);
                         setShowGroupMemberPicker(false);
@@ -280,7 +280,7 @@ export function ChatDialogs({
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
           >
             <div
-              className={`rounded-xl border px-4 py-2.5 text-sm shadow-xl backdrop-blur-sm ${
+              className={`rounded-xl border px-4 py-2.5 text-sm shadow-xl  ${
                 actionToast.type === 'success'
                   ? 'bg-emerald-600/90 border-emerald-400/40 text-white'
                   : 'bg-red-600/90 border-red-400/40 text-white'

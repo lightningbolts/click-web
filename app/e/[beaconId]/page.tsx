@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarDays, MapPin, Users } from "lucide-react";
+import { unstable_cache } from "next/cache";
+import { CalendarDays, Clock, MapPin, Users } from "lucide-react";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadPublicEventPayload } from "@/lib/events/publicEvent";
 import {
@@ -10,13 +11,16 @@ import {
   isEventEnded,
 } from "@/lib/events/eventMetadata";
 import { eventDeepLink, eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
-import { formatEventWhen } from "@/lib/events/formatEventWhen";
+import { formatEventPostedAt, formatEventWhen } from "@/lib/events/formatEventWhen";
 import { FcButton, FcCard, FcPageShell } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { APP_CONFIG } from "@/lib/config";
-import GuestRsvpForm from "@/components/events/GuestRsvpForm";
+import EventRsvpPanel from "@/components/events/EventRsvpPanel";
+import EventBackLink from "@/components/events/EventBackLink";
 import MutualAttendeesTeaser from "@/components/events/MutualAttendeesTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
+import PinMapLazy from "@/components/maps/PinMapLazy";
+import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +28,12 @@ function isUuidLike(v: string): boolean {
   return EVENT_BEACON_UUID_RE.test(v);
 }
 
-async function loadEvent(beaconId: string) {
-  const admin = createAdminSupabaseClient();
-  return loadPublicEventPayload(admin, beaconId);
-}
+const loadEvent = (beaconId: string) =>
+  unstable_cache(
+    async () => loadPublicEventPayload(createAdminSupabaseClient(), beaconId),
+    ["public-event-v1", beaconId],
+    { revalidate: 60 },
+  )();
 
 export async function generateMetadata({
   params,
@@ -42,7 +48,7 @@ export async function generateMetadata({
   const url = eventShareUrl(beaconId);
   const description =
     event?.description?.trim() ||
-    formatEventWhen(event?.event_start_at ?? null, event?.event_end_at ?? null) ||
+    formatEventWhen(event?.event_start_at ?? null, event?.event_end_at ?? null, event?.timezone) ||
     "Open this event in Click.";
   return {
     title: `${title} · Click`,
@@ -70,28 +76,31 @@ export default async function EventShareLandingPage({
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
   const description =
     event.description?.trim() && event.description.trim() !== title ? event.description.trim() : null;
-  const when = formatEventWhen(event.event_start_at, event.event_end_at);
+  const when = formatEventWhen(event.event_start_at, event.event_end_at, event.timezone);
+  const posted = formatEventPostedAt(event.created_at);
   const ended = isEventEnded({
     event_end_at: event.event_end_at,
     event_start_at: event.event_start_at,
   });
   const showRsvp = event.rsvp_enabled && !ended;
-  const mapsUrl =
-    event.latitude != null && event.longitude != null
-      ? `https://maps.google.com/?q=${event.latitude},${event.longitude}`
-      : null;
+  const hasPin = event.latitude != null && event.longitude != null;
+  const mapsUrl = hasPin
+    ? `https://maps.google.com/?q=${event.latitude},${event.longitude}`
+    : null;
   const shareUrl = eventShareUrl(beaconId, publicOrigin());
+  const viewerRsvp = showRsvp ? await loadViewerEventRsvp(beaconId) : { kind: "unknown" as const };
 
   return (
     <FcPageShell className="px-4 py-8 md:px-8 md:py-12">
       <article className="mx-auto w-full max-w-5xl">
+        <EventBackLink />
         <CardVisualHero
           id={beaconId}
           imageUrl={event.image_url}
           chipLabel="Event"
           className="h-64 overflow-hidden rounded-[16px] md:h-80"
         >
-          <div className="flex h-full flex-col justify-end bg-gradient-to-t from-black/75 via-black/25 to-transparent p-6 md:p-8">
+          <div className="flex h-full flex-col justify-end p-6 md:p-8">
             <h1 className="max-w-3xl text-3xl font-bold leading-tight tracking-tight text-white md:text-5xl">
               {title}
             </h1>
@@ -122,12 +131,18 @@ export default async function EventShareLandingPage({
                     </p>
                     {mapsUrl ? (
                       <a href={mapsUrl} className="text-sm font-semibold text-secondary hover:underline">
-                        Open map
+                        Open in Google Maps
                       </a>
                     ) : null}
                   </div>
                 </div>
               </div>
+              {posted ? (
+                <p className="flex items-center gap-2 text-sm text-on-surface-variant">
+                  <Clock className="h-4 w-4 shrink-0 text-secondary" />
+                  {posted}
+                </p>
+              ) : null}
               <p className="flex items-center gap-2 text-sm font-semibold text-secondary">
                 <Users className="h-4 w-4" />
                 {event.rsvp_count} going
@@ -136,6 +151,21 @@ export default async function EventShareLandingPage({
                 <p className="whitespace-pre-wrap text-base leading-relaxed text-on-surface">{description}</p>
               ) : null}
             </FcCard>
+
+            {hasPin ? (
+              <PinMapLazy
+                testId="event-pin-map"
+                markers={[
+                  {
+                    id: beaconId,
+                    lat: event.latitude as number,
+                    lng: event.longitude as number,
+                    label: event.location_name?.trim() || title,
+                  },
+                ]}
+              />
+            ) : null}
+
             <MutualAttendeesTeaser beaconId={beaconId} />
             <div className="flex flex-col gap-3 sm:flex-row">
               <a href={eventDeepLink(beaconId)} className="inline-flex">
@@ -158,11 +188,7 @@ export default async function EventShareLandingPage({
           <aside className="lg:sticky lg:top-24">
             {showRsvp ? (
               <FcCard className="p-6">
-                <h2 className="text-lg font-bold text-on-surface">RSVP</h2>
-                <p className="mb-4 mt-1 text-sm text-on-surface-variant">
-                  Save a spot. No Click account needed.
-                </p>
-                <GuestRsvpForm beaconId={beaconId} />
+                <EventRsvpPanel beaconId={beaconId} initialViewer={viewerRsvp} />
               </FcCard>
             ) : (
               <FcCard className="p-6">

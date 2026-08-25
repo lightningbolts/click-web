@@ -93,9 +93,14 @@ function PhoneNavButton({
 export function WebChrome({
   children,
   label,
+  lockScroll = false,
+  address = 'click.app / dashboard',
 }: {
   children: ReactNode;
   label: string;
+  /** Keep the inner pane from scrolling so a child nav can stay full height. */
+  lockScroll?: boolean;
+  address?: string;
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -108,10 +113,16 @@ export function WebChrome({
           <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
           <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
           <span className="ml-2 truncate rounded-[6px] bg-background px-2 py-0.5 text-[10px] text-on-surface-variant">
-            click.app / dashboard
+            {address}
           </span>
         </div>
-        <div className="min-h-[420px] flex-1 overflow-auto bg-background sm:min-h-[560px] lg:min-h-[640px]">
+        <div
+          className={
+            lockScroll
+              ? 'flex h-[560px] flex-col overflow-hidden bg-background lg:h-[640px]'
+              : 'min-h-[420px] flex-1 overflow-auto bg-background sm:min-h-[560px] lg:min-h-[640px]'
+          }
+        >
           {children}
         </div>
       </div>

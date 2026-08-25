@@ -16,7 +16,7 @@ import {
   BarChart2,
 } from 'lucide-react';
 import useSWR from 'swr';
-import DashboardEventsModule from '@/components/dashboard/DashboardEventsModule';
+import DashboardEventsModule, { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
 import ProductAppShell from '@/components/shell/ProductAppShell';
 import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
 import SettingsView from '@/components/SettingsView';
@@ -367,6 +367,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
     user ? '/api/user/insights-access' : null,
     insightsAccessFetcher,
   );
+  useSWR(user ? MINE_EVENTS_KEY : null, fetchMineEvents, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
 
   const handleSignOut = async () => {
     try {
@@ -543,6 +547,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
       rootTestId="dashboard-root"
       chromeTestId="dashboard-chrome"
       itemTestIdPrefix="dashboard-tab"
+      fillViewport={activeTab === 'chat'}
+      hideHeader={activeTab === 'chat'}
     >
       {needsTagging === true && (
         <InterestTagging
@@ -709,11 +715,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
             {activeTab === 'chat' && (
               <motion.div
                 key="chat"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="h-[calc(100dvh-12rem)] min-h-0 overflow-visible"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex h-full min-h-0 flex-col overflow-hidden"
               >
                 <ChatTabSection
                   user={user}

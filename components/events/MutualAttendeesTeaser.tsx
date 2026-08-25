@@ -1,32 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
+import UserProfileModal from "@/components/UserProfileModal";
+import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
 
 type MutualPayload = {
   count: number;
   attendees: Array<{ user_id: string; name: string; avatar_url: string | null }>;
 };
 
+const fetcher = async (url: string) => {
+  const headers = await getFreshAuthHeaders();
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error("Failed to load");
+  return res.json() as Promise<MutualPayload>;
+};
+
 export default function MutualAttendeesTeaser({ beaconId }: { beaconId: string }) {
   const { user } = useAuth();
-  const [payload, setPayload] = useState<MutualPayload | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      const headers = await getFreshAuthHeaders();
-      const res = await fetch(`/api/beacons/${beaconId}/mutual-attendees`, { headers });
-      if (!res.ok || cancelled) return;
-      const json = (await res.json()) as MutualPayload;
-      if (!cancelled) setPayload(json);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [beaconId, user]);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const { data: payload } = useSWR(
+    user ? `/api/beacons/${beaconId}/mutual-attendees` : null,
+    fetcher,
+  );
 
   if (!user || !payload || payload.count < 1) return null;
 
@@ -35,26 +34,28 @@ export default function MutualAttendeesTeaser({ beaconId }: { beaconId: string }
       <p className="text-sm font-semibold text-on-surface">
         {payload.count} {payload.count === 1 ? "person" : "people"} you know {payload.count === 1 ? "is" : "are"} going
       </p>
-      <div className="mt-3 flex -space-x-2">
-        {payload.attendees.slice(0, 6).map((a) =>
-          a.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={a.user_id}
-              src={a.avatar_url}
-              alt={a.name}
-              className="h-8 w-8 rounded-full border border-border-hard object-cover"
-            />
-          ) : (
-            <span
-              key={a.user_id}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border-hard bg-surface-container text-xs font-bold text-on-surface"
+      <ul className="mt-3 space-y-2">
+        {payload.attendees.slice(0, 8).map((person) => (
+          <li key={person.user_id}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-[12px] px-1 py-1 text-left hover:bg-surface-container"
+              onClick={() => setProfileUserId(person.user_id)}
             >
-              {a.name.slice(0, 1).toUpperCase()}
-            </span>
-          ),
-        )}
-      </div>
+              <ConnectionPeerAvatar label={person.name} imageUrl={person.avatar_url} size="sm" />
+              <span className="text-sm font-medium text-on-surface">{person.name}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {profileUserId ? (
+        <UserProfileModal
+          userId={profileUserId}
+          getAuthHeaders={getFreshAuthHeaders}
+          onClose={() => setProfileUserId(null)}
+          currentUserId={user.id}
+        />
+      ) : null}
     </div>
   );
 }

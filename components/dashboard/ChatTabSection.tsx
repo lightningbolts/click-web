@@ -141,6 +141,7 @@ export function ChatTabSection({
   setChatListGroupActionBusyId: Dispatch<SetStateAction<string | null>>;
 }) {
   return (
+    <div className="h-full min-h-0">
     <AnimatePresence mode="wait" initial={false}>
       {selectedConnection ? (
         <motion.div
@@ -149,7 +150,7 @@ export function ChatTabSection({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 24 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="h-full min-h-0 overflow-visible"
+          className="flex h-full min-h-0 flex-col overflow-hidden"
         >
           <ChatView
             connection={selectedConnection}
@@ -192,8 +193,9 @@ export function ChatTabSection({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="space-y-6"
+          className="chat-thread-scroll h-full min-h-0"
         >
+        <div className="space-y-6 px-4 py-4 md:px-8">
         <div className="flex w-full items-center gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="p-2 bg-primary/20 rounded-xl">
@@ -298,7 +300,7 @@ export function ChatTabSection({
             {chatListTab === 'archived' ? (
               <motion.span
                 layoutId="chatListTabPill"
-                className="absolute inset-0 rounded-xl border border-zinc-600/50 bg-[linear-gradient(135deg,rgba(131,56,236,0.18),rgba(86,86,101,0.30))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(24,24,27,0.28)]"
+                className="absolute inset-0 rounded-xl border border-border-hard bg-primary/15"
                 transition={{ type: 'spring', stiffness: 380, damping: 32 }}
               />
             ) : null}
@@ -332,7 +334,7 @@ export function ChatTabSection({
                 </p>
               </div>
             ) : (
-              <div className="fc-card overflow-visible rounded-[16px] border border-border-hard divide-y divide-zinc-800/50">
+              <div className="fc-card overflow-visible rounded-[16px] border border-border-hard divide-y divide-border-hard">
                 {visibleChatConnections.map((conn: ConnectionRecord, index) => {
                   const isUserArchived = archivedConnectionIds.has(conn.id);
                   const isServerArchived = conn.status === 'archived';
@@ -505,7 +507,7 @@ export function ChatTabSection({
                             ) : null}
                             <div className="flex flex-wrap items-center justify-end gap-2">
                               {isArchived ? (
-                                <span className="shrink-0 rounded-full border border-zinc-600/40 bg-zinc-700/30 px-2 py-0.5 text-[10px] text-on-surface-variant">
+                                <span className="shrink-0 rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] text-on-surface-variant">
                                   {isServerArchived ? 'Auto-archived' : 'Archived'}
                                 </span>
                               ) : null}
@@ -726,8 +728,10 @@ export function ChatTabSection({
             )}
           </motion.div>
         </AnimatePresence>
+        </div>
         </motion.div>
       )}
     </AnimatePresence>
+    </div>
   );
 }

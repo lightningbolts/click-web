@@ -125,21 +125,66 @@ export default function EventsScene({
             <MapPin className="h-3 w-3" /> {open.venue} · Host {open.host}
           </p>
           <p className="mt-2 text-xs text-on-surface-variant">{open.description}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-primary" />
-            {goingPeople.length > 0 ? (
-              <div className="flex items-center gap-1">
-                {goingPeople.map((p) => (
-                  <PlaygroundAvatar key={p.id} initials={p.initials} size="sm" />
+          {goingPeople.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-[11px] font-semibold text-on-surface">
+                {goingPeople.length === 1
+                  ? '1 person you know is going'
+                  : `${goingPeople.length} people you know are going`}
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {goingPeople.map((person) => (
+                  <li key={person.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-container"
+                      onClick={() => {
+                        actions.setOpenChatId(person.id);
+                        actions.setDashboardTab('chat');
+                      }}
+                    >
+                      <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
+                      <span className="text-xs font-semibold text-on-surface">{person.name}</span>
+                    </button>
+                  </li>
                 ))}
-                <span className="text-[11px] text-on-surface-variant">
-                  {goingPeople.map((p) => p.name.split(' ')[0]).join(', ')} going
-                </span>
-              </div>
-            ) : (
-              <span className="text-[11px] text-on-surface-variant">None of your Clicks yet</span>
-            )}
-          </div>
+              </ul>
+            </div>
+          ) : (
+            <p className="mt-2 flex items-center gap-2 text-[11px] text-on-surface-variant">
+              <Users className="h-3.5 w-3.5 text-primary" />
+              None of your Clicks yet
+            </p>
+          )}
+          {rsvped ? (
+            <div className="mt-3 border-t border-border-hard pt-3">
+              <p className="text-[11px] font-semibold text-on-surface">Who&apos;s going</p>
+              <ul className="mt-2 space-y-1.5">
+                <li className="flex items-center gap-2 px-1 py-1 text-xs font-medium text-on-surface">
+                  <PlaygroundAvatar initials="A" size="sm" />
+                  You
+                </li>
+                {(open.attendeeIds ?? [])
+                  .map((id) => PLAYGROUND_PEOPLE.find((p) => p.id === id))
+                  .filter((p): p is NonNullable<typeof p> => Boolean(p))
+                  .map((person) => (
+                    <li key={person.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-container"
+                        onClick={() => {
+                          actions.setOpenChatId(person.id);
+                          actions.setDashboardTab('chat');
+                        }}
+                      >
+                        <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
+                        <span className="text-xs font-semibold text-on-surface">{person.name}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"

@@ -173,8 +173,7 @@ export default function ConnectScene({
           <div className="rounded-[16px] border border-border-hard bg-surface p-4 text-center">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary">My QR Code</p>
             <div className="relative mx-auto mt-3 w-fit">
-              <div className="absolute inset-0 bg-primary/30 blur-xl" />
-              <div className="relative rounded-2xl border border-border-hard bg-[#121212] p-3">
+              <div className="relative rounded-2xl border border-border-hard bg-[#101212] p-3">
                 <DemoQr size={148} />
               </div>
             </div>

@@ -14,13 +14,14 @@ import dynamic from 'next/dynamic';
 import data from '@emoji-mart/data';
 import { motion, AnimatePresence } from 'framer-motion';
 import { REACTION_EMOJIS } from '@/lib/chat/types';
+import { useTheme } from '@/lib/theme/ThemeProvider';
 import { clampBarLeftToBubble, clampLeftEdge, clampTop } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
 
 const Picker = dynamic(() => import('@emoji-mart/react').then((m) => m.default), {
   ssr: false,
   loading: () => (
-    <div className="flex h-16 max-h-[28dvh] items-center justify-center text-[11px] text-zinc-500">
+    <div className="flex h-16 max-h-[28dvh] items-center justify-center text-[11px] text-on-surface-variant">
       Loading…
     </div>
   ),
@@ -348,6 +349,7 @@ export default function ReactionPicker({
   hoverGroupId,
   onPortaledPointerChange,
 }: ReactionPickerProps) {
+  const { theme } = useTheme();
   const [showFull, setShowFull] = useState(false);
   const quickBarRef = useRef<HTMLDivElement>(null);
   const fullPanelRef = useRef<HTMLDivElement>(null);
@@ -513,7 +515,7 @@ export default function ReactionPicker({
               >
                 <div
                   ref={fullPanelRef}
-                  className="flex min-h-0 w-full flex-col overflow-hidden overscroll-contain rounded-2xl border border-zinc-600/80 bg-zinc-950 p-2 pr-1 shadow-xl ring-1 ring-white/[0.06]"
+                  className="flex min-h-0 w-full flex-col overflow-hidden overscroll-contain rounded-2xl border border-border-hard bg-background p-2 pr-1 shadow-xl ring-1 ring-white/[0.06]"
                   style={{
                     width: pos.maxPanelW,
                     maxWidth: pos.maxPanelW,
@@ -529,7 +531,7 @@ export default function ReactionPicker({
                   >
                     <Picker
                       data={data}
-                      theme="dark"
+                      theme={theme}
                       dynamicWidth
                       previewPosition="none"
                       skinTonePosition="search"
@@ -551,7 +553,7 @@ export default function ReactionPicker({
             )}
           <div
             ref={quickBarRef}
-            className="flex w-max max-w-full items-center gap-1 rounded-full border border-zinc-600/50 bg-zinc-950/95 py-1.5 pl-2.5 pr-1 shadow-xl backdrop-blur-md sm:gap-1.5 sm:pl-3 sm:pr-1.5 sm:py-1.5"
+            className="flex w-max max-w-full items-center gap-1 rounded-full border border-border-hard bg-background py-1.5 pl-2.5 pr-1 shadow-xl sm:gap-1.5 sm:pl-3 sm:pr-1.5 sm:py-1.5"
             style={{ maxWidth: pos.maxPanelW, boxSizing: 'border-box' }}
           >
             <div className="flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:thin] sm:gap-1">
@@ -566,7 +568,7 @@ export default function ReactionPicker({
                       onReact(emoji);
                     }}
                     className={`shrink-0 leading-none rounded-full p-1 text-base transition-transform hover:scale-110 sm:p-1.5 sm:text-lg sm:hover:scale-125
-                  ${isActive ? 'bg-[#8338EC]/30 ring-1 ring-[#8338EC]' : 'hover:bg-white/10'}`}
+                  ${isActive ? 'bg-primary/30 ring-1 ring-primary' : 'hover:bg-surface-container'}`}
                   >
                     {emoji}
                   </button>
@@ -579,7 +581,7 @@ export default function ReactionPicker({
                 e.stopPropagation();
                 setShowFull((v) => !v);
               }}
-              className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold tabular-nums text-zinc-200 hover:bg-white/15"
+              className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold tabular-nums text-on-surface hover:bg-surface-container"
               aria-label="More emojis"
               title="More emojis"
             >

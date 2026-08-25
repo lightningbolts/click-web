@@ -92,8 +92,8 @@ export default function NotificationsSection({
   return (
     <div className="fc-card p-8 rounded-[16px] border border-border-hard">
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-[#630ed4]/10 flex items-center justify-center">
-          <Bell className="w-6 h-6 text-[#630ed4]" />
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Bell className="w-6 h-6 text-primary" />
         </div>
         <div>
           <h3 className="text-xl font-bold">Notifications</h3>
@@ -130,7 +130,7 @@ export default function NotificationsSection({
         </div>
 
         <NotificationToggleRow
-          icon={<MessageCircle className="w-4 h-4 text-[#630ed4]" />}
+          icon={<MessageCircle className="w-4 h-4 text-primary" />}
           title="Chat push notifications"
           description="Show browser alerts for new messages when you are outside that conversation or the tab is in the background."
           checked={notificationPreferences.messagePushEnabled}
@@ -139,7 +139,7 @@ export default function NotificationsSection({
         />
 
         <NotificationToggleRow
-          icon={<Phone className="w-4 h-4 text-[#3A86FF]" />}
+          icon={<Phone className="w-4 h-4 text-secondary" />}
           title="Incoming call alerts"
           description="Show browser alerts for incoming calls when the dashboard is not frontmost."
           checked={notificationPreferences.callPushEnabled}
@@ -148,7 +148,7 @@ export default function NotificationsSection({
         />
 
         <NotificationToggleRow
-          icon={<Calendar className="w-4 h-4 text-[#630ed4]" />}
+          icon={<Calendar className="w-4 h-4 text-primary" />}
           title="Event reminders"
           description="Day-of and 30-minutes-before alerts for events you created."
           checked={notificationPreferences.eventReminderPushEnabled}
@@ -157,7 +157,7 @@ export default function NotificationsSection({
         />
 
         <NotificationToggleRow
-          icon={<Users className="w-4 h-4 text-[#630ed4]" />}
+          icon={<Users className="w-4 h-4 text-primary" />}
           title="Availability matches"
           description="When a connection posts a matching intent and overlapping timeframe."
           checked={notificationPreferences.availabilityMatchPushEnabled}
@@ -166,7 +166,7 @@ export default function NotificationsSection({
         />
 
         <NotificationToggleRow
-          icon={<Radio className="w-4 h-4 text-[#630ed4]" />}
+          icon={<Radio className="w-4 h-4 text-primary" />}
           title="Hub messages"
           description="Community hub chat alerts when you are a participant."
           checked={notificationPreferences.hubMessagePushEnabled}

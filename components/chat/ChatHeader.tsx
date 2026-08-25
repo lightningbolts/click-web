@@ -184,8 +184,8 @@ export function ChatHeader({
           aria-label={isGroupClique ? 'View members' : 'View profile'}
         >
           {isGroupClique ? (
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#8338EC] to-[#3A86FF] text-sm font-bold glow-violet">
-              <Users className="h-5 w-5 text-white" aria-hidden />
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-sm font-bold ">
+              <Users className="h-5 w-5 text-on-primary" aria-hidden />
             </div>
           ) : (
             <ConnectionPeerAvatar
@@ -237,7 +237,7 @@ export function ChatHeader({
         >
           <span
             className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-              isGroupClique ? 'bg-emerald-400' : 'bg-[#8338EC]'
+              isGroupClique ? 'bg-emerald-400' : 'bg-primary'
             }`}
           />
           {isGroupClique ? 'Verified clique' : 'Connected'}
@@ -267,7 +267,7 @@ export function ChatHeader({
                     onClick={() => setShowCallMenu(false)}
                   />
                   <div
-                    className="fixed z-[250] min-w-[180px] rounded-[1.4rem] border border-zinc-700/80 bg-zinc-900 shadow-2xl overflow-hidden"
+                    className="fixed z-[250] min-w-[180px] rounded-[1.4rem] border border-border-hard bg-surface shadow-2xl overflow-hidden"
                     style={{ top: callMenuPos.top, left: callMenuPos.left }}
                   >
                     <button
@@ -275,7 +275,7 @@ export function ChatHeader({
                         setShowCallMenu(false);
                         onStartCall(false);
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container"
                     >
                       <Phone className="h-4 w-4" />
                       {isGroupClique ? 'Group voice call' : 'Voice call'}
@@ -285,7 +285,7 @@ export function ChatHeader({
                         setShowCallMenu(false);
                         onStartCall(true);
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white hover:bg-zinc-800/90"
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container"
                     >
                       <Video className="h-4 w-4" />
                       {isGroupClique ? 'Group video call' : 'Video call'}
@@ -321,7 +321,7 @@ export function ChatHeader({
                   onClick={() => setShowHeaderMenu(false)}
                 />
                 <div
-                  className="fixed z-[250] min-w-[180px] rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden"
+                  className="fixed z-[250] min-w-[180px] rounded-xl border border-border-hard bg-surface shadow-xl overflow-hidden"
                   style={{ top: headerMenuPos.top, left: headerMenuPos.left }}
                 >
                   {isGroupClique ? (
@@ -352,7 +352,7 @@ export function ChatHeader({
                             setGroupMenuBusy(false);
                           }
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2 disabled:opacity-40"
+                        className="w-full text-left px-3 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2 disabled:opacity-40"
                       >
                         <LogOut className="w-4 h-4" /> Leave group
                       </button>
@@ -383,7 +383,7 @@ export function ChatHeader({
                               setGroupMenuBusy(false);
                             }
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2 disabled:opacity-40"
+                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-surface-container flex items-center gap-2 disabled:opacity-40"
                         >
                           <Trash2 className="w-4 h-4" /> Delete group
                         </button>
@@ -402,7 +402,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container flex items-center gap-2"
                         >
                           <Star className="w-4 h-4" /> Remove from Core
                         </button>
@@ -417,7 +417,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container flex items-center gap-2"
                         >
                           <Star className="w-4 h-4" /> Add to Core
                         </button>
@@ -443,7 +443,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800"
+                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container"
                         >
                           {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
                         </button>
@@ -458,7 +458,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2"
                         >
                           <Archive className="w-4 h-4" /> Archive
                         </button>
@@ -467,7 +467,7 @@ export function ChatHeader({
                       <button
                         type="button"
                         onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
-                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-zinc-800 flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-surface-container flex items-center gap-2"
                       >
                         <Flag className="w-4 h-4" /> Report
                       </button>
@@ -483,7 +483,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-[#7cc3ff] hover:bg-zinc-800 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container flex items-center gap-2"
                         >
                           <ShieldOff className="w-4 h-4" /> Unblock
                         </button>
@@ -505,7 +505,7 @@ export function ChatHeader({
                             }
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-surface-container flex items-center gap-2"
                         >
                           <Shield className="w-4 h-4" /> Block
                         </button>
@@ -527,7 +527,7 @@ export function ChatHeader({
                             setTimeout(() => onClose(), 700);
                           }
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-zinc-800 flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-surface-container flex items-center gap-2"
                       >
                         <UserMinus className="w-4 h-4" /> Remove connection
                       </button>

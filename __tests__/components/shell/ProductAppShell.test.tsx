@@ -63,6 +63,13 @@ describe("ProductAppShell", () => {
     expect(onSelect).toHaveBeenCalledWith("map");
   });
 
+  it("locks the pane and hides the title when fillViewport and hideHeader are set", () => {
+    renderShell({ fillViewport: true, hideHeader: true, title: "Welcome" });
+    expect(screen.getByTestId("dashboard-root")).toHaveAttribute("data-fill-viewport", "true");
+    expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
+    expect(screen.getByText("Shell body")).toBeInTheDocument();
+  });
+
   it("marks a linked item active from the pathname", () => {
     navState.pathname = "/insights/heatmap";
     renderShell({

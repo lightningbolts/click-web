@@ -1,4 +1,4 @@
-import { countEventRsvpsByBeaconIds, loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
+import { countEventRsvpsByBeaconIds, loadPublicEventPayload, loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
 
 function thenableChain(result: { data: unknown; error: null }) {
   const chain: Record<string, unknown> = {};
@@ -103,5 +103,54 @@ describe("loadPublicUpcomingEvents", () => {
     expect(lawn?.rsvp_count).toBe(3);
     const hiddenHost = events.find((event) => event.beacon_id === "evt-2");
     expect(hiddenHost?.host_name).toBeNull();
+  });
+});
+
+describe("loadPublicEventPayload", () => {
+  it("includes created_at, timezone, and cover image keys", async () => {
+    const start = new Date(Date.now() + 86_400_000).toISOString();
+    const created = "2026-03-01T18:00:00.000Z";
+    const admin = {
+      from: (table: string) => {
+        if (table === "map_beacons") {
+          return thenableChain({
+            data: {
+              id: "evt-9",
+              beacon_type: "event",
+              created_at: created,
+              show_creator_name: true,
+              creator_id: "user-1",
+              expires_at: null,
+              location: { type: "Point", coordinates: [-122.305, 47.655] },
+              metadata: {
+                title: "Club fair",
+                albumArtUrl: "https://cdn.example/cover.jpg",
+                event_start_at: start,
+                event_timezone: "America/Los_Angeles",
+                location_name: "HUB Ballroom",
+              },
+            },
+            error: null,
+          });
+        }
+        if (table === "users") {
+          return thenableChain({
+            data: { name: "Jordan Lee", first_name: "Jordan", last_name: "Lee" },
+            error: null,
+          });
+        }
+        if (table === "beacon_attendees" || table === "event_guest_rsvps") {
+          return thenableChain({ data: [], error: null });
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    };
+
+    const event = await loadPublicEventPayload(admin as never, "evt-9");
+    expect(event?.created_at).toBe(created);
+    expect(event?.timezone).toBe("America/Los_Angeles");
+    expect(event?.image_url).toBe("https://cdn.example/cover.jpg");
+    expect(event?.latitude).toBeCloseTo(47.655);
+    expect(event?.location_name).toBe("HUB Ballroom");
   });
 });
