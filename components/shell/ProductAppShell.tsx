@@ -243,7 +243,7 @@ export default function ProductAppShell({
       <div className="flex min-h-0 flex-1 md:flex">
         <aside
           data-testid={chromeTestId}
-          className="hidden h-full w-64 shrink-0 overflow-y-auto border-r border-border-hard bg-surface md:block"
+          className="hidden min-h-0 w-64 shrink-0 self-stretch overflow-y-auto border-r border-border-hard bg-surface md:block"
           style={{ backgroundColor: "var(--color-surface)" }}
         >
           {sidebar()}
@@ -262,8 +262,8 @@ export default function ProductAppShell({
           )}
           <div
             className={cn(
-              "min-h-0 min-w-0 flex-1 px-4 md:px-8",
-              fillViewport ? "flex flex-col overflow-hidden pb-0" : "overflow-y-auto pb-8",
+              "min-h-0 min-w-0 flex-1",
+              fillViewport ? "flex flex-col overflow-hidden px-0 pb-0 md:px-0" : "overflow-y-auto px-4 pb-8 md:px-8",
             )}
           >
             {children}

@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   BookOpen,
   Calendar,
@@ -40,7 +40,6 @@ export default function DashboardScene({
   const connected = PLAYGROUND_PEOPLE.filter((p) => state.connectedIds.has(p.id));
   const rsvps = PLAYGROUND_EVENTS.filter((e) => state.rsvpIds.has(e.id));
   const [query, setQuery] = useState('');
-  const reduceMotion = useReducedMotion();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -60,8 +59,8 @@ export default function DashboardScene({
   const firstFiveUnlocked = connected.length >= 5;
 
   return (
-    <div className="bg-background text-on-surface" data-testid="playground-scene-dashboard">
-      <div className="px-4 pt-5 pb-3 md:px-6">
+    <div className="flex h-full min-h-0 flex-col bg-background text-on-surface" data-testid="playground-scene-dashboard">
+      <div className="shrink-0 px-4 pt-5 pb-3 md:px-6">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -77,9 +76,9 @@ export default function DashboardScene({
         </motion.div>
       </div>
 
-      <div className="flex min-h-[28rem]">
+      <div className="flex min-h-0 flex-1 items-stretch">
         <nav
-          className="flex w-28 shrink-0 flex-col gap-1 border-r border-border-hard bg-surface p-2 sm:w-40"
+          className="flex w-28 shrink-0 flex-col gap-1 self-stretch border-r border-border-hard bg-surface p-2 sm:w-40"
           role="tablist"
           aria-label="Dashboard tabs"
         >
@@ -109,17 +108,9 @@ export default function DashboardScene({
           })}
         </nav>
 
-        <div className="min-w-0 flex-1 px-4 py-5 md:px-6">
-        <AnimatePresence mode="wait">
-          {state.dashboardTab === 'memory' ? (
-            <motion.div
-              key="memory"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-6"
-            >
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-5 md:px-6">
+        {state.dashboardTab === 'memory' ? (
+            <div className="h-full space-y-6 overflow-y-auto">
             <motion.div
               className="grid grid-cols-2 gap-3 md:grid-cols-4"
               initial="hidden"
@@ -292,43 +283,22 @@ export default function DashboardScene({
                 Your data belongs to you. Export anytime, delete anytime.
               </p>
             </div>
-            </motion.div>
+            </div>
           ) : null}
 
           {state.dashboardTab === 'map' ? (
-            <motion.div
-              key="map"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-            >
+            <div className="h-full min-h-0 overflow-hidden">
               <MapScene state={state} actions={actions} />
-            </motion.div>
+            </div>
           ) : null}
           {state.dashboardTab === 'chat' ? (
-            <motion.div
-              key="chat"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              <ChatPane state={state} actions={actions} />
-            </motion.div>
+            <div className="h-full min-h-0">
+              <ChatPane state={state} actions={actions} compact />
+            </div>
           ) : null}
           {state.dashboardTab === 'identity' ? (
-            <motion.div
-              key="identity"
-              initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduceMotion ? undefined : { opacity: 0, y: -20 }}
-              transition={{ duration: reduceMotion ? 0 : 0.3 }}
-            >
-              <IdentityPane />
-            </motion.div>
+            <IdentityPane />
           ) : null}
-        </AnimatePresence>
         </div>
       </div>
     </div>

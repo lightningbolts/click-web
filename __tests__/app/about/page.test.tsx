@@ -9,5 +9,8 @@ describe("AboutPage", () => {
     expect(screen.queryByText(/room-real/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Tri-Factor Handshake/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /homepage/i })).toHaveAttribute("href", "/");
+    expect(screen.queryByText(/—/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/another scroll/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/a little less lonely/i)).not.toBeInTheDocument();
   });
 });

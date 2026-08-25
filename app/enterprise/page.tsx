@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { FcCard, FcPageShell } from "@/components/fc";
 import EnterpriseCtas from "@/components/enterprise/EnterpriseCtas";
-import EnterprisePlayground from "@/components/enterprise/EnterprisePlayground";
+import EnterprisePlaygroundLazy from "@/components/enterprise/EnterprisePlaygroundLazy";
 
 export const metadata: Metadata = {
   title: "Click for venues and campuses",
   description:
-    "See whether a night actually mixed people — which rooms went quiet, which events created repeat hellos, and whether the floor was full or just loud.",
+    "See whether a night actually mixed people: which rooms went quiet, which events created repeat hellos, and whether the floor was full or just loud.",
 };
 
 const AUDIENCES = [
@@ -36,7 +36,7 @@ export default function EnterprisePage() {
           data-testid="enterprise-heading"
           className="mx-auto mb-6 max-w-4xl text-center text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
         >
-          Did people actually meet — or did they just show up?
+          Did people actually meet, or did they just show up?
         </h1>
         <p className="mx-auto mb-10 max-w-2xl text-center text-lg leading-relaxed text-on-surface-variant">
           Click is for operators who care about the room: which events created repeat hellos, which floors went quiet,
@@ -51,7 +51,7 @@ export default function EnterprisePage() {
           <p className="mx-auto mb-10 max-w-2xl text-center text-on-surface-variant">
             Same kind of walkthrough as the consumer homepage, for the people running the building.
           </p>
-          <EnterprisePlayground />
+          <EnterprisePlaygroundLazy />
         </div>
       </section>
 
@@ -71,7 +71,7 @@ export default function EnterprisePage() {
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold">Want this for a real night?</h2>
           <p className="mt-4 text-on-surface-variant">
-            Tell us about the venue or campus. We&apos;ll talk through a small pilot — one event, one building, honest
+            Tell us about the venue or campus. We can start with a small pilot: one event, one building, and honest
             metrics.
           </p>
           <div className="mt-8">

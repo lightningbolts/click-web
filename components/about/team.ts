@@ -18,7 +18,7 @@ export const ABOUT_TEAM: TeamMember[] = [
     name: "Matthew Epshtein",
     initials: "M",
     subtitle: "Paul Allen School of Computer Science, UW 2029",
-    text: "I helped with product design and development, motivated by UW orientation and Dawg Daze — nights that should have turned into friendships and often didn't. Matthew has experience in mobile and server-side development, plus leadership, project management, and technical writing.",
+    text: "I helped with product design and development. UW orientation and Dawg Daze should have turned into friendships, and often didn't. Matthew has experience in mobile and server-side development, plus leadership, project management, and technical writing.",
     email: "mepsht@uw.edu",
   },
   {

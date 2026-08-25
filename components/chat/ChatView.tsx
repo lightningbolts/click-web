@@ -397,14 +397,14 @@ export default function ChatView({
       {/* ── Messages area ── */}
       <div
         ref={messagesPanelRef}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-[16px] border border-border-hard bg-surface"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface"
       >
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-5 py-5 space-y-3 scrollbar-thin relative z-[1]"
+          className="chat-thread-scroll relative z-[1] min-h-0 flex-1"
         >
-          {/* Load-more indicator */}
+          <div className="space-y-3 px-5 py-5">
           {loadingMore && (
             <div className="flex justify-center py-3">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container border border-border-hard">
@@ -570,6 +570,7 @@ export default function ChatView({
           </AnimatePresence>
 
           <div ref={messagesEndRef} />
+          </div>
         </div>
 
         {/* Scroll-to-bottom button */}

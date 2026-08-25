@@ -1,74 +1,86 @@
 'use client';
 
 import { useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import {
+  CalendarDays,
+  LayoutDashboard,
+  MapPin,
+  MessageSquare,
+  type LucideIcon,
+} from 'lucide-react';
 import { WebChrome } from '@/components/landing/playground/DeviceChrome';
-import PinMapLazy from '@/components/maps/PinMapLazy';
-import { fadePresence, fadeTransition } from '@/lib/motion';
-import { PLAYGROUND_MAX_BOUNDS } from '@/components/landing/playground/playgroundMapStyle';
-import { DEMO_EVENTS, DEMO_PULSE, DEMO_ROOMS } from './enterpriseMock';
+import {
+  EventsScene,
+  HeatmapScene,
+  LiveScene,
+  OverviewScene,
+} from './EnterpriseInsightsScenes';
 
-const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'floor', label: 'Floor' },
-  { id: 'events', label: 'Events' },
-  { id: 'live', label: 'Live' },
-] as const;
+const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'heatmap', label: 'Heatmap', icon: MapPin },
+  { id: 'events', label: 'Events', icon: CalendarDays },
+  { id: 'live', label: 'Vibe Stream', icon: MessageSquare },
+];
 
-type TabId = (typeof TABS)[number]['id'];
+type TabId = 'overview' | 'heatmap' | 'events' | 'live';
 
 const COMPANION: Record<TabId, string> = {
-  overview: 'Sample night at the Husky Union Building. These numbers are demo data, not a live feed.',
-  floor: 'Pins mark rooms where people actually met. Pan and zoom stay in the browser — tiles never hit our Worker.',
-  events: 'Tonight’s programming, with who’s going. Same public event pages students already share.',
-  live: 'A simple pulse of the last hour. Operators see whether a room mixed people or just filled seats.',
+  overview: 'Same cards as Insights: sticky score, density, and live count. This is sample HUB data, not a live feed.',
+  heatmap: 'Heatmap and tribe bubbles match the venue dashboard. Floor pins stay in the browser.',
+  events: 'Tonight’s programming with RSVP and who actually met, the same events students share.',
+  live: 'Anonymous floor notes, same vibe stream operators see on Insights.',
 };
 
 export default function EnterprisePlayground() {
   const [tab, setTab] = useState<TabId>('overview');
-  const reduceMotion = useReducedMotion();
 
   return (
     <div data-testid="enterprise-playground" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
       <div>
-        <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Venue demo">
-          {TABS.map((item) => {
-            const selected = tab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setTab(item.id)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                  selected
-                    ? 'bg-primary text-on-primary'
-                    : 'border border-border-hard bg-surface text-on-surface hover:bg-surface-container'
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-        <WebChrome label="Insights · HUB (demo)">
-          <div className="p-4 md:p-6">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
-              Demo data
-            </p>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={tab}
-                {...(reduceMotion ? {} : fadePresence)}
-                transition={fadeTransition(0.18)}
-              >
-                {tab === 'overview' ? <OverviewScene /> : null}
-                {tab === 'floor' ? <FloorScene /> : null}
-                {tab === 'events' ? <EventsScene /> : null}
-                {tab === 'live' ? <LiveScene /> : null}
-              </motion.div>
-            </AnimatePresence>
+        <WebChrome label="Insights · HUB (demo)" address="click.app / insights" lockScroll>
+          <div className="flex h-full min-h-0 items-stretch">
+            <nav
+              className="flex w-28 shrink-0 flex-col gap-1 self-stretch border-r border-border-hard bg-surface p-2 sm:w-40"
+              role="tablist"
+              aria-label="Venue demo"
+            >
+              {TABS.map((item) => {
+                const Icon = item.icon;
+                const selected = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setTab(item.id)}
+                    className={`flex items-center gap-2 rounded-[8px] px-2 py-2 text-left text-xs font-semibold sm:px-3 sm:text-sm ${
+                      selected
+                        ? 'bg-primary-container text-on-primary-container'
+                        : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                Demo data
+              </p>
+              {tab === "overview" ? (
+                <OverviewScene />
+              ) : tab === "heatmap" ? (
+                <HeatmapScene />
+              ) : tab === "events" ? (
+                <EventsScene />
+              ) : (
+                <LiveScene />
+              )}
+            </div>
           </div>
         </WebChrome>
       </div>
@@ -77,65 +89,5 @@ export default function EnterprisePlayground() {
         <p>{COMPANION[tab]}</p>
       </aside>
     </div>
-  );
-}
-
-function OverviewScene() {
-  return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      {[
-        { label: 'In the building', value: '214' },
-        { label: 'People who met', value: '67' },
-        { label: 'Repeat hellos', value: '19' },
-      ].map((stat) => (
-        <div key={stat.label} className="rounded-[16px] border border-border-hard bg-background p-4">
-          <p className="text-3xl font-bold text-on-surface">{stat.value}</p>
-          <p className="mt-1 text-sm text-on-surface-variant">{stat.label}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FloorScene() {
-  return (
-    <PinMapLazy
-      testId="enterprise-floor-map"
-      maxBounds={PLAYGROUND_MAX_BOUNDS}
-      markers={DEMO_ROOMS.map((room) => ({
-        id: room.id,
-        lat: room.lat,
-        lng: room.lng,
-        label: room.label,
-        tone: room.tone,
-      }))}
-    />
-  );
-}
-
-function EventsScene() {
-  return (
-    <ul className="space-y-3">
-      {DEMO_EVENTS.map((event) => (
-        <li key={event.id} className="rounded-[16px] border border-border-hard bg-background p-4">
-          <p className="font-bold text-on-surface">{event.title}</p>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            {event.when} · {event.room} · {event.going} going
-          </p>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function LiveScene() {
-  return (
-    <ul className="space-y-3">
-      {DEMO_PULSE.map((row) => (
-        <li key={row.id} className="rounded-[16px] border border-border-hard bg-background p-4 text-sm text-on-surface">
-          {row.text}
-        </li>
-      ))}
-    </ul>
   );
 }

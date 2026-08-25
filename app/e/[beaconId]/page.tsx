@@ -15,12 +15,14 @@ import { formatEventPostedAt, formatEventWhen } from "@/lib/events/formatEventWh
 import { FcButton, FcCard, FcPageShell } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { APP_CONFIG } from "@/lib/config";
-import GuestRsvpForm from "@/components/events/GuestRsvpForm";
+import EventRsvpPanel from "@/components/events/EventRsvpPanel";
+import EventBackLink from "@/components/events/EventBackLink";
 import MutualAttendeesTeaser from "@/components/events/MutualAttendeesTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
 import PinMapLazy from "@/components/maps/PinMapLazy";
+import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 function isUuidLike(v: string): boolean {
   return EVENT_BEACON_UUID_RE.test(v);
@@ -86,10 +88,12 @@ export default async function EventShareLandingPage({
     ? `https://maps.google.com/?q=${event.latitude},${event.longitude}`
     : null;
   const shareUrl = eventShareUrl(beaconId, publicOrigin());
+  const viewerRsvp = showRsvp ? await loadViewerEventRsvp(beaconId) : { kind: "unknown" as const };
 
   return (
     <FcPageShell className="px-4 py-8 md:px-8 md:py-12">
       <article className="mx-auto w-full max-w-5xl">
+        <EventBackLink />
         <CardVisualHero
           id={beaconId}
           imageUrl={event.image_url}
@@ -184,11 +188,7 @@ export default async function EventShareLandingPage({
           <aside className="lg:sticky lg:top-24">
             {showRsvp ? (
               <FcCard className="p-6">
-                <h2 className="text-lg font-bold text-on-surface">RSVP</h2>
-                <p className="mb-4 mt-1 text-sm text-on-surface-variant">
-                  Save a spot. No Click account needed.
-                </p>
-                <GuestRsvpForm beaconId={beaconId} />
+                <EventRsvpPanel beaconId={beaconId} initialViewer={viewerRsvp} />
               </FcCard>
             ) : (
               <FcCard className="p-6">

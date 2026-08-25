@@ -141,6 +141,7 @@ export function ChatTabSection({
   setChatListGroupActionBusyId: Dispatch<SetStateAction<string | null>>;
 }) {
   return (
+    <div className="h-full min-h-0">
     <AnimatePresence mode="wait" initial={false}>
       {selectedConnection ? (
         <motion.div
@@ -192,8 +193,9 @@ export function ChatTabSection({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="h-full min-h-0 space-y-6 overflow-y-auto"
+          className="chat-thread-scroll h-full min-h-0"
         >
+        <div className="space-y-6 px-4 py-4 md:px-8">
         <div className="flex w-full items-center gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="p-2 bg-primary/20 rounded-xl">
@@ -726,8 +728,10 @@ export function ChatTabSection({
             )}
           </motion.div>
         </AnimatePresence>
+        </div>
         </motion.div>
       )}
     </AnimatePresence>
+    </div>
   );
 }

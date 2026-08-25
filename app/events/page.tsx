@@ -1,16 +1,21 @@
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
 import { FcButton, FcCard, FcPageShell, FcSectionHeader } from "@/components/fc";
-import { EventListCard } from "@/components/events/EventListCard";
+import PublicEventList from "@/components/events/PublicEventList";
 
-// Request-time only: listing uses the service-role client, which is optional
-// for `next build` (see .env.example) and present on the Worker at runtime.
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
+const loadUpcoming = () =>
+  unstable_cache(
+    async () => loadPublicUpcomingEvents(createAdminSupabaseClient()),
+    ["public-upcoming-events-v1"],
+    { revalidate: 60 },
+  )();
 
 export default async function PublicEventsPage() {
-  const admin = createAdminSupabaseClient();
-  const events = await loadPublicUpcomingEvents(admin);
+  const events = await loadUpcoming();
 
   return (
     <FcPageShell className="px-4 py-10 md:px-8">
@@ -21,7 +26,7 @@ export default async function PublicEventsPage() {
             title="Events"
             subtitle="Public gatherings you can open without an account."
           />
-          <Link href="/events/new">
+          <Link href="/events/new" className="inline-flex">
             <FcButton type="button">Create event</FcButton>
           </Link>
         </div>
@@ -36,11 +41,7 @@ export default async function PublicEventsPage() {
             </Link>
           </FcCard>
         ) : (
-          <div className="space-y-3">
-            {events.map((event) => (
-              <EventListCard key={event.beacon_id} event={event} />
-            ))}
-          </div>
+          <PublicEventList events={events} />
         )}
       </div>
     </FcPageShell>

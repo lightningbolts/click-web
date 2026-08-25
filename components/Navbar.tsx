@@ -18,14 +18,21 @@ type InsightsAccessPayload = { insightsAllowed: boolean };
 const insightsAccessFetcher = (url: string) =>
   fetchInsightsApiJson<InsightsAccessPayload>(url);
 
+const navItemClass =
+  "inline-flex h-9 items-center rounded-[8px] px-3 text-sm font-semibold leading-none";
+
 function navLinkClass(active: boolean) {
   return cn(
-    "rounded-[8px] px-3 py-2 text-sm font-semibold transition-colors",
-    active
-      ? "bg-primary-container text-on-primary-container"
-      : "text-on-surface hover:bg-surface-container-low hover:text-secondary",
+    navItemClass,
+    active ? "text-primary" : "text-on-surface hover:bg-surface-container-low hover:text-secondary",
   );
 }
+
+const navControlClass =
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold leading-none text-on-surface hover:bg-surface-container-low";
+
+const navCtaClass =
+  "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
 
 export default function Navbar() {
   const { user, signOut } = useAuth();
@@ -108,10 +115,10 @@ export default function Navbar() {
         className="relative z-[99999] border-b border-border-hard bg-surface px-4 py-3 text-on-surface md:px-10 md:py-4"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+        <div className="mx-auto grid max-w-6xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
           <Link
             href="/"
-            className="flex shrink-0 items-center gap-2 text-xl font-bold md:gap-2.5 md:text-2xl"
+            className="order-1 flex shrink-0 items-center gap-2 justify-self-start text-xl font-bold md:gap-2.5 md:text-2xl"
           >
             <ClickLogo size={28} className="h-7 w-7 md:h-8 md:w-8" priority />
             <span>
@@ -120,10 +127,15 @@ export default function Navbar() {
             </span>
           </Link>
 
-          <div className="hidden items-center gap-1 md:flex">
+          <div className="order-2 hidden min-w-0 items-center justify-self-center md:flex">
             <Link href="/events" className={navLinkClass(pathname === "/events" || pathname.startsWith("/e/"))}>
               Events
             </Link>
+            {user ? (
+              <Link href="/" className={navLinkClass(pathname === "/" || pathname === "/dashboard")}>
+                Dashboard
+              </Link>
+            ) : null}
             <button type="button" onClick={scrollToHowItWorks} className={navLinkClass(false)}>
               How it works
             </button>
@@ -135,33 +147,26 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="order-3 flex shrink-0 items-center justify-self-end gap-2">
             <ThemeToggle />
 
             {user ? (
               <>
-                <Link
-                  href="/"
-                  className="hidden items-center gap-1.5 text-sm font-semibold text-on-surface hover:text-secondary sm:inline-flex"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                </Link>
-                <Link href="/events/new" className="fc-btn-primary hidden whitespace-nowrap px-3 py-2 text-xs md:inline-flex md:px-4 md:text-sm">
-                  <Plus className="h-3.5 w-3.5" />
+                <Link href="/events/new" className={cn(navCtaClass, "hidden md:inline-flex")}>
+                  <Plus className="block size-4 shrink-0" aria-hidden />
                   Create event
                 </Link>
                 <div className="relative" ref={userMenuRef}>
                   <button
                     type="button"
                     onClick={() => setUserMenuOpen((o) => !o)}
-                    className="fc-btn-secondary flex items-center gap-2 px-2 py-2 text-xs md:px-3 md:text-sm"
+                    className={navControlClass}
                     aria-expanded={userMenuOpen}
                     aria-haspopup="menu"
                   >
-                    <User className="h-4 w-4 shrink-0" />
+                    <User className="block size-4 shrink-0" aria-hidden />
                     <span className="hidden max-w-[160px] truncate sm:inline">{userLabel}</span>
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <ChevronDown className="block size-4 shrink-0" aria-hidden />
                   </button>
                   {userMenuOpen ? (
                     <div
@@ -211,7 +216,7 @@ export default function Navbar() {
               <button
                 onClick={() => setIsLoginOpen(true)}
                 data-testid="nav-login"
-                className="fc-btn-primary px-3 py-2 text-xs md:px-4 md:text-sm"
+                className={navCtaClass}
               >
                 Login
               </button>
@@ -221,7 +226,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => setMobileOpen((o) => !o)}
-                className="rounded-[8px] border border-border-hard p-2 text-on-surface"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-border-hard text-on-surface hover:bg-surface-container-low"
                 aria-expanded={mobileOpen}
                 aria-label={mobileOpen ? "Close menu" : "Open menu"}
               >
@@ -236,6 +241,15 @@ export default function Navbar() {
                   >
                     Events
                   </Link>
+                  {user ? (
+                    <Link
+                      href="/"
+                      onClick={() => setMobileOpen(false)}
+                      className="block rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container"
+                    >
+                      Dashboard
+                    </Link>
+                  ) : null}
                   <Link
                     href="/events/new"
                     onClick={() => setMobileOpen(false)}

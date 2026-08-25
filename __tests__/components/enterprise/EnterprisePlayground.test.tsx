@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EnterprisePlayground from "@/components/enterprise/EnterprisePlayground";
+import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 
 jest.mock("next/dynamic", () => () => {
   const Mock = () => <div data-testid="pin-map" />;
@@ -24,12 +25,17 @@ jest.mock("framer-motion", () => {
 describe("EnterprisePlayground", () => {
   it("walks venue scenes without invented metric jargon", async () => {
     const user = userEvent.setup();
-    render(<EnterprisePlayground />);
+    render(
+      <ThemeProvider>
+        <EnterprisePlayground />
+      </ThemeProvider>,
+    );
     expect(screen.getByTestId("enterprise-playground")).toBeInTheDocument();
     expect(screen.getByText("Demo data")).toBeInTheDocument();
     expect(screen.queryByText(/Connection Velocity/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Social Sticky Score/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Tri-Factor Handshake/i)).not.toBeInTheDocument();
+    expect(await screen.findByText("Social Sticky Score")).toBeInTheDocument();
+    expect(screen.getByText("Popular times")).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Events" }));
     expect(screen.getByText("Club fair")).toBeInTheDocument();
   });

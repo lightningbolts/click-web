@@ -7,7 +7,7 @@ import { ABOUT_TEAM } from "@/components/about/team";
 export const metadata: Metadata = {
   title: "About Click",
   description:
-    "We're University of Washington students building a way to keep the people standing in front of you — not another feed.",
+    "We're University of Washington students building Click so the people you meet in person have a place to stay in touch.",
 };
 
 export default function AboutPage() {
@@ -22,12 +22,12 @@ export default function AboutPage() {
           About <span className="text-primary">Click</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-center text-lg leading-relaxed text-on-surface-variant">
-          We&apos;re five Computer Science students at the University of Washington. We got tired of
-          collecting follows that never become people, so we&apos;re building a way to keep the ones
-          standing in front of you.
+          We&apos;re five Computer Science students at the University of Washington. After class we
+          kept adding people on Instagram and never talking again. Click is how we stay in touch
+          with the people we actually met.
         </p>
         <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-relaxed text-on-surface-variant">
-          How Click works — and how to join the waitlist — is on the{" "}
+          See how it works and join the waitlist on the{" "}
           <Link href="/" className="font-medium text-primary underline-offset-4 hover:underline">
             homepage
           </Link>
@@ -37,9 +37,9 @@ export default function AboutPage() {
         <section className="mt-16">
           <h2 className="text-center text-3xl font-bold md:text-4xl">Why we started</h2>
           <p className="mx-auto mt-4 max-w-2xl text-center leading-relaxed text-on-surface-variant">
-            Orientation. Dawg Daze. A conversation that felt like it should continue. Then an Instagram
-            follow, and nothing. We wanted a place for the people you actually met — the room, the night,
-            the next time you&apos;re both free — without turning it into another scroll.
+            Orientation and Dawg Daze are full of conversations that should continue. A follow is
+            not a plan to get coffee. We wanted a record of the room you were in, and a way to find
+            each other the next time you are both free.
           </p>
         </section>
 
@@ -48,8 +48,8 @@ export default function AboutPage() {
             Meet the <span className="text-primary">team</span>
           </h2>
           <p className="mx-auto mt-4 mb-12 max-w-2xl text-center text-on-surface-variant">
-            Five of us work on product, mobile, and web, with a focus on campus life and making big
-            transitions — new school, new city, new semester — a little less lonely.
+            We split product, mobile, and web. Campus is the first home for Click because that is
+            where a lot of people start over at the same time.
           </p>
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {ABOUT_TEAM.map((member) => (

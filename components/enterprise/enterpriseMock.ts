@@ -7,13 +7,31 @@ export const DEMO_ROOMS = [
 ];
 
 export const DEMO_EVENTS = [
-  { id: "e1", title: "Club fair", when: "Tonight · 6:00 PM", room: "Ballroom", going: 186 },
-  { id: "e2", title: "Study night", when: "Tonight · 8:30 PM", room: "Lounge", going: 42 },
-  { id: "e3", title: "Open mic", when: "Tomorrow · 7:00 PM", room: "Husky Den", going: 67 },
-];
-
-export const DEMO_PULSE = [
-  { id: "p1", text: "12 people met in the lounge in the last hour." },
-  { id: "p2", text: "Club fair check-ins are ahead of last month's fair." },
-  { id: "p3", text: "The ballroom is busy; the cafe is quiet." },
+  {
+    id: "e1",
+    title: "Club fair",
+    when: "Tonight · 6:00 PM",
+    room: "Ballroom",
+    going: 186,
+    met: 41,
+    host: "SAO",
+  },
+  {
+    id: "e2",
+    title: "Study night",
+    when: "Tonight · 8:30 PM",
+    room: "Lounge",
+    going: 42,
+    met: 9,
+    host: "Odegaard",
+  },
+  {
+    id: "e3",
+    title: "Open mic",
+    when: "Tomorrow · 7:00 PM",
+    room: "Husky Den",
+    going: 67,
+    met: 18,
+    host: "HUB Programs",
+  },
 ];
