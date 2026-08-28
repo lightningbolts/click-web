@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QrCode, Copy, Check, Share2, Download, Loader2, RefreshCw, Clock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 
 interface QRIdentityCardProps {
   userId: string;
@@ -75,14 +75,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
     setError(null);
 
     try {
-      const supabase = getSupabaseClient();
-      const session = supabase
-        ? (await supabase.auth.getSession()).data.session
-        : null;
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      };
+      const headers = await getFreshAuthHeaders();
       const locationParams = await resolveQrLocationParams();
       const response = await fetch(`/api/qr${locationParams}`, { headers, credentials: 'include' });
       const data = await response.json();
