@@ -2,7 +2,10 @@
  * @jest-environment node
  */
 
-import { deriveHeightCategoryFromRelativeAltitudeM } from '@/lib/server/terrainElevation';
+import {
+  deriveHeightCategoryFromRelativeAltitudeM,
+  fetchTerrainElevationMeters,
+} from '@/lib/server/terrainElevation';
 
 describe('deriveHeightCategoryFromRelativeAltitudeM', () => {
   it('classifies AGL from AMSL − terrain (not raw AMSL)', () => {
@@ -26,5 +29,26 @@ describe('deriveHeightCategoryFromRelativeAltitudeM', () => {
     expect(deriveHeightCategoryFromRelativeAltitudeM(null)).toBeNull();
     expect(deriveHeightCategoryFromRelativeAltitudeM(undefined)).toBeNull();
     expect(deriveHeightCategoryFromRelativeAltitudeM(Number.NaN)).toBeNull();
+  });
+});
+
+describe('fetchTerrainElevationMeters', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('reads DEM AMSL from Open-Meteo forecast elevation', async () => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      expect(url).toContain('api.open-meteo.com/v1/forecast');
+      expect(url).not.toContain('open-elevation.com');
+      return {
+        ok: true,
+        json: async () => ({ elevation: 38.2, current: { temperature_2m: 12 } }),
+      } as Response;
+    }) as typeof fetch;
+    await expect(fetchTerrainElevationMeters(47.6, -122.3)).resolves.toBe(38.2);
   });
 });

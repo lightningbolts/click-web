@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Save, Sparkles } from 'lucide-react';
 import {
@@ -55,8 +56,7 @@ export default function PersonalitySection() {
   };
 
   const handleSavePersonality = async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase || !user) return;
+    if (!user) return;
     const toSave = canonicalizePersonalityTags(personalityTags);
     if (toSave.length !== PERSONALITY_REQUIRED_TAG_COUNT) {
       setPersonalityMessage({
@@ -68,18 +68,15 @@ export default function PersonalitySection() {
     setPersonalityLoading(true);
     setPersonalityMessage({ type: '', text: '' });
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) {
+      const headers = await getFreshAuthHeaders();
+      const auth = new Headers(headers).get('Authorization');
+      if (!auth) {
         setPersonalityMessage({ type: 'error', text: 'Session expired. Sign in again.' });
         return;
       }
       const res = await fetch(`/api/users/${user.id}/profile`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ personality_tags: toSave }),
       });
       const body = await res.json().catch(() => ({}));

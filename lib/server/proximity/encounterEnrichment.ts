@@ -2,8 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { deriveHeightCategoryFromRelativeAltitudeM } from '@/lib/server/terrainElevation';
 import {
   fetchNominatimReverseGeocode,
-  fetchOpenMeteoWeatherSnapshot,
-  fetchTerrainElevationM,
+  fetchOpenMeteoForecast,
 } from '@/lib/server/proximity/bindSupport';
 
 /**
@@ -44,20 +43,17 @@ export async function scheduleEncounterGeoEnrichment(
   const locationName = manualLocationName ?? geocoded.specificLocationName;
   if (locationName) updates.location_name = locationName;
 
-  if (clientWeatherSnapshot == null) {
-    const weather = await fetchOpenMeteoWeatherSnapshot(memberLat, memberLon);
-    if (weather != null) updates.weather_snapshot = weather;
+  const forecast = await fetchOpenMeteoForecast(memberLat, memberLon);
+  if (clientWeatherSnapshot == null && forecast.weatherSnapshot != null) {
+    updates.weather_snapshot = forecast.weatherSnapshot;
   }
 
-  if (memberExactBarometricElevationM != null) {
-    const terrainM = await fetchTerrainElevationM(memberLat, memberLon);
-    if (terrainM != null) {
-      const relativeAltitudeM = memberExactBarometricElevationM - terrainM;
-      updates.relative_altitude_m = relativeAltitudeM;
-      const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
-      if (elevationCategory != null) {
-        updates.elevation_category = elevationCategory;
-      }
+  if (memberExactBarometricElevationM != null && forecast.elevationM != null) {
+    const relativeAltitudeM = memberExactBarometricElevationM - forecast.elevationM;
+    updates.relative_altitude_m = relativeAltitudeM;
+    const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
+    if (elevationCategory != null) {
+      updates.elevation_category = elevationCategory;
     }
   }
 

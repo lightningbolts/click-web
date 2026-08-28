@@ -242,7 +242,7 @@ export function ChatTabSection({
                   <li key={hit.messageId}>
                     <button
                       type="button"
-                      className="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left hover:bg-surface-container/60"
+                      className="flex w-full flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left hover:bg-surface-container/60"
                       onClick={() => {
                         const conn = [...connectionRecords, ...groupCliqueRecords].find(
                           (c) =>
@@ -384,7 +384,7 @@ export function ChatTabSection({
                         onTouchStart={() => startLongPress(conn.id)}
                         onTouchEnd={endLongPress}
                         onTouchCancel={endLongPress}
-                        className="w-full flex cursor-pointer items-start gap-4 px-5 py-4 pr-16 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        className="w-full flex cursor-pointer items-start gap-4 rounded-xl px-5 py-4 pr-16 text-left transition-colors hover:bg-surface-container/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                       >
                         {isGroupCliqueRow ? (
                           <button

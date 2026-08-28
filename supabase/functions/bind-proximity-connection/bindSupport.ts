@@ -21,8 +21,6 @@ export const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 export const EXTENDED_HANGOUT_TAG = 'Extended Hangout';
 export const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
 export const OPEN_METEO_TIMEOUT_MS = 3_500;
-/** Open-Elevation lookup budget during bind; keep small so tri-factor resolution stays snappy. */
-export const OPEN_ELEVATION_BIND_TIMEOUT_MS = 2_500;
 export const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 export const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
@@ -328,7 +326,16 @@ export function openMeteoCodeToIcon(code: number): string {
   return 'clear';
 }
 
-export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
+export type OpenMeteoForecast = {
+  weatherSnapshot: string | null;
+  elevationM: number | null;
+};
+
+/**
+ * One Open-Meteo forecast request: current weather plus DEM terrain AMSL (`elevation`).
+ */
+export async function fetchOpenMeteoForecast(lat: number, lon: number): Promise<OpenMeteoForecast> {
+  const empty: OpenMeteoForecast = { weatherSnapshot: null, elevationM: null };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
   try {
@@ -336,8 +343,9 @@ export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): P
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl';
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) return null;
+    if (!res.ok) return empty;
     const raw = (await res.json()) as {
+      elevation?: unknown;
       current?: {
         temperature_2m?: number;
         weather_code?: number;
@@ -346,9 +354,11 @@ export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): P
         pressure_msl?: number;
       };
     };
+    const elevationM =
+      typeof raw.elevation === 'number' && Number.isFinite(raw.elevation) ? raw.elevation : null;
     const cur = raw.current;
     if (cur == null || typeof cur.temperature_2m !== 'number' || !Number.isFinite(cur.temperature_2m)) {
-      return null;
+      return { weatherSnapshot: null, elevationM };
     }
     const code =
       typeof cur.weather_code === 'number' && Number.isFinite(cur.weather_code) ? cur.weather_code : 0;
@@ -367,12 +377,16 @@ export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): P
           ? Math.round(cur.wind_direction_10m)
           : null,
     };
-    return JSON.stringify(payload);
+    return { weatherSnapshot: JSON.stringify(payload), elevationM };
   } catch {
-    return null;
+    return empty;
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
+  return (await fetchOpenMeteoForecast(lat, lon)).weatherSnapshot;
 }
 
 export async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
@@ -475,21 +489,8 @@ export function deriveHeightCategoryFromRelativeAltitudeM(
 }
 
 /**
- * Terrain elevation (m above sea level) at a point from Open-Elevation (SRTM-backed DEM).
+ * Terrain elevation (m above sea level) from Open-Meteo forecast DEM (`elevation`).
  */
 export async function fetchTerrainElevationM(lat: number, lon: number): Promise<number | null> {
-  const url = `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPEN_ELEVATION_BIND_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { results?: { elevation?: unknown }[] };
-    const raw = data.results?.[0]?.elevation;
-    return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await fetchOpenMeteoForecast(lat, lon)).elevationM;
 }
