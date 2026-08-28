@@ -6,7 +6,7 @@ Web notification **preferences** and integration patterns for **`send-push-notif
 
 ## Purpose
 
-- Persist per-user push preferences (messages, calls, event reminders, availability matches, hub messages)
+- Persist per-user push preferences (messages, calls, event reminders, event teasers, reconnect nudges, availability matches, hub messages)
 - Align web-initiated pushes with KMP mobile handlers
 - Centralize localStorage fallback when `notification_preferences` table unavailable
 
@@ -30,7 +30,7 @@ FCM / APNs → Mobile app
 
 | Function | Role |
 |----------|------|
-| `DEFAULT_NOTIFICATION_PREFERENCES` | `{ messagePushEnabled, callPushEnabled, eventReminderPushEnabled, availabilityMatchPushEnabled, hubMessagePushEnabled }` all default `true` |
+| `DEFAULT_NOTIFICATION_PREFERENCES` | `{ messagePushEnabled, callPushEnabled, eventReminderPushEnabled, availabilityMatchPushEnabled, hubMessagePushEnabled, eventTeaserPushEnabled, reconnectNudgePushEnabled }` all default `true` |
 | `loadNotificationPreferences(supabase, userId)` | DB first, fallback localStorage |
 | `saveNotificationPreferences` | Dual-write DB + local |
 | `readLocalNotificationPreferences` | Offline / missing table fallback |
@@ -45,6 +45,8 @@ Storage key: `click:web-notification-preferences:{userId}`
 | `components/dashboard/useDashboardCalls.ts` | Outgoing web call | `incoming_call` |
 | `cron-hourly-maintenance` | Disposable reveal | `disposable_reveal` |
 | `cron-hourly-maintenance` | Event reminder | `event_reminder` |
+| `cron-hourly-maintenance` | Seed-a-Room teaser (24–48h before start) | `event_teaser` |
+| `cron-hourly-maintenance` | Reconnect lull / shared upcoming event | `reconnect_nudge` / `shared_upcoming_event` |
 | `match-availability` (client invoke) | Intent overlap | `availability_match` |
 
 All server callers use service role bearer to invoke the Edge Function.
@@ -130,7 +132,7 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 - **Availability intents** — **availability_match** push.
 - **Match alerts** — Push from match flow.
 - **Community Hubs** — Hub messages (client-dependent).
-- **Map beacons** — event_reminder push.
+- **Map beacons** — event_reminder and event_teaser push.
 - **Global search** — N/A.
 - **Core connections** — Same push rules.
 - **Collaboration sessions & disposable rolls** — **disposable_reveal** push.
@@ -144,4 +146,6 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 - **Web dashboard** — Web calls trigger mobile push.
 - **Business insights** — No consumer pushes.
 - **Event reminders** — **event_reminder** push.
+- **Seed a Room teasers** — **event_teaser** push (pref `event_teaser_push_enabled`).
+- **Reconnect nudges** — **reconnect_nudge** / **shared_upcoming_event** (pref `reconnect_nudge_push_enabled`).
 - **Achievements & stats** — Optional future pushes.

@@ -12,7 +12,7 @@ Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/E
 | Personal dashboard | Events tab on `/` — My events, RSVPs, Create event |
 | Venue manager | Insights **Events** tab (`/insights/events?venue_id=`) — same form, sends `venue_id`. Do **not** use Vibe Radar `BeaconDeployModal` (soundtrack / pop-up hub pin). |
 
-Success navigates to `/e/{id}` and the form can copy that link.
+Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-list upload) immediately. The public share URL remains `/e/{id}`.
 
 ## View (logged-out OK)
 
@@ -20,7 +20,7 @@ Success navigates to `/e/{id}` and the form can copy that link.
 |-------|-----|--------|
 | `/events` | Public | Dense date-rail list (`max-w-4xl`, `space-y-3`) of upcoming events with `visibility_audience = 'everyone'` only. Each [`EventListCard`](../../components/events/EventListCard.tsx) shows month/day, title, 2-line description, host (when `show_creator_name`), when, location, RSVP count, and a square thumb. |
 | `/e/[beaconId]` | Public share link | Cover (uploaded banner or generated visual), when **with timezone**, where, posted time, host, description, embedded MapLibre pin (Carto tiles in the browser), guest RSVP, Open in Click. Connections-only events stay reachable via this URL. |
-| `/e/[beaconId]/manage` | Creator or venue manager | Guest list + network-health metrics |
+| `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, network-health metrics |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
 | `/e/[beaconId]/summary?token=` | Public snapshot | Aggregate counts only, after organizer publish |
 
@@ -31,6 +31,16 @@ Guest RSVP is name + email or phone. It writes `event_guest_rsvps`, never `beaco
 ## Mutual connections teaser
 
 Shown only when the visitor has a Click session **and** `GET /api/beacons/{id}/mutual-attendees` returns `count > 0`. One-way, connections only. Users with `users.ghost_mode` are excluded from others' overlap.
+
+## Seed a Room (anonymized teasers)
+
+Organizers upload emails on `/e/{id}/manage` (`POST /api/beacons/{id}/guest-list`). Matching is SHA-256 email vs `user_contact_hashes` only — Instagram handles may be stored but are not matched. Matched Click users get one anonymized count teaser (`GET /api/me/event-bookmarks/{id}/teaser`): `"3 people going who share an interest"`. Payloads never include names unless `teaser_type = mutual_connection_count` and both sides already have an active connection (current generator still stores counts only). Ghost-mode users are excluded from others' counts. This is separate from unauthenticated `event_guest_rsvps`.
+
+Hourly event-reminders cron also sends `event_teaser` pushes 24–48h before `metadata.event_start_at` when the recipient pref `event_teaser_push_enabled` is on.
+
+## Encounter-triggered nudges
+
+Hourly `GET /api/cron/nudges-reconnect` writes inbox rows for handshake connections with a 21-day chat lull after the last BLE encounter (14-day send cooldown). RSVP/bookmark overlap creates `shared_upcoming_event` nudges (`GET /api/me/nudges`, dismiss/snooze). Ghost mode is honored for the shared-event variant only. Names are allowed because both people are already connected.
 
 ## Organizer auth
 
@@ -50,6 +60,15 @@ Shown only when the visitor has a Click session **and** `GET /api/beacons/{id}/m
 | GET | `/api/beacons/{id}/recap` | participant |
 | GET | `/api/beacons/{id}/recap-summary` | organizer |
 | GET | `/api/beacons/{id}/network-health` | organizer |
+| GET/POST | `/api/beacons/{id}/guest-list` | organizer |
+| POST | `/api/beacons/{id}/guest-list/match` | organizer |
+| GET | `/api/beacons/{id}/teasers` | organizer (counts only) |
+| GET | `/api/me/event-bookmarks/{id}/teaser` | session (bookmark, RSVP, or matched guest) |
+| GET | `/api/me/nudges` | session |
+| POST | `/api/me/nudges/{id}/dismiss` | session |
+| POST | `/api/me/nudges/{id}/snooze` | session |
+| POST | `/api/me/nudges/{id}/acted` | session |
+| GET | `/api/cron/nudges-reconnect` | `CRON_SECRET` |
 | POST | `/api/beacons/{id}/summary/publish` | organizer |
 | GET | `/api/beacons/{id}/summary?token=` | none |
 | PATCH | `/api/user/ghost-mode` | session |

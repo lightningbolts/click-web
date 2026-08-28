@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/eventEngagement";
 import { parseBody } from "@/lib/api/parseBody";
 import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
+import { maybeCreateSharedEventNudges } from "@/lib/events/sharedEventNudges";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -240,6 +241,13 @@ export async function POST(
     });
 
     const profile = (await loadAttendeeProfiles(admin, [user.id])).get(user.id) ?? null;
+
+    void maybeCreateSharedEventNudges(admin, user.id, beaconId, {
+      pushUrl: process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
+        : null,
+      authBearer: process.env.CRON_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? null,
+    }).catch((err) => console.warn('shared-event nudge after rsvp:', err));
 
     return NextResponse.json({
       ok: true,

@@ -146,7 +146,7 @@ export default function EventCreateForm({
       } catch {
         /* clipboard may be blocked */
       }
-      router.push(eventSharePath(id));
+      router.push(`/e/${id}/manage`);
     } catch {
       setError("Could not create event");
     } finally {

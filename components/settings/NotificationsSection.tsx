@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import * as Switch from '@radix-ui/react-switch';
-import { RefreshCw, Bell, MessageCircle, Phone, Calendar, Users, Radio } from 'lucide-react';
+import { RefreshCw, Bell, MessageCircle, Phone, Calendar, Users, Radio, Sparkles, HeartHandshake } from 'lucide-react';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
 
 export default function NotificationsSection({
@@ -172,6 +172,24 @@ export default function NotificationsSection({
           checked={notificationPreferences.hubMessagePushEnabled}
           disabled={notificationLoading}
           onChange={(checked) => { void handleNotificationToggle('hubMessagePushEnabled', checked); }}
+        />
+
+        <NotificationToggleRow
+          icon={<Sparkles className="w-4 h-4 text-primary" />}
+          title="Event teasers"
+          description="Anonymized pre-event notes when people like you are going."
+          checked={notificationPreferences.eventTeaserPushEnabled}
+          disabled={notificationLoading}
+          onChange={(checked) => { void handleNotificationToggle('eventTeaserPushEnabled', checked); }}
+        />
+
+        <NotificationToggleRow
+          icon={<HeartHandshake className="w-4 h-4 text-primary" />}
+          title="Reconnect nudges"
+          description="When you Clicked with someone and have not talked in a while, or you are both going to the same event."
+          checked={notificationPreferences.reconnectNudgePushEnabled}
+          disabled={notificationLoading}
+          onChange={(checked) => { void handleNotificationToggle('reconnectNudgePushEnabled', checked); }}
         />
       </div>
 
