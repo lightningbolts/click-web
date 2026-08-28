@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import useSWR from "swr";
 import { FcButton, FcCard, FcTextarea } from "@/components/fc";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 
@@ -21,24 +22,19 @@ type GuestListStatus = {
   entries?: GuestEntry[];
 };
 
+const fetcher = async (url: string) => {
+  const headers = await getFreshAuthHeaders();
+  const res = await fetch(url, { headers });
+  if (!res.ok) return null;
+  return res.json() as Promise<GuestListStatus>;
+};
+
 export default function GuestListUploadCard({ beaconId }: { beaconId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [paste, setPaste] = useState("");
-  const [status, setStatus] = useState<GuestListStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    const headers = await getFreshAuthHeaders();
-    const res = await fetch(`/api/beacons/${beaconId}/guest-list`, { headers });
-    if (!res.ok) return;
-    const json = (await res.json()) as GuestListStatus;
-    setStatus(json);
-  }, [beaconId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data: status, mutate } = useSWR(`/api/beacons/${beaconId}/guest-list`, fetcher);
 
   const upload = async (csvText: string, source: "csv" | "manual") => {
     setBusy(true);
@@ -55,7 +51,7 @@ export default function GuestListUploadCard({ beaconId }: { beaconId: string }) 
         setError(json.error || "Upload failed");
         return;
       }
-      setStatus(json);
+      await mutate(json, { revalidate: false });
       setPaste("");
     } catch {
       setError("Upload failed");
@@ -78,7 +74,7 @@ export default function GuestListUploadCard({ beaconId }: { beaconId: string }) 
         setError(json.error || "Match failed");
         return;
       }
-      setStatus(json);
+      await mutate(json, { revalidate: false });
     } catch {
       setError("Match failed");
     } finally {
@@ -125,7 +121,7 @@ export default function GuestListUploadCard({ beaconId }: { beaconId: string }) 
             Rematch
           </FcButton>
         ) : null}
-        <FcButton type="button" variant="secondary" disabled={busy} onClick={() => void load()}>
+        <FcButton type="button" variant="secondary" disabled={busy} onClick={() => void mutate()}>
           Refresh
         </FcButton>
       </div>

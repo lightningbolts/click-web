@@ -62,12 +62,6 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
-function otherUserId(userIds: unknown, viewerId: string): string | null {
-  if (!Array.isArray(userIds)) return null;
-  const ids = userIds.filter((id): id is string => typeof id === 'string' && id.length > 0);
-  return ids.find((id) => id !== viewerId) ?? null;
-}
-
 function firstNameFromUser(row: Record<string, unknown>): string {
   const first = typeof row.first_name === 'string' ? row.first_name.trim() : '';
   if (first) return first;
