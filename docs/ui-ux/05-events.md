@@ -4,7 +4,7 @@ Event beacons are `map_beacons` rows with `beacon_type = 'event'`. There is no s
 
 ## Create (auth)
 
-Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/EventCreateForm.tsx) → `POST /api/beacons` with `kind: "event"`. Cover upload uses `POST /api/beacons/image`. Location is a place search (plus “Use my location”), not raw latitude/longitude fields. Lat/lng are still submitted with the beacon.
+Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/EventCreateForm.tsx) → `POST /api/beacons` with `kind: "event"`. Cover upload uses `POST /api/beacons/image`. Location is a place search (plus an icon-button “Use my location” that reverse-geocodes a label), not raw latitude/longitude fields. Lat/lng are still submitted with the beacon. Create also writes listing columns (`event_visibility`, `event_capacity`, `approval_required`, `guest_list_visibility`, `cover_theme_id`) and dual-writes `starts_at` / `ends_at` / `event_timezone` beside metadata.
 
 | Surface | Route |
 |---------|--------|
@@ -18,9 +18,10 @@ Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-li
 
 | Route | Who | Notes |
 |-------|-----|--------|
-| `/events` | Public | Dense date-rail list (`max-w-4xl`, `space-y-3`) of upcoming events with `visibility_audience = 'everyone'` only. Each [`EventListCard`](../../components/events/EventListCard.tsx) shows month/day, title, 2-line description, host (when `show_creator_name`), when, location, RSVP count, and a square thumb. |
-| `/e/[beaconId]` | Public share link | Cover (uploaded banner or generated visual), when **with timezone**, where, posted time, host, description, embedded MapLibre pin (Carto tiles in the browser), guest RSVP, Open in Click. Connections-only events stay reachable via this URL. |
-| `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, network-health metrics |
+| `/events` | Public | Shared `EventPageShell` (`max-w-6xl`, Navbar padding). Search + date/going/host chips, featured soonest event, then Today / This week / Upcoming. Cards use `CardVisualHero` (no date-rail). Only `event_visibility = public` **and** `visibility_audience = everyone`. Unlisted / invite-only stay off this feed. |
+| `/events/new` | Signed in | Same 6xl shell. Split-pane create form (cover + theme \| details + Event options). |
+| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended), Open in Click. Connections-only and unlisted/invite-only events stay reachable via this URL. |
+| `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
 | `/e/[beaconId]/summary?token=` | Public snapshot | Aggregate counts only, after organizer publish |
 
@@ -54,6 +55,8 @@ Hourly `GET /api/cron/nudges-reconnect` writes inbox rows for handshake connecti
 | GET | `/api/beacons/{id}/public` | none |
 | POST | `/api/beacons/{id}/rsvp/guest` | none, rate-limited |
 | GET | `/api/beacons/{id}/rsvp/guests` | organizer |
+| GET/POST/DELETE | `/api/beacons/{id}/rsvp` | session (Click RSVP; returns `request_status`) |
+| GET/POST | `/api/beacons/{id}/rsvp/requests` | organizer (approve / deny pending or waitlisted) |
 | GET/POST | `/api/beacons` | session (create event + map fetch) |
 | GET | `/api/beacons/mine` | session |
 | GET | `/api/beacons/{id}/mutual-attendees` | session |
@@ -79,4 +82,8 @@ Recap and network-health both call [`lib/events/eventRecap.ts`](../../lib/events
 
 ## Schema (additive)
 
-Postgres now has first-class `map_beacons.starts_at` / `ends_at` / `event_timezone`, a Click-account `event_participation` table, optional `series_id` / `owner_org_id`, and unused funnel tables (`beacon_share_tokens`, `event_beacon_daily_stats`). **The app does not read or write them yet.** Create still sends `metadata.event_start_at` / `event_end_at` only. Guests still write `event_guest_rsvps`. Organizer auth is still `creator_id` or `venue_managers`, not `owner_org_id`. See [`event-schema-scaling-followups.md`](../event-schema-scaling-followups.md).
+**Live Event Options** (`20260828190000_event_listing_options.sql`, mirrored in click): `map_beacons.event_visibility` (`public | unlisted | invite_only`), `event_capacity`, `approval_required`, `guest_list_visibility` (`public | hosts_only`), `cover_theme_id`, plus `event_rsvp_requests`. Listing visibility is **not** the map pin enum — do not add values to `beacon_visibility_audience`. Unlisted / invite-only map to `visibility_audience = connections` so they stay off strangers’ maps.
+
+**Live time columns:** create dual-writes `starts_at` / `ends_at` / `event_timezone` and `metadata.event_start_at` / `event_end_at` / `event_timezone`. Reads prefer columns, then metadata.
+
+Still unused until dedicated PRs: `event_participation`, `series_id` / `owner_org_id`, funnel tables. Guests still write `event_guest_rsvps`. Organizer auth is still `creator_id` or `venue_managers`. See [`event-schema-scaling-followups.md`](../event-schema-scaling-followups.md) and [`docs/design-assets/events-web/DESIGN.md`](../design-assets/events-web/DESIGN.md).

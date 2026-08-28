@@ -55,6 +55,27 @@ describe("EventListCard", () => {
 
     expect(screen.getByText("Quiet reading hour")).toBeInTheDocument();
     expect(screen.queryByText(/going/)).not.toBeInTheDocument();
-    expect(screen.getByText("Time to be announced")).toBeInTheDocument();
+    expect(screen.getByText("Time TBD")).toBeInTheDocument();
+    expect(screen.queryByText("Location shared on the event page")).not.toBeInTheDocument();
+  });
+
+  it("hides a description that only repeats the title", () => {
+    render(
+      <EventListCard
+        event={{
+          beacon_id: "33333333-3333-4333-8333-333333333333",
+          title: "Campus picnic",
+          description: "Campus picnic",
+          image_url: null,
+          host_name: null,
+          event_start_at: "2030-06-15T18:00:00.000Z",
+          event_end_at: "2030-06-15T21:00:00.000Z",
+          location_name: "The Quad",
+          rsvp_count: 1,
+          rsvp_enabled: true,
+        }}
+      />,
+    );
+    expect(screen.getAllByText("Campus picnic")).toHaveLength(1);
   });
 });

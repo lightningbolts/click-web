@@ -1,0 +1,14 @@
+url: http://localhost:3000
+name: Public events list smoke
+tags:
+  - smoke
+  - web
+env:
+  BASE_URL: http://localhost:3000
+---
+- openLink: ${BASE_URL}/events
+- extendedWaitUntil:
+    visible: "Events"
+    timeout: 15000
+- assertVisible: "Events"
+- assertVisible: "Create event"

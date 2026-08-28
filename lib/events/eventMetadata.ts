@@ -65,7 +65,7 @@ export function eventEndAtFromMetadata(meta: Record<string, unknown>): string | 
   return instantToIso(meta.event_end_at) ?? instantToIso(meta.eventEndAt) ?? instantToIso(meta.end_at);
 }
 
-/** IANA name from metadata only (not map_beacons.event_timezone until dual-write). */
+/** IANA name from metadata. Prefer `map_beacons.event_timezone` at read sites. */
 export function eventTimezoneFromMetadata(meta: Record<string, unknown>): string | null {
   return metaString(meta, "event_timezone", "eventTimezone");
 }
@@ -82,6 +82,26 @@ export function eventDisplayTitle(
   const snippet = description?.trim().split("\n")[0]?.slice(0, 80);
   if (snippet) return snippet;
   return "Event";
+}
+
+/** Hide a description that merely repeats the title (list + detail). */
+export function eventSubtitle(
+  title: string | null | undefined,
+  description: string | null | undefined,
+): string | null {
+  const desc = description?.trim() || null;
+  if (!desc) return null;
+  const named = title?.trim();
+  if (named && desc === named) return null;
+  return desc;
+}
+
+export function eventWhenLabel(when: string | null | undefined): string | null {
+  return when?.trim() || null;
+}
+
+export function eventWhereLabel(locationName: string | null | undefined): string | null {
+  return locationName?.trim() || null;
 }
 
 export function eventLocationNameFromMetadata(meta: Record<string, unknown>): string | null {

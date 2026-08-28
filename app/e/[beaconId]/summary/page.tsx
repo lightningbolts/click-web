@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { FcCard, FcPageShell, FcSectionHeader } from "@/components/fc";
+import { FcCard, FcSectionHeader } from "@/components/fc";
+import EventPageShell from "@/components/events/EventPageShell";
 
 type Summary = {
   title?: string | null;
@@ -40,8 +41,8 @@ export default function EventPublicSummaryPage() {
   }, [params.beaconId, token]);
 
   return (
-    <FcPageShell className="px-4 py-10 md:px-8">
-      <div className="mx-auto w-full max-w-xl space-y-6">
+    <EventPageShell className="py-10">
+      <div className="space-y-6">
         <FcSectionHeader title={summary?.title?.trim() || "Event snapshot"} subtitle="Aggregate numbers only." />
         {error ? <p className="text-on-surface-variant">{error}</p> : null}
         {summary ? (
@@ -60,6 +61,6 @@ export default function EventPublicSummaryPage() {
           </div>
         ) : null}
       </div>
-    </FcPageShell>
+    </EventPageShell>
   );
 }

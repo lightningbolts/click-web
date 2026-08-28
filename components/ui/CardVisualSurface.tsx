@@ -18,6 +18,8 @@ import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
 export type CardVisualHeroProps = {
   /** Raw entity id (e.g. `beacon.id`). Never a list-key prefix, or the visual will drift. */
   id: string;
+  /** Optional theme override seed (`theme:purple`). Defaults to [id]. */
+  visualSeed?: string | null;
   className?: string;
   imageUrl?: string | null;
   /** Short category tag. Deliberately the only text this decorative band renders. */
@@ -28,13 +30,14 @@ export type CardVisualHeroProps = {
 
 export function CardVisualHero({
   id,
+  visualSeed,
   className = '',
   imageUrl,
   chipLabel,
   visual,
   children,
 }: CardVisualHeroProps) {
-  const resolved = visual ?? generateCardVisual(id);
+  const resolved = visual ?? generateCardVisual(visualSeed?.trim() || id);
   const trimmed = imageUrl?.trim() || null;
   const [imageFailed, setImageFailed] = useState(false);
   const useGenerated = !trimmed || imageFailed;

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
-import { FcCard, FcPageShell, FcSectionHeader } from "@/components/fc";
+import { FcCard, FcSectionHeader } from "@/components/fc";
+import EventPageShell from "@/components/events/EventPageShell";
 
 type Person = { user_id: string; name: string; avatar_url: string | null; connection_id: string };
 
@@ -35,8 +36,8 @@ export default function EventRecapPage() {
   }, [beaconId, user]);
 
   return (
-    <FcPageShell className="px-4 py-10 md:px-8">
-      <div className="mx-auto w-full max-w-2xl space-y-6">
+    <EventPageShell className="py-10">
+      <div className="space-y-6">
         <FcSectionHeader title="Event recap" subtitle="People you connected with at this event." />
         {error ? <p className="text-on-surface-variant">{error}</p> : null}
         {people && people.length === 0 ? (
@@ -58,6 +59,6 @@ export default function EventRecapPage() {
           ))}
         </div>
       </div>
-    </FcPageShell>
+    </EventPageShell>
   );
 }

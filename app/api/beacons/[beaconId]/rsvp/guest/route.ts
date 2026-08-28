@@ -10,6 +10,7 @@ import {
   normalizeGuestContact,
   rsvpEnabledFromMetadata,
 } from "@/lib/events/eventMetadata";
+import { decideGuestRsvp, listingOptionsFromBeacon } from "@/lib/events/eventRsvpPolicy";
 
 /**
  * POST /api/beacons/{id}/rsvp/guest — unauthenticated name+contact interest capture.
@@ -49,6 +50,15 @@ export async function POST(
     if ("response" in loaded) return loaded.response;
     if (!rsvpEnabledFromMetadata(loaded.beacon.metadata)) {
       return NextResponse.json({ error: "RSVP is closed for this event" }, { status: 403 });
+    }
+    const guestDecision = await decideGuestRsvp({
+      admin,
+      beaconId,
+      options: listingOptionsFromBeacon(loaded.beacon),
+      contact: contact.contact,
+    });
+    if (guestDecision.kind === "deny") {
+      return NextResponse.json({ error: guestDecision.error }, { status: guestDecision.status });
     }
 
     const { data: existingRows } = await admin

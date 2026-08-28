@@ -26,18 +26,26 @@ const fetcher = async (url: string) => {
   return res.json() as Promise<DirectoryPayload>;
 };
 
-export default function EventRsvpDirectory({ beaconId }: { beaconId: string }) {
+export default function EventRsvpDirectory({
+  beaconId,
+  allowPeek = false,
+}: {
+  beaconId: string;
+  allowPeek?: boolean;
+}) {
   const { user } = useAuth();
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const { data } = useSWR(user ? eventRsvpKey(beaconId) : null, fetcher);
 
-  if (!data?.current_user_signed_up || (data.attendees?.length ?? 0) === 0) return null;
+  if (!data?.attendees?.length) return null;
+  if (!allowPeek && !data.current_user_signed_up) return null;
+  const attendees = data.attendees;
 
   return (
     <div className="mt-5 border-t border-border-hard pt-4" data-testid="event-rsvp-directory">
       <p className="text-sm font-semibold text-on-surface">Who&apos;s going</p>
       <ul className="mt-3 space-y-2">
-        {data.attendees.map((person) => (
+        {attendees.map((person) => (
           <li key={person.user_id}>
             <button
               type="button"

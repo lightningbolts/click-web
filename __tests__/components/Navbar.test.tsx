@@ -3,9 +3,14 @@ import userEvent from "@testing-library/user-event";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 
-const navState: { pathname: string; user: { email: string; user_metadata: Record<string, string> } | null } = {
+const navState: {
+  pathname: string;
+  user: { email: string; user_metadata: Record<string, string> } | null;
+  loading: boolean;
+} = {
   pathname: "/about",
   user: null,
+  loading: false,
 };
 
 jest.mock("next/navigation", () => ({
@@ -17,6 +22,7 @@ jest.mock("@/lib/AuthContext", () => ({
   useAuth: () => ({
     user: navState.user,
     signOut: jest.fn(),
+    loading: navState.loading,
   }),
 }));
 
@@ -42,6 +48,7 @@ describe("Navbar", () => {
   beforeEach(() => {
     navState.pathname = "/about";
     navState.user = null;
+    navState.loading = false;
   });
 
   it("hides marketing chrome on insights routes", () => {
@@ -96,5 +103,12 @@ describe("Navbar", () => {
     await user.click(screen.getByRole("button", { name: /Ada Lovelace/i }));
     expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("nav-sign-out")).toBeInTheDocument();
+  });
+
+  it("holds the login slot while auth is loading instead of flashing Login", () => {
+    navState.loading = true;
+    renderNav();
+    expect(screen.getByTestId("nav-auth-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-login")).not.toBeInTheDocument();
   });
 });
