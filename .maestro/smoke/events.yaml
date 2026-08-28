@@ -6,9 +6,14 @@ tags:
 env:
   BASE_URL: http://localhost:3000
 ---
-- openLink: ${BASE_URL}/events
+# launchApp (not openLink): openLink opens a second window and Maestro
+# asserts against the leftover blank tab. See subflows/open_origin.yaml.
+- runFlow:
+    file: ../subflows/open_origin.yaml
+- launchApp:
+    appId: ${BASE_URL}/events
 - extendedWaitUntil:
-    visible: "Events"
+    visible:
+      id: event-page-shell
     timeout: 15000
-- assertVisible: "Events"
 - assertVisible: "Create event"

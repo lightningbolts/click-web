@@ -18,7 +18,13 @@ const loadUpcoming = () =>
   )();
 
 export default async function PublicEventsPage() {
-  const events = await loadUpcoming();
+  let events: Awaited<ReturnType<typeof loadPublicUpcomingEvents>> = [];
+  try {
+    events = await loadUpcoming();
+  } catch {
+    // CI / local without SUPABASE_SERVICE_ROLE_KEY still render the shell.
+    events = [];
+  }
 
   return (
     <EventPageShell className="py-10">
