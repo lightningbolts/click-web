@@ -32,7 +32,7 @@ jest.mock('@/lib/server/connectionWriteAuth', () => ({
 const BEACON_ID = '11111111-1111-4111-8111-111111111111';
 const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-function jsonRequest(url: string, init?: RequestInit) {
+function jsonRequest(url: string, init?: { method?: string; body?: string; headers?: Record<string, string> }) {
   return new NextRequest(url, init);
 }
 

@@ -54,7 +54,8 @@ describe('generateEventTeasers', () => {
     const forA = teasers.find((t) => t.recipient_user_id === 'a');
     expect(forA?.teaser_type).toBe('shared_interest');
     expect(forA?.payload.count).toBe(1);
-    expect(JSON.stringify(forA?.payload)).not.toMatch(/b|c|name/i);
+    expect(forA?.payload).toEqual({ count: 1, label: 'interest', shared_tag: 'Hiking' });
+    expect(JSON.stringify(forA?.payload)).not.toMatch(/userId|"a"|"b"|"c"/);
     expect(teaserHeadline(forA!.payload)).toMatch(/share your interest in Hiking/);
   });
 
