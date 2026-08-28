@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchTerrainElevationMeters } from '@/lib/server/terrainElevation';
 import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterContextTag';
 import {
   finiteNumber,
@@ -21,7 +20,6 @@ import type {
 export const DISPLAY_LOCATION_FALLBACK = 'A new city';
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
 const OPEN_METEO_TIMEOUT_MS = 3_500;
-const OPEN_ELEVATION_BIND_TIMEOUT_MS = 2_500;
 const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 
 export const PENDING_HANDSHAKE_SELECT =
@@ -207,7 +205,17 @@ function openMeteoCodeToIcon(code: number): string {
   return 'clear';
 }
 
-export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
+export type OpenMeteoForecast = {
+  weatherSnapshot: string | null;
+  elevationM: number | null;
+};
+
+/**
+ * One Open-Meteo forecast request: current weather plus DEM terrain AMSL (`elevation`).
+ * Prefer this over a second Open-Elevation hop for AGL.
+ */
+export async function fetchOpenMeteoForecast(lat: number, lon: number): Promise<OpenMeteoForecast> {
+  const empty: OpenMeteoForecast = { weatherSnapshot: null, elevationM: null };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
   try {
@@ -215,8 +223,9 @@ export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): P
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl';
     const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) return null;
+    if (!res.ok) return empty;
     const raw = (await res.json()) as {
+      elevation?: unknown;
       current?: {
         temperature_2m?: number;
         weather_code?: number;
@@ -225,32 +234,41 @@ export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): P
         pressure_msl?: number;
       };
     };
+    const elevationM =
+      typeof raw.elevation === 'number' && Number.isFinite(raw.elevation) ? raw.elevation : null;
     const cur = raw.current;
     if (cur == null || typeof cur.temperature_2m !== 'number' || !Number.isFinite(cur.temperature_2m)) {
-      return null;
+      return { weatherSnapshot: null, elevationM };
     }
     const code =
       typeof cur.weather_code === 'number' && Number.isFinite(cur.weather_code) ? cur.weather_code : 0;
-    return JSON.stringify({
-      iconCode: openMeteoCodeToIcon(code),
-      condition: openMeteoCodeToLabel(code),
-      windSpeedKph:
-        typeof cur.wind_speed_10m === 'number' && Number.isFinite(cur.wind_speed_10m)
-          ? cur.wind_speed_10m
-          : null,
-      pressureMslHpa:
-        typeof cur.pressure_msl === 'number' && Number.isFinite(cur.pressure_msl) ? cur.pressure_msl : null,
-      temperatureCelsius: cur.temperature_2m,
-      windDirectionDegrees:
-        typeof cur.wind_direction_10m === 'number' && Number.isFinite(cur.wind_direction_10m)
-          ? Math.round(cur.wind_direction_10m)
-          : null,
-    });
+    return {
+      elevationM,
+      weatherSnapshot: JSON.stringify({
+        iconCode: openMeteoCodeToIcon(code),
+        condition: openMeteoCodeToLabel(code),
+        windSpeedKph:
+          typeof cur.wind_speed_10m === 'number' && Number.isFinite(cur.wind_speed_10m)
+            ? cur.wind_speed_10m
+            : null,
+        pressureMslHpa:
+          typeof cur.pressure_msl === 'number' && Number.isFinite(cur.pressure_msl) ? cur.pressure_msl : null,
+        temperatureCelsius: cur.temperature_2m,
+        windDirectionDegrees:
+          typeof cur.wind_direction_10m === 'number' && Number.isFinite(cur.wind_direction_10m)
+            ? Math.round(cur.wind_direction_10m)
+            : null,
+      }),
+    };
   } catch {
-    return null;
+    return empty;
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
+  return (await fetchOpenMeteoForecast(lat, lon)).weatherSnapshot;
 }
 
 export async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
@@ -286,15 +304,7 @@ export async function fetchNominatimReverseGeocode(lat: number, lon: number): Pr
 }
 
 export async function fetchTerrainElevationM(lat: number, lon: number): Promise<number | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPEN_ELEVATION_BIND_TIMEOUT_MS);
-  try {
-    return await fetchTerrainElevationMeters(lat, lon);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await fetchOpenMeteoForecast(lat, lon)).elevationM;
 }
 
 export function pendingRowToHandshakeLite(row: PendingHandshakeRow): HandshakeRowLite {

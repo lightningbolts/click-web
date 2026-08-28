@@ -36,6 +36,7 @@ import type {
   ProximityMatchUserProfile,
   ProximitySensorPayloadJson,
 } from '@/types/supabase-json';
+import { fireEncounterGeoEnrichment } from '@/lib/server/proximity/encounterEnrichment';
 
 const PENDING_HANDSHAKE_SELECT =
   'id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at';
@@ -320,6 +321,32 @@ export async function confirmProximityHandshakeSelection(
     const memberLite = latestByUser.get(memberId);
     const memberLat = finiteNumber(memberLite?.lat) ?? lat;
     const memberLon = finiteNumber(memberLite?.lon) ?? lon;
+    const memberPayload = (
+      isRecord(memberLite?.sensor_payload) ? memberLite!.sensor_payload : {}
+    ) as ProximitySensorPayloadJson;
+    const memberBaro =
+      finiteNumber(memberPayload.exact_barometric_elevation_m) ??
+      finiteNumber(sensorPayload.exact_barometric_elevation_m);
+    const memberLocationName =
+      (typeof memberPayload.location_name === 'string' && memberPayload.location_name.trim()) ||
+      (typeof sensorPayload.location_name === 'string' && sensorPayload.location_name.trim()) ||
+      null;
+    const memberWeather =
+      (typeof memberPayload.weather_snapshot === 'string' && memberPayload.weather_snapshot.trim()) ||
+      (typeof sensorPayload.weather_snapshot === 'string' && sensorPayload.weather_snapshot.trim()) ||
+      null;
+    const fireGeo = () => {
+      fireEncounterGeoEnrichment(
+        admin,
+        connId,
+        memberId,
+        memberLat,
+        memberLon,
+        memberBaro,
+        memberLocationName,
+        memberWeather,
+      );
+    };
     const vibeTags = buildVibeContextTags({
       lux: finiteNumber(memberLite?.lux_level) ?? finiteNumber(hostRow.lux_level),
       selfMotion: finiteNumber(hostRow.motion_variance),
@@ -405,6 +432,7 @@ export async function confirmProximityHandshakeSelection(
             });
           }
           await admin.from('connection_encounters').update(patch).eq('id', recent.id);
+          fireGeo();
           return true;
         }
       }
@@ -416,6 +444,7 @@ export async function confirmProximityHandshakeSelection(
       console.warn('[proximity/confirm] encounter:', encErr.message);
       return false;
     }
+    fireGeo();
     return true;
   }
 

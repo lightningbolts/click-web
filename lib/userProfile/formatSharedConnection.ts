@@ -345,7 +345,7 @@ function extractStrictOriginElevation(origin: ProfileOriginEncounter): string | 
   const m =
     typeof origin.relativeAltitudeM === 'number' && Number.isFinite(origin.relativeAltitudeM)
       ? origin.relativeAltitudeM
-      : origin.exactBarometricElevationM;
+      : null;
   if (typeof m === 'number' && Number.isFinite(m)) parts.push(`${Math.round(m)} m`);
   return parts.length > 0 ? parts.join(' · ') : undefined;
 }

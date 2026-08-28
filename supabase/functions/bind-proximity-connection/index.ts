@@ -51,10 +51,10 @@ import {
   normalizeContextTagsArray,
   mergeContextTagLists,
   fetchOpenMeteoWeatherSnapshot,
+  fetchOpenMeteoForecast,
   fetchNominatimReverseGeocode,
   buildVibeContextTags,
   deriveHeightCategoryFromRelativeAltitudeM,
-  fetchTerrainElevationM,
 } from './bindSupport.ts';
 
 Deno.serve(async (req) => {
@@ -338,18 +338,13 @@ Deno.serve(async (req) => {
   let semanticLocation: Record<string, unknown> | null = null;
   let displayLocation = DISPLAY_LOCATION_FALLBACK;
   let specificLocationName: string | null = null;
+  let openMeteoForecast: { weatherSnapshot: string | null; elevationM: number | null } | null = null;
 
-  if (exactBarometricElevationM != null && encLat != null && encLon != null) {
-    try {
-      const terrainM = await fetchTerrainElevationM(encLat, encLon);
-      if (terrainM != null) {
-        relativeAltitudeM = exactBarometricElevationM - terrainM;
-      }
-    } catch {
-      relativeAltitudeM = null;
-    }
-  }
   if (encLat != null && encLon != null) {
+    openMeteoForecast = await fetchOpenMeteoForecast(encLat, encLon);
+    if (exactBarometricElevationM != null && openMeteoForecast.elevationM != null) {
+      relativeAltitudeM = exactBarometricElevationM - openMeteoForecast.elevationM;
+    }
     const geocoded = await fetchNominatimReverseGeocode(encLat, encLon);
     semanticLocation = geocoded.semanticLocation;
     displayLocation = geocoded.displayLocation;
@@ -611,6 +606,9 @@ Deno.serve(async (req) => {
     if (selfBattery != null) bindingInsertRow.battery_level = selfBattery;
 
     let resolvedWeather = clientWeatherSnapshot;
+    if (resolvedWeather == null && openMeteoForecast?.weatherSnapshot != null) {
+      resolvedWeather = openMeteoForecast.weatherSnapshot;
+    }
     if (resolvedWeather == null && encLat != null && encLon != null) {
       resolvedWeather = await fetchOpenMeteoWeatherSnapshot(encLat, encLon);
     }

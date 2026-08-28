@@ -112,8 +112,8 @@ export function encounterMetricPills(enc: ConnectionEncounterRow): { metricKey: 
     typeof enc.relativeAltitudeM === 'number' &&
     Number.isFinite(enc.relativeAltitudeM)
       ? enc.relativeAltitudeM
-      : enc.exactBarometricElevationM;
-  if (elRaw !== null && elRaw !== undefined && typeof elRaw === 'number' && Number.isFinite(elRaw)) {
+      : null;
+  if (elRaw !== null) {
     out.push({ metricKey: 'el', Icon: Mountain, label: `${Math.round(elRaw)} m` });
   }
   const luxRaw = enc.luxLevel;
