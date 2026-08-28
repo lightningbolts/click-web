@@ -1,7 +1,8 @@
 /**
  * Hourly maintenance (Supabase pg_cron — not Vercel):
  *   1. Click Drops reveal pushes after collaboration_ttl
- *   2. Event beacon day-of + 30-minutes-before reminders (via click-web /api/cron/event-reminders)
+ *   2. Event beacon day-of + 30-minutes-before reminders and Seed-a-Room teasers (via click-web /api/cron/event-reminders)
+ *   2b. Encounter reconnect / shared-event nudges (via click-web /api/cron/nudges-reconnect)
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
  *   4. Delete expired pending_handshakes (expires_at < now())
  *
@@ -321,7 +322,8 @@ Deno.serve(async (req: Request) => {
     const availability = await runAvailabilityMatchesViaWeb();
     const friction = await runFrictionIntentExpirations(admin);
     const pendingHandshakes = await runPendingHandshakesCleanup(admin);
-    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes };
+    const nudges = await runClickWebCron('/api/cron/nudges-reconnect', 'nudges-reconnect');
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,

@@ -14,6 +14,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  *   GET /api/cron/event-reminders
  *   GET /api/cron/availability-matches
  *   GET /api/cron/pending-handshakes-cleanup
+ *   GET /api/cron/nudges-reconnect
  *
  * Auth: Authorization: Bearer $CRON_SECRET
  */
@@ -26,12 +27,13 @@ export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const headers = { Authorization: `Bearer ${CRON_SECRET}` };
 
-  const [disposableRes, frictionRes, eventRes, availabilityRes, pendingRes] = await Promise.all([
+  const [disposableRes, frictionRes, eventRes, availabilityRes, pendingRes, nudgesRes] = await Promise.all([
     fetch(`${origin}/api/cron/disposable-reveal`, { headers, cache: 'no-store' }),
     fetch(`${origin}/api/cron/friction-intent-expirations`, { headers, cache: 'no-store' }),
     fetch(`${origin}/api/cron/event-reminders`, { headers, cache: 'no-store' }),
     fetch(`${origin}/api/cron/availability-matches`, { headers, cache: 'no-store' }),
     fetch(`${origin}/api/cron/pending-handshakes-cleanup`, { headers, cache: 'no-store' }),
+    fetch(`${origin}/api/cron/nudges-reconnect`, { headers, cache: 'no-store' }),
   ]);
 
   const disposable = await disposableRes.json().catch(() => ({ error: 'invalid json' }));
@@ -39,8 +41,16 @@ export async function GET(request: NextRequest) {
   const events = await eventRes.json().catch(() => ({ error: 'invalid json' }));
   const availability = await availabilityRes.json().catch(() => ({ error: 'invalid json' }));
   const pendingHandshakes = await pendingRes.json().catch(() => ({ error: 'invalid json' }));
+  const nudges = await nudgesRes.json().catch(() => ({ error: 'invalid json' }));
 
-  if (!disposableRes.ok || !frictionRes.ok || !eventRes.ok || !availabilityRes.ok || !pendingRes.ok) {
+  if (
+    !disposableRes.ok ||
+    !frictionRes.ok ||
+    !eventRes.ok ||
+    !availabilityRes.ok ||
+    !pendingRes.ok ||
+    !nudgesRes.ok
+  ) {
     return NextResponse.json(
       {
         ok: false,
@@ -49,6 +59,7 @@ export async function GET(request: NextRequest) {
         events: { status: eventRes.status, body: events },
         availability: { status: availabilityRes.status, body: availability },
         pendingHandshakes: { status: pendingRes.status, body: pendingHandshakes },
+        nudges: { status: nudgesRes.status, body: nudges },
       },
       { status: 500 },
     );
@@ -61,5 +72,6 @@ export async function GET(request: NextRequest) {
     events,
     availability,
     pendingHandshakes,
+    nudges,
   });
 }

@@ -6,6 +6,8 @@ export interface NotificationPreferences {
   eventReminderPushEnabled: boolean;
   availabilityMatchPushEnabled: boolean;
   hubMessagePushEnabled: boolean;
+  eventTeaserPushEnabled: boolean;
+  reconnectNudgePushEnabled: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -14,6 +16,8 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   eventReminderPushEnabled: true,
   availabilityMatchPushEnabled: true,
   hubMessagePushEnabled: true,
+  eventTeaserPushEnabled: true,
+  reconnectNudgePushEnabled: true,
 };
 
 function storageKey(userId: string) {
@@ -33,6 +37,8 @@ function coercePreferences(parsed: Partial<NotificationPreferences>): Notificati
     eventReminderPushEnabled: parsed.eventReminderPushEnabled ?? true,
     availabilityMatchPushEnabled: parsed.availabilityMatchPushEnabled ?? true,
     hubMessagePushEnabled: parsed.hubMessagePushEnabled ?? true,
+    eventTeaserPushEnabled: parsed.eventTeaserPushEnabled ?? true,
+    reconnectNudgePushEnabled: parsed.reconnectNudgePushEnabled ?? true,
   };
 }
 
@@ -72,7 +78,7 @@ export async function loadNotificationPreferences(
     const { data, error } = await supabase
       .from('notification_preferences')
       .select(
-        'message_push_enabled, call_push_enabled, event_reminder_push_enabled, availability_match_push_enabled, hub_message_push_enabled',
+        'message_push_enabled, call_push_enabled, event_reminder_push_enabled, availability_match_push_enabled, hub_message_push_enabled, event_teaser_push_enabled, reconnect_nudge_push_enabled',
       )
       .eq('user_id', userId)
       .maybeSingle();
@@ -87,6 +93,8 @@ export async function loadNotificationPreferences(
       eventReminderPushEnabled: data?.event_reminder_push_enabled ?? true,
       availabilityMatchPushEnabled: data?.availability_match_push_enabled ?? true,
       hubMessagePushEnabled: data?.hub_message_push_enabled ?? true,
+      eventTeaserPushEnabled: data?.event_teaser_push_enabled ?? true,
+      reconnectNudgePushEnabled: data?.reconnect_nudge_push_enabled ?? true,
     });
 
     writeLocalNotificationPreferences(userId, preferences);
@@ -120,6 +128,8 @@ export async function saveNotificationPreferences(
         event_reminder_push_enabled: preferences.eventReminderPushEnabled,
         availability_match_push_enabled: preferences.availabilityMatchPushEnabled,
         hub_message_push_enabled: preferences.hubMessagePushEnabled,
+        event_teaser_push_enabled: preferences.eventTeaserPushEnabled,
+        reconnect_nudge_push_enabled: preferences.reconnectNudgePushEnabled,
         updated_at: Date.now(),
       }, { onConflict: 'user_id' });
 

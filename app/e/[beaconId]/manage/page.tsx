@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { FcButton, FcCard, FcPageShell, FcSectionHeader } from "@/components/fc";
 import { eventShareUrl } from "@/lib/events/eventUrls";
+import GuestListUploadCard from "@/components/events/GuestListUploadCard";
 
 type GuestRow = { id: string; name: string; contact: string; created_at: string };
 type Health = {
@@ -63,8 +64,9 @@ export default function EventManagePage() {
   return (
     <FcPageShell className="px-4 py-10 md:px-8">
       <div className="mx-auto w-full max-w-3xl space-y-6">
-        <FcSectionHeader title="Event manage" subtitle="Organizer metrics and guest list." />
+        <FcSectionHeader title="Event manage" subtitle="Organizer metrics, guest list, and Seed a Room." />
         {error ? <p className="text-error">{error}</p> : null}
+        <GuestListUploadCard beaconId={beaconId} />
         <FcCard className="flex flex-wrap items-center gap-3 p-4">
           <code className="break-all text-xs text-on-surface-variant">{share}</code>
           <FcButton

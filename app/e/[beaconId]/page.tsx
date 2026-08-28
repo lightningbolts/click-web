@@ -18,6 +18,7 @@ import { APP_CONFIG } from "@/lib/config";
 import EventRsvpPanel from "@/components/events/EventRsvpPanel";
 import EventBackLink from "@/components/events/EventBackLink";
 import MutualAttendeesTeaser from "@/components/events/MutualAttendeesTeaser";
+import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
 import PinMapLazy from "@/components/maps/PinMapLazy";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
@@ -167,6 +168,7 @@ export default async function EventShareLandingPage({
             ) : null}
 
             <MutualAttendeesTeaser beaconId={beaconId} />
+            <SeedRoomTeaser beaconId={beaconId} />
             <div className="flex flex-col gap-3 sm:flex-row">
               <a href={eventDeepLink(beaconId)} className="inline-flex">
                 <FcButton type="button">Open in Click</FcButton>

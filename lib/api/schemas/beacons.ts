@@ -106,3 +106,21 @@ export const guestRsvpBodySchema = z.object({
   name: z.string().trim().min(1).max(80),
   contact: z.string().min(1),
 });
+
+export const guestListBodySchema = z.object({
+  source: z.enum(['csv', 'manual', 'instagram_import']).optional(),
+  csv_text: z.string().max(500_000).optional(),
+  entries: z
+    .array(
+      z.object({
+        email: z.string().optional().nullable(),
+        instagram_handle: z.string().optional().nullable(),
+      }),
+    )
+    .max(2000)
+    .optional(),
+});
+
+export const nudgeSnoozeBodySchema = z.object({
+  days: z.union([z.literal(7), z.literal(30)]).optional(),
+});

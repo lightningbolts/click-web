@@ -17,6 +17,11 @@ Server helpers for **public event microsites**, organizer auth, recap / network-
 | `formatEventWhen.ts` | Display strings for start/end |
 | `attendeeDirectory.ts` | People directory for authenticated viewers |
 | `connectionEventRecommendation.ts` | Suggest events from connection context |
+| `guestListParse.ts` | CSV/manual emails + optional Instagram column; SHA-256 email hashes |
+| `guestListMatch.ts` | Match hashes against `user_contact_hashes` |
+| `eventTeasers.ts` | Anonymized Seed-a-Room teasers among matched Click users |
+| `guestListService.ts` | Persist / rematch organizer guest lists |
+| `sharedEventNudges.ts` | Shared-upcoming-event nudges on RSVP/bookmark |
 
 ---
 
