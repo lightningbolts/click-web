@@ -93,7 +93,10 @@ describe("Navbar", () => {
     expect(create).toHaveClass("h-9");
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveClass("fc-btn-primary");
-    expect(screen.getByRole("button", { name: /Ada Lovelace/i })).toHaveClass("h-9");
+    const accountButton = screen.getByRole("button", { name: /Ada Lovelace/i });
+    expect(accountButton).toHaveClass("h-9");
+    expect(accountButton).toHaveClass("leading-snug");
+    expect(accountButton).not.toHaveClass("leading-none");
   });
 
   it("opens a user menu with dashboard and sign out", async () => {

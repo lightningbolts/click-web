@@ -12,7 +12,7 @@ export default function DemoQr({ size = 200 }: { size?: number }) {
         size={size}
         level="M"
         bgColor="#121212"
-        fgColor="#630ed4"
+        fgColor="#7c3aed"
         marginSize={0}
         title={`Click QR Code for ${DEMO_USER_NAME}`}
       />

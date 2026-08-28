@@ -78,4 +78,32 @@ describe("EventListCard", () => {
     );
     expect(screen.getAllByText("Campus picnic")).toHaveLength(1);
   });
+
+  it("shows title before date and past-tense RSVP count", () => {
+    render(
+      <EventListCard
+        event={{
+          beacon_id: "44444444-4444-4444-8444-444444444444",
+          title: "Alumni mixer",
+          description: null,
+          image_url: null,
+          host_name: null,
+          event_start_at: "2020-01-01T18:00:00.000Z",
+          event_end_at: "2020-01-01T21:00:00.000Z",
+          location_name: null,
+          rsvp_count: 4,
+          rsvp_enabled: true,
+        }}
+        past
+      />,
+    );
+
+    const card = screen.getByTestId("event-list-card");
+    const title = screen.getByText("Alumni mixer");
+    const date = screen.getByText(/Jan/i);
+    expect(card.textContent?.indexOf(title.textContent ?? "")).toBeLessThan(
+      card.textContent?.indexOf(date.textContent ?? "") ?? 0,
+    );
+    expect(screen.getByText("4 went")).toBeInTheDocument();
+  });
 });

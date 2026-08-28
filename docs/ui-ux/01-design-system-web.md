@@ -1,13 +1,13 @@
 # Design System — Functional Clarity (Web)
 
-**Visual system:** Neo-brutalist Functional Clarity — opaque surfaces, 1px outline-variant borders, primary `#630ed4`, secondary `#224CFF`, no glass/blur/gradients.  
+**Visual system:** Neo-brutalist Functional Clarity — opaque surfaces, 1px outline-variant borders, interactive accent `#7c3aed`, no glass/blur/gradients on chrome.
 **Mobile source of truth:** [`click/docs/design-assets/functional_clarity/DESIGN.md`](../../../click/docs/design-assets/functional_clarity/DESIGN.md), [`Color.kt`](../../../click/composeApp/src/commonMain/kotlin/compose/project/click/click/ui/theme/Color.kt)  
 **Web tokens:** [`app/globals.css`](../../app/globals.css) — use `@theme` (not `@theme inline`) so light/dark can override `--color-*` at runtime.  
 **Primitives:** [`components/fc/`](../../components/fc/)  
 **Theme:** [`lib/theme/ThemeProvider.tsx`](../../lib/theme/ThemeProvider.tsx)  
 **Surfaces:** [02 landing](./02-landing.md) · [03 dashboard](./03-dashboard.md) · [04 insights](./04-insights.md) · [05 events](./05-events.md)
 
-Mobile Compose now matches these quiet 1dp borders and secondary `#224CFF`. Reuse `components/fc/` (`FcCard`, `FcButton`, `FcInput`, `FcTextarea`, `FcChip`) instead of one-off chrome.
+Mobile Compose shares these quiet 1dp borders and the same single interactive accent. Reuse `components/fc/` (`FcCard`, `FcButton`, `FcInput`, `FcTextarea`, `FcChip`) instead of one-off chrome.
 
 ---
 
@@ -16,7 +16,7 @@ Mobile Compose now matches these quiet 1dp borders and secondary `#224CFF`. Reus
 1. De-AI-ified — no ethereal gradients, synthetic glows, glassmorphism, or neon text-shadow.
 2. Neo-brutal + modern minimal — solid fills, heavy Manrope hierarchy, modular bordered panels.
 3. Quiet edges — 1px structural borders in outline-variant; no soft elevation shadows on product chrome. Keep 2px only for focus/selected primary rings.
-4. Primary purple for brand/CTA/active — `#630ED4`. Secondary blue `#224CFF` for events/map emphasis, playground pins/RSVP, and non-CTA text-link hover — not a second primary button.
+4. **One interactive accent** — `#7C3AED` (`primary`) for brand, CTAs, active nav, text links, map pins/clusters, and selected pills. Use Tailwind `text-primary` / `bg-primary` / `border-primary` / `ring-primary`; inline HTML/CSS uses `var(--color-primary)`; raw `#7c3aed` only where APIs cannot consume classes (MapLibre paint, canvas/Recharts series, manifest `theme_color`, SSR CSS-var fallbacks). `secondary` tokens alias the purple family or neutral surfaces — never a second blue interactive accent.
 5. Manrope only — hierarchy via size/weight (no Space Grotesk).
 6. Min 14px body/label text.
 7. Depth via tone — surface tiers, not blur.
@@ -27,14 +27,14 @@ Mobile Compose now matches these quiet 1dp borders and secondary `#224CFF`. Reus
 
 | Token | Light | Dark |
 |-------|-------|------|
-| `primary` | `#630ed4` | `#630ed4` |
+| `primary` | `#7c3aed` | `#7c3aed` |
 | `on-primary` | `#ffffff` | `#ffffff` |
-| `primary-container` | `#7c3aed` | `#7c3aed` |
-| `on-primary-container` | `#ede0ff` | `#ede0ff` |
-| `secondary` | `#224cff` | `#224cff` |
+| `primary-container` | `#ede9fe` | `#2e1065` |
+| `on-primary-container` | `#5b21b6` | `#ede9fe` |
+| `secondary` | `#6d28d9` | `#6d28d9` |
 | `on-secondary` | `#ffffff` | `#ffffff` |
-| `secondary-container` | `#e8edff` | `#1a2a6e` |
-| `on-secondary-container` | `#0d1f73` | `#d6e0ff` |
+| `secondary-container` | `#f3e8ff` | `#3b0764` |
+| `on-secondary-container` | `#5b21b6` | `#ddd6fe` |
 | `background` | `#f9f9f9` | `#120e18` |
 | `surface` | `#ffffff` | `#1c1526` |
 | `surface-container` | `#eeeeee` | `#2a2138` |
@@ -89,8 +89,8 @@ Signed-in product routes (`/` dashboard, `/dashboard`, `/insights/*`) use [`Prod
 
 | Legacy | Replace with |
 |--------|----------------|
-| `#8338EC` | `--primary` `#630ed4` |
-| `#3A86FF` | `--secondary` `#224cff` (events/map/link hover only) |
+| `#8338EC`, `#630ed4` | `--color-primary` `#7c3aed` |
+| `#224cff`, `#3A86FF` | Remove from interactive chrome; decorative entity gradients may still include blue stops via `generateCardVisual.ts` |
 | `.glass`, `.glass-panel`, `GlassPanel` | `FcCard` / `.fc-card` |
 | `.glow-violet`, `.glow-blue`, `.text-neon-*` | Remove |
 | `.text-gradient`, `.gradient-border` | Solid `on-surface` / `primary` |
@@ -115,7 +115,7 @@ Chrome has no gradients. **Content identity does**, and it is the single excepti
 Rules:
 
 - **Seed with the raw entity id** (`beacon.id`), never a list-key prefix like `saved-${id}`, or the same beacon will look different in a list than on its pin.
-- **Never hand-roll a gradient** for an entity (no `hsl()` from a label hash, no hardcoded `linear-gradient(#630ed4, #224cff)`). Go through `cardVisualStyle` / `CardVisualHero` so the pattern layer and the contrast scrim come along.
+- **Never hand-roll a gradient** for an entity (no `hsl()` from a label hash, no hardcoded `linear-gradient(#7c3aed, #224cff)`). Go through `cardVisualStyle` / `CardVisualHero` so the pattern layer and the contrast scrim come along.
 - The palette is **seven hue families** (purple, blue, teal, coral, gold, magenta, green) with purple as the heaviest bucket. It is *not* the chrome accent ratio; do not re-couple them.
 - `contentScrim` is chosen by a **WCAG 4.5:1 search** against every gradient stop. Always render it behind text on a generated surface.
 - **A hero band is decorative.** `CardVisualHero` renders at most a short `chipLabel`; title, date, and location belong to the structured content below, never both.
@@ -124,6 +124,6 @@ Rules:
 
 ## Do / don’t
 
-**Do:** use CSS variables and `Fc*` primitives; keep web density for tables/charts; switch MapLibre light/dark styles with theme; use `secondary` for events, map pins, and text-link hover; route entity gradients through `CardVisualHero` / `cardVisualStyle`.
+**Do:** use CSS variables and `Fc*` primitives; keep web density for tables/charts; switch MapLibre light/dark styles with theme; use `primary` (`#7c3aed`) for all interactive accent; route entity gradients through `CardVisualHero` / `cardVisualStyle`.
 
-**Don’t:** reintroduce glass, neon glows, gradient text, or a second primary CTA color. Don’t fork mobile Compose tokens from this web border/accent change. Don’t invent a per-component gradient for an entity, and don’t repeat a hero's title in the content below it.
+**Don’t:** reintroduce glass, neon glows, gradient text, hardcoded legacy purple/blue on chrome, or a second interactive accent. Don’t fork mobile Compose tokens from this web border/accent change. Don’t invent a per-component gradient for an entity, and don’t repeat a hero's title in the content below it.

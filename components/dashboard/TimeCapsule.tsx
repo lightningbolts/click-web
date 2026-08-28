@@ -21,6 +21,7 @@ import {
   Activity,
 } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
+import { pluralize } from '@/lib/format/pluralize';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { formatDetailedEncounterLocation } from '@/lib/location/detailedEncounterLocation';
 import { CardVisualHero } from '@/components/ui/CardVisualSurface';
@@ -175,7 +176,9 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
           </div>
           <div>
             <h3 className="font-semibold text-on-surface">Time Capsule</h3>
-            <p className="text-xs text-on-surface-variant">{chapters.length} chapters in your journey</p>
+            <p className="text-xs text-on-surface-variant">
+              {pluralize(chapters.length, 'chapter')} in your journey
+            </p>
           </div>
         </div>
         
@@ -189,6 +192,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                 ? 'border-border-hard text-on-surface-variant hover:border-primary hover:text-on-surface' 
                 : 'border-border-hard text-outline cursor-not-allowed'
             }`}
+            aria-label="Scroll timeline left"
+            title="Scroll left"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -200,6 +205,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                 ? 'border-border-hard text-on-surface-variant hover:border-primary hover:text-on-surface' 
                 : 'border-border-hard text-outline cursor-not-allowed'
             }`}
+            aria-label="Scroll timeline right"
+            title="Scroll right"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -243,7 +250,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                       background:
                         chapter.color ??
                         `linear-gradient(135deg, ${chapterVisual(chapter.id).gradient.join(', ')})`,
-                      boxShadow: '0 0 12px rgba(131, 56, 236, 0.5)',
+                      boxShadow: '0 0 12px rgba(124, 58, 237, 0.5)',
                     }}
                   />
                 </div>
@@ -287,7 +294,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                     <div className="flex items-center gap-4 text-sm">
                       <div className="flex items-center gap-1 text-on-surface-variant">
                         <Users className="h-4 w-4" />
-                        <span>{chapter.connectionCount} connections</span>
+                        <span>{pluralize(chapter.connectionCount, 'connection')}</span>
                       </div>
                       {chapter.location && (
                         <div className="flex items-center gap-1 text-on-surface-variant">
@@ -440,7 +447,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                             {conn.encounters && conn.encounters.length > 1 ? (
                               <div className="mt-2 space-y-1.5 border-t border-border-hard/60 pt-2">
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">
-                                  You&apos;ve crossed paths {conn.encounters.length} times
+                                  You&apos;ve crossed paths {pluralize(conn.encounters.length, 'time', 'times')}
                                 </p>
                                 <ul className="scrollbar-thin max-h-36 space-y-1 overflow-y-auto pr-1">
                                   {conn.encounters.map((enc) => (

@@ -491,7 +491,7 @@ export default function LiveConnectionTicker() {
                     type="button"
                     onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
                     disabled={!canPrev || pageLoading}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border-hard/80 text-on-surface-variant transition hover:border-[#630ed4]/50 hover:text-on-surface disabled:pointer-events-none disabled:opacity-30"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border-hard/80 text-on-surface-variant transition hover:border-primary/50 hover:text-on-surface disabled:pointer-events-none disabled:opacity-30"
                     aria-label="Previous page"
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -500,7 +500,7 @@ export default function LiveConnectionTicker() {
                     type="button"
                     onClick={() => setPageIndex((p) => p + 1)}
                     disabled={!canNext || pageLoading}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border-hard/80 text-on-surface-variant transition hover:border-[#630ed4]/50 hover:text-on-surface disabled:pointer-events-none disabled:opacity-30"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border-hard/80 text-on-surface-variant transition hover:border-primary/50 hover:text-on-surface disabled:pointer-events-none disabled:opacity-30"
                     aria-label="Next page"
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -528,7 +528,7 @@ export default function LiveConnectionTicker() {
                       className="fc-card rounded-2xl border border-border-hard/70 bg-surface-container/40 px-4 py-3.5 shadow-inner shadow-black/20"
                     >
                       <p className="text-sm leading-relaxed text-on-surface sm:text-[15px]">
-                        <span className="text-[#630ed4]" aria-hidden>
+                        <span className="text-primary" aria-hidden>
                           ⚡{' '}
                         </span>
                         {formatTickerLine(c)}

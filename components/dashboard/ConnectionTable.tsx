@@ -269,7 +269,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onExport}
-          className="flex items-center gap-2 px-4 py-2 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl text-sm font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 rounded-xl text-sm font-medium text-on-primary transition-colors"
         >
           <Download className="w-4 h-4" />
           Export to CSV
@@ -285,7 +285,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
             placeholder="Search by name, location, event, weather, or noise..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-[#630ed4] transition-colors text-sm"
+            className="w-full pl-10 pr-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors text-sm"
           />
         </div>
         
@@ -294,7 +294,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-[#630ed4] transition-colors text-sm appearance-none cursor-pointer"
+            className="px-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="kept">Kept</option>
@@ -390,7 +390,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                               e.stopPropagation();
                               onOpenProfile(peerId, connection.id);
                             }}
-                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#630ed4]"
+                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             aria-label={`View ${connection.name}'s profile`}
                           >
                             <ConnectionPeerAvatar
@@ -410,7 +410,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                         )}
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="font-medium text-on-surface group-hover:text-[#630ed4] transition-colors leading-snug truncate">
+                            <p className="font-medium text-on-surface group-hover:text-primary transition-colors leading-snug truncate">
                               {connection.name}
                             </p>
                             {connection.intentOverlapLabel ? (
@@ -461,7 +461,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                     <td className="px-4 py-4 align-top">
                       <button
                         onClick={(e) => { e.stopPropagation(); onSelect?.(connection); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-[#630ed4]/10 hover:bg-[#630ed4]/20 border border-[#630ed4]/30 rounded-xl text-xs text-[#630ed4] font-medium"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl text-xs text-primary font-medium"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
                         Chat

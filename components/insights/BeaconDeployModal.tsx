@@ -148,7 +148,7 @@ export default function BeaconDeployModal({
               <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-border-hard">
                 <div>
                   <Dialog.Title className="text-lg font-semibold text-on-surface flex items-center gap-2">
-                    <Radio className="w-5 h-5 text-[#630ed4]" />
+                    <Radio className="w-5 h-5 text-primary" />
                     Deploy beacon
                   </Dialog.Title>
                   <Dialog.Description className="text-xs text-on-surface-variant mt-1 leading-relaxed">
@@ -245,7 +245,7 @@ export default function BeaconDeployModal({
                           onClick={() => setDurationMinutes(p.minutes)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                             durationMinutes === p.minutes
-                              ? "border-[#630ed4]/50 bg-[#630ed4]/20 text-on-surface"
+                              ? "border-primary/50 bg-primary/20 text-on-surface"
                               : "border-border-hard bg-surface-container text-on-surface-variant hover:border-border-hard"
                           }`}
                         >

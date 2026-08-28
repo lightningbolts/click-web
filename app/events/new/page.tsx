@@ -15,7 +15,7 @@ export default function NewEventPage() {
     <EventPageShell className="py-10">
       <FcSectionHeader
         title="Create event"
-        subtitle="Public events appear on /events. Unlisted and invite-only stay off the feed but keep their share link."
+        subtitle="Set the details, location, and schedule for your event."
       />
       {user ? (
         <EventCreateForm />

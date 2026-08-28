@@ -8,7 +8,7 @@ import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 
 const mockSignOut = jest.fn();
 jest.mock('@/lib/AuthContext', () => ({
-  useAuth: () => ({ signOut: mockSignOut }),
+  useAuth: () => ({ signOut: mockSignOut, profileImageUrl: null }),
 }));
 
 jest.mock('@/lib/supabase', () => ({
@@ -138,6 +138,14 @@ jest.mock('@/lib/dashboard/userMetrics', () => ({
     reward: 'Badge',
   })),
   getUnlockedAchievements: jest.fn(() => []),
+  getAllAchievements: jest.fn(() => [
+    {
+      id: 'first_connection',
+      title: 'First Connection',
+      description: 'Met someone on Click',
+      unlocked: false,
+    },
+  ]),
 }));
 
 /* ------------------------------------------------------------------ */
@@ -244,11 +252,10 @@ describe('DashboardView', () => {
     expect(screen.getByTestId('connection-table')).toBeInTheDocument();
   });
 
-  it('shows "No achievements yet" when the achievements list is empty', async () => {
+  it('lists achievement badges on the Memory Box tab', async () => {
     await renderDashboard();
-    expect(
-      await screen.findByText(/No achievements yet/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Achievements')).toBeInTheDocument();
+    expect(screen.getByTestId('achievement-badge')).toHaveTextContent('First Connection');
   });
 
   it('renders the data sovereignty notice', async () => {

@@ -8,9 +8,9 @@ import { loadPublicEventPayload } from "@/lib/events/publicEvent";
 import {
   EVENT_BEACON_UUID_RE,
   eventDisplayTitle,
+  eventIsPast,
   eventSubtitle,
   eventWhereLabel,
-  isEventEnded,
 } from "@/lib/events/eventMetadata";
 import { eventDeepLink, eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
 import { formatEventPostedAt, formatEventWhen } from "@/lib/events/formatEventWhen";
@@ -19,7 +19,6 @@ import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { APP_CONFIG } from "@/lib/config";
 import EventRsvpPanel from "@/components/events/EventRsvpPanel";
 import EventBackLink from "@/components/events/EventBackLink";
-import MutualAttendeesTeaser from "@/components/events/MutualAttendeesTeaser";
 import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
 import EventHostRow from "@/components/events/EventHostRow";
@@ -27,6 +26,10 @@ import EventGuestPreview from "@/components/events/EventGuestPreview";
 import EventPageShell from "@/components/events/EventPageShell";
 import PinMapLazy from "@/components/maps/PinMapLazy";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
+import {
+  shouldShowEventFullCard,
+  shouldShowEventRsvpPanel,
+} from "@/lib/events/eventDetailState";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +87,7 @@ export default async function EventShareLandingPage({
   const when = formatEventWhen(event.event_start_at, event.event_end_at, event.timezone);
   const where = eventWhereLabel(event.location_name);
   const posted = formatEventPostedAt(event.created_at);
-  const ended = isEventEnded({
+  const ended = eventIsPast({
     event_end_at: event.event_end_at,
     event_start_at: event.event_start_at,
   });
@@ -94,11 +97,17 @@ export default async function EventShareLandingPage({
     ? `https://maps.google.com/?q=${event.latitude},${event.longitude}`
     : null;
   const shareUrl = eventShareUrl(beaconId, publicOrigin());
+  const reportMailto = `mailto:mepsht@uw.edu?subject=${encodeURIComponent(`Report event ${beaconId}`)}&body=${encodeURIComponent(`Event ID: ${beaconId}\nURL: ${shareUrl}\n\nDescribe the issue:\n`)}`;
   const viewerRsvp = showRsvp || ended ? await loadViewerEventRsvp(beaconId) : { kind: "unknown" as const };
   const going = viewerRsvp.kind === "member" && viewerRsvp.going;
   const requestStatus = viewerRsvp.kind === "member" ? viewerRsvp.request_status : null;
   const atCapacity =
     event.listing.event_capacity != null && event.rsvp_count >= event.listing.event_capacity;
+  const showFullCard = shouldShowEventFullCard({ atCapacity, going, requestStatus, ended });
+  const showRsvpPanel = shouldShowEventRsvpPanel({
+    rsvpEnabled: event.rsvp_enabled,
+    ended,
+  });
 
   return (
     <EventPageShell className="py-8 md:py-12">
@@ -132,7 +141,7 @@ export default async function EventShareLandingPage({
               />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex gap-3">
-                  <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
+                  <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" />
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">When</p>
                     <p className={when ? "text-sm font-semibold text-on-surface" : "text-sm text-on-surface-variant"}>
@@ -142,12 +151,12 @@ export default async function EventShareLandingPage({
                 </div>
                 {where ? (
                   <div className="flex gap-3">
-                    <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
+                    <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" />
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Where</p>
                       <p className="text-sm font-semibold text-on-surface">{where}</p>
                       {mapsUrl ? (
-                        <a href={mapsUrl} className="text-sm font-semibold text-secondary hover:underline">
+                        <a href={mapsUrl} className="text-sm font-semibold text-primary hover:underline">
                           Open in Google Maps
                         </a>
                       ) : null}
@@ -162,6 +171,7 @@ export default async function EventShareLandingPage({
                   count={event.rsvp_count}
                   listing={event.listing}
                   creatorId={event.creator_id}
+                  past={ended}
                 />
               ) : null}
               {description ? (
@@ -172,6 +182,11 @@ export default async function EventShareLandingPage({
                   {description}
                 </p>
               ) : null}
+              <p className="text-sm">
+                <a href={reportMailto} className="font-semibold text-on-surface-variant hover:text-on-surface hover:underline">
+                  Report event
+                </a>
+              </p>
             </FcCard>
 
             {hasPin ? (
@@ -182,13 +197,12 @@ export default async function EventShareLandingPage({
                     id: beaconId,
                     lat: event.latitude as number,
                     lng: event.longitude as number,
-                    label: event.location_name?.trim() || title,
+                    label: where || title,
                   },
                 ]}
               />
             ) : null}
 
-            <MutualAttendeesTeaser beaconId={beaconId} />
             <SeedRoomTeaser beaconId={beaconId} />
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
@@ -202,7 +216,7 @@ export default async function EventShareLandingPage({
                     href={APP_CONFIG.ios_store_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-secondary hover:underline"
+                    className="font-semibold text-primary hover:underline"
                   >
                     Get the app
                   </a>
@@ -211,7 +225,7 @@ export default async function EventShareLandingPage({
                     href={APP_CONFIG.android_store_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-secondary hover:underline"
+                    className="font-semibold text-primary hover:underline"
                   >
                     Android
                   </a>
@@ -220,44 +234,20 @@ export default async function EventShareLandingPage({
               <EventCopyLinkButton url={shareUrl} icon />
             </div>
             <p>
-              <Link href="/events" className="text-sm font-semibold text-secondary hover:underline">
+              <Link href="/events" className="text-sm font-semibold text-primary hover:underline">
                 Browse public events
               </Link>
             </p>
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-24">
-            {ended ? (
-              <FcCard className="p-6">
-                <h2 className="text-lg font-bold text-on-surface">This event has ended</h2>
-                <p className="mt-2 text-sm text-on-surface-variant">Open in Click for recap and connections.</p>
-              </FcCard>
-            ) : null}
-            {going ? (
-              <FcCard className="p-6" data-testid="event-state-going">
-                <h2 className="text-lg font-bold text-on-surface">You&apos;re going</h2>
-                <p className="mt-2 text-sm text-on-surface-variant">Your Click profile is on the guest list.</p>
-              </FcCard>
-            ) : null}
-            {requestStatus === "pending" ? (
-              <FcCard className="p-6" data-testid="event-state-pending">
-                <h2 className="text-lg font-bold text-on-surface">Approval pending</h2>
-                <p className="mt-2 text-sm text-on-surface-variant">The host is reviewing your request.</p>
-              </FcCard>
-            ) : null}
-            {requestStatus === "waitlisted" || (atCapacity && !going && requestStatus !== "pending") ? (
+            {showFullCard ? (
               <FcCard className="p-6" data-testid="event-state-full">
-                <h2 className="text-lg font-bold text-on-surface">
-                  {requestStatus === "waitlisted" ? "You're on the waitlist" : "This event is full"}
-                </h2>
-                <p className="mt-2 text-sm text-on-surface-variant">
-                  {requestStatus === "waitlisted"
-                    ? "We'll confirm you if a spot opens."
-                    : "Ask the host about the waitlist."}
-                </p>
+                <h2 className="text-lg font-bold text-on-surface">This event is full</h2>
+                <p className="mt-2 text-sm text-on-surface-variant">Ask the host about the waitlist.</p>
               </FcCard>
             ) : null}
-            {showRsvp ? (
+            {showRsvpPanel ? (
               <FcCard className="p-6">
                 <EventRsvpPanel
                   beaconId={beaconId}
@@ -266,7 +256,7 @@ export default async function EventShareLandingPage({
                   eventEnded={ended}
                 />
               </FcCard>
-            ) : ended ? null : (
+            ) : (
               <FcCard className="p-6">
                 <h2 className="text-lg font-bold text-on-surface">RSVP closed</h2>
                 <p className="mt-2 text-sm text-on-surface-variant">Open in Click for recap and connections.</p>

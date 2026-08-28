@@ -88,7 +88,7 @@ export default function ChatThemeAudioPlayer({
 
   const shell =
     variant === 'mine'
-      ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.06] border border-white/25 shadow-[0_4px_24px_rgba(131,56,236,0.25)]'
+      ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.06] border border-white/25 shadow-[0_4px_24px_rgba(124,58,237,0.25)]'
       : 'bg-surface border border-border-hard';
 
   const timeClass =

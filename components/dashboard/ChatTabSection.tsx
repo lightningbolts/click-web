@@ -277,7 +277,7 @@ export function ChatTabSection({
             {chatListTab === 'active' ? (
               <motion.span
                 layoutId="chatListTabPill"
-                className="absolute inset-0 rounded-xl border border-primary/35 bg-[linear-gradient(135deg,rgba(131,56,236,0.28),rgba(58,134,255,0.18))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(131,56,236,0.16)]"
+                className="absolute inset-0 rounded-xl border border-primary/35 bg-[linear-gradient(135deg,rgba(124,58,237,0.28),rgba(124,58,237,0.12))] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_10px_30px_rgba(124,58,237,0.16)]"
                 transition={{ type: 'spring', stiffness: 380, damping: 32 }}
               />
             ) : null}
@@ -359,7 +359,7 @@ export function ChatTabSection({
                       <motion.div
                         role="button"
                         tabIndex={0}
-                        whileHover={{ backgroundColor: 'rgba(131, 56, 236, 0.05)' }}
+                        whileHover={{ backgroundColor: 'rgba(124, 58, 237, 0.05)' }}
                         whileTap={{ scale: 0.995 }}
                         onClick={() => {
                           if (suppressClickConnectionId === conn.id) {

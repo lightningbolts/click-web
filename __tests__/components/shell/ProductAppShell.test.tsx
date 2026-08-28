@@ -83,4 +83,10 @@ describe("ProductAppShell", () => {
     expect(screen.getByTestId("insights-nav-heatmap")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("insights-nav-overview")).not.toHaveAttribute("aria-current");
   });
+
+  it("renders the user avatar beside the sidebar label when provided", () => {
+    renderShell({ userLabel: "Alice", userAvatarUrl: "https://cdn.example/avatar.png" });
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-chrome").querySelector('img[src="https://cdn.example/avatar.png"]')).toBeTruthy();
+  });
 });

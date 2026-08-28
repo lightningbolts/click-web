@@ -6,7 +6,6 @@ import { FcButton } from "@/components/fc";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import GuestRsvpForm from "@/components/events/GuestRsvpForm";
-import EventRsvpDirectory from "@/components/events/EventRsvpDirectory";
 import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
 import type { ViewerEventRsvpSnapshot } from "@/lib/events/viewerEventGoing";
 import type { EventListingOptions } from "@/lib/events/eventOptions";
@@ -123,39 +122,87 @@ export default function EventRsvpPanel({
     );
   }
 
-  const ctaLabel = listing?.approval_required && !going ? "Request to join" : "RSVP";
-  const helper =
-    eventEnded
-      ? "This event has ended."
-      : requestStatus === "pending"
-        ? "Your request is waiting for host approval."
-        : requestStatus === "waitlisted"
-          ? "This event is full. You're on the waitlist."
-          : going
-            ? "You're going. Your Click profile is already on the list."
-            : listing?.approval_required
-              ? "The host approves guests before they join."
-              : "RSVP with this Click account. No name or email needed.";
+  if (eventEnded) {
+    return (
+      <div data-testid="account-rsvp-panel">
+        <h2 className="text-lg font-bold text-on-surface">This event has ended</h2>
+        <p className="mt-2 text-sm text-on-surface-variant">Open in Click for recap and connections.</p>
+      </div>
+    );
+  }
+
+  if (going) {
+    return (
+      <div data-testid="event-state-going">
+        <h2 className="text-lg font-bold text-on-surface">You&apos;re going</h2>
+        <p className="mb-4 mt-1 text-sm text-on-surface-variant">
+          Your Click profile is on the guest list.
+        </p>
+        <FcButton
+          type="button"
+          variant="secondary"
+          className="w-full"
+          onClick={() => void cancel()}
+          disabled={status === "saving" || !user}
+        >
+          {status === "saving" ? "Saving…" : "Cancel RSVP"}
+        </FcButton>
+        {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}
+      </div>
+    );
+  }
+
+  if (requestStatus === "pending") {
+    return (
+      <div data-testid="event-state-pending">
+        <h2 className="text-lg font-bold text-on-surface">Approval pending</h2>
+        <p className="mb-4 mt-1 text-sm text-on-surface-variant">The host is reviewing your request.</p>
+        <FcButton
+          type="button"
+          variant="secondary"
+          className="w-full"
+          onClick={() => void cancel()}
+          disabled={status === "saving" || !user}
+        >
+          {status === "saving" ? "Saving…" : "Withdraw request"}
+        </FcButton>
+        {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}
+      </div>
+    );
+  }
+
+  if (requestStatus === "waitlisted") {
+    return (
+      <div data-testid="event-state-full">
+        <h2 className="text-lg font-bold text-on-surface">You&apos;re on the waitlist</h2>
+        <p className="mb-4 mt-1 text-sm text-on-surface-variant">We&apos;ll confirm you if a spot opens.</p>
+        <FcButton
+          type="button"
+          variant="secondary"
+          className="w-full"
+          onClick={() => void cancel()}
+          disabled={status === "saving" || !user}
+        >
+          {status === "saving" ? "Saving…" : "Withdraw request"}
+        </FcButton>
+        {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}
+      </div>
+    );
+  }
+
+  const ctaLabel = listing?.approval_required ? "Request to join" : "RSVP";
+  const helper = listing?.approval_required
+    ? "The host approves guests before they join."
+    : "RSVP with this Click account. No name or email needed.";
 
   return (
     <div data-testid="account-rsvp-panel">
       <h2 className="text-lg font-bold text-on-surface">RSVP</h2>
       <p className="mb-4 mt-1 text-sm text-on-surface-variant">{helper}</p>
-      {eventEnded ? null : going || requestStatus === "pending" || requestStatus === "waitlisted" ? (
-        <FcButton type="button" variant="secondary" className="w-full" onClick={() => void cancel()} disabled={status === "saving" || !user}>
-          {status === "saving" ? "Saving…" : going ? "Cancel RSVP" : "Withdraw request"}
-        </FcButton>
-      ) : (
-        <FcButton type="button" className="w-full" onClick={() => void rsvp()} disabled={status === "saving" || !user}>
-          {status === "saving" ? "Saving…" : ctaLabel}
-        </FcButton>
-      )}
+      <FcButton type="button" className="w-full" onClick={() => void rsvp()} disabled={status === "saving" || !user}>
+        {status === "saving" ? "Saving…" : ctaLabel}
+      </FcButton>
       {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}
-      {going && listing?.guest_list_visibility !== "hosts_only" ? (
-        <EventRsvpDirectory beaconId={beaconId} />
-      ) : going ? (
-        <p className="mt-3 text-sm text-on-surface-variant">Guest list is private to hosts.</p>
-      ) : null}
     </div>
   );
 }

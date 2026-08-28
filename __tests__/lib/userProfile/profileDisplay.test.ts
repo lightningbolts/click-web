@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { encounterMetricPills } from '@/lib/userProfile/profileDisplay';
+import { encounterMetricPills, ageFromBirthday } from '@/lib/userProfile/profileDisplay';
 import type { ConnectionEncounterRow } from '@/lib/dashboard/connectionEncounters';
 
 function enc(partial: Partial<ConnectionEncounterRow>): ConnectionEncounterRow {
@@ -31,5 +31,38 @@ describe('encounterMetricPills elevation', () => {
     );
     expect(pills.some((p) => p.metricKey === 'el')).toBe(false);
     expect(pills.some((p) => p.metricKey === 'el-cat' && p.label === 'Ground level')).toBe(true);
+  });
+});
+
+describe('ageFromBirthday', () => {
+  const today = new Date('2026-08-28T12:00:00Z');
+
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(today);
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  it('returns age for a valid birthday within display bounds', () => {
+    expect(ageFromBirthday('2000-01-15')).toBe(26);
+  });
+
+  it('rejects malformed, future, and implausible birthdays', () => {
+    expect(ageFromBirthday('')).toBeNull();
+    expect(ageFromBirthday('not-a-date')).toBeNull();
+    expect(ageFromBirthday('2026-09-01')).toBeNull();
+    expect(ageFromBirthday('2015-01-01')).toBeNull();
+    expect(ageFromBirthday('1900-01-01')).toBeNull();
+    expect(ageFromBirthday('2024-02-30')).toBeNull();
+  });
+
+  it('enforces minimum age 13 and maximum age 100', () => {
+    expect(ageFromBirthday('2013-08-28')).toBe(13);
+    expect(ageFromBirthday('2013-08-29')).toBeNull();
+    expect(ageFromBirthday('1926-08-28')).toBe(100);
+    expect(ageFromBirthday('1925-08-28')).toBeNull();
   });
 });

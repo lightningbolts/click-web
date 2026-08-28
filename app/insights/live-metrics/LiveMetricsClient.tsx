@@ -313,7 +313,7 @@ export default function LiveMetricsPage() {
                     <Cell
                       key={idx}
                       fill={idx === peakHourDisplay ? '#8338EC' : chart.barMuted}
-                      style={idx === peakHourDisplay ? { filter: 'drop-shadow(0 0 8px rgba(131,56,236,0.5))' } : {}}
+                      style={idx === peakHourDisplay ? { filter: 'drop-shadow(0 0 8px rgba(124,58,237,0.5))' } : {}}
                     />
                   ))}
                 </Bar>

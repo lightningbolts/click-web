@@ -89,12 +89,12 @@ export default function EventLocationPicker({
             onLocationNameChange(json.result.label);
             setQuery(json.result.label);
           } else {
-            onLocationNameChange("Current location");
-            setQuery("Current location");
+            onLocationNameChange("Location shared privately");
+            setQuery("Location shared privately");
           }
         } catch {
-          onLocationNameChange("Current location");
-          setQuery("Current location");
+          onLocationNameChange("Location shared privately");
+          setQuery("Location shared privately");
         } finally {
           setGeoBusy(false);
         }
@@ -130,7 +130,7 @@ export default function EventLocationPicker({
           disabled={geoBusy}
           aria-label={geoBusy ? "Locating" : "Use my location"}
           title={geoBusy ? "Locating…" : "Use my location"}
-          className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-secondary hover:bg-surface-container-low disabled:opacity-40"
+          className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-on-surface-variant hover:bg-surface-container-low disabled:opacity-40"
         >
           <Navigation className="h-4 w-4" />
         </button>

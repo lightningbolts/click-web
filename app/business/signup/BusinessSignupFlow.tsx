@@ -162,7 +162,7 @@ export function BusinessSignupFlow() {
         </p>
         <Link
           href="/insights"
-          className="inline-flex items-center justify-center rounded-xl bg-[#630ed4] px-6 py-3 text-sm font-medium text-on-surface hover:bg-[#630ed4]/90 transition-colors"
+          className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-medium text-on-primary hover:bg-primary/90 transition-colors"
         >
           Go to Click Insights
         </Link>
@@ -205,9 +205,9 @@ export function BusinessSignupFlow() {
         </div>
 
         <div className="flex gap-2 justify-center text-xs text-zinc-500">
-          <span className={step === 'account' ? 'text-[#630ed4]' : ''}>1. Account</span>
+          <span className={step === 'account' ? 'text-primary' : ''}>1. Account</span>
           <span>→</span>
-          <span className={step === 'venue' ? 'text-[#630ed4]' : ''}>2. Venue &amp; pay</span>
+          <span className={step === 'venue' ? 'text-primary' : ''}>2. Venue &amp; pay</span>
         </div>
 
         {step === 'account' && (
@@ -217,7 +217,7 @@ export function BusinessSignupFlow() {
                 type="button"
                 onClick={() => setIsSignupMode(true)}
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  isSignupMode ? 'bg-[#630ed4] text-on-surface' : 'text-on-surface-variant'
+                  isSignupMode ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
                 }`}
               >
                 Create account
@@ -226,7 +226,7 @@ export function BusinessSignupFlow() {
                 type="button"
                 onClick={() => setIsSignupMode(false)}
                 className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                  !isSignupMode ? 'bg-[#630ed4] text-on-surface' : 'text-on-surface-variant'
+                  !isSignupMode ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
                 }`}
               >
                 Sign in
@@ -243,7 +243,7 @@ export function BusinessSignupFlow() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
+                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder="you@venue.com"
               />
             </div>
@@ -258,7 +258,7 @@ export function BusinessSignupFlow() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
+                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
             {isSignupMode && (
@@ -273,7 +273,7 @@ export function BusinessSignupFlow() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
+                  className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
             )}
@@ -281,7 +281,7 @@ export function BusinessSignupFlow() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-[#630ed4] py-3 text-sm font-medium text-on-surface hover:bg-[#630ed4]/90 disabled:opacity-50"
+              className="w-full rounded-xl bg-primary py-3 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50"
             >
               {loading ? 'Please wait…' : isSignupMode ? 'Continue' : 'Sign in'}
             </button>
@@ -300,7 +300,7 @@ export function BusinessSignupFlow() {
                 required
                 value={venueName}
                 onChange={(e) => setVenueName(e.target.value)}
-                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
+                className="w-full rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder="e.g. The Rooftop"
               />
             </div>
@@ -313,7 +313,7 @@ export function BusinessSignupFlow() {
                 rows={3}
                 value={venueLocation}
                 onChange={(e) => setVenueLocation(e.target.value)}
-                className="w-full resize-none rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-[#630ed4]/50"
+                className="w-full resize-none rounded-xl border border-border-hard bg-surface px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder="City, neighborhood, or address"
               />
             </div>
@@ -333,7 +333,7 @@ export function BusinessSignupFlow() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-[2] rounded-xl bg-[#630ed4] py-3 text-sm font-medium text-on-surface hover:bg-[#630ed4]/90 disabled:opacity-50"
+                className="flex-[2] rounded-xl bg-primary py-3 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50"
               >
                 {loading ? 'Redirecting…' : 'Continue to Stripe'}
               </button>

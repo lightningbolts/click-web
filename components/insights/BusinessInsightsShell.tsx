@@ -94,7 +94,7 @@ export default function BusinessInsightsShell({
   const router = useRouter();
   const searchParams = useSearchParams();
   const insightsVenueId = searchParams.get("venue_id")?.trim() || null;
-  const { user, signOut } = useAuth();
+  const { user, signOut, profileImageUrl } = useAuth();
   const { demoMode, setDemoMode } = useInsightsDemo();
   const [isLive] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -137,6 +137,7 @@ export default function BusinessInsightsShell({
       subtitle={`${venueName} · ${isLive ? "Live" : "Offline"} dashboard`}
       extraNav={[{ href: "/", label: "Dashboard", icon: LayoutGrid }]}
       userLabel={userLabel}
+      userAvatarUrl={profileImageUrl}
       onSignOut={handleSignOut}
       actions={
         <>
@@ -147,6 +148,11 @@ export default function BusinessInsightsShell({
               demoMode
                 ? "Turn off sample data — show live insights only"
                 : "Fill empty insights with sample data (demo)"
+            }
+            aria-label={
+              demoMode
+                ? "Turn off demo data"
+                : "Turn on demo data"
             }
             className={`flex items-center gap-1.5 rounded-[8px] border-2 px-2.5 py-2 text-xs font-bold md:px-3 ${
               demoMode
@@ -160,7 +166,7 @@ export default function BusinessInsightsShell({
           <div className="hidden items-center gap-2 rounded-[8px] border border-border-hard bg-surface px-3 py-1.5 md:flex">
             <div
               className={`h-1.5 w-1.5 rounded-full ${
-                isLive ? "animate-pulse bg-secondary" : "bg-outline"
+                isLive ? "animate-pulse bg-primary" : "bg-outline"
               }`}
             />
             <span className="text-xs font-medium text-on-surface-variant">
@@ -172,6 +178,7 @@ export default function BusinessInsightsShell({
             onClick={handleRefresh}
             className="rounded-[8px] border border-border-hard bg-surface p-2 hover:bg-surface-container-low"
             title="Refresh data"
+            aria-label="Refresh data"
           >
             <RefreshCw className="h-3.5 w-3.5 text-on-surface-variant md:h-4 md:w-4" />
           </button>
@@ -179,6 +186,7 @@ export default function BusinessInsightsShell({
             type="button"
             className="rounded-[8px] border border-border-hard bg-surface p-2 hover:bg-surface-container-low"
             title="Export data"
+            aria-label="Export data"
           >
             <Download className="h-3.5 w-3.5 text-on-surface-variant md:h-4 md:w-4" />
           </button>
@@ -186,6 +194,7 @@ export default function BusinessInsightsShell({
             type="button"
             className="hidden rounded-[8px] border border-border-hard bg-surface p-2 hover:bg-surface-container-low md:flex"
             title="Settings"
+            aria-label="Settings"
           >
             <Settings className="h-4 w-4 text-on-surface-variant" />
           </button>

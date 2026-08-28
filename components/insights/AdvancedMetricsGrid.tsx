@@ -108,8 +108,8 @@ export default function AdvancedMetricsGrid({
         >
           <GlassPanel className="p-6 h-full" hover glow="purple">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-                <HeartHandshake className="w-4 h-4 text-[#630ed4]" />
+              <div className="p-2 bg-primary/20 rounded-lg">
+                <HeartHandshake className="w-4 h-4 text-primary" />
               </div>
               <span className="text-sm font-medium text-on-surface-variant">
                 Venue Loyalty Coefficient
@@ -140,8 +140,8 @@ export default function AdvancedMetricsGrid({
         >
           <GlassPanel className="p-6 h-full" hover glow="blue">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-                <Anchor className="w-4 h-4 text-[#630ed4]" />
+              <div className="p-2 bg-primary/20 rounded-lg">
+                <Anchor className="w-4 h-4 text-primary" />
               </div>
               <span className="text-sm font-medium text-on-surface-variant">Anchor Magnetism</span>
             </div>

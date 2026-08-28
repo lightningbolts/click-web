@@ -500,8 +500,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-secondary/20 rounded-lg">
-              <TrendingUp className="w-4 h-4 text-secondary" />
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <TrendingUp className="w-4 h-4 text-primary" />
             </div>
             <span className="text-sm font-medium text-on-surface-variant">
               Retention Rate
@@ -515,8 +515,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-secondary/20 rounded-lg">
-              <Calendar className="w-4 h-4 text-secondary" />
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Calendar className="w-4 h-4 text-on-surface-variant" />
             </div>
             <span className="text-sm font-medium text-on-surface-variant">
               Busiest Day

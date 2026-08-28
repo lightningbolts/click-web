@@ -3,7 +3,12 @@ import { MapPin, User } from "lucide-react";
 import { FcCard } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { formatEventWhen } from "@/lib/events/formatEventWhen";
-import { eventDisplayTitle, eventSubtitle, eventWhereLabel } from "@/lib/events/eventMetadata";
+import {
+  eventDisplayTitle,
+  eventIsPast,
+  eventSubtitle,
+  eventWhereLabel,
+} from "@/lib/events/eventMetadata";
 import { eventSharePath } from "@/lib/events/eventUrls";
 import EventGoingAvatars, { type EventGoingPerson } from "@/components/events/EventGoingAvatars";
 import { cn } from "@/lib/cn";
@@ -28,20 +33,25 @@ export type EventListItem = {
 export function EventListCard({
   event,
   featured = false,
+  past,
+  dense = false,
 }: {
   event: EventListItem;
   featured?: boolean;
+  past?: boolean;
+  dense?: boolean;
 }) {
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
   const subtitle = eventSubtitle(title, event.description);
   const when = formatEventWhen(event.event_start_at, event.event_end_at, event.timezone);
   const where = eventWhereLabel(event.location_name);
   const seed = event.visual_seed || event.cover_theme_id || event.beacon_id;
+  const isPast = past ?? eventIsPast(event);
 
   return (
     <Link href={eventSharePath(event.beacon_id)} className="block" data-testid="event-list-card">
       <FcCard
-        className={cn("overflow-hidden transition-colors hover:border-secondary", featured ? "md:flex" : "flex")}
+        className={cn("overflow-hidden transition-colors hover:border-primary", featured ? "md:flex" : "flex")}
       >
         <CardVisualHero
           id={event.beacon_id}
@@ -55,26 +65,26 @@ export function EventListCard({
           }
         />
         <div className={cn("min-w-0 p-4", featured && "flex flex-1 flex-col justify-center md:p-6")}>
-          {when ? (
-            <p className="text-sm font-bold text-on-surface">{when}</p>
-          ) : (
-            <p className="text-xs text-on-surface-variant">Time TBD</p>
-          )}
           <h3
             className={cn(
-              "mt-1 font-bold leading-tight text-on-surface",
+              "font-bold leading-tight text-on-surface",
               featured ? "font-display text-2xl md:text-3xl" : "text-base sm:text-lg",
             )}
           >
             {title}
           </h3>
+          {when ? (
+            <p className="mt-1 text-sm text-on-surface-variant">{when}</p>
+          ) : (
+            <p className="mt-1 text-xs text-on-surface-variant">Time TBD</p>
+          )}
           {subtitle ? (
             <p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">{subtitle}</p>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-on-surface-variant">
             {where ? (
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <MapPin className="h-4 w-4 shrink-0 text-secondary" />
+                <MapPin className="h-4 w-4 shrink-0 text-on-surface-variant" />
                 <span className="line-clamp-1">{where}</span>
               </span>
             ) : null}
@@ -85,7 +95,12 @@ export function EventListCard({
               </span>
             ) : null}
             {typeof event.rsvp_count === "number" && event.rsvp_enabled !== false ? (
-              <EventGoingAvatars people={event.attendees ?? []} count={event.rsvp_count} />
+              <EventGoingAvatars
+                people={event.attendees ?? []}
+                count={event.rsvp_count}
+                past={isPast}
+                dense={dense}
+              />
             ) : null}
           </div>
         </div>

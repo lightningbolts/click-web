@@ -1,34 +1,35 @@
 "use client";
 
 import { FcInput } from "@/components/fc";
-import { cn } from "@/lib/cn";
+import { Pill } from "@/components/ui/Pill";
+import { Toggle } from "@/components/ui/Toggle";
+import { InfoRow } from "@/components/ui/InfoRow";
 import type {
   EventVisibility,
   GuestListVisibility,
 } from "@/lib/events/eventOptions";
 
-function Chip({
-  selected,
+const CHECK_IN_TOOLTIP =
+  "Check-in area sets the geofencing radius an attendee must be within to check in to the event — Intimate/Neighborhood/Venue/Campus map to increasingly large check-in radii.";
+
+function Subcard({
+  title,
+  tooltip,
   children,
-  onClick,
 }: {
-  selected: boolean;
-  children: string;
-  onClick: () => void;
+  title: string;
+  tooltip?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-sm font-semibold",
-        selected
-          ? "border-primary bg-primary text-on-primary"
-          : "border-border-hard bg-surface text-on-surface hover:bg-surface-container-low",
+    <section className="space-y-4 rounded-[16px] border border-border-hard bg-surface-container-low p-4">
+      {tooltip ? (
+        <InfoRow title={title} tooltip={tooltip} />
+      ) : (
+        <h3 className="text-sm font-bold text-on-surface">{title}</h3>
       )}
-    >
       {children}
-    </button>
+    </section>
   );
 }
 
@@ -66,30 +67,69 @@ export default function EventOptionsFields({
   return (
     <details className="rounded-[16px] border border-border-hard bg-surface-container-low p-4" data-testid="event-options">
       <summary className="cursor-pointer text-sm font-bold text-on-surface">Event options</summary>
-      <div className="mt-4 space-y-5">
-        <div>
-          <p className="mb-2 text-sm font-semibold text-on-surface">Visibility</p>
-          <div className="flex flex-wrap gap-2">
-            <Chip selected={visibility === "public"} onClick={() => onVisibility("public")}>
-              Public
-            </Chip>
-            <Chip selected={visibility === "unlisted"} onClick={() => onVisibility("unlisted")}>
-              Unlisted
-            </Chip>
-            <Chip selected={visibility === "invite_only"} onClick={() => onVisibility("invite_only")}>
-              Invite-only
-            </Chip>
+      <div className="mt-4 space-y-4">
+        <Subcard title="Visibility & Access">
+          <div>
+            <p className="mb-2 text-sm font-semibold text-on-surface">Visibility</p>
+            <div className="flex flex-wrap gap-2">
+              <Pill selected={visibility === "public"} onClick={() => onVisibility("public")}>
+                Public
+              </Pill>
+              <Pill selected={visibility === "unlisted"} onClick={() => onVisibility("unlisted")}>
+                Unlisted
+              </Pill>
+              <Pill selected={visibility === "invite_only"} onClick={() => onVisibility("invite_only")}>
+                Invite-only
+              </Pill>
+            </div>
+            <p className="mt-1.5 text-xs text-on-surface-variant">
+              Public appears on /events. Unlisted is link-only. Invite-only requires a guest list match.
+            </p>
           </div>
-          <p className="mt-1.5 text-xs text-on-surface-variant">
-            Public appears on /events. Unlisted is link-only. Invite-only requires a guest list match.
-          </p>
-        </div>
-        <div>
-          <p className="mb-2 text-sm font-semibold text-on-surface">Capacity</p>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-on-surface">Guest list visibility</p>
+            <div className="flex flex-wrap gap-2">
+              <Pill
+                selected={guestListVisibility === "public"}
+                onClick={() => onGuestListVisibility("public")}
+              >
+                Public
+              </Pill>
+              <Pill
+                selected={guestListVisibility === "hosts_only"}
+                onClick={() => onGuestListVisibility("hosts_only")}
+              >
+                Hosts only
+              </Pill>
+            </div>
+          </div>
+          <InfoRow
+            title="Approval required"
+            description="Hosts vet Click RSVPs before they are confirmed."
+          >
+            <Toggle
+              checked={approvalRequired}
+              onCheckedChange={onApproval}
+              aria-label="Approval required"
+            />
+          </InfoRow>
+          <InfoRow
+            title="Display my name"
+            description="Show your name as host on the event page."
+          >
+            <Toggle
+              checked={showCreatorName}
+              onCheckedChange={onShowCreatorName}
+              aria-label="Display my name"
+            />
+          </InfoRow>
+        </Subcard>
+
+        <Subcard title="Capacity">
           <div className="flex flex-wrap items-center gap-2">
-            <Chip selected={capacity == null} onClick={() => onCapacity(null)}>
+            <Pill selected={capacity == null} onClick={() => onCapacity(null)}>
               Unlimited
-            </Chip>
+            </Pill>
             <FcInput
               type="number"
               min={1}
@@ -103,47 +143,12 @@ export default function EventOptionsFields({
               }}
             />
           </div>
-        </div>
-        <label className="flex items-center justify-between gap-3">
-          <span>
-            <span className="block text-sm font-semibold text-on-surface">Approval required</span>
-            <span className="text-xs text-on-surface-variant">Hosts vet Click RSVPs before they are confirmed.</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={approvalRequired}
-            onChange={(e) => onApproval(e.target.checked)}
-            className="h-5 w-5 accent-primary"
-          />
-        </label>
-        <div>
-          <p className="mb-2 text-sm font-semibold text-on-surface">Guest list visibility</p>
-          <div className="flex flex-wrap gap-2">
-            <Chip selected={guestListVisibility === "public"} onClick={() => onGuestListVisibility("public")}>
-              Public
-            </Chip>
-            <Chip selected={guestListVisibility === "hosts_only"} onClick={() => onGuestListVisibility("hosts_only")}>
-              Hosts only
-            </Chip>
-          </div>
-        </div>
-        <label className="flex items-center justify-between gap-3">
-          <span>
-            <span className="block text-sm font-semibold text-on-surface">Display my name</span>
-            <span className="text-xs text-on-surface-variant">Show your name as host on the event page.</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={showCreatorName}
-            onChange={(e) => onShowCreatorName(e.target.checked)}
-            className="h-5 w-5 accent-primary"
-          />
-        </label>
-        <div>
-          <p className="mb-2 text-sm font-semibold text-on-surface">Check-in area</p>
+        </Subcard>
+
+        <Subcard title="Check-in area" tooltip={CHECK_IN_TOOLTIP}>
           <div className="flex flex-wrap gap-2">
             {(["intimate", "neighborhood", "venue", "campus"] as const).map((scale) => (
-              <Chip key={scale} selected={venueScale === scale} onClick={() => onVenueScale(scale)}>
+              <Pill key={scale} selected={venueScale === scale} onClick={() => onVenueScale(scale)}>
                 {scale === "intimate"
                   ? "Intimate"
                   : scale === "neighborhood"
@@ -151,17 +156,18 @@ export default function EventOptionsFields({
                     : scale === "venue"
                       ? "Venue"
                       : "Campus"}
-              </Chip>
+              </Pill>
             ))}
           </div>
-        </div>
-        <div>
-          <p className="mb-2 text-sm font-semibold text-on-surface">Categories</p>
+        </Subcard>
+
+        <section className="space-y-3">
+          <h3 className="text-sm font-bold text-on-surface">Categories</h3>
           <div className="flex flex-wrap gap-2">
             {["Promotional", "Social", "School Event"].map((cat) => {
               const on = categories.includes(cat);
               return (
-                <Chip
+                <Pill
                   key={cat}
                   selected={on}
                   onClick={() =>
@@ -169,11 +175,11 @@ export default function EventOptionsFields({
                   }
                 >
                   {cat}
-                </Chip>
+                </Pill>
               );
             })}
           </div>
-        </div>
+        </section>
       </div>
     </details>
   );

@@ -154,9 +154,9 @@ export default function ConnectScene({
             ) : null}
 
             {phase === 'done' && jordanMemory ? (
-              <div className="mt-4 rounded-[12px] border border-border-hard bg-secondary-container p-3">
-                <p className="text-sm font-semibold text-on-secondary-container">You Clicked</p>
-                <p className="mt-1 text-xs text-on-secondary-container">
+              <div className="mt-4 rounded-[12px] border border-border-hard bg-primary-container p-3">
+                <p className="text-sm font-semibold text-on-primary-container">You Clicked</p>
+                <p className="mt-1 text-xs text-on-primary-container">
                   {jordanMemory.label} · {jordanMemory.place}
                 </p>
                 <p className="mt-1 flex items-center gap-2 text-[11px] text-on-surface-variant">
@@ -171,7 +171,7 @@ export default function ConnectScene({
       {method === 'qr' ? (
         <div className="px-4 pb-4">
           <div className="rounded-[16px] border border-border-hard bg-surface p-4 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary">My QR Code</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">My QR Code</p>
             <div className="relative mx-auto mt-3 w-fit">
               <div className="relative rounded-2xl border border-border-hard bg-[#101212] p-3">
                 <DemoQr size={148} />

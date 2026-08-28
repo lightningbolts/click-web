@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
+
+const VISIBLE_STARTER_COUNT = 5;
 
 /** "Conversation starters" banner listing shared interest tags. Extracted verbatim from ChatView. */
 export function ChatSharedInterestsBanner({
@@ -13,6 +16,12 @@ export function ChatSharedInterestsBanner({
   sharedInterestTags: string[];
   peerUserId: string | undefined;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const overflowCount = Math.max(0, sharedInterestTags.length - VISIBLE_STARTER_COUNT);
+  const visibleTags = expanded
+    ? sharedInterestTags
+    : sharedInterestTags.slice(0, VISIBLE_STARTER_COUNT);
+
   return (
     <AnimatePresence>
       {!isGroupClique && sharedInterestTags.length > 0 && (
@@ -53,7 +62,7 @@ export function ChatSharedInterestsBanner({
             Shared interests — try weaving one into your next message
           </motion.p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {sharedInterestTags.map((t, i) => (
+            {visibleTags.map((t, i) => (
               <motion.span
                 key={t}
                 initial={{ opacity: 0, y: 6, scale: 0.9 }}
@@ -69,6 +78,16 @@ export function ChatSharedInterestsBanner({
                 {t}
               </motion.span>
             ))}
+            {overflowCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((value) => !value)}
+                className="rounded-full border border-border-hard bg-surface px-2.5 py-0.5 text-[11px] font-medium text-primary hover:bg-surface-container"
+                aria-expanded={expanded}
+              >
+                {expanded ? 'Show less' : `+${overflowCount} more`}
+              </button>
+            ) : null}
           </div>
         </motion.div>
       )}

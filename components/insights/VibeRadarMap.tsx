@@ -16,6 +16,7 @@ import {
 } from "@/lib/map/mapBeacons";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { mapStyleForTheme, FC_PRIMARY } from "@/lib/theme/mapStyles";
+import { Toggle } from "@/components/ui/Toggle";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
 
@@ -389,15 +390,15 @@ export default function VibeRadarMap({
     const pulse = document.createElement("div");
     pulse.style.cssText = `
       position:absolute;width:56px;height:56px;border-radius:9999px;
-      background:radial-gradient(circle,rgba(131,56,236,0.45) 0%,transparent 70%);
+      background:radial-gradient(circle,rgba(124,58,237,0.45) 0%,transparent 70%);
       animation:vibe-beacon-pulse 1.6s ease-out infinite;
     `;
     const core = document.createElement("div");
     core.style.cssText = `
       width:16px;height:16px;border-radius:9999px;
-      background:linear-gradient(135deg,#630ed4,#630ed4);
+      background:linear-gradient(135deg,${FC_PRIMARY},${FC_PRIMARY});
       border:2px solid rgba(255,255,255,0.9);
-      box-shadow:0 0 24px rgba(131,56,236,0.85);
+      box-shadow:0 0 24px rgba(124,58,237,0.85);
     `;
     wrap.appendChild(pulse);
     wrap.appendChild(core);
@@ -450,7 +451,7 @@ export default function VibeRadarMap({
             transition={{ duration: 0.25 }}
             className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90"
           >
-            <Loader2 className="w-9 h-9 text-[#630ed4] animate-spin mb-2" />
+            <Loader2 className="w-9 h-9 text-primary animate-spin mb-2" />
             <p className="text-sm text-on-surface-variant">Loading map…</p>
           </motion.div>
         )}
@@ -461,35 +462,25 @@ export default function VibeRadarMap({
       {mapLoaded && (
         <div className="absolute top-3 left-3 z-[6] max-w-[220px] rounded-2xl border border-border-hard bg-background/70 shadow-lg shadow-black/40 p-3 text-xs text-on-surface">
           <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
-            <Layers className="w-3.5 h-3.5 text-[#630ed4]" />
+            <Layers className="w-3.5 h-3.5 text-primary" />
             Map layers
           </div>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#630ed4]" checked={layers.myNetwork} onChange={() => toggle("myNetwork")} />
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.myNetwork} onCheckedChange={() => toggle("myNetwork")} aria-label="Availability intents" className="scale-75" />
             Availability intents
-          </label>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="accent-[#630ed4]"
-              checked={layers.officialSoundtracks}
-              onChange={() => toggle("officialSoundtracks")}
-            />
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.officialSoundtracks} onCheckedChange={() => toggle("officialSoundtracks")} aria-label="Official Soundtracks" className="scale-75" />
             Official Soundtracks
-          </label>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="accent-[#630ed4]"
-              checked={layers.communityBeacons}
-              onChange={() => toggle("communityBeacons")}
-            />
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.communityBeacons} onCheckedChange={() => toggle("communityBeacons")} aria-label="Community Beacons" className="scale-75" />
             Community Beacons
-          </label>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#630ed4]" checked={layers.hazards} onChange={() => toggle("hazards")} />
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.hazards} onCheckedChange={() => toggle("hazards")} aria-label="Hazards" className="scale-75" />
             Hazards
-          </label>
+          </div>
         </div>
       )}
 

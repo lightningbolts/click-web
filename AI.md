@@ -34,7 +34,7 @@ This file is for **human developers** and **AI assistants** working in the Click
 
 ## 4. Tailwind and UI language (Functional Clarity)
 
-- **Use Functional Clarity**, shared with the mobile app: opaque surfaces, **2px hard borders**, primary **`#630ED4`**, Manrope only, no glass/blur/gradients/neon glow.
+- **Use Functional Clarity**, shared with the mobile app: opaque surfaces, **2px hard borders**, primary **`#7C3AED`**, Manrope only, no glass/blur/gradients/neon glow.
 - **Tokens live in** `app/globals.css` (light + `.dark`). Prefer semantic classes (`bg-background`, `text-on-surface`, `border-border-hard`, `FcCard` / `.fc-card`) over hard-coded zinc/glass utilities.
 - **Theme:** `lib/theme/ThemeProvider.tsx` + `components/ThemeToggle.tsx`. Do not reintroduce dark-only glass marketing styling.
 - **Docs:** `docs/ui-ux/01-design-system-web.md` (and 02–05 for landing/dashboard/insights/events). Public event pages (`/events`, `/e/*`) inherit `ThemeProvider`; do not hardcode dark chrome (`zinc-950`). Landing playground map lazy-loads Carto tiles in the browser; do not proxy tiles through the Worker or `/api/map`.

@@ -86,7 +86,7 @@ export default function EventManagePage() {
             Publish summary
           </FcButton>
           {summaryPath ? (
-            <a href={summaryPath} className="text-sm font-semibold text-secondary hover:underline">
+            <a href={summaryPath} className="text-sm font-semibold text-primary hover:underline">
               Open snapshot
             </a>
           ) : null}

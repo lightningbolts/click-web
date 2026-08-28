@@ -210,6 +210,25 @@ export function getUnlockedAchievements(metrics: UserDashboardMetrics): Unlocked
     .sort((a, b) => b.priority - a.priority);
 }
 
+export interface AchievementStatus extends UnlockedAchievement {
+  unlocked: boolean;
+}
+
+/** All achievement rules with earned vs locked state (earned first). */
+export function getAllAchievements(metrics: UserDashboardMetrics): AchievementStatus[] {
+  return ACHIEVEMENT_RULES.map(({ id, title, description, icon, priority, unlocked }) => ({
+    id,
+    title,
+    description,
+    icon,
+    priority,
+    unlocked: unlocked(metrics),
+  })).sort((a, b) => {
+    if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
+    return b.priority - a.priority;
+  });
+}
+
 export interface NextMilestone {
   target: number;
   label: string;

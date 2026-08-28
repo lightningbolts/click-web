@@ -122,14 +122,14 @@ export default function DashboardScene({
             >
               <StatCard icon={Users} label="Total Connections" value={connected.length} trend="+2" />
               <StatCard icon={Calendar} label="This Month" value={connected.length} />
-              <StatCard icon={Flame} label="Connection Streak" value="4 days" accent="text-secondary" />
+              <StatCard icon={Flame} label="Connection Streak" value="4 days" accent="text-primary" />
               <StatCard icon={Heart} label="Retention Rate" value="100%" accent="text-primary" />
             </motion.div>
 
             <div className="rounded-[16px] border border-border-hard bg-surface p-4">
               <p className="text-sm font-semibold text-on-surface">Availability</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-secondary px-3 py-1 text-[11px] font-semibold text-on-secondary">
+                <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-on-primary">
                   Coffee
                 </span>
                 <span className="text-xs text-on-surface-variant">Fri afternoon</span>
@@ -167,7 +167,7 @@ export default function DashboardScene({
                     />
                   </div>
                   <p className="mt-2 flex items-center gap-1 text-xs text-on-surface-variant">
-                    <Zap className="h-3 w-3 text-secondary" />
+                    <Zap className="h-3 w-3 text-primary" />
                     {firstFiveUnlocked ? 'Unlocked.' : 'Tap Jordan in the app to hit five.'}
                   </p>
                 </div>
@@ -185,10 +185,10 @@ export default function DashboardScene({
                   {rsvps.map((event) => (
                     <li
                       key={event.id}
-                      className="rounded-[12px] border border-border-hard bg-secondary-container px-3 py-2"
+                      className="rounded-[12px] border border-border-hard bg-primary-container px-3 py-2"
                     >
-                      <p className="text-sm font-semibold text-on-secondary-container">{event.title}</p>
-                      <p className="text-xs text-on-secondary-container">
+                      <p className="text-sm font-semibold text-on-primary-container">{event.title}</p>
+                      <p className="text-xs text-on-primary-container">
                         {event.when} · {event.venue}
                       </p>
                     </li>

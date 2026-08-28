@@ -26,7 +26,7 @@ export function metaString(meta: Record<string, unknown>, ...keys: string[]): st
   return null;
 }
 
-function instantToIso(raw: unknown): string | null {
+export function instantToIso(raw: unknown): string | null {
   if (typeof raw === "string" && raw.trim()) {
     const ms = Date.parse(raw.trim());
     return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
@@ -35,7 +35,18 @@ function instantToIso(raw: unknown): string | null {
     const ms = raw > 1e12 ? raw : raw > 1e9 ? raw * 1000 : NaN;
     return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
   }
+  if (raw instanceof Date && Number.isFinite(raw.getTime())) {
+    return raw.toISOString();
+  }
   return null;
+}
+
+/** Prefer first-class `map_beacons` time columns; fall back to metadata helpers. */
+export function eventInstantFromRowOrMeta(
+  rowValue: unknown,
+  metaValue: string | null,
+): string | null {
+  return instantToIso(rowValue) ?? metaValue;
 }
 
 export function eventTitleFromMetadata(meta: Record<string, unknown>): string | null {
@@ -101,7 +112,10 @@ export function eventWhenLabel(when: string | null | undefined): string | null {
 }
 
 export function eventWhereLabel(locationName: string | null | undefined): string | null {
-  return locationName?.trim() || null;
+  const trimmed = locationName?.trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase() === "current location") return "Location shared privately";
+  return trimmed;
 }
 
 export function eventLocationNameFromMetadata(meta: Record<string, unknown>): string | null {
@@ -131,6 +145,18 @@ export function isUpcomingEvent(meta: Record<string, unknown>, nowMs = Date.now(
 export function isEventEnded(meta: Record<string, unknown>, nowMs = Date.now()): boolean {
   const end = parseIsoMs(eventEndAtFromMetadata(meta));
   return end != null && end <= nowMs;
+}
+
+/** Whether an event is in the past (end_at, else start_at with a 6h grace). */
+export function eventIsPast(
+  event: { event_end_at?: string | null; event_start_at?: string | null },
+  nowMs = Date.now(),
+): boolean {
+  const end = parseIsoMs(event.event_end_at ?? null);
+  if (end != null) return end < nowMs;
+  const start = parseIsoMs(event.event_start_at ?? null);
+  if (start != null) return start < nowMs - 6 * 60 * 60 * 1000;
+  return false;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -24,12 +24,12 @@ const navItemClass =
 function navLinkClass(active: boolean) {
   return cn(
     navItemClass,
-    active ? "text-primary" : "text-on-surface hover:bg-surface-container-low hover:text-secondary",
+    active ? "text-primary" : "text-on-surface hover:bg-surface-container-low hover:text-primary",
   );
 }
 
 const navControlClass =
-  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold leading-none text-on-surface hover:bg-surface-container-low";
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold leading-snug text-on-surface hover:bg-surface-container-low";
 
 const navCtaClass =
   "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";

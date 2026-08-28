@@ -176,7 +176,7 @@ export function isSafeBeaconUri(uri: string): boolean {
 }
 
 export function beaconTint(beaconType: MapBeaconType, group: ReturnType<typeof beaconLayerGroup>): string {
-  if (beaconType === "utility") return "#3b82f6";
+  if (beaconType === "utility") return "#a78bfa";
   if (group === "hazard") return "#f97316";
   if (group === "official") return "#22d3ee";
   if (beaconType === "sos") return "#ef4444";

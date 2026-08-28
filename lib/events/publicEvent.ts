@@ -5,6 +5,7 @@ import {
   eventEndAtFromMetadata,
   eventImageFromMetadata,
   eventLocationNameFromMetadata,
+  eventInstantFromRowOrMeta,
   eventStartAtFromMetadata,
   eventTimezoneFromMetadata,
   eventTitleFromMetadata,
@@ -136,31 +137,24 @@ async function loadHostProfilesByCreatorIds(
   return names;
 }
 
-function instantFromRowOrMeta(
-  rowValue: unknown,
-  metaValue: string | null,
-): string | null {
-  if (typeof rowValue === "string" && rowValue.trim()) {
-    const ms = Date.parse(rowValue);
-    if (Number.isFinite(ms)) return new Date(ms).toISOString();
-  }
-  return metaValue;
-}
-
 function isUpcomingFromRow(
   row: Record<string, unknown>,
   meta: Record<string, unknown>,
   nowMs: number,
 ): boolean {
-  const end =
-    parseIsoMs(typeof row.ends_at === "string" ? row.ends_at : null) ??
-    parseIsoMs(eventEndAtFromMetadata(meta));
+  const end = parseIsoMs(eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)));
   if (end != null) return end >= nowMs;
-  const start =
-    parseIsoMs(typeof row.starts_at === "string" ? row.starts_at : null) ??
-    parseIsoMs(eventStartAtFromMetadata(meta));
+  const start = parseIsoMs(eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)));
   if (start != null) return start >= nowMs - 6 * 60 * 60 * 1000;
   return isUpcomingEvent(meta, nowMs);
+}
+
+function sortInstantMs(eventEndAt: string | null, eventStartAt: string | null): number {
+  const end = eventEndAt ? Date.parse(eventEndAt) : NaN;
+  if (Number.isFinite(end)) return end;
+  const start = eventStartAt ? Date.parse(eventStartAt) : NaN;
+  if (Number.isFinite(start)) return start;
+  return 0;
 }
 
 async function loadAttendeePreviewsByBeaconIds(
@@ -258,8 +252,8 @@ export async function loadPublicEventPayload(
       ? (await loadAttendeePreviewsByBeaconIds(admin, [beaconId])).get(beaconId) ?? []
       : [];
   const coverThemeId = listing.cover_theme_id;
-  const startAt = instantFromRowOrMeta(data.starts_at, eventStartAtFromMetadata(meta));
-  const endAt = instantFromRowOrMeta(data.ends_at, eventEndAtFromMetadata(meta));
+  const startAt = eventInstantFromRowOrMeta(data.starts_at, eventStartAtFromMetadata(meta));
+  const endAt = eventInstantFromRowOrMeta(data.ends_at, eventEndAtFromMetadata(meta));
   const timezone =
     (typeof data.event_timezone === "string" && data.event_timezone.trim()) ||
     eventTimezoneFromMetadata(meta);
@@ -289,8 +283,11 @@ export async function loadPublicEventPayload(
   };
 }
 
-export async function loadPublicUpcomingEvents(
+type PublicEventTemporal = "upcoming" | "past";
+
+async function loadPublicDiscoverableEvents(
   admin: SupabaseClient,
+  temporal: PublicEventTemporal,
   limit = 40,
 ): Promise<PublicEventListItem[]> {
   const { data, error } = await admin
@@ -330,7 +327,9 @@ export async function loadPublicUpcomingEvents(
     const meta = parseBeaconMetadata(row.metadata);
     const listing = parseEventListingOptions(row, meta);
     if (listing.event_visibility !== "public") continue;
-    if (!isUpcomingFromRow(row, meta, now)) continue;
+    const isUpcoming = isUpcomingFromRow(row, meta, now);
+    if (temporal === "upcoming" && !isUpcoming) continue;
+    if (temporal === "past" && isUpcoming) continue;
     const coords = parseLatLngFromLocationField(row.location, Number.NaN, Number.NaN);
     const beaconId = typeof row.id === "string" ? row.id : "";
     pending.push({
@@ -338,8 +337,8 @@ export async function loadPublicUpcomingEvents(
       title: eventTitleFromMetadata(meta),
       description: eventDescriptionFromMetadata(meta),
       image_url: eventImageFromMetadata(meta),
-      event_start_at: instantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)),
-      event_end_at: instantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)),
+      event_start_at: eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)),
+      event_end_at: eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)),
       location_name: eventLocationNameFromMetadata(meta),
       latitude: Number.isFinite(coords.lat) ? coords.lat : null,
       longitude: Number.isFinite(coords.lng) ? coords.lng : null,
@@ -390,9 +389,23 @@ export async function loadPublicUpcomingEvents(
   });
 
   items.sort((a, b) => {
-    const aMs = a.event_start_at ? Date.parse(a.event_start_at) : Number.POSITIVE_INFINITY;
-    const bMs = b.event_start_at ? Date.parse(b.event_start_at) : Number.POSITIVE_INFINITY;
-    return aMs - bMs;
+    const aMs = sortInstantMs(a.event_end_at, a.event_start_at);
+    const bMs = sortInstantMs(b.event_end_at, b.event_start_at);
+    return temporal === "past" ? bMs - aMs : aMs - bMs;
   });
   return items;
+}
+
+export async function loadPublicUpcomingEvents(
+  admin: SupabaseClient,
+  limit = 40,
+): Promise<PublicEventListItem[]> {
+  return loadPublicDiscoverableEvents(admin, "upcoming", limit);
+}
+
+export async function loadPublicPastEvents(
+  admin: SupabaseClient,
+  limit = 40,
+): Promise<PublicEventListItem[]> {
+  return loadPublicDiscoverableEvents(admin, "past", limit);
 }

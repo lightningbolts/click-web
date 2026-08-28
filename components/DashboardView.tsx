@@ -54,7 +54,7 @@ import {
 import {
   buildDashboardMetrics,
   getNextMilestone,
-  getUnlockedAchievements,
+  getAllAchievements,
 } from '@/lib/dashboard/userMetrics';
 import { isActiveChatListStatus } from '@/lib/dashboard/connectionStatus';
 import { useDashboardCalls } from '@/components/dashboard/useDashboardCalls';
@@ -87,7 +87,7 @@ interface DashboardViewProps {
  * the tab shell.
  */
 export default function DashboardView({ user }: DashboardViewProps) {
-  const { signOut, onlineUserIds } = useAuth();
+  const { signOut, onlineUserIds, profileImageUrl } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
@@ -456,10 +456,46 @@ export default function DashboardView({ user }: DashboardViewProps) {
     [connectionRecords]
   );
 
-  const unlockedAchievements = useMemo(
-    () => getUnlockedAchievements(dashboardMetrics),
+  const achievementStatuses = useMemo(
+    () => getAllAchievements(dashboardMetrics),
     [dashboardMetrics]
   );
+
+  const shellHeader = useMemo(() => {
+    switch (activeTab) {
+      case 'memory':
+        return {
+          title: (
+            <>
+              Welcome back, <span className="text-primary">{userName}</span>
+            </>
+          ),
+          subtitle: 'Your digital memory box',
+        };
+      case 'events':
+        return {
+          title: 'Events',
+          subtitle: 'Events you host or plan to attend.',
+        };
+      case 'map':
+        return {
+          title: 'Click Map',
+          subtitle: 'Where your memories were made',
+        };
+      case 'identity':
+        return {
+          title: 'QR Identity',
+          subtitle: 'Share your Click ID to connect in person',
+        };
+      case 'settings':
+        return {
+          title: 'Settings',
+          subtitle: 'Profile, interests, and preferences',
+        };
+      default:
+        return { title: userName, subtitle: undefined };
+    }
+  }, [activeTab, userName]);
 
   const nextMilestone = useMemo(
     () => getNextMilestone(dashboardMetrics.totalConnections),
@@ -531,18 +567,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
       }))}
       activeId={activeTab}
       onSelect={(id) => setActiveTab(id as DashboardTab)}
-      title={
-        <>
-          Welcome back, <span className="text-primary">{userName}</span>
-        </>
-      }
-      subtitle="Your digital memory box"
+      title={shellHeader.title}
+      subtitle={shellHeader.subtitle}
       extraNav={
         insightsAccess?.insightsAllowed
           ? [{ href: '/insights', label: 'Insights', icon: BarChart2 }]
           : []
       }
       userLabel={userName}
+      userAvatarUrl={profileImageUrl}
       onSignOut={handleSignOut}
       rootTestId="dashboard-root"
       chromeTestId="dashboard-chrome"
@@ -612,21 +645,18 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 {/* Achievements & Milestones Row */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-on-surface-variant mb-2">Recent Achievements</h3>
-                    {unlockedAchievements.length === 0 ? (
-                      <div className="p-4 fc-card rounded-xl border border-border-hard text-sm text-on-surface-variant">
-                        No achievements yet. Connect with people to unlock your first badge.
-                      </div>
-                    ) : (
-                      unlockedAchievements.slice(0, 5).map((achievement) => (
+                    <h3 className="text-sm font-medium text-on-surface-variant mb-2">Achievements</h3>
+                    <div className="space-y-2">
+                      {achievementStatuses.map((achievement) => (
                         <AchievementBadge
                           key={achievement.id}
                           title={achievement.title}
                           description={achievement.description}
                           icon={achievement.icon}
+                          unlocked={achievement.unlocked}
                         />
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
                   <div className="space-y-3">
                     <h3 className="text-sm font-medium text-on-surface-variant mb-2">Next Milestone</h3>
@@ -697,16 +727,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-primary/20 rounded-xl">
-                    <MapPin className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Click Map</h2>
-                    <p className="text-sm text-on-surface-variant">Where your memories were made</p>
-                  </div>
-                </div>
-
                 <ConnectionMap connections={mapConnectionRecords} onConnectionClick={handleOpenChat} />
               </motion.div>
             )}
@@ -784,13 +804,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="max-w-md mx-auto"
+                className="flex min-h-[min(70vh,640px)] flex-col items-center justify-center py-4"
               >
-                <QRIdentityCard
-                  userId={user.id}
-                  userName={displayNameFromUserMetadata(user?.user_metadata)}
-                  userEmail={user?.email}
-                />
+                <div className="w-full max-w-md">
+                  <QRIdentityCard
+                    userId={user.id}
+                    userName={displayNameFromUserMetadata(user?.user_metadata)}
+                    userEmail={user?.email}
+                  />
+                </div>
               </motion.div>
             )}
 

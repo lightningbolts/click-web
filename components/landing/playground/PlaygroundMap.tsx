@@ -6,6 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Loader2, MapPin } from 'lucide-react';
 import { escapeHtml } from '@/lib/dashboard/connectionExtras';
 import { useTheme } from '@/lib/theme/ThemeProvider';
+import { Toggle } from '@/components/ui/Toggle';
 import {
   applyPinStack,
   pinBorderForTheme,
@@ -25,8 +26,8 @@ import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from './mockData';
 import type { PlaygroundActions, PlaygroundEvent, PlaygroundPerson, PlaygroundState } from './types';
 
 const CLUSTER_METERS = 90;
-const PRIMARY = '#630ed4';
-const SECONDARY = '#224CFF';
+const PRIMARY = '#7c3aed';
+const SECONDARY = '#6d28d9';
 
 type Cluster = {
   id: string;
@@ -132,7 +133,7 @@ function buildPinPopupHtml(cluster: Cluster, state: PlaygroundState, actions?: P
   const chatPerson = cluster.people[0];
   const chatBtn =
     chatPerson && actions
-      ? `<button type="button" data-playground-chat="${escapeHtml(chatPerson.id)}" style="display:block;width:100%;margin-top:10px;padding:6px 12px;background:linear-gradient(135deg, #630ed4, #6520c0);color:white;font-size:12px;font-weight:600;border:none;border-radius:8px;cursor:pointer;text-align:center;">Chat →</button>`
+      ? `<button type="button" data-playground-chat="${escapeHtml(chatPerson.id)}" style="display:block;width:100%;margin-top:10px;padding:6px 12px;background:linear-gradient(135deg, #7c3aed, #6d28d9);color:white;font-size:12px;font-weight:600;border:none;border-radius:8px;cursor:pointer;text-align:center;">Chat →</button>`
       : '';
   return `<div data-testid="playground-pin-overlay">
     <div data-testid="playground-pin-popup-card" style="color:#fff;background:#18181b;padding:14px;border-radius:14px;border:1px solid #27272a;box-shadow:0 8px 32px rgba(0,0,0,0.4);min-width:200px;max-width:260px;">
@@ -382,32 +383,20 @@ export default function PlaygroundMap({
               <Layers className="h-3.5 w-3.5 text-primary" />
               Map layers
             </div>
-            <label className="flex cursor-pointer items-center gap-2 py-1">
-              <input
-                type="checkbox"
-                className="accent-primary"
-                checked={showNetwork}
-                onChange={() => setShowNetwork((v) => !v)}
-                aria-label="My Network"
-              />
+            <div className="flex items-center gap-2 py-1">
+              <Toggle checked={showNetwork} onCheckedChange={setShowNetwork} aria-label="My Network" className="scale-75" />
               My Network
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 py-1">
-              <input
-                type="checkbox"
-                className="accent-secondary"
-                checked={showEvents}
-                onChange={() => setShowEvents((v) => !v)}
-                aria-label="Events"
-              />
-              <span className="text-secondary">Events</span>
-            </label>
+            </div>
+            <div className="flex items-center gap-2 py-1">
+              <Toggle checked={showEvents} onCheckedChange={setShowEvents} aria-label="Events" className="scale-75" />
+              <span className="text-primary">Events</span>
+            </div>
           </div>
           <div className="absolute bottom-4 left-4 z-[8] rounded-xl border border-border-hard bg-surface-container/90 px-4 py-2">
             <span className="text-sm text-on-surface-variant">
               <span className="font-bold text-primary">{people.length}</span> connections
               <span className="mx-1.5">·</span>
-              <span className="font-bold text-secondary">{events.length}</span> events
+              <span className="font-bold text-primary">{events.length}</span> events
             </span>
           </div>
         </>

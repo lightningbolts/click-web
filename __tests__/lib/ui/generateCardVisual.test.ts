@@ -1,6 +1,5 @@
 import {
   generateCardVisual,
-  accentColorForStableId,
   beaconPinShapeFor,
   contrastRatio,
   CARD_HUE_FAMILIES,
@@ -50,16 +49,6 @@ describe('generateCardVisual', () => {
         );
       }
     }
-  });
-
-  it('accent slots stay ~62.5% purple', () => {
-    let purple = 0;
-    for (let i = 0; i < 800; i++) {
-      if (accentColorForStableId(`a-${i}`) === '#630ED4') purple += 1;
-    }
-    const ratio = purple / 800;
-    expect(ratio).toBeGreaterThanOrEqual(0.58);
-    expect(ratio).toBeLessThanOrEqual(0.68);
   });
 
   it('maps beacon types to distinct shapes', () => {

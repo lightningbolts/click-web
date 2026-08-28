@@ -1,5 +1,5 @@
-export const PIN_PRIMARY = '#630ed4';
-export const PIN_SECONDARY = '#224CFF';
+export const PIN_PRIMARY = '#7c3aed';
+export const PIN_SECONDARY = '#6d28d9';
 
 export type OverlayPin = {
   id: string;

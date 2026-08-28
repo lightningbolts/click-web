@@ -35,7 +35,7 @@ export default function GuestRsvpForm({ beaconId }: { beaconId: string }) {
 
   if (status === "ok") {
     return (
-      <div className="rounded-[12px] border border-border-hard bg-secondary-container p-4">
+      <div className="rounded-[12px] border border-border-hard bg-primary-container p-4">
         <p className="text-sm font-semibold text-on-secondary-container">{message}</p>
         <p className="mt-1 text-sm text-on-surface-variant">We’ll keep your spot. Share the event with a friend.</p>
       </div>

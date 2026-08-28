@@ -92,8 +92,8 @@ export default function WaitlistModal({
               </button>
             </div>
             {status === 'success' ? (
-              <div className="rounded-[16px] border border-border-hard bg-secondary-container p-5 text-center">
-                <CheckCircle className="mx-auto mb-3 h-10 w-10 text-secondary" />
+              <div className="rounded-[16px] border border-border-hard bg-primary-container p-5 text-center">
+                <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" />
                 <p className="font-medium text-on-secondary-container">You&apos;re on the list. We&apos;ll be in touch.</p>
                 <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
               </div>

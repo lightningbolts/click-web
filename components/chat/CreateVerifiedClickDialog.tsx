@@ -8,6 +8,7 @@ import {
   createVerifiedClickFromConnections,
   verifiedCliqueEdgesExist,
 } from '@/lib/chat/createVerifiedClick';
+import { Toggle } from '@/components/ui/Toggle';
 
 export type ClickFriendOption = { connectionId: string; userId: string; name: string };
 
@@ -198,21 +199,20 @@ export default function CreateVerifiedClickDialog({
                   const checked = selected.has(f.userId);
                   const enabled = checked || (eligibilityReady && mask[f.userId] === true);
                   return (
-                    <label
+                    <div
                       key={f.connectionId}
                       className={`flex items-center gap-3 rounded-xl border border-border-hard px-3 py-2 ${
-                        enabled ? 'cursor-pointer bg-surface-container' : 'cursor-default opacity-40'
+                        enabled ? 'bg-surface-container' : 'opacity-40'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-primary"
+                      <Toggle
                         checked={checked}
                         disabled={!enabled}
-                        onChange={() => toggle(f.userId)}
+                        onCheckedChange={() => toggle(f.userId)}
+                        aria-label={`Select ${f.name}`}
                       />
                       <span className="text-sm text-on-surface">{f.name}</span>
-                    </label>
+                    </div>
                   );
                 })
               )}

@@ -2,10 +2,9 @@
  * Deterministic card / beacon visual identity. Mirrors mobile `ui/theme/CardVisual.kt` +
  * `ui/theme/Contrast.kt` — same FNV-1a seed, same 16 hue buckets, same WCAG scrim search.
  *
- * Two separate systems live in this file, and they must stay separate:
- * - `generateCardVisual` paints **content** identity from the full hue palette so individual
- *   beacons / events / connections are visually distinguishable.
- * - `accentColorForStableId` is **UI chrome** and stays on the 60/40–65/35 purple/blue ratio.
+ * `generateCardVisual` paints **content** identity from the full hue palette so individual
+ * beacons / events / connections are visually distinguishable. Interactive chrome must use
+ * the semantic primary token instead of these decorative palette colors.
  */
 
 export const CLICK_PURPLE = '#630ED4';
@@ -89,7 +88,6 @@ export function fnv1a32(text: string): number {
   }
   return hash | 0;
 }
-
 function parseHexRgb(hex: string): [number, number, number] {
   const raw = hex.replace('#', '');
   return [
@@ -192,13 +190,4 @@ export function beaconPinShapeFor(kind: string | null | undefined): BeaconPinSha
     default:
       return 'pentagon';
   }
-}
-
-/**
- * UI chrome accent for a stable id. Stays 5/8 purple (62.5%) — the 60/40–65/35 product ratio.
- * Do not fold this into the content palette above.
- */
-export function accentColorForStableId(id: string): string {
-  const hash = fnv1a32(id || 'click') >>> 0;
-  return hash % 8 < 5 ? CLICK_PURPLE : CLICK_BLUE;
 }

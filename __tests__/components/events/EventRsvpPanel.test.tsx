@@ -67,6 +67,7 @@ describe("EventRsvpPanel", () => {
         initialViewer={{ kind: "member", going: true }}
       />,
     );
+    expect(screen.getByTestId("event-state-going")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel RSVP" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "RSVP" })).not.toBeInTheDocument();
   });
@@ -101,6 +102,7 @@ describe("EventRsvpPanel", () => {
     authState.user = { id: "user-1" };
     swrState.data = { current_user_signed_up: true };
     render(<EventRsvpPanel beaconId="11111111-1111-4111-8111-111111111111" />);
+    expect(screen.getByTestId("event-state-going")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel RSVP" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/name/i)).not.toBeInTheDocument();
   });

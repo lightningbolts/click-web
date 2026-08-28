@@ -10,14 +10,14 @@
 @theme {
   --color-background: #f9f9f9;
   --color-foreground: #1a1c1c;
-  --color-primary: #630ed4;
+  --color-primary: #7c3aed;
   --color-on-primary: #ffffff;
-  --color-primary-container: #7c3aed;
-  --color-on-primary-container: #ede0ff;
-  --color-secondary: #224cff;
+  --color-primary-container: #ede9fe;
+  --color-on-primary-container: #5b21b6;
+  --color-secondary: #6d28d9;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #e8edff;
-  --color-on-secondary-container: #0d1f73;
+  --color-secondary-container: #f3e8ff;
+  --color-on-secondary-container: #5b21b6;
   --color-surface: #ffffff;
   --color-surface-container-low: #f3f3f4;
   --color-surface-container: #eeeeee;
@@ -30,7 +30,7 @@
   --color-outline-variant: #ccc3d8;
   --color-border-hard: #ccc3d8;
   --color-error: #ba1a1a;
-  --color-surface-tint: #732ee4;
+  --color-surface-tint: #8b5cf6;
   --color-inverse-primary: #d2bbff;
   --font-sans:
     var(--font-manrope), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
@@ -55,11 +55,11 @@
     --color-outline: #9b8fb0;
     --color-outline-variant: #2e2838;
     --color-border-hard: #2e2838;
-    --color-on-primary-container: #ede0ff;
-    --color-inverse-primary: #d2bbff;
-    --color-secondary-container: #1a2a6e;
-    --color-on-secondary-container: #d6e0ff;
-    /* primary stays brand purple; secondary stays #224CFF */
+    --color-primary-container: #2e1065;
+    --color-on-primary-container: #ede9fe;
+    --color-inverse-primary: #ddd6fe;
+    --color-secondary-container: #3b0764;
+    --color-on-secondary-container: #ddd6fe;
   }
 }
 

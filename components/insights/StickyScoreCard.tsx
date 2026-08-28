@@ -38,7 +38,7 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
   const scoreColor = getScoreColor(score);
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-secondary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
+  const trendColor = trend === 'up' ? 'text-primary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
 
   return (
     <GlassPanel className="p-6">
@@ -136,7 +136,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
   const { value, totalArea, activeZones, trend } = data;
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-secondary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
+  const trendColor = trend === 'up' ? 'text-primary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
   
   // Visual density indicator
   const densityLevel = Math.min(Math.floor(value / 2), 10);
@@ -221,14 +221,14 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
     <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-secondary/20 rounded-lg">
-            <Users className="w-4 h-4 text-secondary" />
+          <div className="p-2 bg-primary/20 rounded-lg">
+            <Users className="w-4 h-4 text-primary" />
           </div>
           <span className="text-sm font-medium text-on-surface-variant">Live Count</span>
         </div>
         <div className="flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-secondary opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-primary opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
         </div>
       </div>
       

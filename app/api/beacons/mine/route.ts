@@ -7,6 +7,7 @@ import {
   eventDisplayTitle,
   eventEndAtFromMetadata,
   eventImageFromMetadata,
+  eventInstantFromRowOrMeta,
   eventLocationNameFromMetadata,
   eventStartAtFromMetadata,
   eventTitleFromMetadata,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     const admin = createAdminSupabaseClient();
     const { data: created, error: createdErr } = await admin
       .from("map_beacons")
-      .select("id, metadata, location, beacon_type")
+      .select("id, metadata, location, beacon_type, starts_at, ends_at")
       .eq("creator_id", user.id)
       .eq("beacon_type", "event")
       .order("created_at", { ascending: false })
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
     if (rsvpIds.length > 0) {
       const { data } = await admin
         .from("map_beacons")
-        .select("id, metadata, location, beacon_type")
+        .select("id, metadata, location, beacon_type, starts_at, ends_at")
         .in("id", rsvpIds)
         .eq("beacon_type", "event");
       rsvpBeacons = Array.isArray(data) ? data : [];
@@ -98,8 +99,8 @@ export async function GET(request: NextRequest) {
         ),
         description: eventDescriptionFromMetadata(meta),
         image_url: eventImageFromMetadata(meta),
-        event_start_at: eventStartAtFromMetadata(meta),
-        event_end_at: eventEndAtFromMetadata(meta),
+        event_start_at: eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)),
+        event_end_at: eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)),
         location_name: eventLocationNameFromMetadata(meta),
         latitude: Number.isFinite(coords.lat) ? coords.lat : null,
         longitude: Number.isFinite(coords.lng) ? coords.lng : null,

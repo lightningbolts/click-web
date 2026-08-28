@@ -52,7 +52,7 @@ export default function LandingPage() {
             <h1 className="mt-8 text-4xl font-bold tracking-tight sm:text-5xl">
               <span className="text-primary">C</span>
               <span className="text-on-surface">lick:</span>
-              <span className="text-secondary"> from handshake to friendship.</span>
+              <span className="text-primary"> from handshake to friendship.</span>
             </h1>
             <p className="mt-4 max-w-md text-base font-medium leading-relaxed text-on-surface-variant sm:text-lg">
               Stop scrolling. Start living.
@@ -67,7 +67,7 @@ export default function LandingPage() {
             </button>
             <Link
               href="/about"
-              className="mt-4 text-sm font-semibold text-on-surface-variant hover:text-secondary"
+              className="mt-4 text-sm font-semibold text-on-surface-variant hover:text-primary"
             >
               About
             </Link>
@@ -87,11 +87,11 @@ export default function LandingPage() {
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed text-on-surface-variant">
               You&apos;ve had that conversation at a party, a class, a show — the kind where you think,{' '}
-              <span className="font-semibold text-secondary">I should actually know this person</span>. Then you follow
+              <span className="font-semibold text-primary">I should actually know this person</span>. Then you follow
               each other and it evaporates. Pretty soon they&apos;re just another handle in the same endless scroll.
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-2">
-              <div className="rounded-[16px] border border-border-hard border-l-4 border-l-secondary bg-surface p-5">
+              <div className="rounded-[16px] border border-border-hard border-l-4 border-l-primary bg-surface p-5">
                 <h3 className="font-bold text-on-surface">The follow-back void</h3>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   You follow. They follow back. Neither of you ever sends a message.
@@ -104,7 +104,7 @@ export default function LandingPage() {
                   room.
                 </p>
               </div>
-              <div className="rounded-[16px] border border-border-hard border-l-4 border-l-secondary bg-surface p-5">
+              <div className="rounded-[16px] border border-border-hard border-l-4 border-l-primary bg-surface p-5">
                 <h3 className="font-bold text-on-surface">A name without a where</h3>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   Later they&apos;re a row in your messages with no tether to the night, the venue, or the vibe.
@@ -131,8 +131,8 @@ export default function LandingPage() {
                 Profiles swap without hunting a handle.
               </p>
             </div>
-            <div className="fc-card border-l-4 border-l-secondary p-6">
-              <MapPin className="mb-4 h-6 w-6 text-secondary" aria-hidden />
+            <div className="fc-card border-l-4 border-l-primary p-6">
+              <MapPin className="mb-4 h-6 w-6 text-on-surface-variant" aria-hidden />
               <h2 className="text-lg font-bold text-on-surface">Events</h2>
               <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                 Nearby gatherings, RSVP with people you already Clicked, join the route when it
@@ -176,7 +176,7 @@ export default function LandingPage() {
         <section className="relative z-10 px-6 pb-8 md:px-12">
           <p className="mx-auto max-w-2xl text-center text-sm text-on-surface-variant">
             Running a venue, campus, or event program?{' '}
-            <Link href="/enterprise" className="font-semibold text-primary hover:text-secondary">
+            <Link href="/enterprise" className="font-semibold text-primary hover:text-primary/80">
               See Click for enterprise
             </Link>
             .
@@ -190,13 +190,13 @@ export default function LandingPage() {
             </h2>
             <p className="mt-4 text-base leading-relaxed text-on-surface-variant">
               Every other app is optimized to keep you scrolling. Click is optimized for the{' '}
-              <span className="font-semibold text-secondary">thirty seconds</span> when you meet someone worth knowing, and the months to come.
+              <span className="font-semibold text-primary">thirty seconds</span> when you meet someone worth knowing, and the months to come.
             </p>
           </div>
         </section>
 
         <section className="relative z-10 px-6 pb-24 pt-8 md:px-12">
-          <div className="mx-auto max-w-xl rounded-[16px] border border-border-hard border-t-4 border-t-secondary bg-surface px-8 py-12 text-center">
+          <div className="mx-auto max-w-xl rounded-[16px] border border-border-hard border-t-4 border-t-primary bg-surface px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
               Launching in Fall 2026.
             </h2>

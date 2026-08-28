@@ -47,13 +47,13 @@ export function MediaTab({
           {imageItems.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {imageItems.map((m) => (
-                <div key={m.id} className="group relative">
+                <div key={m.id} className="group relative aspect-square overflow-hidden">
                   {resolvedMediaUrls[m.id] ? (
                     <>
                       <button
                         type="button"
                         onClick={() => openMediaItem(m)}
-                        className="block w-full"
+                        className="block h-full w-full"
                         aria-label="Expand image"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -61,9 +61,9 @@ export function MediaTab({
                           src={resolvedMediaUrls[m.id]}
                           alt={m.caption ?? ''}
                           width={400}
-                          height={112}
+                          height={400}
                           decoding="async"
-                          className="h-28 w-full rounded-[8px] border border-border-hard object-cover"
+                          className="h-full w-full rounded-[8px] border border-border-hard object-cover"
                         />
                       </button>
                       <div className="pointer-events-none absolute inset-0 rounded-[8px] bg-black/0 transition group-hover:bg-black/30" />
@@ -87,7 +87,7 @@ export function MediaTab({
                       </div>
                     </>
                   ) : (
-                    <div className="flex h-28 w-full items-center justify-center rounded-[8px] border border-border-hard bg-surface-container text-[11px] font-medium text-on-surface-variant">
+                    <div className="flex aspect-square h-full w-full items-center justify-center rounded-[8px] border border-border-hard bg-surface-container text-[11px] font-medium text-on-surface-variant">
                       Secured image
                     </div>
                   )}

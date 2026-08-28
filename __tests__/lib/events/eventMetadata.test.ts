@@ -1,5 +1,6 @@
 import {
   eventDisplayTitle,
+  eventInstantFromRowOrMeta,
   eventStartAtFromMetadata,
   eventSubtitle,
   eventTimezoneFromMetadata,
@@ -50,5 +51,21 @@ describe("eventMetadata helpers", () => {
     expect(eventWhereLabel("Cal Anderson Park")).toBe("Cal Anderson Park");
     expect(eventWhereLabel("  ")).toBeNull();
     expect(eventWhereLabel(null)).toBeNull();
+  });
+
+  it("maps legacy Current location labels for viewers", () => {
+    expect(eventWhereLabel("Current location")).toBe("Location shared privately");
+    expect(eventWhereLabel("CURRENT LOCATION")).toBe("Location shared privately");
+    expect(eventWhereLabel(" current location ")).toBe("Location shared privately");
+  });
+
+  it("prefers valid row timestamps and falls back to metadata", () => {
+    const metaStart = "2026-08-24T18:00:00.000Z";
+    expect(eventInstantFromRowOrMeta("not-a-date", metaStart)).toBe(metaStart);
+    expect(eventInstantFromRowOrMeta(null, metaStart)).toBe(metaStart);
+    expect(eventInstantFromRowOrMeta("2026-09-01T12:00:00.000Z", metaStart)).toBe(
+      "2026-09-01T12:00:00.000Z",
+    );
+    expect(eventInstantFromRowOrMeta(1_724_457_600_000, null)).toBe("2024-08-24T00:00:00.000Z");
   });
 });

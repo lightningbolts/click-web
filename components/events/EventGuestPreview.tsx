@@ -13,12 +13,14 @@ export default function EventGuestPreview({
   count,
   listing,
   creatorId,
+  past = false,
 }: {
   beaconId: string;
   people: EventGoingPerson[];
   count: number;
   listing: EventListingOptions;
   creatorId: string | null;
+  past?: boolean;
 }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -32,6 +34,7 @@ export default function EventGuestPreview({
       <EventGoingAvatars
         people={showAvatars ? people : []}
         count={count}
+        past={past}
         onOpen={canOpen ? () => setOpen((value) => !value) : undefined}
       />
       {open && canOpen ? (

@@ -140,15 +140,28 @@ export default function InterestsSection() {
 
       {/* Current tags summary */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-5 mt-4">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/15 border border-primary/30 text-primary"
-            >
-              {tag}
-            </span>
-          ))}
+        <div className="mb-5 mt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+            Your interests
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className="rounded p-0.5 hover:bg-surface-container"
+                  aria-label={`Remove ${tag}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
@@ -189,7 +202,7 @@ export default function InterestsSection() {
             {customSelectedTags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 rounded-lg border border-secondary/35 bg-secondary/10 px-2 py-1 text-xs text-primary"
+                className="inline-flex items-center gap-1 rounded-lg border border-primary/35 bg-primary/10 px-2 py-1 text-xs text-primary"
               >
                 {tag}
                 <button

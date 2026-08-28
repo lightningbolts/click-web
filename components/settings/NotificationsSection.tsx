@@ -139,7 +139,7 @@ export default function NotificationsSection({
         />
 
         <NotificationToggleRow
-          icon={<Phone className="w-4 h-4 text-secondary" />}
+          icon={<Phone className="w-4 h-4 text-on-surface-variant" />}
           title="Incoming call alerts"
           description="Show browser alerts for incoming calls when the dashboard is not frontmost."
           checked={notificationPreferences.callPushEnabled}

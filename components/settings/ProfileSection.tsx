@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { User, Save, Camera, Loader2 } from 'lucide-react';
 import { firstLastFromUserMetadata } from '@/lib/userDisplayName';
-
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+import {
+  AVATAR_IMAGE_ACCEPT,
+  AVATAR_IMAGE_MIME_TYPES,
+  USER_AVATAR_ENDPOINT,
+} from '@/lib/uploads/constants';
+import { useImageUpload } from '@/lib/uploads/useImageUpload';
 
 export default function ProfileSection({
   firstName,
@@ -25,7 +29,25 @@ export default function ProfileSection({
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarUploadSuccess = useCallback(
+    (url: string) => {
+      setProfileImageUrl(url);
+      void refreshUser();
+      setProfileMessage({ type: 'success', text: 'Profile photo updated.' });
+    },
+    [refreshUser, setProfileImageUrl],
+  );
+
+  const {
+    uploading: avatarUploading,
+    error: avatarUploadError,
+    upload: uploadAvatar,
+  } = useImageUpload({
+    endpoint: USER_AVATAR_ENDPOINT,
+    acceptedMimeTypes: AVATAR_IMAGE_MIME_TYPES,
+    onSuccess: handleAvatarUploadSuccess,
+  });
 
   const profileMetadataKey = useMemo(() => {
     const m = user?.user_metadata as Record<string, unknown> | undefined;
@@ -53,62 +75,8 @@ export default function ProfileSection({
     e.target.value = '';
     if (!file || !user?.id) return;
 
-    if (!file.type.startsWith('image/')) {
-      setProfileMessage({ type: 'error', text: 'Please choose an image file.' });
-      return;
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
-      setProfileMessage({ type: 'error', text: 'Image must be under 2 MB.' });
-      return;
-    }
-
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      setProfileMessage({ type: 'error', text: 'Supabase client not initialized' });
-      return;
-    }
-
-    const previousImage = profileImageUrl;
-    const objectPath = `${user.id}/${Date.now()}.png`;
-
-    setAvatarUploading(true);
     setProfileMessage({ type: '', text: '' });
-
-    try {
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(objectPath, file, {
-        upsert: true,
-        contentType: file.type || 'image/png',
-      });
-      if (uploadError) {
-        setProfileMessage({ type: 'error', text: uploadError.message });
-        return;
-      }
-
-      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(objectPath);
-      const publicUrl = pub?.publicUrl;
-      if (!publicUrl) {
-        setProfileMessage({ type: 'error', text: 'Could not resolve public URL for avatar.' });
-        return;
-      }
-
-      setProfileImageUrl(publicUrl);
-
-      const { error: dbError } = await supabase.from('users').update({ image: publicUrl }).eq('id', user.id);
-      if (dbError) {
-        setProfileImageUrl(previousImage ?? null);
-        setProfileMessage({ type: 'error', text: dbError.message });
-        return;
-      }
-
-      await refreshUser();
-      setProfileMessage({ type: 'success', text: 'Profile photo updated.' });
-    } catch (err: unknown) {
-      setProfileImageUrl(previousImage ?? null);
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      setProfileMessage({ type: 'error', text: message });
-    } finally {
-      setAvatarUploading(false);
-    }
+    await uploadAvatar(file);
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -171,7 +139,7 @@ export default function ProfileSection({
         <input
           ref={avatarFileInputRef}
           type="file"
-          accept="image/*"
+          accept={AVATAR_IMAGE_ACCEPT}
           className="hidden"
           aria-hidden="true"
           tabIndex={-1}
@@ -209,6 +177,11 @@ export default function ProfileSection({
           <div className="min-w-0">
             <p className="text-sm font-medium text-on-surface">Profile photo</p>
             <p className="text-xs text-on-surface-variant mt-1">JPG or PNG, max 2 MB. Opens your photo library.</p>
+            {avatarUploadError ? (
+              <p className="mt-1.5 text-sm text-error" role="alert">
+                {avatarUploadError}
+              </p>
+            ) : null}
           </div>
         </div>
 

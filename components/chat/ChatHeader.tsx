@@ -402,7 +402,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container flex items-center gap-2"
                         >
                           <Star className="w-4 h-4" /> Remove from Core
                         </button>
@@ -417,7 +417,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container flex items-center gap-2"
                         >
                           <Star className="w-4 h-4" /> Add to Core
                         </button>
@@ -443,7 +443,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container"
+                          className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container"
                         >
                           {connection.status === 'archived' ? 'Restore' : 'Unarchive'}
                         </button>
@@ -483,7 +483,7 @@ export function ChatHeader({
                             );
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-secondary hover:bg-surface-container flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-primary hover:bg-surface-container flex items-center gap-2"
                         >
                           <ShieldOff className="w-4 h-4" /> Unblock
                         </button>

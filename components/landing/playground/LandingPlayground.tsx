@@ -168,9 +168,7 @@ export default function LandingPlayground() {
               onClick={() => setScene(item.id)}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 selected
-                  ? item.id === 'events'
-                    ? 'bg-secondary text-on-secondary'
-                    : 'bg-primary text-on-primary'
+                  ? 'bg-primary text-on-primary'
                   : 'border border-border-hard bg-surface text-on-surface hover:bg-surface-container'
               }`}
             >

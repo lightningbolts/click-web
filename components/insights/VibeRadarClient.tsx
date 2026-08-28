@@ -126,8 +126,8 @@ export default function VibeRadarClient({
 
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-[#630ed4]/20 rounded-xl border border-[#630ed4]/35">
-            <Radar className="w-5 h-5 text-[#630ed4]" />
+          <div className="p-2.5 bg-primary/20 rounded-xl border border-primary/35">
+            <Radar className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-on-surface">Vibe Radar</h2>
@@ -139,9 +139,9 @@ export default function VibeRadarClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="fc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-[#630ed4]/35 transition-colors"
+          className="fc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-primary/35 transition-colors"
         >
-          <Crosshair className="w-4 h-4 text-[#630ed4]" />
+          <Crosshair className="w-4 h-4 text-primary" />
           Deploy beacon
         </button>
       </motion.div>

@@ -18,12 +18,12 @@
 
 - Replace `GlassPanel` with `FcCard`.
 - Demo banner: bordered primary-container plate (no violet→amber gradient wash).
-- Charts: Recharts grid/tooltip follow CSS tokens; series accent `#630ED4`.
+- Charts: Recharts grid/tooltip follow CSS tokens; primary series accent `#7C3AED`.
 
 ---
 
 ## Maps
 
-- Pin/series color → `#630ED4`
+- Pin/series color → `#7C3AED`
 - Basemap: light Positron / dark Dark Matter
 - Popups/controls: FC opaque panels

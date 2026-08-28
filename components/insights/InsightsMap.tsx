@@ -6,7 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, MapPin, Users } from "lucide-react";
 import type { VerifiedConnectionMapNode } from "@/lib/insights/connectionEncounterClustering";
 import { useTheme } from "@/lib/theme/ThemeProvider";
-import { mapStyleForTheme } from "@/lib/theme/mapStyles";
+import { FC_PRIMARY, mapStyleForTheme } from "@/lib/theme/mapStyles";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
 const SRC_VERIFIED = "insights-verified-connections";
@@ -114,7 +114,7 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
               "case",
               ["get", "isVerifiedHandshake"],
               "#22d3ee",
-              "#630ed4",
+              FC_PRIMARY,
             ],
             "circle-radius": [
               "case",
@@ -218,7 +218,7 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
     <div className="relative h-[420px] overflow-hidden rounded-2xl border border-border-hard bg-surface-container">
       {!mapLoaded && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-container">
-          <Loader2 className="h-7 w-7 animate-spin text-[#630ed4]" />
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
         </div>
       )}
       <div ref={containerRef} className="absolute inset-0" />
@@ -227,7 +227,7 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
           <Users className="h-3.5 w-3.5 text-cyan-400" />
           <span>
             <span className="font-semibold text-cyan-300">{verifiedCount}</span> verified ·{" "}
-            <span className="font-semibold text-[#630ed4]">{nodes.length}</span> nodes
+            <span className="font-semibold text-primary">{nodes.length}</span> nodes
           </span>
         </div>
       )}

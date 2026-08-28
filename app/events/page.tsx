@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { unstable_cache } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
+import { loadPublicPastEvents, loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
 import { FcButton, FcCard, FcSectionHeader } from "@/components/fc";
 import PublicEventList from "@/components/events/PublicEventList";
 import EventPageShell from "@/components/events/EventPageShell";
@@ -17,13 +17,22 @@ const loadUpcoming = () =>
     { revalidate: 60 },
   )();
 
+const loadPast = () =>
+  unstable_cache(
+    async () => loadPublicPastEvents(createAdminSupabaseClient()),
+    ["public-past-events-v1"],
+    { revalidate: 60 },
+  )();
+
 export default async function PublicEventsPage() {
-  let events: Awaited<ReturnType<typeof loadPublicUpcomingEvents>> = [];
+  let upcomingEvents: Awaited<ReturnType<typeof loadPublicUpcomingEvents>> = [];
+  let pastEvents: Awaited<ReturnType<typeof loadPublicPastEvents>> = [];
   try {
-    events = await loadUpcoming();
+    [upcomingEvents, pastEvents] = await Promise.all([loadUpcoming(), loadPast()]);
   } catch {
     // CI / local without SUPABASE_SERVICE_ROLE_KEY still render the shell.
-    events = [];
+    upcomingEvents = [];
+    pastEvents = [];
   }
 
   return (
@@ -38,7 +47,7 @@ export default async function PublicEventsPage() {
           <FcButton type="button">Create event</FcButton>
         </Link>
       </div>
-      {events.length === 0 ? (
+      {upcomingEvents.length === 0 && pastEvents.length === 0 ? (
         <FcCard className="px-6 py-12 text-center">
           <h2 className="text-lg font-bold text-on-surface">No public events yet</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-variant">
@@ -49,7 +58,7 @@ export default async function PublicEventsPage() {
           </Link>
         </FcCard>
       ) : (
-        <PublicEventList events={events} />
+        <PublicEventList upcomingEvents={upcomingEvents} pastEvents={pastEvents} />
       )}
     </EventPageShell>
   );

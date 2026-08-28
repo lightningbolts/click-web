@@ -50,7 +50,7 @@ export default function EventsScene({
 
       <div className="px-3 pt-3">
         <div className="flex items-center gap-2 rounded-full border border-border-hard bg-surface px-3 py-2 text-xs text-on-surface-variant">
-          <span className="font-semibold text-secondary">Search</span>
+          <span className="font-semibold text-primary">Search</span>
           people, events, places
         </div>
       </div>
@@ -59,26 +59,26 @@ export default function EventsScene({
         <button
           type="button"
           onClick={() => setOpenId(featured.id)}
-          className="mx-3 mt-3 rounded-[16px] border border-secondary bg-secondary-container p-3 text-left"
+          className="mx-3 mt-3 rounded-[16px] border border-primary bg-primary-container p-3 text-left"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary">Featured</p>
-          <p className="mt-1 text-sm font-bold text-on-secondary-container">{featured.title}</p>
-          <p className="text-xs text-on-secondary-container">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Featured</p>
+          <p className="mt-1 text-sm font-bold text-on-primary-container">{featured.title}</p>
+          <p className="text-xs text-on-primary-container">
             {featured.when} · {featured.venue}
           </p>
           {state.rsvpIds.has(featured.id) ? (
-            <p className="mt-1 text-[11px] font-semibold text-secondary">You&apos;re going</p>
+            <p className="mt-1 text-[11px] font-semibold text-primary">You&apos;re going</p>
           ) : null}
         </button>
       ) : null}
 
       <div className="px-3 pt-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-secondary">I&apos;m down for…</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">I&apos;m down for…</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {['Coffee', 'Live music'].map((intent) => (
             <span
               key={intent}
-              className="rounded-full bg-secondary px-3 py-1 text-[11px] font-semibold text-on-secondary"
+              className="rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-on-primary"
             >
               {intent}
             </span>
@@ -99,7 +99,7 @@ export default function EventsScene({
                 type="button"
                 onClick={() => setOpenId(event.id)}
                 className={`w-full rounded-[12px] border px-3 py-2.5 text-left ${
-                  selected ? 'border-secondary bg-secondary-container' : 'border-border-hard bg-surface'
+                  selected ? 'border-primary bg-primary-container' : 'border-border-hard bg-surface'
                 }`}
               >
                 <p className="text-sm font-semibold text-on-surface">{event.title}</p>
@@ -107,7 +107,7 @@ export default function EventsScene({
                   {event.when} · {event.venue}
                 </p>
                 {going ? (
-                  <p className="mt-1 text-[11px] font-semibold text-secondary">You&apos;re going</p>
+                  <p className="mt-1 text-[11px] font-semibold text-primary">You&apos;re going</p>
                 ) : null}
               </button>
             </li>
@@ -199,8 +199,8 @@ export default function EventsScene({
               onClick={toggleRoute}
               className={`inline-flex items-center justify-center gap-1 rounded-[8px] py-2.5 text-xs font-bold ${
                 routed
-                  ? 'bg-secondary text-on-secondary'
-                  : 'border border-secondary bg-secondary-container text-secondary'
+                  ? 'bg-primary text-on-primary'
+                  : 'border border-primary bg-primary-container text-primary'
               }`}
             >
               <Navigation className="h-3 w-3" />

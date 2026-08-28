@@ -137,13 +137,38 @@ export function encounterMetricPills(enc: ConnectionEncounterRow): { metricKey: 
   return out;
 }
 
+const MIN_DISPLAY_AGE = 13;
+const MAX_DISPLAY_AGE = 100;
+
 export function ageFromBirthday(birthday?: string | null): number | null {
   if (!birthday?.trim()) return null;
-  const d = new Date(birthday.slice(0, 10));
-  if (Number.isNaN(d.getTime())) return null;
-  const t = new Date();
-  let age = t.getFullYear() - d.getFullYear();
-  const md = t.getMonth() - d.getMonth();
-  if (md < 0 || (md === 0 && t.getDate() < d.getDate())) age--;
-  return age >= 0 && age < 130 ? age : null;
+
+  const isoDate = birthday.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+
+  const [year, month, day] = isoDate.split('-').map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const birth = new Date(year, month - 1, day);
+  if (
+    birth.getFullYear() !== year ||
+    birth.getMonth() !== month - 1 ||
+    birth.getDate() !== day
+  ) {
+    return null;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (birth.getTime() > today.getTime()) return null;
+
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDelta = today.getMonth() - birth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  if (age < MIN_DISPLAY_AGE || age > MAX_DISPLAY_AGE) return null;
+  return age;
 }

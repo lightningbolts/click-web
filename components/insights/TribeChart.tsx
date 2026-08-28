@@ -80,7 +80,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
       {/* Bubble Chart */}
       <div className="relative h-[320px] bg-surface-container rounded-xl border border-border-hard overflow-hidden">
         {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4]/5 via-transparent to-[#630ed4]/5" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5" />
         
         <svg 
           viewBox="0 0 100 100" 

@@ -198,7 +198,7 @@ export default function PostConnectionVibePrompt({
                 onClick={() => setRating(n)}
                 className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
                   rating === n
-                    ? "bg-[#630ed4] text-on-surface"
+                    ? "bg-primary text-on-primary"
                     : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
                 }`}
               >
@@ -289,7 +289,7 @@ export default function PostConnectionVibePrompt({
               type="button"
               onClick={submit}
               disabled={status === "saving" || (rating === null && !message.trim())}
-              className="flex-1 rounded-xl bg-[#630ed4] py-3 text-sm font-semibold text-on-surface transition-colors hover:bg-[#732ee4] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {status === "saving" ? "Saving…" : "Share vibe"}
             </button>

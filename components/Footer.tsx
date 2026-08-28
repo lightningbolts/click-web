@@ -24,19 +24,19 @@ export default function Footer() {
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-semibold md:gap-6 md:text-base">
-            <Link href="/privacy" className="text-on-surface hover:text-secondary">
+            <Link href="/privacy" className="text-on-surface hover:text-primary">
               Privacy
             </Link>
             <span className="text-outline">•</span>
-            <Link href="/terms" className="text-on-surface hover:text-secondary">
+            <Link href="/terms" className="text-on-surface hover:text-primary">
               Terms
             </Link>
             <span className="text-outline">•</span>
-            <Link href="/about" className="text-on-surface hover:text-secondary">
+            <Link href="/about" className="text-on-surface hover:text-primary">
               About
             </Link>
             <span className="text-outline">•</span>
-            <Link href="/enterprise" className="text-on-surface hover:text-secondary">
+            <Link href="/enterprise" className="text-on-surface hover:text-primary">
               Enterprise
             </Link>
           </div>

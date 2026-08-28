@@ -15,6 +15,27 @@ describe("formatEventWhen", () => {
     const label = formatEventWhen("2026-04-10T19:00:00.000Z", null, "Not/A_Zone");
     expect(label).toMatch(/Apr/);
   });
+
+  it("keeps time-only end labels for same-day ranges in the event timezone", () => {
+    const label = formatEventWhen(
+      "2026-04-10T20:00:00.000Z",
+      "2026-04-11T04:00:00.000Z",
+      "America/Los_Angeles",
+    );
+    expect(label).toMatch(/Apr 10/);
+    expect(label).not.toMatch(/Apr 11/);
+    expect(label).toMatch(/–\s*\d/);
+  });
+
+  it("includes weekday and date on the end when the range crosses calendar days in the event timezone", () => {
+    const label = formatEventWhen(
+      "2026-04-10T20:00:00.000Z",
+      "2026-04-11T07:00:00.000Z",
+      "America/Los_Angeles",
+    );
+    expect(label).toMatch(/Apr 10/);
+    expect(label).toMatch(/Apr 11/);
+  });
 });
 
 describe("formatEventPostedAt", () => {

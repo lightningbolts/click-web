@@ -125,7 +125,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-on-surface-variant py-4">
-          <Loader2 className="w-4 h-4 animate-spin text-[#630ed4]" />
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
           Loading…
         </div>
       ) : (
@@ -162,7 +162,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                       className="flex items-center justify-between gap-2 rounded-xl border border-border-hard/90 bg-surface-container/40 px-3 py-2"
                     >
                       <div className="min-w-0 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-[#630ed4]/35 bg-[#630ed4]/10 px-2.5 py-0.5 text-xs text-sky-200 truncate max-w-[200px]">
+                        <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-0.5 text-xs text-sky-200 truncate max-w-[200px]">
                           {row.intent_tag.trim()}
                         </span>
                         <span className="text-xs text-on-surface-variant">{row.timeframe}</span>
@@ -208,12 +208,12 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                 onChange={(e) => setTag(e.target.value.slice(0, 25))}
                 placeholder="e.g. Coffee, Study session"
                 maxLength={25}
-                className="flex-1 rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-[#630ed4]/50"
+                className="flex-1 rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
               <select
                 value={durationMs}
                 onChange={(e) => setDurationMs(Number(e.target.value))}
-                className="rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-[#630ed4]/50 sm:min-w-[140px]"
+                className="rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/50 sm:min-w-[140px]"
               >
                 {DURATION_OPTIONS.map((o) => (
                   <option key={o.ms} value={o.ms}>
@@ -225,7 +225,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
             <button
               type="submit"
               disabled={saving || !tag.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#630ed4] to-[#6520c0] px-4 py-2.5 text-sm font-medium text-on-surface hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-opacity"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Share availability

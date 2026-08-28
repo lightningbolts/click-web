@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
 import { FcButton, FcTextarea } from "@/components/fc";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
+import {
+  BEACON_IMAGE_ENDPOINT,
+  COVER_IMAGE_ACCEPT,
+  COVER_IMAGE_MIME_TYPES,
+} from "@/lib/uploads/constants";
+import { useImageUpload } from "@/lib/uploads/useImageUpload";
 import { eventSharePath } from "@/lib/events/eventUrls";
 import EventLocationPicker from "@/components/events/EventLocationPicker";
 import EventDateTimeFields from "@/components/events/EventDateTimeFields";
@@ -43,7 +49,6 @@ export default function EventCreateForm({
   const [locationName, setLocationName] = useState(defaultLocationName ?? "");
   const [lat, setLat] = useState(defaultLat != null ? String(defaultLat) : "");
   const [lng, setLng] = useState(defaultLng != null ? String(defaultLng) : "");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [coverThemeId, setCoverThemeId] = useState<string>(EVENT_COVER_THEME_IDS[0]);
   const [visibility, setVisibility] = useState<EventVisibility>(
     DEFAULT_EVENT_LISTING_OPTIONS.event_visibility,
@@ -56,41 +61,20 @@ export default function EventCreateForm({
     "neighborhood",
   );
   const [categories, setCategories] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const {
+    uploading,
+    error: coverUploadError,
+    url: imageUrl,
+    upload: uploadCover,
+  } = useImageUpload({
+    endpoint: BEACON_IMAGE_ENDPOINT,
+    acceptedMimeTypes: COVER_IMAGE_MIME_TYPES,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-
-  const onUpload = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      setError("Cover must be an image");
-      return;
-    }
-    setUploading(true);
-    setError(null);
-    try {
-      const buf = await file.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      const headers = await getFreshAuthHeaders();
-      const res = await fetch("/api/beacons/image", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ file_b64: b64, mime_type: file.type || "image/jpeg" }),
-      });
-      const json = (await res.json()) as { image?: string; error?: string };
-      if (!res.ok || !json.image) {
-        setError(json.error || "Cover upload failed");
-        return;
-      }
-      setImageUrl(json.image);
-    } catch {
-      setError("Cover upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +180,7 @@ export default function EventCreateForm({
                 e.preventDefault();
                 setDragOver(false);
                 const file = e.dataTransfer.files?.[0];
-                if (file) void onUpload(file);
+                if (file) void uploadCover(file);
               }}
             >
               {imageUrl ? (
@@ -217,14 +201,19 @@ export default function EventCreateForm({
               </div>
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept={COVER_IMAGE_ACCEPT}
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) void onUpload(file);
+                  if (file) void uploadCover(file);
                 }}
               />
             </label>
+            {coverUploadError ? (
+              <p className="mt-1.5 text-sm text-error" role="alert">
+                {coverUploadError}
+              </p>
+            ) : null}
           </div>
           <EventThemePicker value={coverThemeId} onChange={setCoverThemeId} />
         </div>

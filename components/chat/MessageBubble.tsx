@@ -499,7 +499,7 @@ export default function MessageBubble({
                   <div
                     className={`max-w-full overflow-hidden rounded-2xl ${
                       isMine
-                        ? 'shadow-[0_10px_40px_rgba(131,56,236,0.38)] ring-1 ring-white/30'
+                        ? 'shadow-[0_10px_40px_rgba(124,56,237,0.38)] ring-1 ring-white/30'
                         : 'border border-border-hard shadow-[0_8px_28px_rgba(0,0,0,0.35)] ring-1 ring-black/30'
                     }`}
                   >
@@ -643,7 +643,7 @@ export default function MessageBubble({
                 <button
                   type="button"
                   onClick={() => onEdit(message.id, message.content)}
-                  className="shrink-0 p-1 rounded-full hover:bg-secondary/20 text-on-surface-variant hover:text-secondary transition-colors"
+                  className="shrink-0 p-1 rounded-full hover:bg-primary/20 text-on-surface-variant hover:text-primary transition-colors"
                   title="Edit"
                 >
                   <Pencil className="w-3.5 h-3.5" />

@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import { LogOut, Menu, X } from "lucide-react";
 import ClickLogo from "@/components/ClickLogo";
 import ThemeToggle from "@/components/ThemeToggle";
+import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
 import { cn } from "@/lib/cn";
 
 export type ProductAppShellItem = {
@@ -35,6 +36,7 @@ type ProductAppShellProps = {
   actions?: ReactNode;
   extraNav?: ProductAppShellLink[];
   userLabel?: string | null;
+  userAvatarUrl?: string | null;
   onSignOut?: () => void | Promise<void>;
   rootTestId?: string;
   chromeTestId?: string;
@@ -70,6 +72,7 @@ export default function ProductAppShell({
   actions,
   extraNav,
   userLabel,
+  userAvatarUrl,
   onSignOut,
   rootTestId,
   chromeTestId,
@@ -177,7 +180,10 @@ export default function ProductAppShell({
           <ThemeToggle />
         </div>
         {userLabel ? (
-          <p className="mb-2 truncate px-1 text-xs font-medium text-on-surface-variant">{userLabel}</p>
+          <div className="mb-2 flex min-w-0 items-center gap-2 px-1">
+            <ConnectionPeerAvatar label={userLabel} imageUrl={userAvatarUrl} size="sm" />
+            <p className="truncate text-xs font-medium text-on-surface-variant">{userLabel}</p>
+          </div>
         ) : null}
         {onSignOut ? (
           <button

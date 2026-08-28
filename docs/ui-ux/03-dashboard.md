@@ -28,7 +28,7 @@ Migrate glass panels → `FcCard`:
 
 - Stats, QR identity, connections table, map, chat list, availability, time capsule
 
-Accent: `#630ED4` / primary-container for brand; `#224CFF` secondary for events/map emphasis (no ad-hoc blue gradient avatars).
+Accent: `#7C3AED` / `primary` + `primary-container` for brand, links, map pins, and selected states. No hardcoded `#630ed4` or blue secondary on chrome.
 
 ### Generated entity identity
 
@@ -40,7 +40,7 @@ Chrome stays flat, but anything representing a specific entity paints its determ
 | Profile Beacons tab rows + detail header | `components/UserProfileModal.tsx` |
 | Time capsule chapter headers | `components/dashboard/TimeCapsule.tsx` — replaces the old fixed `getChapterColor` cycle |
 | Connection avatar fallbacks | `components/dashboard/ConnectionPeerAvatar.tsx` — replaces the old label-hash `hsl()` gradient |
-| Connection popup chat buttons | `components/dashboard/ConnectionMap.tsx` — `accentColorForStableId`, not a hardcoded purple |
+| Connection popup chat buttons | `components/dashboard/ConnectionMap.tsx` — semantic primary accent |
 
 The beacon detail header is decorative: it carries the status chip only, and title / schedule / location live once in the structured section below it.
 

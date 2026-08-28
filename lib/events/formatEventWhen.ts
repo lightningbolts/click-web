@@ -14,6 +14,16 @@ function zoneOptions(timeZone?: string | null): Intl.DateTimeFormatOptions {
   return {};
 }
 
+function calendarDayKey(ms: number, timeZone?: string | null): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    ...(timeZone && isValidTimeZone(timeZone) ? { timeZone } : {}),
+  };
+  return new Intl.DateTimeFormat("en-CA", opts).format(new Date(ms));
+}
+
 export function formatEventWhen(
   startIso: string | null,
   endIso: string | null,
@@ -34,7 +44,15 @@ export function formatEventWhen(
   if (!endIso) return startLabel;
   const endMs = Date.parse(endIso);
   if (!Number.isFinite(endMs)) return startLabel;
+  const sameDay = calendarDayKey(startMs, timeZone) === calendarDayKey(endMs, timeZone);
   const endLabel = new Date(endMs).toLocaleString(undefined, {
+    ...(sameDay
+      ? {}
+      : {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
     hour: "numeric",
     minute: "2-digit",
     ...zone,
