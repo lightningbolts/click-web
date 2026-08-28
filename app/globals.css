@@ -35,24 +35,26 @@
   --font-sans:
     var(--font-manrope), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-display:
+    var(--font-source-serif), ui-serif, Georgia, "Times New Roman", serif;
 }
 
 @layer theme {
   .dark {
     /* Purple-tinted dark (brand), still opaque Functional Clarity */
-    --color-background: #120e18;
+    --color-background: #0b0a10;
     --color-foreground: #f0f1f1;
-    --color-surface: #1c1526;
-    --color-surface-container-low: #221a2e;
-    --color-surface-container: #2a2138;
-    --color-surface-container-high: #322844;
-    --color-surface-container-highest: #3a2f4f;
-    --color-surface-variant: #2a2138;
+    --color-surface: #15121c;
+    --color-surface-container-low: #1c1826;
+    --color-surface-container: #221d2c;
+    --color-surface-container-high: #2a2436;
+    --color-surface-container-highest: #322c40;
+    --color-surface-variant: #221d2c;
     --color-on-surface: #f0f1f1;
     --color-on-surface-variant: #cfc4e0;
     --color-outline: #9b8fb0;
-    --color-outline-variant: #4a3d5c;
-    --color-border-hard: #4a3d5c;
+    --color-outline-variant: #2e2838;
+    --color-border-hard: #2e2838;
     --color-on-primary-container: #ede0ff;
     --color-inverse-primary: #d2bbff;
     --color-secondary-container: #1a2a6e;

@@ -12,6 +12,14 @@ import {
 import { parseBody } from "@/lib/api/parseBody";
 import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 import { maybeCreateSharedEventNudges } from "@/lib/events/sharedEventNudges";
+import {
+  decideMemberRsvp,
+  listingOptionsFromBeacon,
+  loadRequestStatus,
+  upsertRsvpRequest,
+} from "@/lib/events/eventRsvpPolicy";
+import { rsvpEnabledFromMetadata } from "@/lib/events/eventMetadata";
+import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -137,7 +145,16 @@ export async function GET(
       attendeeRows.map((row) => row.user_id),
     );
 
-    const attendees = attendeeRows.map((row) => {
+    const listing = listingOptionsFromBeacon(loaded.beacon);
+    const isHost = await userMayManageBeacon(admin, user.id, {
+      creator_id: loaded.beacon.creator_id ?? "",
+      venue_id: loaded.beacon.venue_id,
+    });
+    const visibleRows =
+      listing.guest_list_visibility === "hosts_only" && !isHost
+        ? attendeeRows.filter((row) => row.user_id === user.id)
+        : attendeeRows;
+    const attendees = visibleRows.map((row) => {
       const profile = profiles.get(row.user_id) ?? null;
       return {
         user_id: row.user_id,
@@ -147,10 +164,13 @@ export async function GET(
       };
     });
 
+    const requestStatus = await loadRequestStatus(admin, beaconId, user.id);
+
     return NextResponse.json({
       beacon_id: beaconId,
       attendees,
       current_user_signed_up: attendeeRows.some((row) => row.user_id === user.id),
+      request_status: requestStatus,
     });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/rsvp:", e);
@@ -182,6 +202,44 @@ export async function POST(
     const loaded = await loadEventBeaconOrResponse(admin, beaconId);
     if ("response" in loaded) return loaded.response;
     const { beacon } = loaded;
+    if (!rsvpEnabledFromMetadata(beacon.metadata)) {
+      return NextResponse.json({ error: "RSVP is closed for this event" }, { status: 403 });
+    }
+    const options = listingOptionsFromBeacon(beacon);
+
+    const { data: existingGoing } = await admin
+      .from("beacon_attendees")
+      .select("user_id")
+      .eq("beacon_id", beaconId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const decision = await decideMemberRsvp({
+      admin,
+      beaconId,
+      userId: user.id,
+      options,
+      alreadyGoing: existingGoing != null,
+    });
+    if (decision.kind === "deny") {
+      return NextResponse.json({ error: decision.error, code: decision.kind }, { status: decision.status });
+    }
+    if (decision.kind === "pending" || decision.kind === "waitlisted") {
+      try {
+        await upsertRsvpRequest(admin, beaconId, user.id, decision.kind);
+      } catch (err) {
+        console.error("POST rsvp request:", err);
+        return NextResponse.json({ error: "Could not save request" }, { status: 400 });
+      }
+      return NextResponse.json({
+        ok: true,
+        request_status: decision.kind,
+        message:
+          decision.kind === "pending"
+            ? "Approval required — request to join"
+            : "Event full — join waitlist",
+      });
+    }
 
     let distanceMeters: number | null = null;
     if (telemetry.latitude != null && telemetry.longitude != null) {

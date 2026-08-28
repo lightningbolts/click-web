@@ -18,7 +18,7 @@ These migrations are **already applied** on the live Click Supabase project (`lr
 
 On 2026-08-24, click-web `main` was reset to `382158d` so [PR #32](https://github.com/lightningbolts/click-web/pull/32) (Reallyrealistic / Andrew Lu) could merge without conflicts. The public event microsite / guest-RSVP **application** is re-landed on `feature/event-microsite` on top of that split-file tree. Original commits remain on `backup/event-microsite-20260823`.
 
-Guest RSVP / public event helpers (`lib/events/publicEvent.ts`) count RSVPs from `beacon_attendees` + `event_guest_rsvps`. First-class time columns and `event_participation` stay unused until the dual-write PRs below.
+Guest RSVP / public event helpers (`lib/events/publicEvent.ts`) count RSVPs from `beacon_attendees` + `event_guest_rsvps`. First-class time columns are dual-written on event create and preferred on public reads, with metadata fallback. `event_participation` stays unused until the dual-write PRs below.
 
 ## Dual-write `event_participation` (after P0 backfill is verified)
 
@@ -36,9 +36,9 @@ Guest RSVPs stay in `event_guest_rsvps` only. `countEventRsvps` in `lib/events/p
 
 Only after a full deploy cycle of verified dual-writes should a **future**, separate migration consider deprecating the legacy tables.
 
-## First-class event time (after P0.1 backfill)
+## First-class event time (live)
 
-- **Writes:** event create/update (`POST /api/beacons`, `EventCreateForm`, mobile `BeaconDropSheet`) set `starts_at` / `ends_at` / `event_timezone` **and** `metadata.event_start_at` / `event_end_at` / `event_timezone`.
+- **Writes:** event create (`POST /api/beacons` with `kind=event`, `EventCreateForm`, mobile `BeaconDropSheet`) sets `starts_at` / `ends_at` / `event_timezone` **and** `metadata.event_start_at` / `event_end_at` / `event_timezone`.
 - **Reads:** prefer the new columns; fall back to `eventStartAtFromMetadata` / `eventEndAtFromMetadata` / `eventTimezoneFromMetadata`.
 - **Cron:** `lib/cron/eventReminders.ts` still parses metadata today. Switch to columns after dual-write, still falling back to metadata.
 

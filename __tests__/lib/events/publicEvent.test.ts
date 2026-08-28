@@ -152,5 +152,8 @@ describe("loadPublicEventPayload", () => {
     expect(event?.image_url).toBe("https://cdn.example/cover.jpg");
     expect(event?.latitude).toBeCloseTo(47.655);
     expect(event?.location_name).toBe("HUB Ballroom");
+    expect(event?.creator_id).toBe("user-1");
+    expect(event?.listing.event_visibility).toBe("public");
+    expect(event?.visual_seed).toBe("evt-9");
   });
 });

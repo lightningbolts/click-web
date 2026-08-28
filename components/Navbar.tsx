@@ -35,7 +35,7 @@ const navCtaClass =
   "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
 
 export default function Navbar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -150,7 +150,11 @@ export default function Navbar() {
           <div className="order-3 flex shrink-0 items-center justify-self-end gap-2">
             <ThemeToggle />
 
-            {user ? (
+            {loading && !user ? (
+              <div data-testid="nav-auth-loading" className={navCtaClass} aria-hidden>
+                <span className="invisible">Login</span>
+              </div>
+            ) : user ? (
               <>
                 <Link href="/events/new" className={cn(navCtaClass, "hidden md:inline-flex")}>
                   <Plus className="block size-4 shrink-0" aria-hidden />

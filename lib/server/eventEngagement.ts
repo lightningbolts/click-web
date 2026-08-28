@@ -53,6 +53,12 @@ export type EventBeaconRow = {
   metadata: Record<string, unknown>;
   lat: number | null;
   lng: number | null;
+  event_visibility?: string | null;
+  event_capacity?: number | null;
+  approval_required?: boolean | null;
+  guest_list_visibility?: string | null;
+  cover_theme_id?: string | null;
+  creator_id?: string | null;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -280,7 +286,9 @@ export async function loadEventBeaconOrResponse(
 
   const { data, error } = await admin
     .from("map_beacons")
-    .select("id, beacon_type, expires_at, venue_id, metadata, location")
+    .select(
+      "id, beacon_type, expires_at, venue_id, metadata, location, creator_id, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id",
+    )
     .eq("id", beaconId)
     .maybeSingle();
 
@@ -322,6 +330,13 @@ export async function loadEventBeaconOrResponse(
       metadata,
       lat,
       lng,
+      creator_id: typeof data.creator_id === "string" ? data.creator_id : null,
+      event_visibility: typeof data.event_visibility === "string" ? data.event_visibility : null,
+      event_capacity: typeof data.event_capacity === "number" ? data.event_capacity : null,
+      approval_required: data.approval_required === true,
+      guest_list_visibility:
+        typeof data.guest_list_visibility === "string" ? data.guest_list_visibility : null,
+      cover_theme_id: typeof data.cover_theme_id === "string" ? data.cover_theme_id : null,
     },
   };
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Navigation } from "lucide-react";
-import { FcButton, FcInput } from "@/components/fc";
+import { FcInput } from "@/components/fc";
 
 type Place = { label: string; lat: number; lng: number };
 
@@ -88,9 +88,13 @@ export default function EventLocationPicker({
           if (json.result?.label) {
             onLocationNameChange(json.result.label);
             setQuery(json.result.label);
+          } else {
+            onLocationNameChange("Current location");
+            setQuery("Current location");
           }
         } catch {
-          /* coords still saved */
+          onLocationNameChange("Current location");
+          setQuery("Current location");
         } finally {
           setGeoBusy(false);
         }
@@ -104,58 +108,58 @@ export default function EventLocationPicker({
 
   return (
     <div className="space-y-2" ref={wrapRef}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-        <div className="relative min-w-0 flex-1">
-          <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-          <FcInput
-            name="location_name"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              onLocationNameChange(e.target.value);
-            }}
-            onFocus={() => {
-              if (results.length > 0) setOpen(true);
-            }}
-            placeholder="Search a park, hall, or address"
-            autoComplete="off"
-            className="pl-9"
-          />
-          {open && results.length > 0 ? (
-            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-[12px] border border-border-hard bg-surface shadow-lg">
-              {results.map((place) => (
-                <li key={`${place.lat},${place.lng},${place.label}`}>
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface-container-low"
-                    onClick={() => pick(place)}
-                  >
-                    {place.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        <FcButton
+      <div className="relative min-w-0">
+        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+        <FcInput
+          name="location_name"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onLocationNameChange(e.target.value);
+          }}
+          onFocus={() => {
+            if (results.length > 0) setOpen(true);
+          }}
+          placeholder="Search a park, hall, or address"
+          autoComplete="off"
+          className="pl-9 pr-12"
+        />
+        <button
           type="button"
-          variant="secondary"
           onClick={useMyLocation}
           disabled={geoBusy}
-          className="shrink-0"
+          aria-label={geoBusy ? "Locating" : "Use my location"}
+          title={geoBusy ? "Locating…" : "Use my location"}
+          className="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-secondary hover:bg-surface-container-low disabled:opacity-40"
         >
           <Navigation className="h-4 w-4" />
-          {geoBusy ? "Locating…" : "Use my location"}
-        </FcButton>
+        </button>
+        {open && results.length > 0 ? (
+          <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-[12px] border border-border-hard bg-surface shadow-lg">
+            {results.map((place) => (
+              <li key={`${place.lat},${place.lng},${place.label}`}>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface-container-low"
+                  onClick={() => pick(place)}
+                >
+                  {place.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
       <input type="hidden" name="lat" value={lat} required />
       <input type="hidden" name="lng" value={lng} required />
       <p className="text-xs text-on-surface-variant">
         {searching
           ? "Searching places…"
-          : pinned
-            ? "Location pinned. Guests will get an open-map link."
-            : "Search or use your location so the event has a map pin."}
+          : geoBusy
+            ? "Locating…"
+            : pinned
+              ? "Location pinned. Guests will get an open-map link."
+              : "Search or use your location so the event has a map pin."}
       </p>
     </div>
   );

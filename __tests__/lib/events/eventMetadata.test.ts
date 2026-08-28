@@ -1,7 +1,9 @@
 import {
   eventDisplayTitle,
   eventStartAtFromMetadata,
+  eventSubtitle,
   eventTimezoneFromMetadata,
+  eventWhereLabel,
   normalizeGuestContact,
   rsvpEnabledFromMetadata,
 } from "@/lib/events/eventMetadata";
@@ -36,5 +38,17 @@ describe("eventMetadata helpers", () => {
     );
     expect(eventTimezoneFromMetadata({ eventTimezone: "America/New_York" })).toBe("America/New_York");
     expect(eventTimezoneFromMetadata({})).toBeNull();
+  });
+
+  it("hides a description that only echoes the title", () => {
+    expect(eventSubtitle("Picnic", "Picnic")).toBeNull();
+    expect(eventSubtitle("Picnic", "Bring a blanket.")).toBe("Bring a blanket.");
+    expect(eventSubtitle("Picnic", "  ")).toBeNull();
+  });
+
+  it("omits empty locations instead of placeholder copy", () => {
+    expect(eventWhereLabel("Cal Anderson Park")).toBe("Cal Anderson Park");
+    expect(eventWhereLabel("  ")).toBeNull();
+    expect(eventWhereLabel(null)).toBeNull();
   });
 });

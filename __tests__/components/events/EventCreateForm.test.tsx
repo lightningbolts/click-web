@@ -13,8 +13,9 @@ describe("EventCreateForm", () => {
   it("posts event beacon fields including title and schedule", () => {
     render(<EventCreateForm />);
     expect(screen.getByTestId("event-create-form")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Community picnic")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Event name")).toBeInTheDocument();
     expect(screen.getByText("Create event")).toBeInTheDocument();
+    expect(screen.getByText("Event options")).toBeInTheDocument();
     const form = screen.getByTestId("event-create-form");
     expect(form.querySelector('[name="title"]')).not.toBeNull();
     expect(form.querySelector('[name="event_start_at"]')).not.toBeNull();

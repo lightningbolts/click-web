@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Manrope, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { Analytics } from "@vercel/analytics/next";
@@ -15,6 +15,12 @@ const manrope = Manrope({
   // Apply className on <body> so font-family is set directly — variable alone
   // can fall through to the browser/system sans (often Inter-like) if theme
   // resolution of var(--font-manrope) fails.
+});
+
+const sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-source-serif",
 });
 
 export const metadata: Metadata = {
@@ -47,7 +53,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#f9f9f9" />
       </head>
       <body
-        className={`${manrope.variable} ${manrope.className} font-sans antialiased bg-background text-on-surface flex flex-col min-h-screen`}
+        className={`${manrope.variable} ${sourceSerif.variable} ${manrope.className} font-sans antialiased bg-background text-on-surface flex flex-col min-h-screen`}
       >
         <ThemeProvider>
           <AuthProvider>

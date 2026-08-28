@@ -29,6 +29,11 @@ import {
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
 import { parseBody } from "@/lib/api/parseBody";
 import { beaconCreateBodySchema } from "@/lib/api/schemas/beacons";
+import {
+  eventListingMetadataPatch,
+  eventTimeColumnsFromMetadata,
+  parseEventListingOptionsFromBody,
+} from "@/lib/events/eventOptions";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -352,7 +357,19 @@ export async function POST(request: NextRequest) {
       body.show_creator_name === "true" ||
       body.showCreatorName === true;
 
-    const visibilityAudience = parseVisibilityAudienceFromBody(body);
+    let visibilityAudience = parseVisibilityAudienceFromBody(body);
+    const eventListing =
+      beacon_type === "event" ? parseEventListingOptionsFromBody(body) : null;
+    if (eventListing) {
+      metadata = { ...metadata, ...eventListingMetadataPatch(eventListing) };
+      if (typeof body.event_timezone === "string" && body.event_timezone.trim()) {
+        metadata = { ...metadata, event_timezone: body.event_timezone.trim() };
+      }
+      if (eventListing.event_visibility !== "public" && visibilityAudience === "everyone") {
+        visibilityAudience = "connections";
+      }
+    }
+    const eventTimes = eventListing ? eventTimeColumnsFromMetadata(metadata) : null;
 
     let venueId: string | null = null;
     const venueIdRaw =
@@ -414,6 +431,18 @@ export async function POST(request: NextRequest) {
         location: `POINT(${lon} ${lat})`,
         metadata,
         expires_at: expiresAtIso,
+        ...(eventListing
+          ? {
+              event_visibility: eventListing.event_visibility,
+              event_capacity: eventListing.event_capacity,
+              approval_required: eventListing.approval_required,
+              guest_list_visibility: eventListing.guest_list_visibility,
+              cover_theme_id: eventListing.cover_theme_id,
+              starts_at: eventTimes?.starts_at ?? null,
+              ends_at: eventTimes?.ends_at ?? null,
+              event_timezone: eventTimes?.event_timezone ?? null,
+            }
+          : {}),
       })
       .select(
         "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",

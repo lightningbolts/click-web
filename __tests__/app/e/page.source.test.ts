@@ -9,5 +9,8 @@ describe("event share page source", () => {
     );
     expect(src).toContain("event-pin-map");
     expect(src).toContain("PinMapLazy");
+    expect(src).toContain("EventPageShell");
+    expect(src).toContain("max-w-prose");
+    expect(src).not.toContain("max-w-5xl");
   });
 });

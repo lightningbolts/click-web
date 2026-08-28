@@ -104,4 +104,22 @@ describe("EventRsvpPanel", () => {
     expect(screen.getByRole("button", { name: "Cancel RSVP" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/name/i)).not.toBeInTheDocument();
   });
+
+  it("asks the host for approval when the listing requires it", () => {
+    authState.user = { id: "user-1" };
+    swrState.data = { current_user_signed_up: false };
+    render(
+      <EventRsvpPanel
+        beaconId="11111111-1111-4111-8111-111111111111"
+        listing={{
+          event_visibility: "public",
+          event_capacity: null,
+          approval_required: true,
+          guest_list_visibility: "public",
+          cover_theme_id: null,
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Request to join" })).toBeInTheDocument();
+  });
 });

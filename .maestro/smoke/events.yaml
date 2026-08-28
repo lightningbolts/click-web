@@ -1,0 +1,19 @@
+url: http://localhost:3000
+name: Public events list smoke
+tags:
+  - smoke
+  - web
+env:
+  BASE_URL: http://localhost:3000
+---
+# launchApp (not openLink): openLink opens a second window and Maestro
+# asserts against the leftover blank tab. See subflows/open_origin.yaml.
+- runFlow:
+    file: ../subflows/open_origin.yaml
+- launchApp:
+    appId: ${BASE_URL}/events
+- extendedWaitUntil:
+    visible:
+      id: event-page-shell
+    timeout: 15000
+- assertVisible: "Create event"

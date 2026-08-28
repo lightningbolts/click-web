@@ -3,10 +3,22 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
-import { FcButton, FcCard, FcField, FcInput, FcTextarea } from "@/components/fc";
+import { FcButton, FcTextarea } from "@/components/fc";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { eventSharePath } from "@/lib/events/eventUrls";
 import EventLocationPicker from "@/components/events/EventLocationPicker";
+import EventDateTimeFields from "@/components/events/EventDateTimeFields";
+import EventOptionsFields from "@/components/events/EventOptionsFields";
+import EventThemePicker from "@/components/events/EventThemePicker";
+import { CardVisualHero } from "@/components/ui/CardVisualSurface";
+import {
+  DEFAULT_EVENT_LISTING_OPTIONS,
+  EVENT_COVER_THEME_IDS,
+  type EventVisibility,
+  type GuestListVisibility,
+} from "@/lib/events/eventOptions";
+import { defaultEventWindow, resolvedTimeZone } from "@/lib/events/eventScheduleUi";
+import { cn } from "@/lib/cn";
 
 type EventCreateFormProps = {
   venueId?: string | null;
@@ -15,22 +27,6 @@ type EventCreateFormProps = {
   defaultLocationName?: string | null;
 };
 
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function toDatetimeLocal(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function defaultWindow(): { start: string; end: string } {
-  const start = new Date();
-  start.setMinutes(0, 0, 0);
-  start.setHours(start.getHours() + 1);
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-  return { start: toDatetimeLocal(start), end: toDatetimeLocal(end) };
-}
-
 export default function EventCreateForm({
   venueId = null,
   defaultLat = null,
@@ -38,15 +34,28 @@ export default function EventCreateForm({
   defaultLocationName = null,
 }: EventCreateFormProps) {
   const router = useRouter();
-  const initialWindow = useMemo(() => defaultWindow(), []);
+  const initialWindow = useMemo(() => defaultEventWindow(), []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [startLocal, setStartLocal] = useState(initialWindow.start);
-  const [endLocal, setEndLocal] = useState(initialWindow.end);
+  const [start, setStart] = useState(initialWindow.start);
+  const [end, setEnd] = useState(initialWindow.end);
+  const [timeZone] = useState(() => resolvedTimeZone());
   const [locationName, setLocationName] = useState(defaultLocationName ?? "");
   const [lat, setLat] = useState(defaultLat != null ? String(defaultLat) : "");
   const [lng, setLng] = useState(defaultLng != null ? String(defaultLng) : "");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [coverThemeId, setCoverThemeId] = useState<string>(EVENT_COVER_THEME_IDS[0]);
+  const [visibility, setVisibility] = useState<EventVisibility>(
+    DEFAULT_EVENT_LISTING_OPTIONS.event_visibility,
+  );
+  const [capacity, setCapacity] = useState<number | null>(null);
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [guestListVisibility, setGuestListVisibility] = useState<GuestListVisibility>("public");
+  const [showCreatorName, setShowCreatorName] = useState(true);
+  const [venueScale, setVenueScale] = useState<"intimate" | "neighborhood" | "venue" | "campus">(
+    "neighborhood",
+  );
+  const [categories, setCategories] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,13 +105,11 @@ export default function EventCreateForm({
       setError("Search for a place or use your current location");
       return;
     }
-    if (!startLocal || !endLocal) {
-      setError("Start and end times are required");
+    if (!locationName.trim()) {
+      setError("Add a location name so guests know where to go");
       return;
     }
-    const startIso = new Date(startLocal).toISOString();
-    const endIso = new Date(endLocal).toISOString();
-    if (Date.parse(endIso) <= Date.parse(startIso)) {
+    if (end.getTime() <= start.getTime()) {
       setError("End must be after start");
       return;
     }
@@ -117,18 +124,30 @@ export default function EventCreateForm({
           kind: "event",
           lat: latN,
           lng: lngN,
-          show_creator_name: true,
-          visibility_audience: "everyone",
+          show_creator_name: showCreatorName,
+          event_visibility: visibility,
+          event_capacity: capacity,
+          approval_required: approvalRequired,
+          guest_list_visibility: guestListVisibility,
+          cover_theme_id: coverThemeId,
+          event_timezone: timeZone,
           ...(venueId ? { venue_id: venueId } : {}),
           metadata: {
             title: title.trim(),
             description: description.trim(),
-            event_start_at: startIso,
-            event_end_at: endIso,
-            location_name: locationName.trim() || null,
+            event_start_at: start.toISOString(),
+            event_end_at: end.toISOString(),
+            event_timezone: timeZone,
+            location_name: locationName.trim(),
             image_url: imageUrl,
             rsvp_enabled: true,
-            venue_scale: "neighborhood",
+            venue_scale: venueScale,
+            event_categories: categories,
+            cover_theme_id: coverThemeId,
+            event_visibility: visibility,
+            event_capacity: capacity,
+            approval_required: approvalRequired,
+            guest_list_visibility: guestListVisibility,
           },
         }),
       });
@@ -158,19 +177,68 @@ export default function EventCreateForm({
     createdId && typeof window !== "undefined" ? `${window.location.origin}${eventSharePath(createdId)}` : null;
 
   return (
-    <FcCard className="p-6 md:p-8">
-      <form onSubmit={onSubmit} className="space-y-6" data-testid="event-create-form">
-        <FcField label="Title">
-          <FcInput
+    <form onSubmit={onSubmit} className="space-y-8" data-testid="event-create-form">
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="space-y-4">
+          <div>
+            <span className="mb-1.5 block text-sm font-semibold text-on-surface">Cover</span>
+            <label
+              className={cn(
+                "relative flex aspect-[4/5] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[16px] border border-dashed text-center transition-colors",
+                dragOver ? "border-primary bg-primary/10" : "border-border-hard bg-surface-container-low hover:border-primary",
+              )}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void onUpload(file);
+              }}
+            >
+              {imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <CardVisualHero
+                  id="create-preview"
+                  visualSeed={coverThemeId}
+                  className="absolute inset-0 h-full w-full"
+                />
+              )}
+              <div className="relative z-10 flex flex-col items-center gap-2 rounded-[12px] bg-black/35 px-4 py-3 text-white">
+                <ImagePlus className="h-6 w-6" />
+                <span className="text-sm font-medium">
+                  {uploading ? "Uploading…" : "Drop a photo or click to upload"}
+                </span>
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void onUpload(file);
+                }}
+              />
+            </label>
+          </div>
+          <EventThemePicker value={coverThemeId} onChange={setCoverThemeId} />
+        </div>
+
+        <div className="space-y-6">
+          <input
             name="title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={80}
             required
-            placeholder="Community picnic"
+            placeholder="Event name"
+            className="w-full border-0 border-b border-border-hard bg-transparent pb-2 font-display text-[32px] font-semibold leading-tight text-on-surface outline-none placeholder:text-on-surface-variant"
           />
-        </FcField>
-        <FcField label="Description">
           <FcTextarea
             name="description"
             value={description}
@@ -179,28 +247,13 @@ export default function EventCreateForm({
             rows={4}
             placeholder="What should people know?"
           />
-        </FcField>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FcField label="Starts">
-            <FcInput
-              type="datetime-local"
-              name="event_start_at"
-              value={startLocal}
-              onChange={(e) => setStartLocal(e.target.value)}
-              required
-            />
-          </FcField>
-          <FcField label="Ends">
-            <FcInput
-              type="datetime-local"
-              name="event_end_at"
-              value={endLocal}
-              onChange={(e) => setEndLocal(e.target.value)}
-              required
-            />
-          </FcField>
-        </div>
-        <FcField label="Location">
+          <EventDateTimeFields
+            start={start}
+            end={end}
+            timeZone={timeZone}
+            onStartChange={setStart}
+            onEndChange={setEnd}
+          />
           <EventLocationPicker
             locationName={locationName}
             lat={lat}
@@ -211,65 +264,34 @@ export default function EventCreateForm({
               setLng(nextLng);
             }}
           />
-        </FcField>
-        <div className="flex w-full min-w-0 flex-col gap-1.5">
-          <span className="text-sm font-semibold text-on-surface">Cover image</span>
-          <label
-            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed px-4 py-8 text-center transition-colors ${
-              dragOver ? "border-secondary bg-secondary-container" : "border-border-hard bg-surface-container-low"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              const file = e.dataTransfer.files?.[0];
-              if (file) void onUpload(file);
-            }}
-          >
-            <ImagePlus className="h-6 w-6 text-on-surface-variant" />
-            <span className="text-sm font-medium text-on-surface">
-              {uploading ? "Uploading…" : "Drop a photo or click to upload"}
-            </span>
-            <span className="text-xs text-on-surface-variant">JPEG, PNG, WebP, or GIF</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onUpload(file);
-              }}
-            />
-          </label>
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="" className="h-40 w-full rounded-[12px] object-cover" />
+          <EventOptionsFields
+            visibility={visibility}
+            capacity={capacity}
+            approvalRequired={approvalRequired}
+            guestListVisibility={guestListVisibility}
+            showCreatorName={showCreatorName}
+            venueScale={venueScale}
+            categories={categories}
+            onVisibility={setVisibility}
+            onCapacity={setCapacity}
+            onApproval={setApprovalRequired}
+            onGuestListVisibility={setGuestListVisibility}
+            onShowCreatorName={setShowCreatorName}
+            onVenueScale={setVenueScale}
+            onCategories={setCategories}
+          />
+          {error ? <p className="text-sm text-error">{error}</p> : null}
+          <FcButton type="submit" className="w-full" disabled={submitting || uploading}>
+            {submitting ? "Creating…" : "Create event"}
+          </FcButton>
+          {shareUrl ? (
+            <p className="break-all text-xs text-on-surface-variant">
+              {copied ? "Link copied. " : ""}
+              {shareUrl}
+            </p>
           ) : null}
         </div>
-        {error ? <p className="text-sm text-error">{error}</p> : null}
-        <FcButton type="submit" className="w-full sm:w-auto" disabled={submitting || uploading}>
-          {submitting ? "Creating…" : "Create event"}
-        </FcButton>
-        {shareUrl ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="break-all text-xs text-on-surface-variant">{shareUrl}</code>
-            <FcButton
-              type="button"
-              variant="secondary"
-              onClick={async () => {
-                await navigator.clipboard.writeText(shareUrl);
-                setCopied(true);
-              }}
-            >
-              {copied ? "Copied" : "Copy link"}
-            </FcButton>
-          </div>
-        ) : null}
-      </form>
-    </FcCard>
+      </div>
+    </form>
   );
 }

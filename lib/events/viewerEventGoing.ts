@@ -7,7 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
  */
 export type ViewerEventRsvpSnapshot =
   | { kind: "guest" }
-  | { kind: "member"; going: boolean }
+  | { kind: "member"; going: boolean; request_status?: "pending" | "waitlisted" | "denied" | null }
   | { kind: "unknown" };
 
 export async function loadViewerEventRsvp(beaconId: string): Promise<ViewerEventRsvpSnapshot> {
@@ -27,7 +27,21 @@ export async function loadViewerEventRsvp(beaconId: string): Promise<ViewerEvent
       .eq("beacon_id", beaconId)
       .eq("user_id", user.id)
       .maybeSingle();
-    return { kind: "member", going: data != null };
+    if (data != null) return { kind: "member", going: true };
+    const { data: request } = await admin
+      .from("event_rsvp_requests")
+      .select("status")
+      .eq("beacon_id", beaconId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const status =
+      request && typeof (request as { status?: unknown }).status === "string"
+        ? (request as { status: string }).status
+        : null;
+    if (status === "pending" || status === "waitlisted") {
+      return { kind: "member", going: false, request_status: status };
+    }
+    return { kind: "member", going: false };
   } catch {
     return { kind: "unknown" };
   }

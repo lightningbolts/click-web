@@ -102,6 +102,11 @@ export const hubPatchBodySchema = z.object({
   category: optionalNonEmptyString,
 }).passthrough();
 
+export const eventRsvpRequestActionSchema = z.object({
+  user_id: z.string().trim().min(1),
+  action: z.enum(['approve', 'deny']).optional(),
+});
+
 export const guestRsvpBodySchema = z.object({
   name: z.string().trim().min(1).max(80),
   contact: z.string().min(1),

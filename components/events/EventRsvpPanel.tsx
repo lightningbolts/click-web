@@ -9,9 +9,11 @@ import GuestRsvpForm from "@/components/events/GuestRsvpForm";
 import EventRsvpDirectory from "@/components/events/EventRsvpDirectory";
 import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
 import type { ViewerEventRsvpSnapshot } from "@/lib/events/viewerEventGoing";
+import type { EventListingOptions } from "@/lib/events/eventOptions";
 
 export type EventRsvpPayload = {
   current_user_signed_up?: boolean;
+  request_status?: "pending" | "waitlisted" | null;
   attendees?: Array<{ user_id: string; name: string; avatar_url: string | null }>;
 };
 
@@ -25,9 +27,13 @@ const loadDirectory = async (url: string) => {
 export default function EventRsvpPanel({
   beaconId,
   initialViewer = { kind: "unknown" },
+  listing,
+  eventEnded = false,
 }: {
   beaconId: string;
   initialViewer?: ViewerEventRsvpSnapshot;
+  listing?: EventListingOptions;
+  eventEnded?: boolean;
 }) {
   const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
@@ -40,6 +46,9 @@ export default function EventRsvpPanel({
     revalidateOnMount: true,
   });
   const going = Boolean(data?.current_user_signed_up ?? memberGoing);
+  const requestStatus =
+    data?.request_status ??
+    (initialViewer.kind === "member" ? initialViewer.request_status : null);
   const sessionFromServer = initialViewer.kind === "member";
   const stateReady = data != null || sessionFromServer;
 
@@ -53,7 +62,7 @@ export default function EventRsvpPanel({
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({ source: "web", platform: "web" }),
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as { error?: string; status?: string };
       if (!res.ok) {
         setStatus("error");
         setMessage(json.error || "Could not save RSVP");
@@ -114,25 +123,39 @@ export default function EventRsvpPanel({
     );
   }
 
+  const ctaLabel = listing?.approval_required && !going ? "Request to join" : "RSVP";
+  const helper =
+    eventEnded
+      ? "This event has ended."
+      : requestStatus === "pending"
+        ? "Your request is waiting for host approval."
+        : requestStatus === "waitlisted"
+          ? "This event is full. You're on the waitlist."
+          : going
+            ? "You're going. Your Click profile is already on the list."
+            : listing?.approval_required
+              ? "The host approves guests before they join."
+              : "RSVP with this Click account. No name or email needed.";
+
   return (
     <div data-testid="account-rsvp-panel">
       <h2 className="text-lg font-bold text-on-surface">RSVP</h2>
-      <p className="mb-4 mt-1 text-sm text-on-surface-variant">
-        {going
-          ? "You're going. Your Click profile is already on the list."
-          : "RSVP with this Click account. No name or email needed."}
-      </p>
-      {going ? (
+      <p className="mb-4 mt-1 text-sm text-on-surface-variant">{helper}</p>
+      {eventEnded ? null : going || requestStatus === "pending" || requestStatus === "waitlisted" ? (
         <FcButton type="button" variant="secondary" className="w-full" onClick={() => void cancel()} disabled={status === "saving" || !user}>
-          {status === "saving" ? "Saving…" : "Cancel RSVP"}
+          {status === "saving" ? "Saving…" : going ? "Cancel RSVP" : "Withdraw request"}
         </FcButton>
       ) : (
         <FcButton type="button" className="w-full" onClick={() => void rsvp()} disabled={status === "saving" || !user}>
-          {status === "saving" ? "Saving…" : "RSVP"}
+          {status === "saving" ? "Saving…" : ctaLabel}
         </FcButton>
       )}
       {message ? <p className="mt-3 text-sm text-error">{message}</p> : null}
-      {going ? <EventRsvpDirectory beaconId={beaconId} /> : null}
+      {going && listing?.guest_list_visibility !== "hosts_only" ? (
+        <EventRsvpDirectory beaconId={beaconId} />
+      ) : going ? (
+        <p className="mt-3 text-sm text-on-surface-variant">Guest list is private to hosts.</p>
+      ) : null}
     </div>
   );
 }

@@ -460,6 +460,7 @@ describe("event engagement API contracts", () => {
           }),
         },
         beacon_attendees: {
+          ...chainSelect({ data: null, error: null, count: 0 }),
           upsert: jest.fn().mockResolvedValue({ error: null }),
           delete: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
@@ -467,6 +468,7 @@ describe("event engagement API contracts", () => {
             }),
           }),
         },
+        event_guest_rsvps: chainSelect({ data: [], error: null, count: 0 }),
         users: {
           select: jest.fn().mockReturnValue({
             in: jest.fn().mockResolvedValue({
