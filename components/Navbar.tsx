@@ -148,7 +148,7 @@ export default function Navbar({
             className="order-1 flex shrink-0 items-center gap-2 justify-self-start text-xl font-bold md:gap-2.5 md:text-2xl"
           >
             <ClickLogo size={28} className="h-7 w-7 md:h-8 md:w-8" priority />
-            <span>
+            <span className="whitespace-nowrap">
               <span className="text-primary">C</span>
               <span className="text-on-surface">lick</span>
             </span>
@@ -171,7 +171,7 @@ export default function Navbar({
           </div>
 
           <div className="order-3 flex shrink-0 items-center justify-self-end gap-2">
-            <ThemeToggle />
+            <ThemeToggle className="hidden md:inline-flex" />
 
             {loading && !user ? (
               <div data-testid="nav-auth-loading" className={navCtaClass} aria-hidden>
@@ -183,7 +183,7 @@ export default function Navbar({
                   <Plus className="block size-4 shrink-0" aria-hidden />
                   Create event
                 </Link>
-                <div className="relative" ref={userMenuRef}>
+                <div className="relative hidden md:block" ref={userMenuRef}>
                   <button
                     type="button"
                     onClick={() => setUserMenuOpen((o) => !o)}
@@ -248,8 +248,8 @@ export default function Navbar({
         </div>
       </nav>
       <MobileNavDrawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
-        <div className="flex h-full min-h-0 flex-col p-3" id="mobile-nav-drawer">
-          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Primary">
+        <div className="flex h-full min-h-0 flex-col" id="mobile-nav-drawer">
+          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary">
             {showProductLinks
               ? productItems.map((item) => (
                   <Link
@@ -282,10 +282,50 @@ export default function Navbar({
               )}
             {user ? (
               <Link href="/events/new" onClick={() => setMobileOpen(false)} className={drawerLinkClass}>
+                <Plus className="h-4 w-4 shrink-0" />
                 Create event
               </Link>
             ) : null}
           </nav>
+          <div className="space-y-1 border-t border-border-hard p-3">
+            <ThemeToggle showLabel className="h-10 w-full justify-start px-3" />
+            {user ? (
+              <>
+                {insightsAccess?.insightsAllowed ? (
+                  <Link
+                    href="/insights"
+                    onClick={() => setMobileOpen(false)}
+                    className={drawerLinkClass}
+                  >
+                    <BarChart2 className="h-4 w-4" />
+                    Insights
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    void handleSignOut();
+                  }}
+                  className={cn(drawerLinkClass, "w-full text-left hover:text-error")}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  setIsLoginOpen(true);
+                }}
+                className={cn(drawerLinkClass, "w-full text-left")}
+              >
+                Login
+              </button>
+            )}
+          </div>
         </div>
       </MobileNavDrawer>
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />

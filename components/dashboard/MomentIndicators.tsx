@@ -84,7 +84,7 @@ export function MomentBlock({
           <Sparkles
             className={`shrink-0 text-amber-800 dark:text-amber-300/95 mt-0.5 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
           />
-          <span className={`min-w-0 ${textMain}`}>{context}</span>
+          <span className={`min-w-0 truncate ${textMain}`} title={context}>{context}</span>
         </div>
       )}
       {weatherSummary && (
@@ -92,7 +92,7 @@ export function MomentBlock({
           <CloudSun
             className={`shrink-0 text-sky-300 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
           />
-          <span className={textMain}>{weatherSummary}</span>
+          <span className={`min-w-0 truncate ${textMain}`} title={weatherSummary}>{weatherSummary}</span>
         </div>
       )}
       {noiseSummary && (
@@ -104,7 +104,7 @@ export function MomentBlock({
               className={`shrink-0 text-primary ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
             />
           )}
-          <span className={textMain}>{noiseSummary}</span>
+          <span className={`min-w-0 truncate ${textMain}`} title={noiseSummary}>{noiseSummary}</span>
         </div>
       )}
     </div>

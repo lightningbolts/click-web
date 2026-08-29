@@ -29,6 +29,14 @@ describe("chat panel chrome", () => {
     expect(composer).toContain("border-t border-border-hard");
     expect(composer).not.toContain("w-[calc(100%-2rem)]");
 
+    const list = fs.readFileSync(
+      path.join(__dirname, "../../../components/dashboard/ChatTabSection.tsx"),
+      "utf8",
+    );
+    expect(list).toContain("CHAT_PANEL_CLASS");
+    expect(list).not.toContain("pr-16");
+    expect(list).not.toContain("absolute right-4 top-1/2");
+
     const token = fs.readFileSync(
       path.join(__dirname, "../../../lib/chat/layout.ts"),
       "utf8",

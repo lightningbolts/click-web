@@ -122,6 +122,17 @@ describe("Navbar", () => {
     expect(screen.getByTestId("nav-sign-out").tagName).toBe("BUTTON");
   });
 
+  it("keeps signed-in mobile chrome to logo plus the menu button", () => {
+    navState.pathname = "/";
+    navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
+    renderNav();
+    const theme = screen.getByRole("button", { name: /Switch to (light|dark) mode/i });
+    expect(theme.className).toMatch(/hidden/);
+    expect(theme.className).toMatch(/md:inline-flex/);
+    expect(screen.getByRole("button", { name: /Ada Lovelace/i }).closest("div")).toHaveClass("hidden");
+    expect(screen.getByTestId("nav-menu-toggle")).toBeInTheDocument();
+  });
+
   it("animates the mobile drawer open and closed", async () => {
     const user = userEvent.setup();
     renderNav();

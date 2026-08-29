@@ -10,6 +10,8 @@ import AppToaster from "@/components/AppToaster";
 import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/lib/theme/ThemeProvider";
 import { ProductChromeProvider } from "@/lib/shell/ProductChromeContext";
 import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
+import { publicOrigin } from "@/lib/events/eventUrls";
+import { brandShareImage } from "@/lib/brand/shareImage";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -27,6 +29,7 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(publicOrigin()),
   title: "Click - From Handshake to Friendship",
   description:
     "Stop collecting followers. Start building real connections. Click transforms fleeting in-person moments into lasting friendships.",
@@ -39,6 +42,16 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/site.webmanifest",
+  openGraph: {
+    title: "Click - From Handshake to Friendship",
+    description:
+      "Stop collecting followers. Start building real connections. Click transforms fleeting in-person moments into lasting friendships.",
+    images: [brandShareImage()],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [brandShareImage().url],
+  },
   other: {
     "theme-color": "#f9f9f9",
   },
