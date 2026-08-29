@@ -1,9 +1,8 @@
 /**
  * Shared chat transcript chrome width.
  *
- * Marketing pages use `max-w-5xl` (1024px). The dashboard chat pane is already
- * full-bleed beside the sidebar, so that cap leaves short bubbles floating in a
- * huge column. `max-w-xl` (576px) tracks mobile `ChatBubbleTokens.contentMaxWidth`
- * (~450dp) without looking like a phone screenshot on desktop.
+ * The dashboard chat pane is already the main column beside the sidebar.
+ * Do not cap header / transcript / composer with `max-w-xl` (that leaves a
+ * skinny strip and huge gutters). Bubble width stays on `MessageBubble`.
  */
-export const CHAT_TRANSCRIPT_MAX_CLASS = 'max-w-xl';
+export const CHAT_TRANSCRIPT_MAX_CLASS = 'max-w-none';

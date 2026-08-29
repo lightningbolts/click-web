@@ -34,7 +34,7 @@ function EventCardList({
           {...(reduceMotion ? {} : fadePresence)}
           transition={fadeTransition(0.16)}
         >
-          <EventListCard event={event} past={past} dense />
+          <EventListCard event={event} past={past} dense hostActions={event.role === "creator"} />
         </motion.div>
       ))}
     </div>

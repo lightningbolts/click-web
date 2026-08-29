@@ -23,6 +23,7 @@ import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
 import EventHostRow from "@/components/events/EventHostRow";
 import EventGuestPreview from "@/components/events/EventGuestPreview";
+import EventHostActions from "@/components/events/EventHostActions";
 import EventPageShell from "@/components/events/EventPageShell";
 import PinMapLazy from "@/components/maps/PinMapLazy";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
@@ -174,6 +175,7 @@ export default async function EventShareLandingPage({
                   past={ended}
                 />
               ) : null}
+              <EventHostActions beaconId={beaconId} creatorId={event.creator_id} />
               {description ? (
                 <p
                   data-testid="event-description"

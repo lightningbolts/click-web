@@ -7,21 +7,14 @@ import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import GuestRsvpForm from "@/components/events/GuestRsvpForm";
 import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
+import {
+  applyCancelOptimistic,
+  applyRsvpOptimistic,
+  fetchEventRsvpPayload,
+  type EventRsvpPayload,
+} from "@/lib/events/eventRsvpClient";
 import type { ViewerEventRsvpSnapshot } from "@/lib/events/viewerEventGoing";
 import type { EventListingOptions } from "@/lib/events/eventOptions";
-
-export type EventRsvpPayload = {
-  current_user_signed_up?: boolean;
-  request_status?: "pending" | "waitlisted" | null;
-  attendees?: Array<{ user_id: string; name: string; avatar_url: string | null }>;
-};
-
-const loadDirectory = async (url: string) => {
-  const headers = await getFreshAuthHeaders();
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error("Failed to load RSVP");
-  return res.json() as Promise<EventRsvpPayload>;
-};
 
 export default function EventRsvpPanel({
   beaconId,
@@ -38,7 +31,7 @@ export default function EventRsvpPanel({
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const memberGoing = initialViewer.kind === "member" ? initialViewer.going : null;
-  const { data, isLoading } = useSWR(user ? eventRsvpKey(beaconId) : null, loadDirectory, {
+  const { data, isLoading } = useSWR(user ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload, {
     fallbackData:
       memberGoing != null ? { current_user_signed_up: memberGoing } : undefined,
     revalidateOnFocus: false,
@@ -50,24 +43,46 @@ export default function EventRsvpPanel({
     (initialViewer.kind === "member" ? initialViewer.request_status : null);
   const sessionFromServer = initialViewer.kind === "member";
   const stateReady = data != null || sessionFromServer;
+  const cacheKey = eventRsvpKey(beaconId);
 
   const rsvp = async () => {
     setStatus("saving");
     setMessage(null);
     try {
       const headers = await getFreshAuthHeaders();
-      const res = await fetch(eventRsvpKey(beaconId), {
+      const res = await fetch(cacheKey, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({ source: "web", platform: "web" }),
       });
-      const json = (await res.json()) as { error?: string; status?: string };
+      const json = (await res.json()) as {
+        error?: string;
+        request_status?: "pending" | "waitlisted";
+        attendee?: { user_id: string; name: string; avatar_url: string | null };
+      };
       if (!res.ok) {
         setStatus("error");
         setMessage(json.error || "Could not save RSVP");
         return;
       }
-      await mutate(eventRsvpKey(beaconId));
+      if (json.request_status === "pending" || json.request_status === "waitlisted") {
+        await mutate(
+          cacheKey,
+          (current: EventRsvpPayload | undefined) => ({
+            ...current,
+            request_status: json.request_status,
+          }),
+          { revalidate: true },
+        );
+      } else if (json.attendee) {
+        await mutate(
+          cacheKey,
+          (current: EventRsvpPayload | undefined) => applyRsvpOptimistic(current, json.attendee!),
+          { revalidate: true },
+        );
+      } else {
+        await mutate(cacheKey);
+      }
       setStatus("idle");
     } catch {
       setStatus("error");
@@ -80,13 +95,18 @@ export default function EventRsvpPanel({
     setMessage(null);
     try {
       const headers = await getFreshAuthHeaders();
-      const res = await fetch(eventRsvpKey(beaconId), { method: "DELETE", headers });
+      const res = await fetch(cacheKey, { method: "DELETE", headers });
       if (!res.ok) {
         setStatus("error");
         setMessage("Could not cancel RSVP");
         return;
       }
-      await mutate(eventRsvpKey(beaconId));
+      await mutate(
+        cacheKey,
+        (current: EventRsvpPayload | undefined) =>
+          user ? applyCancelOptimistic(current, user.id) : current,
+        { revalidate: true },
+      );
       setStatus("idle");
     } catch {
       setStatus("error");

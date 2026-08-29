@@ -84,7 +84,7 @@ interface DashboardViewProps {
  * the tab shell.
  */
 export default function DashboardView({ user }: DashboardViewProps) {
-  const { signOut, onlineUserIds, profileImageUrl } = useAuth();
+  const { user: sessionUser, loading: authLoading, signOut, onlineUserIds, profileImageUrl } = useAuth();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
     parseDashboardTab(searchParams.get('tab')),
@@ -551,6 +551,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   }, []);
 
   const tabs = personalProductNavItems();
+
+  if (!authLoading && !sessionUser) {
+    return <LoadingScreen />;
+  }
 
   if (!connectionsInitialLoadComplete || !birthdayProfileGateResolved) {
     return <LoadingScreen />;

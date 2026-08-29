@@ -13,6 +13,7 @@ import useSWR from "swr";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import { cn } from "@/lib/cn";
 import { isSignedInProductPath } from "@/lib/shell/personalProductNav";
+import { useProductChrome } from "@/lib/shell/ProductChromeContext";
 
 type InsightsAccessPayload = { insightsAllowed: boolean };
 
@@ -35,8 +36,13 @@ const navControlClass =
 const navCtaClass =
   "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
 
-export default function Navbar() {
+export default function Navbar({
+  initialHasSession = false,
+}: {
+  initialHasSession?: boolean;
+}) {
   const { user, signOut, loading } = useAuth();
+  const productChrome = useProductChrome();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -50,8 +56,11 @@ export default function Navbar() {
     insightsAccessFetcher,
   );
 
+  const sessionForChrome = Boolean(user) || (loading && initialHasSession);
   const isProductRoute =
-    pathname.startsWith("/insights") || Boolean(user && isSignedInProductPath(pathname));
+    pathname.startsWith("/insights") ||
+    productChrome ||
+    Boolean(sessionForChrome && isSignedInProductPath(pathname));
 
   useEffect(() => {
     setMobileOpen(false);

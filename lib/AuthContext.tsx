@@ -175,13 +175,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Sign out error or timeout:', error);
       } finally {
-        // Always clear local state
         setUser(null);
         setProfileImageUrl(null);
+        router.replace('/');
+        router.refresh();
       }
     } else {
       setUser(null);
       setProfileImageUrl(null);
+      router.replace('/');
+      router.refresh();
     }
   };
 

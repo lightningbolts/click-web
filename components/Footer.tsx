@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import ClickLogo from '@/components/ClickLogo';
+import { useProductChrome } from '@/lib/shell/ProductChromeContext';
 
 export default function Footer() {
   const { user } = useAuth();
+  const productChrome = useProductChrome();
 
-  if (user) return null;
+  if (user || productChrome) return null;
 
   return (
     <footer

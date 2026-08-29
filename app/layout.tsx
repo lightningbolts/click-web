@@ -7,6 +7,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AppToaster from "@/components/AppToaster";
 import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/lib/theme/ThemeProvider";
+import { ProductChromeProvider } from "@/lib/shell/ProductChromeContext";
+import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -41,11 +43,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let initialHasSession = false;
+  try {
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      const supabase = await createSupabaseServerClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      initialHasSession = Boolean(user);
+    }
+  } catch {
+    initialHasSession = false;
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -57,10 +72,12 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AuthProvider>
-            <Navbar />
-            <main className="flex-1 flex flex-col">{children}</main>
-            <Footer />
-            <AppToaster />
+            <ProductChromeProvider>
+              <Navbar initialHasSession={initialHasSession} />
+              <main className="flex-1 flex flex-col">{children}</main>
+              <Footer />
+              <AppToaster />
+            </ProductChromeProvider>
           </AuthProvider>
         </ThemeProvider>
         <Analytics />

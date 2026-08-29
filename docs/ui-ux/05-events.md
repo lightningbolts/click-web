@@ -20,8 +20,9 @@ Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-li
 |-------|-----|--------|
 | `/events` | Public | Shared `EventPageShell` (`max-w-6xl`). Signed-in visitors also get `ProductAppShell`; anonymous visitors keep marketing `Navbar`. Search + date/going/host chips, featured soonest event, then Today / This week / Upcoming. Cards use `CardVisualHero` (no date-rail). Only `event_visibility = public` **and** `visibility_audience = everyone`. Unlisted / invite-only stay off this feed. |
 | `/events/new` | Signed in | Same 6xl shell, plus product chrome when signed in. Split-pane create form (cover + theme \| details + Event options). |
-| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended). One action row: **Open in Click** + copy-link icon (both `h-11`), then **Get the app** / **Android** as secondary `FcButton`s. Back goes to `/events` when that was the previous page, otherwise signed-in visitors return to `/?tab=events`. Connections-only and unlisted/invite-only events stay reachable via this URL. |
-| `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics |
+| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended). Signed-in RSVP mutates `GET /api/beacons/{id}/rsvp` (attendees + `rsvp_count`) so the guest preview updates without a reload. Hosts also see **Edit details** / **Host settings**. One action row: **Open in Click** + copy-link icon (both `h-11`), then **Get the app** / **Android** as secondary `FcButton`s. Back goes to `/events` when that was the previous page, otherwise signed-in visitors return to `/?tab=events`. Connections-only and unlisted/invite-only events stay reachable via this URL. |
+| `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics, **Edit details** |
+| `/e/[beaconId]/edit` | Creator or venue manager | Same `EventCreateForm` as create, `PATCH /api/beacons/{id}`. Hosted dashboard cards and the public event page expose **Edit details** and **Host settings**. |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
 | `/e/[beaconId]/summary?token=` | Public snapshot | Aggregate counts only, after organizer publish |
 
@@ -55,9 +56,10 @@ Hourly `GET /api/cron/nudges-reconnect` writes inbox rows for handshake connecti
 | GET | `/api/beacons/{id}/public` | none |
 | POST | `/api/beacons/{id}/rsvp/guest` | none, rate-limited |
 | GET | `/api/beacons/{id}/rsvp/guests` | organizer |
-| GET/POST/DELETE | `/api/beacons/{id}/rsvp` | session (Click RSVP; returns `request_status`) |
+| GET/POST/DELETE | `/api/beacons/{id}/rsvp` | session (Click RSVP; returns `request_status`, `attendees`, `rsvp_count`) |
 | GET/POST | `/api/beacons/{id}/rsvp/requests` | organizer (approve / deny pending or waitlisted) |
 | GET/POST | `/api/beacons` | session (create event + map fetch) |
+| GET/PATCH/DELETE | `/api/beacons/{id}` | session (PATCH is creator; event listing columns + location) |
 | GET | `/api/beacons/mine` | session |
 | GET | `/api/beacons/{id}/mutual-attendees` | session |
 | GET | `/api/beacons/{id}/recap` | participant |
