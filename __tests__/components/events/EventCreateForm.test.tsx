@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EventCreateForm from "@/components/events/EventCreateForm";
-import { UPLOAD_FALLBACK_ERROR } from "@/lib/uploads/constants";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -9,6 +8,9 @@ jest.mock("next/navigation", () => ({
 
 jest.mock("@/lib/auth/freshAuthHeaders", () => ({
   getFreshAuthHeaders: async () => ({ "Content-Type": "application/json" }),
+  fetchWithFreshAuth: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+  authFailureMessage: (status: number, fallback: string) =>
+    status === 401 || status === 403 ? "Session expired. Sign in again." : fallback,
 }));
 
 const mockFetch = jest.fn();
@@ -40,6 +42,7 @@ describe("EventCreateForm", () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({
       ok: false,
+      status: 400,
       json: async () => ({ error: "Storage upload failed" }),
     });
 
@@ -48,6 +51,6 @@ describe("EventCreateForm", () => {
     const file = new File([new Uint8Array(1200)], "cover.jpg", { type: "image/jpeg" });
     await user.upload(input, file);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(UPLOAD_FALLBACK_ERROR);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Storage upload failed");
   });
 });

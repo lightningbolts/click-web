@@ -20,9 +20,12 @@ jest.mock('@/components/dashboard/DashboardEventsModule', () => ({
   default: () => <div data-testid="dashboard-events-module" />,
 }));
 
+const searchState: { tab: string | null } = { tab: null };
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
   usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(searchState.tab ? `tab=${searchState.tab}` : ''),
 }));
 
 jest.mock('livekit-client', () => ({
@@ -192,6 +195,7 @@ async function renderDashboard(user: Record<string, unknown> = buildMockUser()) 
 describe('DashboardView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    searchState.tab = null;
     global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/api/users/') && url.includes('/profile')) {
@@ -250,6 +254,12 @@ describe('DashboardView', () => {
     expect(screen.getByTestId('milestone-progress')).toBeInTheDocument();
     expect(screen.getByTestId('time-capsule')).toBeInTheDocument();
     expect(screen.getByTestId('connection-table')).toBeInTheDocument();
+  });
+
+  it('opens the Events tab when ?tab=events is present', async () => {
+    searchState.tab = 'events';
+    await renderDashboard();
+    expect(await screen.findByTestId('dashboard-events-module')).toBeInTheDocument();
   });
 
   it('lists achievement badges on the Memory Box tab', async () => {

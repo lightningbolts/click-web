@@ -9,7 +9,13 @@ import {
 } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
-import { normalizeDbMessage } from '@/lib/chat/messages';
+import {
+  coerceMessageType,
+  coerceMetadata,
+  isBeaconChatMessage,
+  normalizeDbMessage,
+  shouldSkipChatDecrypt,
+} from '@/lib/chat/messages';
 import {
   decryptContent,
   isEncrypted,
@@ -82,7 +88,12 @@ export function useChatRealtime({
           const { eventType, new: newRow, old: oldRow } = payload;
 
           if (eventType === 'INSERT') {
-            const skipDecrypt = newRow.message_type === 'call_log';
+            const skipDecrypt =
+              shouldSkipChatDecrypt(newRow.message_type) ||
+              isBeaconChatMessage({
+                message_type: coerceMessageType(newRow.message_type),
+                metadata: coerceMetadata(newRow.metadata),
+              });
             const plainContent = skipDecrypt
               ? (newRow.content ?? '')
               : await decryptIfNeeded(newRow.content ?? '');
@@ -138,7 +149,12 @@ export function useChatRealtime({
               void firePeerDeliveredAck([msg.id]);
             }
           } else if (eventType === 'UPDATE') {
-            const skipDecrypt = newRow.message_type === 'call_log';
+            const skipDecrypt =
+              shouldSkipChatDecrypt(newRow.message_type) ||
+              isBeaconChatMessage({
+                message_type: coerceMessageType(newRow.message_type),
+                metadata: coerceMetadata(newRow.metadata),
+              });
             const plainContent = skipDecrypt
               ? (newRow.content ?? '')
               : await decryptIfNeeded(newRow.content ?? '');

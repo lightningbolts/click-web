@@ -190,34 +190,35 @@ export default async function EventShareLandingPage({
             </FcCard>
 
             <SeedRoomTeaser beaconId={beaconId} />
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <a href={eventDeepLink(beaconId)} className="block max-w-md">
-                  <FcButton type="button" className="w-full">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 max-w-md flex-1">
+                <a href={eventDeepLink(beaconId)} className="block">
+                  <FcButton type="button" className="h-11 w-full">
                     Open in Click
                   </FcButton>
                 </a>
-                <p className="mt-2 text-sm text-on-surface-variant">
-                  <a
-                    href={APP_CONFIG.ios_store_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-primary hover:underline"
-                  >
-                    Get the app
-                  </a>
-                  {" · "}
-                  <a
-                    href={APP_CONFIG.android_store_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-primary hover:underline"
-                  >
-                    Android
-                  </a>
-                </p>
               </div>
               <EventCopyLinkButton url={shareUrl} icon />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <a
+                href={APP_CONFIG.ios_store_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <FcButton type="button" variant="secondary">
+                  Get the app
+                </FcButton>
+              </a>
+              <a
+                href={APP_CONFIG.android_store_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <FcButton type="button" variant="secondary">
+                  Android
+                </FcButton>
+              </a>
             </div>
             <p>
               <Link href="/events" className="text-sm font-semibold text-primary hover:underline">

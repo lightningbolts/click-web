@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
-import { normalizeDbMessage } from '@/lib/chat/messages';
+import { isBeaconChatMessage, normalizeDbMessage, shouldSkipChatDecrypt } from '@/lib/chat/messages';
 import { CHAT_SEARCH_FOCUS_MS } from '@/lib/chat/searchSnippet';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import {
@@ -249,7 +249,7 @@ export function useMessageLoading({
       if (!groupMasterKey) return raw;
       return Promise.all(
         raw.map(async (m) => {
-          if (m.message_type === 'call_log' || !isGroupMessageEncrypted(m.content)) return m;
+          if (shouldSkipChatDecrypt(m.message_type) || isBeaconChatMessage(m) || !isGroupMessageEncrypted(m.content)) return m;
           const plaintext = await decryptGroupMessageContent(m.content, groupMasterKey);
           return { ...m, content: plaintext };
         }),
@@ -259,7 +259,7 @@ export function useMessageLoading({
     if (!e2eKeys) return raw;
     const decrypted = await Promise.all(
       raw.map(async (m) => {
-        if (m.message_type === 'call_log' || !isEncrypted(m.content)) return m;
+        if (shouldSkipChatDecrypt(m.message_type) || isBeaconChatMessage(m) || !isEncrypted(m.content)) return m;
         const plaintext = await decryptContent(m.content, e2eKeys);
         return { ...m, content: plaintext };
       }),

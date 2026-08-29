@@ -26,7 +26,9 @@ import {
 } from '@/lib/chat/mediaMetadata';
 import { isAnyE2eeWireContent, type DerivedKeys } from '@/lib/chat/crypto';
 import { tryDecodeEnvelope } from '@/lib/chat/attachmentCrypto';
+import { isBeaconChatMessage } from '@/lib/chat/messages';
 import AttachmentBubble from './AttachmentBubble';
+import BeaconChatCard from './BeaconChatCard';
 import { useSecureMedia } from '@/lib/chat/useSecureMedia';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
@@ -379,6 +381,7 @@ export default function MessageBubble({
       ? tryDecodeEnvelope(captionText)
       : null;
   const isAttachment = attachmentEnvelope !== null;
+  const isBeacon = isBeaconChatMessage(message);
   const textBubbleClass = isMine
     ? 'bg-primary text-on-primary rounded-br-sm'
     : 'border border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
@@ -437,7 +440,29 @@ export default function MessageBubble({
           }}
         />
 
-        {isAttachment && attachmentEnvelope ? (
+        {isBeacon ? (
+          <div
+            ref={bubbleRef}
+            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
+          >
+            {replyMeta && (
+              <div
+                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
+                  isMine
+                    ? 'border-white/20 bg-black/15 text-on-primary'
+                    : 'border-border-hard bg-surface text-on-surface-variant'
+                }`}
+              >
+                <span className="flex items-center gap-1 font-medium opacity-90">
+                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
+                  Reply
+                </span>
+                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+              </div>
+            )}
+            <BeaconChatCard message={message} />
+          </div>
+        ) : isAttachment && attachmentEnvelope ? (
           <div
             ref={bubbleRef}
             className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}

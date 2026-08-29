@@ -43,7 +43,7 @@ Covered routes: `/events`, `/events/new`, `/e/{id}`, `/e/{id}/manage`, `/e/{id}/
 
 **Create** — desktop two-column (cover + theme swatches | title/description/schedule/location/options). Each start/end field opens one themed date-and-time popover; timezone remains a separate chip. Event options are grouped into Visibility & Access, Capacity, Check-in area, and Categories. Boolean settings use the shared styled toggle—never a native checkbox. Location “Use my location” is an icon on the input. Submit is a full-width primary button. Cover and profile images share one validated upload client and always expose failures inline.
 
-**Detail** — hero + info card + one sticky RSVP-status card. Host avatar opens the profile modal when signed in, else `/c/{id}`. Attendees appear exactly twice: a compact avatar summary and one expanded directory where mutual connections are marked inline. Guest avatars open the directory when `guest_list_visibility` allows. One primary CTA: `click://e/{id}` (“Open in Click”) with store links as text underneath. Copy link is an icon control.
+**Detail** — hero + info card + one sticky RSVP-status card. Host avatar opens the profile modal when signed in, else `/c/{id}`. Attendees appear exactly twice: a compact avatar summary and one expanded directory where mutual connections are marked inline. Guest avatars open the directory when `guest_list_visibility` allows. One primary row: `click://e/{id}` (“Open in Click”) plus a square copy-link control, both `h-11`. Store actions (“Get the app”, “Android”) are secondary `FcButton`s on the next row.
 
 ## Shared event primitives
 

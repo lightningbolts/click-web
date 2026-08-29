@@ -10,10 +10,21 @@ import {
   COVER_IMAGE_MIME_TYPES,
   UPLOAD_FALLBACK_ERROR,
 } from '@/lib/uploads/constants';
+import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
 
-jest.mock('@/lib/auth/freshAuthHeaders', () => ({
-  getFreshAuthHeaders: jest.fn(async () => ({ 'Content-Type': 'application/json' })),
-}));
+jest.mock('@/lib/auth/freshAuthHeaders', () => {
+  const actual = jest.requireActual('@/lib/auth/freshAuthHeaders') as typeof import('@/lib/auth/freshAuthHeaders');
+  return {
+    ...actual,
+    fetchWithFreshAuth: jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      let res = await fetch(input, init);
+      if (res.status === 401) {
+        res = await fetch(input, init);
+      }
+      return res;
+    }),
+  };
+});
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -79,6 +90,7 @@ describe('uploadImageFile', () => {
   it('posts base64 JSON to the configured endpoint and returns the image URL', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({ image: 'https://cdn.example/cover.jpg' }),
     });
 
@@ -98,10 +110,50 @@ describe('uploadImageFile', () => {
     );
   });
 
-  it('returns the fallback error for failed uploads', async () => {
+  it('surfaces the server error instead of the generic fallback', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
+      status: 400,
       json: async () => ({ error: 'Storage upload failed' }),
+    });
+
+    const file = makeFile('avatar.png', 'image/png', 1200);
+    const result = await uploadImageFile(file, {
+      endpoint: '/api/user/avatar',
+      acceptedMimeTypes: AVATAR_IMAGE_MIME_TYPES,
+    });
+
+    expect(result).toEqual({ ok: false, error: 'Storage upload failed' });
+  });
+
+  it('retries once on 401 and then maps a lingering 401 to session expired', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Unauthorized' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Unauthorized' }),
+      });
+
+    const file = makeFile('cover.jpg', 'image/jpeg', 1200);
+    const result = await uploadImageFile(file, {
+      endpoint: '/api/beacons/image',
+      acceptedMimeTypes: COVER_IMAGE_MIME_TYPES,
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ ok: false, error: authFailureMessage(401, 'Unauthorized') });
+  });
+
+  it('returns the fallback error when the body has no message', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
     });
 
     const file = makeFile('avatar.png', 'image/png', 1200);
@@ -134,6 +186,7 @@ describe('uploadImageFile', () => {
     });
     mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({ image: 'https://cdn.example/compressed.webp' }),
     });
 

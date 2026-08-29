@@ -12,6 +12,7 @@ import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
 import useSWR from "swr";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import { cn } from "@/lib/cn";
+import { isSignedInProductPath } from "@/lib/shell/personalProductNav";
 
 type InsightsAccessPayload = { insightsAllowed: boolean };
 
@@ -50,8 +51,7 @@ export default function Navbar() {
   );
 
   const isProductRoute =
-    pathname.startsWith("/insights") ||
-    Boolean(user && (pathname === "/" || pathname === "/dashboard"));
+    pathname.startsWith("/insights") || Boolean(user && isSignedInProductPath(pathname));
 
   useEffect(() => {
     setMobileOpen(false);

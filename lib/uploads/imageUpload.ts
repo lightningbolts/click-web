@@ -1,4 +1,4 @@
-import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
+import { authFailureMessage, fetchWithFreshAuth } from '@/lib/auth/freshAuthHeaders';
 import {
   IMAGE_UPLOAD_MAX_BYTES,
   UPLOAD_FALLBACK_ERROR,
@@ -203,10 +203,8 @@ export async function uploadImageFile(
 
   try {
     const fileB64 = await fileToBase64(uploadFile);
-    const headers = await getFreshAuthHeaders();
-    const res = await fetch(config.endpoint, {
+    const res = await fetchWithFreshAuth(config.endpoint, {
       method: 'POST',
-      headers,
       body: JSON.stringify({
         file_b64: fileB64,
         mime_type: uploadFile.type || 'image/jpeg',
@@ -220,9 +218,12 @@ export async function uploadImageFile(
       json = null;
     }
 
-    const { url } = normalizeImageUploadResponse(json);
+    const { url, serverError } = normalizeImageUploadResponse(json);
     if (!res.ok || !url) {
-      return { ok: false, error: UPLOAD_FALLBACK_ERROR };
+      return {
+        ok: false,
+        error: authFailureMessage(res.status, serverError ?? UPLOAD_FALLBACK_ERROR),
+      };
     }
 
     return { ok: true, url };
