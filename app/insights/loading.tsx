@@ -1,7 +1,10 @@
+import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
+import { cn } from "@/lib/cn";
+
 /** Skeleton for /insights/* while server data and the dashboard chunk load. */
 export default function InsightsLoading() {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6" role="status" aria-label="Loading insights">
+    <div className={cn(PAGE_COLUMN_CLASS, "py-8")} role="status" aria-label="Loading insights">
       <div className="animate-pulse space-y-6">
         <div className="space-y-2">
           <div className="h-4 w-32 rounded bg-zinc-800" />

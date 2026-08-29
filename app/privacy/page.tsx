@@ -2,13 +2,14 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-background text-on-surface">
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 md:px-12 py-20">
+      <div className={`${PAGE_COLUMN_CLASS} py-20`}>
         <motion.div
           initial={false}
           animate={{ y: 0, opacity: 1 }}

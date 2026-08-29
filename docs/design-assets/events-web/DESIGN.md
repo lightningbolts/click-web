@@ -29,8 +29,8 @@ Events are not dark-only. Semantic classes (`bg-background`, `bg-surface`, `text
 
 All event routes use `EventPageShell`:
 
-- Inner column: `mx-auto w-full max-w-6xl` (same as Navbar / Footer)
-- Horizontal padding: `px-4 md:px-10` (Navbar, not About/Footer `px-6 md:px-12`)
+- Inner column: `PAGE_COLUMN_CLASS` (`mx-auto w-full max-w-6xl px-4 md:px-10`) — same as Navbar / Footer / Insights
+- Navbar must not add a second `px-4 md:px-10` outside that column
 - Vertical padding is page-specific (`py-8` / `py-10`)
 
 Create’s split pane and Detail’s two-column layout live **inside** that 6xl column. Do not nest a second `max-w-2xl` page wrapper. Description copy may use `max-w-prose` for line length.

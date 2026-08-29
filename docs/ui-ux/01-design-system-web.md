@@ -75,13 +75,13 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | `FcPageShell` | Flat background page wrapper |
 | `FcSectionHeader` | Oversized headline + muted support line |
 | Call overlay | Full-screen Grid / Speaker (`components/chat/CallOverlay.tsx`) — `bg-[#101212]`, `border border-border-hard`, primary active border; layout policy in `lib/calls/callLayoutPolicy.ts` |
-| `ProductAppShell` | Insights chrome: horizontal top bar (desktop) + animated mobile drawer. Personal dashboard uses the same [`Navbar`](../../components/Navbar.tsx) as marketing. |
+| `ProductAppShell` | Insights chrome: identity row + wrapping tool nav in [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts), plus animated mobile drawer. Personal dashboard uses the same [`Navbar`](../../components/Navbar.tsx) as marketing. |
 
 ---
 
 ## Product vs marketing chrome
 
-One horizontal [`Navbar`](../../components/Navbar.tsx) for logged-in and logged-out visitors (`data-navbar-root="true"`). Logged-out: Events, How it works, Enterprise, About, Login. Signed-in: Memory Box, Events (`/events`), Map, Chat, QR Identity, Settings, plus Create event and an account menu. Insights (`/insights/*`) keeps [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) as its own horizontal top bar so venue tools stay scoped; marketing Navbar is hidden there only. Shared page column is `max-w-6xl` ([`lib/shell/pageColumn.ts`](../../lib/shell/pageColumn.ts)).
+One horizontal [`Navbar`](../../components/Navbar.tsx) for logged-in and logged-out visitors (`data-navbar-root="true"`). Logged-out: Events, How it works, Enterprise, About, Login. Signed-in: Memory Box, Events (`/events`), Map, Chat, QR Identity, Settings, plus Create event and an account menu. Insights (`/insights/*`) keeps [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) as its own top bar so venue tools stay scoped; marketing Navbar is hidden there only. Every nav bar and page body uses the same [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts) (`max-w-6xl` + `px-4 md:px-10`). Do not pad the bar and then pad the column again.
 
 ---
 

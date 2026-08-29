@@ -4,7 +4,6 @@ import { type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { Send, Loader2, ImagePlus, Paperclip, Mic, Square, X } from 'lucide-react';
 import type { Message } from '@/lib/chat/types';
 import { ATTACHMENT_ACCEPT_STRING } from '@/lib/chat/attachmentValidator';
-import { CHAT_TRANSCRIPT_MAX_CLASS } from '@/lib/chat/layout';
 
 /**
  * ChatView's input area: reply banner, photo/file/voice controls, the
@@ -66,7 +65,7 @@ export function ChatComposer({
   };
 
   return (
-    <div className={`relative z-40 mx-auto mb-4 mt-3 w-[calc(100%-2rem)] ${CHAT_TRANSCRIPT_MAX_CLASS} shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface px-4 py-3 shadow-sm md:w-[calc(100%-3rem)]`}>
+    <div className="relative z-40 shrink-0 overflow-visible border-t border-border-hard bg-surface px-4 py-3">
       {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
         <div className="mb-2 flex w-full items-start gap-2 rounded-[8px] border border-border-hard bg-surface-container px-3 py-2.5 text-xs">
           <span className="shrink-0 font-medium text-primary">Replying</span>

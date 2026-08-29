@@ -591,8 +591,9 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
       )}
       <div
         className={cn(
+          PAGE_COLUMN_CLASS,
           'min-h-0 min-w-0 flex-1',
-          fillViewport ? 'flex flex-col overflow-hidden' : cn(PAGE_COLUMN_CLASS, 'pb-8'),
+          fillViewport ? 'flex flex-col overflow-hidden py-4' : 'pb-8',
         )}
       >
       {needsTagging === true && (
@@ -725,7 +726,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="flex min-h-0 flex-1 px-4 pb-4 md:px-8 md:pb-8"
+                className="flex min-h-0 flex-1 overflow-hidden"
               >
                 <ConnectionMap connections={mapConnectionRecords} onConnectionClick={handleOpenChat} />
               </motion.div>

@@ -7,7 +7,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { notifyMessagesDelivered } from '@/lib/chat/messages';
-import { CHAT_TRANSCRIPT_MAX_CLASS } from '@/lib/chat/layout';
+import { CHAT_PANEL_CLASS } from '@/lib/chat/layout';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { useAuth } from '@/lib/AuthContext';
@@ -337,7 +337,8 @@ export default function ChatView({
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col overflow-hidden"
+      data-testid="chat-panel"
+      className={`${CHAT_PANEL_CLASS} relative`}
       onDragOver={onAttachmentDragOver}
       onDragLeave={onAttachmentDragLeave}
       onDrop={onAttachmentDrop}
@@ -405,7 +406,7 @@ export default function ChatView({
           onScroll={handleScroll}
           className="chat-thread-scroll relative z-[1] min-h-0 flex-1"
         >
-          <div className={`mx-auto w-full ${CHAT_TRANSCRIPT_MAX_CLASS} space-y-4 px-6 py-6 md:px-10`}>
+          <div className="space-y-4 px-4 py-4 md:px-6">
           {loadingMore && (
             <div className="flex justify-center py-3">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container border border-border-hard">

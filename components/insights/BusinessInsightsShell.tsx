@@ -201,7 +201,7 @@ export default function BusinessInsightsShell({
         </>
       }
     >
-      <div className="mx-auto max-w-[1800px] space-y-6">
+      <div className="space-y-6">
         {pathname === "/insights/vibe-radar" && insightsVenueId ? (
           <VenueBroadcastingModule venueId={insightsVenueId} />
         ) : null}

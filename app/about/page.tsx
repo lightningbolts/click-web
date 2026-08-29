@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FcCard, FcPageShell } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { ABOUT_TEAM } from "@/components/about/team";
+import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
 
 export const metadata: Metadata = {
   title: "About Click",
@@ -12,8 +13,8 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <FcPageShell className="px-6 py-20 md:px-12">
-      <div className="mx-auto max-w-5xl">
+    <FcPageShell className="py-20">
+      <div className={PAGE_COLUMN_CLASS}>
         <h1
           id="about-heading"
           data-testid="about-heading"

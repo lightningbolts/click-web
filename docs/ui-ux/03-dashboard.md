@@ -9,7 +9,7 @@
 ## Shell
 
 - Shared horizontal [`Navbar`](../../components/Navbar.tsx): same top bar as marketing. Signed-in items come from `personalProductNavItems()` (`data-testid="dashboard-tab-{id}"`). Tab state is URL-synced via `/?tab=` except Events, which lives at `/events` (`parseDashboardTab` / `dashboardTabHref` in [`lib/shell/personalProductNav.ts`](../../lib/shell/personalProductNav.ts)). Missing or unknown `tab` defaults to Memory Box. `/?tab=events` redirects to `/events`.
-- Page column: [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts) (`max-w-6xl`) for Memory Box, settings, identity, and chat transcript chrome. Chat/map fill the remaining viewport under the navbar.
+- Page column: [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts) (`max-w-6xl` + `px-4 md:px-10`) for Memory Box, settings, identity, chat, and map. Navbar uses the same inner wrapper with no extra bar padding so card edges line up with the logo and account row. Chat is one bordered `rounded-[16px]` panel (`CHAT_PANEL_CLASS`) inside that column.
 - Mobile: [`MobileNavDrawer`](../../components/shell/MobileNavDrawer.tsx) stays mounted so open/close can animate (overlay fade + panel slide). `prefers-reduced-motion` uses `motion-reduce:transition-none`.
 - Events: [`DashboardEventsModule`](../../components/dashboard/DashboardEventsModule.tsx) on `/events` (hosted + attending) above the public Discover list. Hosted cards put **Edit details** / **Host settings** as top-right icon buttons, not a footer strip.
 - Sign out is a button in the Navbar account menu. It clears the session, `router.replace('/')`, and `router.refresh()`. The dashboard unmounts as soon as `useAuth().user` is null.

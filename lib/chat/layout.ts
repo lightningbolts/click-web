@@ -1,10 +1,10 @@
 /**
- * Shared chat transcript chrome width.
+ * Chat sits in the shared page column (`PAGE_COLUMN_CLASS` on the dashboard
+ * pane). The thread itself is one bordered card so header, messages, and
+ * composer share edges and 16px corners — same as Memory Box cards.
  *
- * Match Navbar / event pages (`max-w-6xl`). Edge-to-edge bubbles on a wide
- * pane leave a hole in the middle; `max-w-xl` was too skinny. Bubble width
- * still lives on `MessageBubble`.
+     * Do not pin bubbles edge-to-edge or in a skinny column.
+     * Bubble width still lives on `MessageBubble`.
  */
-import { PAGE_COLUMN_MAX_CLASS } from "@/lib/shell/pageColumn";
-
-export const CHAT_TRANSCRIPT_MAX_CLASS = PAGE_COLUMN_MAX_CLASS;
+export const CHAT_PANEL_CLASS =
+  "flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border border-border-hard bg-surface";

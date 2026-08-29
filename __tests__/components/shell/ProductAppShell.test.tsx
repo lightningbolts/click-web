@@ -41,6 +41,14 @@ describe("ProductAppShell", () => {
     navState.pathname = "/";
   });
 
+  it("wraps product tools under the identity row on desktop", () => {
+    renderShell();
+    const chrome = screen.getByTestId("dashboard-chrome");
+    const productNav = chrome.querySelector('nav[aria-label="Product"]');
+    expect(productNav).toHaveClass("flex-wrap");
+    expect(chrome.className).not.toMatch(/px-4/);
+  });
+
   it("renders a horizontal nav with the active item marked current", () => {
     renderShell();
     expect(screen.getByTestId("dashboard-root")).toBeInTheDocument();
