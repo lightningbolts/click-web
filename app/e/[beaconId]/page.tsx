@@ -130,15 +130,15 @@ export default async function EventShareLandingPage({
 
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="space-y-6">
-            <FcCard className="relative space-y-4 p-6">
-              {posted ? (
-                <p className="absolute right-4 top-4 text-xs text-on-surface-variant">{posted}</p>
-              ) : null}
-              <EventHostRow
-                creatorId={event.creator_id}
-                name={event.host_name}
-                avatarUrl={event.host_avatar_url}
-              />
+            <FcCard className="space-y-4 p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <EventHostRow
+                  creatorId={event.creator_id}
+                  name={event.host_name}
+                  avatarUrl={event.host_avatar_url}
+                />
+                {posted ? <p className="text-xs text-on-surface-variant">{posted}</p> : null}
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex gap-3">
                   <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" />
@@ -189,24 +189,10 @@ export default async function EventShareLandingPage({
               </p>
             </FcCard>
 
-            {hasPin ? (
-              <PinMapLazy
-                testId="event-pin-map"
-                markers={[
-                  {
-                    id: beaconId,
-                    lat: event.latitude as number,
-                    lng: event.longitude as number,
-                    label: where || title,
-                  },
-                ]}
-              />
-            ) : null}
-
             <SeedRoomTeaser beaconId={beaconId} />
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <a href={eventDeepLink(beaconId)} className="block">
+                <a href={eventDeepLink(beaconId)} className="block max-w-md">
                   <FcButton type="button" className="w-full">
                     Open in Click
                   </FcButton>
@@ -240,7 +226,7 @@ export default async function EventShareLandingPage({
             </p>
           </div>
 
-          <aside className="space-y-4 lg:sticky lg:top-24">
+          <aside className="order-first space-y-4 lg:order-none lg:sticky lg:top-24">
             {showFullCard ? (
               <FcCard className="p-6" data-testid="event-state-full">
                 <h2 className="text-lg font-bold text-on-surface">This event is full</h2>
@@ -264,6 +250,21 @@ export default async function EventShareLandingPage({
             )}
           </aside>
         </div>
+        {hasPin ? (
+          <div className="mt-6">
+            <PinMapLazy
+              testId="event-pin-map"
+              markers={[
+                {
+                  id: beaconId,
+                  lat: event.latitude as number,
+                  lng: event.longitude as number,
+                  label: where || title,
+                },
+              ]}
+            />
+          </div>
+        ) : null}
       </article>
     </EventPageShell>
   );

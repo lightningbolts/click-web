@@ -112,4 +112,47 @@ describe('uploadImageFile', () => {
 
     expect(result).toEqual({ ok: false, error: UPLOAD_FALLBACK_ERROR });
   });
+
+  it('compresses an oversized cover before uploading it', async () => {
+    const OriginalImage = global.Image;
+    const createObjectUrl = jest.fn(() => 'blob:cover');
+    const revokeObjectUrl = jest.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl });
+    global.Image = class {
+      src = '';
+      naturalWidth = 4000;
+      naturalHeight = 3000;
+      decode = jest.fn(async () => undefined);
+    } as unknown as typeof Image;
+    const context = { drawImage: jest.fn() };
+    jest
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    jest.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      callback(new Blob([new Uint8Array(1_000)], { type: 'image/webp' }));
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ image: 'https://cdn.example/compressed.webp' }),
+    });
+
+    const result = await uploadImageFile(
+      makeFile('cover.png', 'image/png', 2_000_001),
+      {
+        endpoint: '/api/beacons/image',
+        acceptedMimeTypes: COVER_IMAGE_MIME_TYPES,
+        compressOversize: true,
+      },
+    );
+
+    expect(result).toEqual({ ok: true, url: 'https://cdn.example/compressed.webp' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/beacons/image',
+      expect.objectContaining({ body: expect.stringContaining('"mime_type":"image/webp"') }),
+    );
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:cover');
+    global.Image = OriginalImage;
+    jest.restoreAllMocks();
+  });
 });

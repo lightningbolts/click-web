@@ -150,7 +150,7 @@ export function ChatHeader({
   }, [showHeaderMenu]);
 
   return (
-    <div className="relative z-50 mb-4 shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface pt-[env(safe-area-inset-top,0px)]">
+    <div className="relative z-50 mx-auto mb-3 mt-4 w-[calc(100%-2rem)] max-w-5xl shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface pt-[env(safe-area-inset-top,0px)] shadow-sm md:w-[calc(100%-3rem)]">
       {isGroupClique && groupKeyError ? (
         <div className="mx-4 mt-3 rounded-[8px] border-2 border-amber-600/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-100">
           {groupKeyError}

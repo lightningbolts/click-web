@@ -46,4 +46,18 @@ describe("EventDateTimeFields", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+
+  it("accepts an exact minute typed by the host", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Starts date and time" }));
+
+    const minute = screen.getByRole("spinbutton", { name: "Minute" });
+    await user.click(minute);
+    await user.keyboard("37");
+
+    expect(document.querySelector<HTMLInputElement>('[name="event_start_at"]')?.value).toContain(
+      ":37:",
+    );
+  });
 });

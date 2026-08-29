@@ -14,6 +14,7 @@ export function useImageUpload({
   endpoint,
   acceptedMimeTypes,
   maxBytes,
+  compressOversize,
   onSuccess,
 }: UseImageUploadOptions) {
   const [uploading, setUploading] = useState(false);
@@ -29,6 +30,7 @@ export function useImageUpload({
         endpoint,
         acceptedMimeTypes,
         maxBytes,
+        compressOversize,
       });
 
       setUploading(false);
@@ -42,7 +44,7 @@ export function useImageUpload({
       onSuccess?.(result.url);
       return result.url;
     },
-    [acceptedMimeTypes, endpoint, maxBytes, onSuccess],
+    [acceptedMimeTypes, compressOversize, endpoint, maxBytes, onSuccess],
   );
 
   const reset = useCallback(() => {

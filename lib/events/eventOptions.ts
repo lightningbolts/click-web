@@ -21,7 +21,23 @@ export const EVENT_COVER_THEME_IDS = [
   "theme:magenta",
 ] as const;
 
-export const EVENT_CATEGORY_OPTIONS = ["Promotional", "Social", "School Event"] as const;
+export const EVENT_CATEGORY_OPTIONS = [
+  "Social",
+  "School Event",
+  "Networking",
+  "Music",
+  "Arts",
+  "Sports",
+  "Food & Drink",
+  "Nightlife",
+  "Outdoors",
+  "Wellness",
+  "Tech",
+  "Workshop",
+  "Volunteering",
+  "Community",
+  "Promotional",
+] as const;
 
 export const DEFAULT_EVENT_LISTING_OPTIONS: EventListingOptions = {
   event_visibility: "public",
@@ -108,10 +124,14 @@ export function eventListingMetadataPatch(options: EventListingOptions): Record<
 export function eventCategoriesFromMetadata(meta: Record<string, unknown>): string[] {
   const raw = meta.event_categories ?? meta.eventCategories;
   if (!Array.isArray(raw)) return [];
-  return raw
+  const normalized = raw
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
-    .filter((item) => (EVENT_CATEGORY_OPTIONS as readonly string[]).includes(item));
+    .filter((item) => item.length > 0 && item.length <= 40);
+  return Array.from(new Map(normalized.map((item) => [item.toLowerCase(), item])).values()).slice(
+    0,
+    8,
+  );
 }
 
 export function coverVisualSeed(beaconId: string, coverThemeId?: string | null): string {

@@ -2,7 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { EventListCard } from "@/components/events/EventListCard";
 
 jest.mock("@/components/ui/CardVisualSurface", () => ({
-  CardVisualHero: () => <div data-testid="event-thumb" />,
+  CardVisualHero: ({ className }: { className?: string }) => (
+    <div data-testid="event-thumb" className={className} />
+  ),
 }));
 
 describe("EventListCard", () => {
@@ -33,6 +35,7 @@ describe("EventListCard", () => {
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
     expect(screen.getByText("Cal Anderson Park")).toBeInTheDocument();
     expect(screen.getByText("12 going")).toBeInTheDocument();
+    expect(screen.getByTestId("event-thumb")).toHaveClass("self-stretch");
   });
 
   it("hides RSVP count when RSVP is disabled", () => {

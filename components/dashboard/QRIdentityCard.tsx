@@ -205,7 +205,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
       canvas.width = 256;
       canvas.height = 256;
       if (ctx) {
-        ctx.fillStyle = '#121212';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 28, 28, 200, 200);
         const link = document.createElement('a');
@@ -222,12 +222,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative mx-auto w-full max-w-md overflow-hidden rounded-[16px]"
+      className="relative mx-auto w-full max-w-md overflow-hidden rounded-[16px] border border-border-hard bg-surface shadow-sm"
     >
-      {/* Card background with gradient border */}
-      <div className="absolute inset-0 bg-primary/20 opacity-100" />
-      <div className="absolute inset-[1px] rounded-[16px] bg-surface-container" />
-
       {/* Content */}
       <div className="relative space-y-6 p-6">
         {/* Header */}
@@ -276,9 +272,9 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         {/* QR Code */}
         <div className="flex justify-center">
           <div className="relative">
-            <div className="absolute inset-0 bg-primary/30 blur-xl" />
+            <div className="absolute inset-2 bg-primary/15 blur-2xl" />
 
-            <div ref={qrRef} className="relative rounded-2xl border border-border-hard bg-background p-4">
+            <div ref={qrRef} className="relative rounded-2xl border border-border-hard bg-white p-4 shadow-md">
               <AnimatePresence mode="wait">
                 {(loading || refreshing) ? (
                   <motion.div
@@ -318,8 +314,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                       value={qrContent}
                       size={200}
                       level="M"
-                      bgColor="#121212"
-                      fgColor={primaryColor}
+                      bgColor="#ffffff"
+                      fgColor="#17121f"
                       marginSize={0}
                       title={`Click QR Code for ${userName || userEmail || userId}`}
                     />
@@ -329,8 +325,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
 
               {!loading && !refreshing && qrContent && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="rounded-lg bg-background px-2 py-1">
-                    <span className="text-lg font-bold tracking-wide text-on-surface">Click</span>
+                  <div className="rounded-lg border border-primary/20 bg-white px-2 py-1 shadow-sm">
+                    <span className="text-lg font-bold tracking-wide" style={{ color: primaryColor }}>Click</span>
                   </div>
                 </div>
               )}
@@ -363,14 +359,14 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleCopy}
-              className="rounded-xl bg-zinc-800 p-2 transition-colors hover:bg-zinc-700"
+              className="rounded-xl bg-primary p-2 text-on-primary transition-colors hover:brightness-110"
               title="Copy Click ID"
               aria-label="Copy Click ID"
             >
               {copied ? (
                 <Check className="h-5 w-5 text-green-500" />
               ) : (
-                <Copy className="h-5 w-5 text-on-surface-variant" />
+                <Copy className="h-5 w-5" />
               )}
             </motion.button>
           </div>
@@ -388,7 +384,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         )}
 
         {/* Usage instructions */}
-        <div className="space-y-2 rounded-xl bg-zinc-800/50 p-4">
+        <div className="space-y-2 rounded-xl border border-border-hard bg-surface-container-low p-4">
           <p className="text-xs font-medium text-on-surface-variant">How to use:</p>
           <ul className="space-y-1 text-xs text-on-surface-variant">
             <li className="flex items-start gap-2">

@@ -1,5 +1,6 @@
 import {
   coverVisualSeed,
+  eventCategoriesFromMetadata,
   eventVisibilityToMapAudience,
   parseEventListingOptions,
   parseEventListingOptionsFromBody,
@@ -36,6 +37,14 @@ describe("event listing options", () => {
     expect(parseEventListingOptions(null, { event_visibility: "invite_only" }).event_visibility).toBe(
       "invite_only",
     );
+  });
+
+  it("preserves safe custom event categories", () => {
+    expect(
+      eventCategoriesFromMetadata({
+        event_categories: ["Music", "Board game night", "board game night", "x".repeat(41)],
+      }),
+    ).toEqual(["Music", "board game night"]);
   });
 });
 
