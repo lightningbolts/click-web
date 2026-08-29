@@ -68,7 +68,7 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | Component | Role |
 |-----------|------|
 | `FcCard` | Opaque surface, 1px outline-variant border, 16px radius |
-| `FcButton` | Primary solid / secondary bordered |
+| `FcButton` | Primary solid / secondary bordered; default height `h-11` (44px) to match copy/icon controls |
 | `FcChip` | Solid container chip |
 | `FcInput` | 16px-radius field (matches search) |
 | `FcTextarea` | Same field chrome, top-aligned caret, 112px min height |

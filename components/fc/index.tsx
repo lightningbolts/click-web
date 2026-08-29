@@ -33,7 +33,7 @@ export function FcButton({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-40",
+        "inline-flex h-11 items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-40",
         variant === "primary" ? "fc-btn-primary" : "fc-btn-secondary",
         className,
       )}

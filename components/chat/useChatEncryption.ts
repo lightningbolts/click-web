@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
+import { isBeaconChatMessage, shouldSkipChatDecrypt } from '@/lib/chat/messages';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import {
   deriveKeysForConnection,
@@ -91,7 +92,7 @@ export function useChatEncryption({
   /** Decrypt wire `content` for display — same rules as the Supabase realtime handler. */
   const decryptWireMessageContent = useCallback(
     async (content: string, messageType: string): Promise<string> => {
-      if (messageType === 'call_log') return content ?? '';
+      if (shouldSkipChatDecrypt(messageType)) return content ?? '';
       if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(content)) {
         return decryptGroupMessageContent(content, groupMasterKey);
       }
@@ -105,7 +106,7 @@ export function useChatEncryption({
 
   const appendReplyToMetadata = useCallback(
     async (meta: Record<string, unknown>): Promise<Record<string, unknown>> => {
-      if (!replyingTo || replyingTo.message_type === 'call_log') return meta;
+      if (!replyingTo || shouldSkipChatDecrypt(replyingTo.message_type)) return meta;
       let snippetSource = replyingTo.content;
       if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(replyingTo.content)) {
         snippetSource = await decryptGroupMessageContent(replyingTo.content, groupMasterKey);
@@ -126,11 +127,15 @@ export function useChatEncryption({
   );
 
   useEffect(() => {
-    if (!replyingTo || replyingTo.message_type === 'call_log') {
+    if (!replyingTo || shouldSkipChatDecrypt(replyingTo.message_type)) {
       setReplyBannerText('');
       return;
     }
-    if (replyingTo.message_type === 'image' || replyingTo.message_type === 'audio') {
+    if (
+      replyingTo.message_type === 'image' ||
+      replyingTo.message_type === 'audio' ||
+      isBeaconChatMessage(replyingTo)
+    ) {
       const raw = replyingTo.content;
       if (!isAnyE2eeWireContent(raw)) {
         setReplyBannerText(previewLabelForMessage({ ...replyingTo, content: raw }));

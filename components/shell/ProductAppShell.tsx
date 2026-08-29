@@ -53,12 +53,16 @@ function itemIsActive(
   pathname: string,
   activeId: string | undefined,
 ): boolean {
-  if (item.href) {
-    return item.exact
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(`${item.href}/`);
+  if (activeId !== undefined) {
+    return activeId === item.id;
   }
-  return activeId === item.id;
+  if (item.href) {
+    const hrefPath = item.href.split("?")[0] || item.href;
+    return item.exact
+      ? pathname === hrefPath
+      : pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+  }
+  return false;
 }
 
 export default function ProductAppShell({

@@ -9,8 +9,9 @@
 ## Shell
 
 - [`ProductAppShell`](../../components/shell/ProductAppShell.tsx): full-height sidebar on desktop, hamburger drawer on mobile. Flat `background`; opaque `surface` + 1px `border-hard` (no backdrop-blur).
-- Nav items: memory, events, map, chat, identity, settings (`data-testid="dashboard-tab-{id}"`).
+- Nav items: memory, events, map, chat, identity, settings (`data-testid="dashboard-tab-{id}"`). Tab state is URL-synced via `/?tab=` (`parseDashboardTab` in [`lib/shell/personalProductNav.ts`](../../lib/shell/personalProductNav.ts)). Missing or unknown `tab` defaults to Memory Box.
 - Events item: My events, RSVPs, primary **Create event** (`DashboardEventsModule` + `EventCreateForm`) as a dense date-rail list.
+- Signed-in `/events*` and `/e/*` reuse the same shell via [`AuthenticatedProductShell`](../../components/shell/AuthenticatedProductShell.tsx). Marketing Navbar is hidden on those paths when a session is present.
 - Active item: `bg-primary-container text-on-primary-container`.
 - Marketing Navbar is hidden while this shell is mounted.
 

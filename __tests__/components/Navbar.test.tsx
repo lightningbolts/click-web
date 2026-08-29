@@ -64,6 +64,13 @@ describe("Navbar", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("hides marketing chrome on signed-in event routes", () => {
+    navState.pathname = "/events";
+    navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
+    const { container } = renderNav();
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("shows a login CTA when logged out on marketing pages", () => {
     renderNav();
     const logo = screen.getByRole("link", { name: /lick/i });
@@ -85,7 +92,7 @@ describe("Navbar", () => {
   });
 
   it("keeps signed-in actions as one CTA plus matching icon controls", () => {
-    navState.pathname = "/events";
+    navState.pathname = "/about";
     navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
     renderNav();
     const create = screen.getByRole("link", { name: "Create event" });

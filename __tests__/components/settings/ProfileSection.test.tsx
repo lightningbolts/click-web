@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProfileSection from '@/components/settings/ProfileSection';
-import { UPLOAD_FALLBACK_ERROR } from '@/lib/uploads/constants';
 
 const mockRefreshUser = jest.fn();
 const mockSetProfileImageUrl = jest.fn();
@@ -23,6 +22,9 @@ jest.mock('@/lib/supabase', () => ({
 
 jest.mock('@/lib/auth/freshAuthHeaders', () => ({
   getFreshAuthHeaders: async () => ({ 'Content-Type': 'application/json' }),
+  fetchWithFreshAuth: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+  authFailureMessage: (status: number, fallback: string) =>
+    status === 401 || status === 403 ? 'Session expired. Sign in again.' : fallback,
 }));
 
 const mockFetch = jest.fn();
@@ -39,6 +41,7 @@ describe('ProfileSection avatar upload', () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({
       ok: false,
+      status: 400,
       json: async () => ({ error: 'Storage upload failed' }),
     });
 
@@ -60,6 +63,6 @@ describe('ProfileSection avatar upload', () => {
       '/api/user/avatar',
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent(UPLOAD_FALLBACK_ERROR);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Storage upload failed');
   });
 });

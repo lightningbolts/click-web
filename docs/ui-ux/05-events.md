@@ -9,7 +9,7 @@ Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/E
 | Surface | Route |
 |---------|--------|
 | Anyone signed in | `/events/new` (login modal if logged out) |
-| Personal dashboard | Events tab on `/` — My events, RSVPs, Create event |
+| Personal dashboard | Events tab on `/?tab=events` — My events, RSVPs, Create event |
 | Venue manager | Insights **Events** tab (`/insights/events?venue_id=`) — same form, sends `venue_id`. Do **not** use Vibe Radar `BeaconDeployModal` (soundtrack / pop-up hub pin). |
 
 Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-list upload) immediately. The public share URL remains `/e/{id}`.
@@ -18,9 +18,9 @@ Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-li
 
 | Route | Who | Notes |
 |-------|-----|--------|
-| `/events` | Public | Shared `EventPageShell` (`max-w-6xl`, Navbar padding). Search + date/going/host chips, featured soonest event, then Today / This week / Upcoming. Cards use `CardVisualHero` (no date-rail). Only `event_visibility = public` **and** `visibility_audience = everyone`. Unlisted / invite-only stay off this feed. |
-| `/events/new` | Signed in | Same 6xl shell. Split-pane create form (cover + theme \| details + Event options). |
-| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended), Open in Click. Connections-only and unlisted/invite-only events stay reachable via this URL. |
+| `/events` | Public | Shared `EventPageShell` (`max-w-6xl`). Signed-in visitors also get `ProductAppShell`; anonymous visitors keep marketing `Navbar`. Search + date/going/host chips, featured soonest event, then Today / This week / Upcoming. Cards use `CardVisualHero` (no date-rail). Only `event_visibility = public` **and** `visibility_audience = everyone`. Unlisted / invite-only stay off this feed. |
+| `/events/new` | Signed in | Same 6xl shell, plus product chrome when signed in. Split-pane create form (cover + theme \| details + Event options). |
+| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended). One action row: **Open in Click** + copy-link icon (both `h-11`), then **Get the app** / **Android** as secondary `FcButton`s. Back goes to `/events` when that was the previous page, otherwise signed-in visitors return to `/?tab=events`. Connections-only and unlisted/invite-only events stay reachable via this URL. |
 | `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
 | `/e/[beaconId]/summary?token=` | Public snapshot | Aggregate counts only, after organizer publish |

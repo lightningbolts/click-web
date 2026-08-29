@@ -35,7 +35,7 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 
 | Export | Description |
 |--------|-------------|
-| `MessageType` | `'text' \| 'image' \| 'audio' \| 'file' \| 'call_log'` — matches `public.messages.message_type` and KMP `ChatMessageType` |
+| `MessageType` | `'text' \| 'image' \| 'audio' \| 'file' \| 'call_log' \| 'beacon'` — matches `public.messages.message_type` and KMP `ChatMessageType`. Beacon rows render as `BeaconChatCard` in the timeline (not plaintext `Beacon: …`). |
 | `Message` | Full row shape including `local_sent_at`, `delivered_at`, `read_at`, `metadata` |
 | `MessageMediaMetadata` | `media_url`, `is_encrypted_media`, `original_mime_type`, `duration_seconds`, reply threading |
 | `REACTION_EMOJIS` | Quick reaction strip defaults |
@@ -44,11 +44,16 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 
 | Function | Role |
 |----------|------|
-| `normalizeDbMessage(row)` | Safe coercion from DB/Realtime records; handles new columns with defaults |
+| `normalizeDbMessage(row)` | Safe coercion from DB/Realtime records; handles new columns with defaults; coerces `text` + `beacon_id` metadata to `message_type: 'beacon'` |
+| `isBeaconChatMessage` / `shouldSkipChatDecrypt` | Beacon detection (type or metadata) and E2EE skip, matching KMP |
 | `buildMessageInsertRow(params)` | Builds insert payload; when `metadata.disposable_roll === true`, sets `collaboration_ttl` and `reveal_at` via `computeClickDropRevealTtlIso` (24h) |
 | `coerceMessageType` / `coerceMetadata` | Defensive parsing |
 | `insertCallLogMessage` | POST call_log rows through messages API |
 | `notifyMessagesDelivered` | PATCH `/api/chat/messages/delivered` for sender "Delivered" state |
+
+### `layout.ts`
+
+`CHAT_TRANSCRIPT_MAX_CLASS` (`max-w-xl`) is the shared max width for the dashboard chat header, transcript, composer, and starters banner. Do not reuse marketing `max-w-5xl` here.
 
 ### `chatGatekeeper` (server)
 

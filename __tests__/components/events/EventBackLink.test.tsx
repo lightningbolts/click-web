@@ -2,20 +2,24 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EventBackLink from "@/components/events/EventBackLink";
 
-const back = jest.fn();
 const push = jest.fn();
+const authState = { user: null as { id: string } | null };
 
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ back, push }),
+  useRouter: () => ({ push }),
+}));
+
+jest.mock("@/lib/AuthContext", () => ({
+  useAuth: () => ({ user: authState.user }),
 }));
 
 describe("EventBackLink", () => {
   beforeEach(() => {
-    back.mockReset();
     push.mockReset();
+    authState.user = null;
   });
 
-  it("goes back when the previous page is on this origin", async () => {
+  it("opens the public events list when coming from /events", async () => {
     const user = userEvent.setup();
     Object.defineProperty(document, "referrer", {
       configurable: true,
@@ -23,17 +27,24 @@ describe("EventBackLink", () => {
     });
     render(<EventBackLink />);
     await user.click(screen.getByTestId("event-back-link"));
-    expect(back).toHaveBeenCalled();
-    expect(push).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/events");
+  });
+
+  it("opens the dashboard events tab when signed in from the dashboard", async () => {
+    const user = userEvent.setup();
+    authState.user = { id: "u1" };
+    Object.defineProperty(document, "referrer", {
+      configurable: true,
+      value: `${window.location.origin}/`,
+    });
+    render(<EventBackLink />);
+    await user.click(screen.getByTestId("event-back-link"));
+    expect(push).toHaveBeenCalledWith("/?tab=events");
   });
 
   it("opens the events list when there is no same-origin history", async () => {
     const user = userEvent.setup();
     Object.defineProperty(document, "referrer", { configurable: true, value: "" });
-    Object.defineProperty(window, "history", {
-      configurable: true,
-      value: { length: 1 },
-    });
     render(<EventBackLink />);
     await user.click(screen.getByTestId("event-back-link"));
     expect(push).toHaveBeenCalledWith("/events");

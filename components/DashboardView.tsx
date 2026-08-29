@@ -2,20 +2,12 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  MapPin,
-  Settings,
-  Users,
-  QrCode,
-  BookOpen,
-  CalendarDays,
-  MessageCircle,
-  BarChart2,
-} from 'lucide-react';
+import { Users, BarChart2 } from 'lucide-react';
 import useSWR from 'swr';
 import DashboardEventsModule, { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
 import ProductAppShell from '@/components/shell/ProductAppShell';
@@ -68,8 +60,11 @@ import { useConnectionLifecycle } from '@/components/dashboard/useConnectionLife
 import { ChatTabSection } from '@/components/dashboard/ChatTabSection';
 import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModals';
 import { messagesForProfileConnection } from '@/lib/userProfile/profileChatContext';
-
-type DashboardTab = 'memory' | 'events' | 'map' | 'chat' | 'identity' | 'settings';
+import {
+  parseDashboardTab,
+  personalProductNavItems,
+  type DashboardTab,
+} from '@/lib/shell/personalProductNav';
 
 type InsightsAccessPayload = { insightsAllowed: boolean };
 
@@ -90,7 +85,10 @@ interface DashboardViewProps {
  */
 export default function DashboardView({ user }: DashboardViewProps) {
   const { signOut, onlineUserIds, profileImageUrl } = useAuth();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('memory');
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
+    parseDashboardTab(searchParams.get('tab')),
+  );
   const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
   /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
   const [mapConnectionRecords, setMapConnectionRecords] = useState<ConnectionRecord[]>([]);
@@ -148,6 +146,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
+
+  useEffect(() => {
+    setActiveTab(parseDashboardTab(searchParams.get('tab')));
+  }, [searchParams]);
 
   useEffect(() => {
     selectedConnectionRef.current = selectedConnection;
@@ -548,14 +550,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     });
   }, []);
 
-  const tabs: { id: DashboardTab; label: string; icon: any }[] = [
-    { id: 'memory', label: 'Memory Box', icon: BookOpen },
-    { id: 'events', label: 'Events', icon: CalendarDays },
-    { id: 'map', label: 'Map', icon: MapPin },
-    { id: 'chat', label: 'Chat', icon: MessageCircle },
-    { id: 'identity', label: 'QR Identity', icon: QrCode },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  const tabs = personalProductNavItems();
 
   if (!connectionsInitialLoadComplete || !birthdayProfileGateResolved) {
     return <LoadingScreen />;
@@ -565,13 +560,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
     <ProductAppShell
       productLabel="Click"
       productHref="/"
-      items={tabs.map((tab) => ({
-        id: tab.id,
-        label: tab.label,
-        icon: tab.icon,
-      }))}
+      items={tabs}
       activeId={activeTab}
-      onSelect={(id) => setActiveTab(id as DashboardTab)}
       title={shellHeader.title}
       subtitle={shellHeader.subtitle}
       extraNav={

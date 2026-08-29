@@ -1,5 +1,5 @@
 import { highlightedMessageSnippet, type ChatSearchHit } from '@/lib/chat/searchSnippet';
-import { normalizeDbMessage } from '@/lib/chat/messages';
+import { isBeaconChatMessage, normalizeDbMessage, shouldSkipChatDecrypt } from '@/lib/chat/messages';
 import {
   decryptContent,
   decryptGroupMessageContent,
@@ -43,7 +43,7 @@ async function decryptMessage(
   pairwiseKeys: DerivedKeys | null,
   groupMaster: ArrayBuffer | null,
 ): Promise<Message> {
-  if (message.message_type === 'call_log') return message;
+  if (shouldSkipChatDecrypt(message.message_type) || isBeaconChatMessage(message)) return message;
   if (scope.isGroup && groupMaster && isGroupMessageEncrypted(message.content)) {
     return { ...message, content: await decryptGroupMessageContent(message.content, groupMaster) };
   }
