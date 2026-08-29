@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { FcButton, FcTextarea } from "@/components/fc";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import {
@@ -45,6 +46,7 @@ export default function EventCreateForm({
   initial,
 }: EventCreateFormProps) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const isEdit = Boolean(beaconId);
   const initialWindow = useMemo(() => defaultEventWindow(), []);
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -201,7 +203,21 @@ export default function EventCreateForm({
     createdId && typeof window !== "undefined" ? `${window.location.origin}${eventSharePath(createdId)}` : null;
 
   return (
-    <form onSubmit={onSubmit} className="space-y-8" data-testid="event-create-form">
+    <form onSubmit={onSubmit} className="relative space-y-8" data-testid="event-create-form">
+      {submitting ? (
+        <motion.div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 overflow-hidden rounded-full bg-primary/20"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          aria-hidden
+        >
+          <motion.div
+            className="h-full w-1/3 rounded-full bg-primary"
+            animate={reduceMotion ? undefined : { x: ["-100%", "300%"] }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
+      ) : null}
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="space-y-4">
           <div>

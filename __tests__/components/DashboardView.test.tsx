@@ -32,9 +32,10 @@ jest.mock('@/components/dashboard/DashboardEventsModule', () => ({
 }));
 
 const searchState: { tab: string | null } = { tab: null };
+const navFns = { push: jest.fn(), replace: jest.fn() };
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => navFns,
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(searchState.tab ? `tab=${searchState.tab}` : ''),
 }));
@@ -209,6 +210,8 @@ describe('DashboardView', () => {
     authState.user = { id: 'user-123' };
     authState.loading = false;
     searchState.tab = null;
+    navFns.replace.mockClear();
+    navFns.push.mockClear();
     global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/api/users/') && url.includes('/profile')) {
@@ -251,13 +254,10 @@ describe('DashboardView', () => {
     expect((await screen.findAllByText(/Pat Lee/)).length).toBeGreaterThan(0);
   });
 
-  it('renders all six navigation tabs', async () => {
+  it('does not render product tabs inside the dashboard pane', async () => {
     await renderDashboard();
-
-    const expectedLabels = ['Memory Box', 'Events', 'Map', 'Chat', 'QR Identity', 'Settings'];
-    for (const label of expectedLabels) {
-      expect(await screen.findByText(label)).toBeInTheDocument();
-    }
+    expect(screen.queryByTestId('dashboard-tab-memory')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-tab-events')).not.toBeInTheDocument();
   });
 
   it('shows the Memory Box tab content by default (stats + milestones)', async () => {
@@ -269,10 +269,19 @@ describe('DashboardView', () => {
     expect(screen.getByTestId('connection-table')).toBeInTheDocument();
   });
 
-  it('opens the Events tab when ?tab=events is present', async () => {
+  it('redirects ?tab=events to /events', async () => {
     searchState.tab = 'events';
-    await renderDashboard();
-    expect(await screen.findByTestId('dashboard-events-module')).toBeInTheDocument();
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <DashboardView user={buildMockUser()} />
+        </ThemeProvider>,
+      );
+    });
+    await waitFor(() => {
+      expect(navFns.replace).toHaveBeenCalledWith('/events');
+    });
+    expect(screen.queryByTestId('dashboard-events-module')).not.toBeInTheDocument();
   });
 
   it('lists achievement badges on the Memory Box tab', async () => {

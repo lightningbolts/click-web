@@ -7,7 +7,9 @@ import type { LucideIcon } from "lucide-react";
 import { LogOut, Menu, X } from "lucide-react";
 import ClickLogo from "@/components/ClickLogo";
 import ThemeToggle from "@/components/ThemeToggle";
+import MobileNavDrawer from "@/components/shell/MobileNavDrawer";
 import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
+import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
 import { cn } from "@/lib/cn";
 
 export type ProductAppShellItem = {
@@ -101,12 +103,18 @@ export default function ProductAppShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
-  const renderItem = (item: ProductAppShellItem, opts?: { onNavigate?: () => void }) => {
+  const renderItem = (
+    item: ProductAppShellItem,
+    opts?: { onNavigate?: () => void; stacked?: boolean },
+  ) => {
     const Icon = item.icon;
     const active = itemIsActive(item, pathname, activeId);
-    const testId = item.testId ?? (itemTestIdPrefix ? `${itemTestIdPrefix}-${item.id}` : undefined);
+    const testId = opts?.stacked
+      ? undefined
+      : item.testId ?? (itemTestIdPrefix ? `${itemTestIdPrefix}-${item.id}` : undefined);
     const className = cn(
-      "flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm font-semibold transition-colors",
+      "inline-flex items-center gap-2 rounded-[8px] px-3 py-2 text-sm font-semibold transition-colors",
+      opts?.stacked && "w-full",
       active
         ? "bg-primary-container text-on-primary-container"
         : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
@@ -148,59 +156,32 @@ export default function ProductAppShell({
     );
   };
 
-  const sidebar = (opts?: { onNavigate?: () => void }) => (
-    <div className="flex h-full min-h-0 flex-col">
-      <Link
-        href={productHref}
-        onClick={opts?.onNavigate}
-        className="flex items-center gap-2.5 border-b border-border-hard px-4 py-4"
-      >
-        <ClickLogo variant="boxed" size={32} className="h-8 w-8 rounded-[8px] border border-border-hard" />
-        <span className="text-sm font-bold text-on-surface">{productLabel}</span>
-      </Link>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Product">
-        {items.map((item) => renderItem(item, opts))}
-      </nav>
-      {extraNav && extraNav.length > 0 ? (
-        <div className="border-t border-border-hard p-3">
-          {extraNav.map((link) => {
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={opts?.onNavigate}
-                className="flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {link.label}
-              </Link>
-            );
-          })}
+  const accountBlock = (opts?: { onNavigate?: () => void; stacked?: boolean }) => (
+    <div className={cn("flex items-center gap-2", opts?.stacked && "flex-col items-stretch")}>
+      <ThemeToggle />
+      {userLabel ? (
+        <div className="flex min-w-0 items-center gap-2 px-1">
+          <ConnectionPeerAvatar label={userLabel} imageUrl={userAvatarUrl} size="sm" />
+          <p className="truncate text-xs font-medium text-on-surface-variant">{userLabel}</p>
         </div>
       ) : null}
-      <div className="border-t border-border-hard p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <ThemeToggle />
-        </div>
-        {userLabel ? (
-          <div className="mb-2 flex min-w-0 items-center gap-2 px-1">
-            <ConnectionPeerAvatar label={userLabel} imageUrl={userAvatarUrl} size="sm" />
-            <p className="truncate text-xs font-medium text-on-surface-variant">{userLabel}</p>
-          </div>
-        ) : null}
-        {onSignOut ? (
-          <button
-            type="button"
-            data-testid="nav-sign-out"
-            onClick={() => void onSignOut()}
-            className="fc-btn-secondary flex w-full items-center justify-center gap-2 px-3 py-2 text-xs hover:border-error hover:text-error"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Sign out
-          </button>
-        ) : null}
-      </div>
+      {onSignOut ? (
+        <button
+          type="button"
+          data-testid={opts?.stacked ? undefined : "nav-sign-out"}
+          onClick={() => {
+            opts?.onNavigate?.();
+            void onSignOut();
+          }}
+          className={cn(
+            "fc-btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 text-xs hover:border-error hover:text-error",
+            opts?.stacked && "w-full",
+          )}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Sign out
+        </button>
+      ) : null}
     </div>
   );
 
@@ -208,76 +189,113 @@ export default function ProductAppShell({
     <div
       className={cn(
         "flex flex-col bg-background text-on-surface",
-        fillViewport ? "h-dvh overflow-hidden" : "min-h-dvh md:h-dvh md:overflow-hidden",
+        fillViewport ? "h-dvh overflow-hidden" : "min-h-dvh",
       )}
       data-testid={rootTestId}
       data-fill-viewport={fillViewport ? "true" : undefined}
     >
       <header
         data-navbar-root="true"
-        className="sticky top-0 z-40 flex items-center justify-between border-b border-border-hard bg-surface px-4 py-3 md:hidden"
+        data-testid={chromeTestId}
+        className="sticky top-0 z-40 border-b border-border-hard bg-surface px-4 py-3 md:px-10"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <Link href={productHref} className="flex items-center gap-2">
-          <ClickLogo variant="boxed" size={28} className="h-7 w-7 rounded-[8px] border border-border-hard" />
-          <span className="text-sm font-bold">{productLabel}</span>
-        </Link>
-        <button
-          type="button"
-          className="rounded-[8px] border border-border-hard p-2"
-          aria-expanded={mobileOpen}
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMobileOpen((o) => !o)}
-        >
-          {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </button>
-      </header>
-
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <Link href={productHref} className="flex shrink-0 items-center gap-2">
+            <ClickLogo variant="boxed" size={28} className="h-7 w-7 rounded-[8px] border border-border-hard" />
+            <span className="text-sm font-bold">{productLabel}</span>
+          </Link>
+          <nav
+            className="hidden min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto md:flex"
+            aria-label="Product"
+          >
+            {items.map((item) => renderItem(item))}
+            {extraNav?.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="inline-flex items-center gap-2 rounded-[8px] px-3 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="ml-auto hidden shrink-0 items-center gap-2 md:flex">{accountBlock()}</div>
           <button
             type="button"
-            className="absolute inset-0 bg-on-surface/40"
-            aria-label="Close menu"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside
-            className="relative h-full w-72 max-w-[85vw] border-r border-border-hard bg-surface"
-            style={{ backgroundColor: "var(--color-surface)" }}
+            className="ml-auto rounded-[8px] border border-border-hard p-2 md:hidden"
+            data-testid="nav-menu-toggle"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-drawer"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMobileOpen((o) => !o)}
           >
-            {sidebar({ onNavigate: () => setMobileOpen(false) })}
-          </aside>
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
-      ) : null}
+      </header>
 
-      <div className="flex min-h-0 flex-1 md:flex">
-        <aside
-          data-testid={chromeTestId}
-          className="hidden min-h-0 w-64 shrink-0 self-stretch overflow-y-auto border-r border-border-hard bg-surface md:block"
-          style={{ backgroundColor: "var(--color-surface)" }}
-        >
-          {sidebar()}
-        </aside>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {hideHeader ? null : (
-            <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 px-4 py-6 md:px-8">
-              <div>
-                <h1 className="text-2xl font-bold text-on-surface">{title}</h1>
-                {subtitle ? (
-                  <p className="mt-1 text-sm text-on-surface-variant">{subtitle}</p>
-                ) : null}
-              </div>
-              {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-            </div>
-          )}
-          <div
-            className={cn(
-              "min-h-0 min-w-0 flex-1",
-              fillViewport ? "flex flex-col overflow-hidden px-0 pb-0 md:px-0" : "overflow-y-auto px-4 pb-8 md:px-8",
-            )}
-          >
-            {children}
+      <MobileNavDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} labelledBy="mobile-nav-title">
+        <div className="flex h-full min-h-0 flex-col" id="mobile-nav-drawer">
+          <div className="flex items-center gap-2.5 border-b border-border-hard px-4 py-4">
+            <ClickLogo variant="boxed" size={32} className="h-8 w-8 rounded-[8px] border border-border-hard" />
+            <span id="mobile-nav-title" className="text-sm font-bold text-on-surface">
+              {productLabel}
+            </span>
           </div>
+          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Product">
+            {items.map((item) =>
+              renderItem(item, { onNavigate: () => setMobileOpen(false), stacked: true }),
+            )}
+          </nav>
+          {extraNav && extraNav.length > 0 ? (
+            <div className="border-t border-border-hard p-3">
+              {extraNav.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
+          <div className="border-t border-border-hard p-3">
+            {accountBlock({ onNavigate: () => setMobileOpen(false), stacked: true })}
+          </div>
+        </div>
+      </MobileNavDrawer>
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        {hideHeader ? null : (
+          <div className={cn(PAGE_COLUMN_CLASS, "flex shrink-0 flex-wrap items-start justify-between gap-4 py-6")}>
+            <div>
+              <h1 className="text-2xl font-bold text-on-surface">{title}</h1>
+              {subtitle ? (
+                <p className="mt-1 text-sm text-on-surface-variant">{subtitle}</p>
+              ) : null}
+            </div>
+            {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+          </div>
+        )}
+        <div
+          className={cn(
+            "min-h-0 min-w-0 flex-1",
+            fillViewport ? "flex flex-col overflow-hidden" : "overflow-y-auto pb-8",
+            !fillViewport && PAGE_COLUMN_CLASS,
+          )}
+        >
+          {children}
         </div>
       </div>
     </div>

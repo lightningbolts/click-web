@@ -7,6 +7,8 @@ import { loadEventEditDraft } from "@/lib/events/eventEditDraft";
 import EventCreateForm from "@/components/events/EventCreateForm";
 import EventEditSignIn from "@/components/events/EventEditSignIn";
 import EventPageShell from "@/components/events/EventPageShell";
+import EventBackLink from "@/components/events/EventBackLink";
+import { eventSharePath } from "@/lib/events/eventUrls";
 import { FcSectionHeader } from "@/components/fc";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +52,7 @@ export default async function EventEditPage({
 
   return (
     <EventPageShell className="py-10">
+      <EventBackLink href={eventSharePath(beaconId)} />
       <FcSectionHeader title="Edit event" subtitle="Update the details guests see on the event page." />
       <EventCreateForm beaconId={beaconId} initial={draft} />
     </EventPageShell>

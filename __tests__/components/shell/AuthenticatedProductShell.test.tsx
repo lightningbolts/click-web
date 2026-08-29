@@ -29,7 +29,7 @@ describe("AuthenticatedProductShell", () => {
     authState.user = null;
   });
 
-  it("renders children without product chrome when logged out", () => {
+  it("renders children without a second product chrome when logged out", () => {
     render(
       <ThemeProvider>
         <AuthenticatedProductShell>
@@ -41,7 +41,7 @@ describe("AuthenticatedProductShell", () => {
     expect(screen.queryByTestId("event-product-shell")).not.toBeInTheDocument();
   });
 
-  it("wraps signed-in visitors in ProductAppShell with Events active", () => {
+  it("renders children without a stacked sidebar when signed in", () => {
     authState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
     render(
       <ThemeProvider>
@@ -50,8 +50,7 @@ describe("AuthenticatedProductShell", () => {
         </AuthenticatedProductShell>
       </ThemeProvider>,
     );
-    expect(screen.getByTestId("event-product-shell")).toBeInTheDocument();
-    expect(screen.getByTestId("dashboard-tab-events")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("event-product-shell")).not.toBeInTheDocument();
     expect(screen.getByText("Public event")).toBeInTheDocument();
   });
 });

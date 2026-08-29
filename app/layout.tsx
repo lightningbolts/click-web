@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Manrope, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
@@ -73,7 +74,9 @@ export default async function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <ProductChromeProvider>
-              <Navbar initialHasSession={initialHasSession} />
+              <Suspense fallback={null}>
+                <Navbar initialHasSession={initialHasSession} />
+              </Suspense>
               <main className="flex-1 flex flex-col">{children}</main>
               <Footer />
               <AppToaster />

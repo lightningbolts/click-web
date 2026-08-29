@@ -7,10 +7,10 @@
 
 ## Shell
 
-- Same [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) as the personal dashboard (vertical sidebar / mobile drawer). Opaque `surface`, 1px `border-hard`; no blur orbs or glass icon wells.
+- Same [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) as a horizontal top bar + animated mobile drawer (not a desktop sidebar). Opaque `surface`, 1px `border-hard`; no blur orbs or glass icon wells.
 - Nav items: Overview, Social activity, Heatmap, Tribes, Vibe stream, Vibe radar, Live metrics, **Events**, **Event engagement**. Preserve `venue_id` on hrefs. Extra nav links back to the personal dashboard.
 - Events: create/list via `EventCreateForm`, not Vibe Radar `BeaconDeployModal`. Funnel / network-health charts still aggregate live tables (`event_engagement_events`, recap SQL). `event_beacon_daily_stats` exists but is unused until [`event-schema-scaling-followups.md`](../event-schema-scaling-followups.md).
-- Header actions: Demo, live timestamp, Refresh, Export, Settings, plus `ThemeToggle` in the sidebar (marketing Navbar is hidden on `/insights`). Overview series use `primary` / `secondary` / `on-surface-variant` — no hex glow.
+- Header actions: Demo, live timestamp, Refresh, Export, Settings, plus `ThemeToggle` in the top bar (marketing Navbar is hidden on `/insights`). Overview series use `primary` / `secondary` / `on-surface-variant` — no hex glow.
 
 ---
 

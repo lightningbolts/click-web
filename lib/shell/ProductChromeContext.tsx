@@ -12,8 +12,8 @@ const ProductChromeContext = createContext(false);
 const SetProductChromeContext = createContext<(active: boolean) => void>(() => {});
 
 /**
- * True while a product shell (dashboard or signed-in event chrome) is mounted.
- * Navbar/Footer read this so marketing chrome cannot stack on the product UI,
+ * True while a signed-in product surface is mounted.
+ * Footer reads this so marketing footer cannot stack on dashboard/event pages,
  * including the gap after sign-out before `router.refresh()` swaps the page.
  */
 export function ProductChromeProvider({ children }: { children: ReactNode }) {

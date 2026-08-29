@@ -158,7 +158,11 @@ export default function PublicEventList({
       ) : null}
 
       {featured ? (
-        <motion.div {...(reduceMotion ? {} : fadePresence)} transition={fadeTransition(0.18)}>
+        <motion.div
+          key="featured"
+          {...(reduceMotion ? {} : fadePresence)}
+          transition={fadeTransition(0.24)}
+        >
           <EventListCard event={featured} featured />
         </motion.div>
       ) : null}
@@ -182,11 +186,14 @@ export default function PublicEventList({
               <h2 className="text-sm font-bold uppercase tracking-wide text-on-surface-variant">
                 {GROUP_LABEL[key]}
               </h2>
-              {groups[key].map((event) => (
+              {groups[key].map((event, index) => (
                 <motion.div
                   key={event.beacon_id}
                   {...(reduceMotion ? {} : fadePresence)}
-                  transition={fadeTransition(0.18)}
+                  transition={{
+                    ...fadeTransition(0.22),
+                    delay: reduceMotion ? 0 : index * 0.04,
+                  }}
                 >
                   <EventListCard event={event} />
                 </motion.div>

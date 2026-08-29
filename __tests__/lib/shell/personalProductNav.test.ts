@@ -3,6 +3,7 @@ import {
   isSignedInProductPath,
   parseDashboardTab,
   personalProductNavItems,
+  productNavItemIsActive,
 } from '@/lib/shell/personalProductNav';
 import { eventBackHref } from '@/components/events/EventBackLink';
 
@@ -14,7 +15,8 @@ describe('personalProductNav', () => {
   });
 
   it('builds hrefs for every dashboard tab', () => {
-    expect(dashboardTabHref('events')).toBe('/?tab=events');
+    expect(dashboardTabHref('events')).toBe('/events');
+    expect(dashboardTabHref('memory')).toBe('/?tab=memory');
     expect(personalProductNavItems().map((item) => item.id)).toEqual([
       'memory',
       'events',
@@ -23,6 +25,15 @@ describe('personalProductNav', () => {
       'identity',
       'settings',
     ]);
+  });
+
+  it('marks Events current on event routes', () => {
+    const events = personalProductNavItems().find((item) => item.id === 'events')!;
+    const memory = personalProductNavItems().find((item) => item.id === 'memory')!;
+    expect(productNavItemIsActive(events, '/events', null)).toBe(true);
+    expect(productNavItemIsActive(events, '/e/abc', null)).toBe(true);
+    expect(productNavItemIsActive(memory, '/', 'memory')).toBe(true);
+    expect(productNavItemIsActive(memory, '/events', null)).toBe(false);
   });
 
   it('treats event routes as signed-in product chrome', () => {
@@ -41,8 +52,8 @@ describe('eventBackHref', () => {
     expect(eventBackHref({ referrer: `${origin}/events`, origin, signedIn: true })).toBe('/events');
   });
 
-  it('returns the dashboard events tab for signed-in visitors from the dashboard', () => {
-    expect(eventBackHref({ referrer: `${origin}/`, origin, signedIn: true })).toBe('/?tab=events');
+  it('returns /events for signed-in visitors from the dashboard', () => {
+    expect(eventBackHref({ referrer: `${origin}/`, origin, signedIn: true })).toBe('/events');
   });
 
   it('returns the public feed for anonymous visitors', () => {

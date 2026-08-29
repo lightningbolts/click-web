@@ -27,6 +27,7 @@ export function parseDashboardTab(raw: string | null | undefined): DashboardTab 
 }
 
 export function dashboardTabHref(tab: DashboardTab): string {
+  if (tab === 'events') return '/events';
   return `/?tab=${tab}`;
 }
 
@@ -53,7 +54,7 @@ export function personalProductNavItems(): {
   }));
 }
 
-/** Signed-in routes that use ProductAppShell instead of marketing Navbar. */
+/** Routes where the signed-in Navbar shows product tabs instead of marketing links. */
 export function isSignedInProductPath(pathname: string): boolean {
   return (
     pathname === '/' ||
@@ -61,4 +62,16 @@ export function isSignedInProductPath(pathname: string): boolean {
     pathname.startsWith('/events') ||
     pathname.startsWith('/e/')
   );
+}
+
+export function productNavItemIsActive(
+  item: { id: DashboardTab; href: string },
+  pathname: string,
+  tab: string | null | undefined,
+): boolean {
+  if (item.id === 'events') {
+    return pathname === '/events' || pathname.startsWith('/events/') || pathname.startsWith('/e/');
+  }
+  if (pathname !== '/' && pathname !== '/dashboard') return false;
+  return parseDashboardTab(tab) === item.id;
 }

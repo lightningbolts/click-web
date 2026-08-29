@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 describe("chat transcript width", () => {
-  it("fills the product pane instead of a skinny max-w-xl or marketing max-w-5xl column", () => {
+  it("fills the shared max-w-6xl page column instead of a skinny max-w-xl or edge-to-edge max-w-none", () => {
     const files = [
       "components/chat/ChatView.tsx",
       "components/chat/ChatHeader.tsx",
@@ -19,7 +19,13 @@ describe("chat transcript width", () => {
       path.join(__dirname, "../../../lib/chat/layout.ts"),
       "utf8",
     );
-    expect(token).toMatch(/CHAT_TRANSCRIPT_MAX_CLASS = 'max-w-none'/);
-    expect(token).not.toMatch(/CHAT_TRANSCRIPT_MAX_CLASS = 'max-w-xl'/);
+    expect(token).toContain("PAGE_COLUMN_MAX_CLASS");
+    expect(token).not.toMatch(/CHAT_TRANSCRIPT_MAX_CLASS = ["']max-w-none['"]/);
+    expect(token).not.toMatch(/CHAT_TRANSCRIPT_MAX_CLASS = ["']max-w-xl['"]/);
+    const column = fs.readFileSync(
+      path.join(__dirname, "../../../lib/shell/pageColumn.ts"),
+      "utf8",
+    );
+    expect(column).toMatch(/PAGE_COLUMN_MAX_CLASS = ["']max-w-6xl["']/);
   });
 });

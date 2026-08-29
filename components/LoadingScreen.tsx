@@ -5,12 +5,14 @@ import ClickLogo from '@/components/ClickLogo';
 
 export default function LoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center overflow-hidden bg-background">
+    <div
+      className="flex min-h-[calc(100dvh-var(--navbar-height))] items-center justify-center overflow-hidden bg-background"
+      data-testid="boot-loading-screen"
+    >
       <div className="relative z-10 flex flex-col items-center gap-8">
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={false}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.4 }}
           className="flex flex-col items-center gap-4"
         >
           <ClickLogo size={72} className="h-[72px] w-[72px]" priority />
@@ -40,9 +42,8 @@ export default function LoadingScreen() {
         </div>
 
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
           className="text-sm font-medium text-on-surface-variant"
         >
           Loading your connections...

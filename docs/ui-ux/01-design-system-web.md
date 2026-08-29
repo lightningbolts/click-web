@@ -75,13 +75,13 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | `FcPageShell` | Flat background page wrapper |
 | `FcSectionHeader` | Oversized headline + muted support line |
 | Call overlay | Full-screen Grid / Speaker (`components/chat/CallOverlay.tsx`) — `bg-[#101212]`, `border border-border-hard`, primary active border; layout policy in `lib/calls/callLayoutPolicy.ts` |
-| `ProductAppShell` | Signed-in product chrome: full-height sidebar (desktop) + drawer (mobile). Used by the personal dashboard and Insights. |
+| `ProductAppShell` | Insights chrome: horizontal top bar (desktop) + animated mobile drawer. Personal dashboard uses the same [`Navbar`](../../components/Navbar.tsx) as marketing. |
 
 ---
 
 ## Product vs marketing chrome
 
-Signed-in product routes (`/` dashboard, `/dashboard`, `/insights/*`) use [`ProductAppShell`](../../components/shell/ProductAppShell.tsx): opaque `surface` sidebar, 1px `border-hard`, active item `bg-primary-container text-on-primary-container`. The marketing [`Navbar`](../../components/Navbar.tsx) is hidden on those routes (`data-navbar-root="true"` stays on the shell’s mobile header so call overlay offset still works). Logged-out marketing pages keep the top Navbar with grouped links, active states, and a primary Login CTA.
+One horizontal [`Navbar`](../../components/Navbar.tsx) for logged-in and logged-out visitors (`data-navbar-root="true"`). Logged-out: Events, How it works, Enterprise, About, Login. Signed-in: Memory Box, Events (`/events`), Map, Chat, QR Identity, Settings, plus Create event and an account menu. Insights (`/insights/*`) keeps [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) as its own horizontal top bar so venue tools stay scoped; marketing Navbar is hidden there only. Shared page column is `max-w-6xl` ([`lib/shell/pageColumn.ts`](../../lib/shell/pageColumn.ts)).
 
 ---
 

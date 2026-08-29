@@ -9,7 +9,7 @@ Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/E
 | Surface | Route |
 |---------|--------|
 | Anyone signed in | `/events/new` (login modal if logged out) |
-| Personal dashboard | Events tab on `/?tab=events` — My events, RSVPs, Create event |
+| Personal dashboard | Navbar **Events** → `/events` — My events, RSVPs, Create event, then public Discover |
 | Venue manager | Insights **Events** tab (`/insights/events?venue_id=`) — same form, sends `venue_id`. Do **not** use Vibe Radar `BeaconDeployModal` (soundtrack / pop-up hub pin). |
 
 Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-list upload) immediately. The public share URL remains `/e/{id}`.
@@ -18,11 +18,11 @@ Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-li
 
 | Route | Who | Notes |
 |-------|-----|--------|
-| `/events` | Public | Shared `EventPageShell` (`max-w-6xl`). Signed-in visitors also get `ProductAppShell`; anonymous visitors keep marketing `Navbar`. Search + date/going/host chips, featured soonest event, then Today / This week / Upcoming. Cards use `CardVisualHero` (no date-rail). Only `event_visibility = public` **and** `visibility_audience = everyone`. Unlisted / invite-only stay off this feed. |
-| `/events/new` | Signed in | Same 6xl shell, plus product chrome when signed in. Split-pane create form (cover + theme \| details + Event options). |
-| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended). Signed-in RSVP mutates `GET /api/beacons/{id}/rsvp` (attendees + `rsvp_count`) so the guest preview updates without a reload. Hosts also see **Edit details** / **Host settings**. One action row: **Open in Click** + copy-link icon (both `h-11`), then **Get the app** / **Android** as secondary `FcButton`s. Back goes to `/events` when that was the previous page, otherwise signed-in visitors return to `/?tab=events`. Connections-only and unlisted/invite-only events stay reachable via this URL. |
-| `/e/[beaconId]/manage` | Creator or venue manager | Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics, **Edit details** |
-| `/e/[beaconId]/edit` | Creator or venue manager | Same `EventCreateForm` as create, `PATCH /api/beacons/{id}`. Hosted dashboard cards and the public event page expose **Edit details** and **Host settings**. |
+| `/events` | Public + signed-in | Shared `EventPageShell` (`max-w-6xl`) and the same horizontal Navbar as the rest of the site. Signed-in visitors see **Your events** (`DashboardEventsModule`) then **Discover** (public list). Anonymous visitors see the public list only. Search + date/going/host chips, featured soonest event, then Today / This week / Upcoming. Cards use `CardVisualHero` (no date-rail). Route navigations show [`EventRouteLoading`](../../components/events/EventRouteLoading.tsx) skeletons (`app/events/loading.tsx`, `app/e/[beaconId]/loading.tsx`, `app/events/new/loading.tsx`); the ready page fades in via `EventPageEnter`. Hosted cards: top-right icon actions for Edit / Host settings. Only `event_visibility = public` **and** `visibility_audience = everyone`. Unlisted / invite-only stay off this feed. |
+| `/events/new` | Signed in | Same 6xl shell and global Navbar. Split-pane create form (cover + theme \| details + Event options). |
+| `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended). Signed-in RSVP mutates `GET /api/beacons/{id}/rsvp` (attendees + `rsvp_count`) so the guest preview updates without a reload. Hosts see **Edit details** / **Host settings** in the toolbar next to Back, not under the banner. One action row: **Open in Click** + copy-link icon (both `h-11`), then **Get the app** / **Android** as secondary `FcButton`s. Back always returns to `/events` unless an explicit `href` is passed (manage/edit go back to `/e/{id}`). Connections-only and unlisted/invite-only events stay reachable via this URL. |
+| `/e/[beaconId]/manage` | Creator or venue manager | **Back** to the event page, Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics, **Edit details** |
+| `/e/[beaconId]/edit` | Creator or venue manager | **Back** to the event page, same `EventCreateForm` as create, `PATCH /api/beacons/{id}`. Hosted list cards and the event toolbar expose **Edit details** and **Host settings**. |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
 | `/e/[beaconId]/summary?token=` | Public snapshot | Aggregate counts only, after organizer publish |
 
