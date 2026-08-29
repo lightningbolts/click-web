@@ -36,7 +36,7 @@ export function ChatSharedInterestsBanner({
             damping: 32,
             mass: 0.85,
           }}
-          className="mb-3 shrink-0 overflow-hidden rounded-[16px] border-2 border-emerald-700/25 bg-emerald-500/10 px-4 py-3"
+          className="mx-auto mb-3 w-[calc(100%-2rem)] max-w-5xl shrink-0 overflow-hidden rounded-[16px] border-2 border-emerald-700/25 bg-emerald-500/10 px-4 py-3 md:w-[calc(100%-3rem)]"
         >
           <motion.div
             initial={{ opacity: 0, x: -6 }}

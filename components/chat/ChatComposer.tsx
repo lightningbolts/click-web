@@ -65,7 +65,7 @@ export function ChatComposer({
   };
 
   return (
-    <div className="relative z-40 mt-2 shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface px-4 py-2">
+    <div className="relative z-40 mx-auto mb-4 mt-3 w-[calc(100%-2rem)] max-w-5xl shrink-0 overflow-visible rounded-[16px] border border-border-hard bg-surface px-4 py-3 shadow-sm md:w-[calc(100%-3rem)]">
       {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
         <div className="mb-2 flex w-full items-start gap-2 rounded-[8px] border border-border-hard bg-surface-container px-3 py-2.5 text-xs">
           <span className="shrink-0 font-medium text-primary">Replying</span>

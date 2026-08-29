@@ -69,6 +69,7 @@ export default function EventCreateForm({
   } = useImageUpload({
     endpoint: BEACON_IMAGE_ENDPOINT,
     acceptedMimeTypes: COVER_IMAGE_MIME_TYPES,
+    compressOversize: true,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,7 +197,7 @@ export default function EventCreateForm({
               <div className="relative z-10 flex flex-col items-center gap-2 rounded-[12px] bg-black/35 px-4 py-3 text-white">
                 <ImagePlus className="h-6 w-6" />
                 <span className="text-sm font-medium">
-                  {uploading ? "Uploading…" : "Drop a photo or click to upload"}
+                  {uploading ? "Preparing image…" : "Drop a photo or click to upload"}
                 </span>
               </div>
               <input
@@ -213,7 +214,11 @@ export default function EventCreateForm({
               <p className="mt-1.5 text-sm text-error" role="alert">
                 {coverUploadError}
               </p>
-            ) : null}
+            ) : (
+              <p className="mt-1.5 text-xs text-on-surface-variant">
+                Large photos are compressed automatically before upload.
+              </p>
+            )}
           </div>
           <EventThemePicker value={coverThemeId} onChange={setCoverThemeId} />
         </div>

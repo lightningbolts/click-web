@@ -221,13 +221,10 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                     const isExpanded = expandedCategory === label;
 
                     return (
-                        <div key={label} className={isExpanded ? 'col-span-2' : ''}>
+                        <div key={label} className="min-w-0">
                             <motion.div
-                                role="button"
-                                tabIndex={0}
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
-                                onClick={() => onToggleTag(label)}
                                 className={`relative flex w-full cursor-pointer select-none items-center gap-2 rounded-[8px] border-2 px-3 py-2.5 text-sm font-bold transition-colors ${isSelected
                                         ? 'border-border-hard bg-on-primary-container text-primary'
                                         : hasSelectedSubs
@@ -235,11 +232,20 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                             : 'border-border-hard bg-surface text-on-surface hover:bg-surface-container-low'
                                     }`}
                             >
-                                <span>{emoji}</span>
-                                <span className="flex-1 truncate text-left">{label}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => onToggleTag(label)}
+                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                                    aria-pressed={isSelected}
+                                >
+                                    <span>{emoji}</span>
+                                    <span className="flex-1 truncate">{label}</span>
+                                </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onToggleExpand(label); }}
-                                    className="rounded p-0.5 hover:bg-surface-container"
+                                    className="-my-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${label} interests`}
+                                    aria-expanded={isExpanded}
                                 >
                                     {isExpanded
                                         ? <ChevronUp className="h-3.5 w-3.5 text-on-surface-variant" />

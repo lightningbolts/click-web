@@ -26,8 +26,7 @@ describe("EventCreateForm", () => {
     expect(screen.getByPlaceholderText("Event name")).toBeInTheDocument();
     expect(screen.getByText("Create event")).toBeInTheDocument();
     expect(screen.getByText("Event options")).toBeInTheDocument();
-    await user.click(screen.getByText("Event options"));
-    expect(screen.getByText("Visibility & Access")).toBeInTheDocument();
+    expect(screen.getByText("Visibility & access")).toBeInTheDocument();
     const form = screen.getByTestId("event-create-form");
     expect(form.querySelector('[name="title"]')).not.toBeNull();
     expect(form.querySelector('[name="event_start_at"]')).not.toBeNull();

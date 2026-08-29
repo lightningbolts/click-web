@@ -24,18 +24,14 @@ export default function EventGoingAvatars({
   const label = `${count} ${past ? "went" : "going"}`;
   return (
     <AvatarStack
-      items={
-        dense
-          ? []
-          : people.map((person) => ({
-              id: person.user_id,
-              label: person.name,
-              imageUrl: person.avatar_url,
-            }))
-      }
+      items={people.map((person) => ({
+        id: person.user_id,
+        label: person.name,
+        imageUrl: person.avatar_url,
+      }))}
       count={count}
       label={label}
-      maxVisible={5}
+      maxVisible={dense ? 2 : 5}
       showOverflow={false}
       className={className}
       onClick={onOpen}

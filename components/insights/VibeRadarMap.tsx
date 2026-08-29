@@ -8,9 +8,7 @@ import { Loader2, MapPin, Layers } from "lucide-react";
 import type { VibeRadarCluster } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
 import {
-  DEFAULT_MAP_LAYER_TOGGLES,
   type MapBeaconRecord,
-  type MapLayerToggles,
   beaconGeoJsonFeatures,
   isSafeBeaconUri,
 } from "@/lib/map/mapBeacons";
@@ -27,6 +25,20 @@ const SRC_HAZARDS = "vr-beacons-hazards";
 
 const CLUSTER_MAX_ZOOM = 13;
 const CLUSTER_RADIUS = 48;
+
+type VibeMapLayers = {
+  myNetwork: boolean;
+  officialSoundtracks: boolean;
+  communityBeacons: boolean;
+  hazards: boolean;
+};
+
+const DEFAULT_VIBE_MAP_LAYERS: VibeMapLayers = {
+  myNetwork: true,
+  officialSoundtracks: true,
+  communityBeacons: true,
+  hazards: true,
+};
 
 function emptyFc(): GeoJSON.FeatureCollection {
   return { type: "FeatureCollection", features: [] };
@@ -81,7 +93,7 @@ export default function VibeRadarMap({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
+  const [layers, setLayers] = useState<VibeMapLayers>(() => ({ ...DEFAULT_VIBE_MAP_LAYERS }));
 
   const initCenterRef = useRef<[number, number] | null>(null);
   if (initCenterRef.current === null) {
@@ -425,7 +437,7 @@ export default function VibeRadarMap({
     };
   }, [mapLoaded]);
 
-  const toggle = (key: keyof MapLayerToggles) => {
+  const toggle = (key: keyof VibeMapLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 

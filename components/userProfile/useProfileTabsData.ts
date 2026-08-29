@@ -165,6 +165,7 @@ export function useProfileTabsData({
           if (cancelled) return;
           if (master) {
             setGroupMasterKey(master);
+            setCryptoUnlockError(null);
           } else {
             setCryptoUnlockError('Could not unlock group encryption for this device.');
           }
@@ -183,7 +184,10 @@ export function useProfileTabsData({
 
     void deriveKeysForConnection(effectiveConnectionId, connectionUserIds)
       .then((keys) => {
-        if (!cancelled) setDerivedKeys(keys);
+        if (!cancelled) {
+          setDerivedKeys(keys);
+          setCryptoUnlockError(null);
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -334,11 +338,8 @@ export function useProfileTabsData({
 
           if (item.isEncrypted) {
             if (!mediaChatKey) {
-              if (!cancelled) {
-                setCryptoUnlockError((prev) =>
-                  prev ?? 'Encrypted media could not be unlocked for this profile.',
-                );
-              }
+              // Key derivation is asynchronous. Leave the tile pending instead of
+              // reporting a decryption failure before the key has had time to load.
               continue;
             }
             const objectUrl = await createSecureMediaObjectUrl({

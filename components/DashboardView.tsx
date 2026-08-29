@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
@@ -66,6 +67,7 @@ import { useChatSearch } from '@/components/dashboard/useChatSearch';
 import { useConnectionLifecycle } from '@/components/dashboard/useConnectionLifecycle';
 import { ChatTabSection } from '@/components/dashboard/ChatTabSection';
 import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModals';
+import { messagesForProfileConnection } from '@/lib/userProfile/profileChatContext';
 
 type DashboardTab = 'memory' | 'events' | 'map' | 'chat' | 'identity' | 'settings';
 
@@ -119,17 +121,20 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const [profileConnectionId, setProfileConnectionId] = useState<string | null>(null);
   const [chatMessagesSnapshot, setChatMessagesSnapshot] = useState<Message[]>([]);
-  const profileDecryptedMessages = useMemo<DecryptedProfileMessage[]>(
-    () =>
-      chatMessagesSnapshot.map((m) => ({
+  const profileDecryptedMessages = useMemo<DecryptedProfileMessage[]>(() => {
+    const scopedMessages = messagesForProfileConnection(
+      chatMessagesSnapshot,
+      profileConnectionId,
+      selectedConnection?.id,
+    );
+    return scopedMessages.map((m) => ({
         id: m.id,
         content: m.content,
         timestamp: new Date(m.time_created).toISOString(),
         messageType: m.message_type,
         metadata: m.metadata as Record<string, unknown> | null,
-      })),
-    [chatMessagesSnapshot],
-  );
+      }));
+  }, [chatMessagesSnapshot, profileConnectionId, selectedConnection]);
   const [chatListGroupRenameGroupId, setChatListGroupRenameGroupId] = useState<string | null>(null);
   const [chatListGroupRenameInput, setChatListGroupRenameInput] = useState('');
   const [chatListGroupRenameBusy, setChatListGroupRenameBusy] = useState(false);
@@ -580,8 +585,15 @@ export default function DashboardView({ user }: DashboardViewProps) {
       rootTestId="dashboard-root"
       chromeTestId="dashboard-chrome"
       itemTestIdPrefix="dashboard-tab"
-      fillViewport={activeTab === 'chat'}
+      fillViewport={activeTab === 'chat' || activeTab === 'map'}
       hideHeader={activeTab === 'chat'}
+      actions={
+        activeTab === 'events' ? (
+          <Link href="/events/new" className="fc-btn-primary inline-flex px-4 py-2">
+            Create event
+          </Link>
+        ) : null
+      }
     >
       {needsTagging === true && (
         <InterestTagging
@@ -726,6 +738,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
+                className="flex min-h-0 flex-1 px-4 pb-4 md:px-8 md:pb-8"
               >
                 <ConnectionMap connections={mapConnectionRecords} onConnectionClick={handleOpenChat} />
               </motion.div>
@@ -876,21 +889,22 @@ export default function DashboardView({ user }: DashboardViewProps) {
           user?.id && profileUserId === user.id && birthdayProfileGateOpen,
         )}
         connectionId={
-          (profileConnectionId ?? selectedConnection?.id ?? null) &&
-          (selectedConnection?.chatKind === 'group_clique' ||
-            groupCliqueRecords.some(
-              (g) => g.id === (profileConnectionId ?? selectedConnection?.id),
-            ))
+          profileConnectionId &&
+          ((selectedConnection?.id === profileConnectionId &&
+            selectedConnection.chatKind === 'group_clique') ||
+            groupCliqueRecords.some((g) => g.id === profileConnectionId))
             ? null
-            : (profileConnectionId ?? selectedConnection?.id ?? null)
+            : profileConnectionId
         }
         chatId={
-          selectedConnection?.chatKind === 'group_clique'
+          selectedConnection?.id === profileConnectionId &&
+          selectedConnection.chatKind === 'group_clique'
             ? selectedConnection.groupChatId ?? null
             : groupCliqueRecords.find((g) => g.id === profileConnectionId)?.groupChatId ?? null
         }
         groupId={
-          selectedConnection?.chatKind === 'group_clique'
+          selectedConnection?.id === profileConnectionId &&
+          selectedConnection.chatKind === 'group_clique'
             ? selectedConnection.id
             : groupCliqueRecords.some((g) => g.id === profileConnectionId)
               ? profileConnectionId

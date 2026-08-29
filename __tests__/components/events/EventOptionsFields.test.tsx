@@ -36,12 +36,11 @@ function Harness() {
 }
 
 describe("EventOptionsFields", () => {
-  it("renders subcards and toggles instead of checkboxes", async () => {
+  it("renders options directly with styled toggles", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(screen.getByText("Event options"));
 
-    expect(screen.getByText("Visibility & Access")).toBeInTheDocument();
+    expect(screen.getByText("Visibility & access")).toBeInTheDocument();
     expect(screen.getByText("Capacity")).toBeInTheDocument();
     expect(screen.getByText("Check-in area")).toBeInTheDocument();
     expect(screen.getByText("Categories")).toBeInTheDocument();
@@ -54,11 +53,24 @@ describe("EventOptionsFields", () => {
   });
 
   it("shows check-in area tooltip copy", async () => {
+    render(<Harness />);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Choose how close guests must be to the event pin to check in: Intimate 75 m, Neighborhood 250 m, Venue 750 m, or Campus 2.5 km.",
+    );
+  });
+
+  it("offers an expanded taxonomy and custom categories", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(screen.getByText("Event options"));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(
-      "Check-in area sets the geofencing radius an attendee must be within to check in to the event — Intimate/Neighborhood/Venue/Campus map to increasingly large check-in radii.",
+
+    expect(screen.getByRole("button", { name: "Music" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Volunteering" })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Custom event category"), "Game night");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getByRole("button", { name: "Game night" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
   });
 });

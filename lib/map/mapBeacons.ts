@@ -86,17 +86,39 @@ export function displayTitleForBeacon(b: MapBeaconRecord): string {
 
 export type MapLayerToggles = {
   myNetwork: boolean;
-  officialSoundtracks: boolean;
-  communityBeacons: boolean;
-  hazards: boolean;
+  events: boolean;
+  socialVibes: boolean;
+  soundtracks: boolean;
+  alertsUtilities: boolean;
+  other: boolean;
 };
 
 export const DEFAULT_MAP_LAYER_TOGGLES: MapLayerToggles = {
   myNetwork: true,
-  officialSoundtracks: true,
-  communityBeacons: true,
-  hazards: true,
+  events: true,
+  socialVibes: true,
+  soundtracks: true,
+  alertsUtilities: true,
+  other: true,
 };
+
+export function mapLayerForBeacon(
+  beaconType: MapBeaconType,
+): Exclude<keyof MapLayerToggles, "myNetwork"> {
+  if (beaconType === "event") return "events";
+  if (beaconType === "recreation") return "socialVibes";
+  if (beaconType === "soundtrack") return "soundtracks";
+  if (
+    beaconType === "hazard" ||
+    beaconType === "utility" ||
+    beaconType === "hazard_utility" ||
+    beaconType === "sos" ||
+    beaconType === "study"
+  ) {
+    return "alertsUtilities";
+  }
+  return "other";
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);

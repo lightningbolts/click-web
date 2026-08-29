@@ -25,10 +25,6 @@ function hours(): number[] {
   return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 }
 
-function minutes(): number[] {
-  return [0, 15, 30, 45];
-}
-
 function parseDateValue(value: string): { year: number; month: number; day: number } {
   const [year, month, day] = value.split("-").map((part) => Number(part));
   return {
@@ -109,6 +105,35 @@ function Stepper({
         </button>
       </div>
     </div>
+  );
+}
+
+function MinuteInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <label className="flex min-w-0 flex-1 flex-col gap-1">
+      <span className="text-xs font-semibold text-on-surface-variant">Minute</span>
+      <input
+        type="number"
+        min={0}
+        max={59}
+        step={1}
+        inputMode="numeric"
+        value={String(value).padStart(2, "0")}
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          if (Number.isInteger(next) && next >= 0 && next <= 59) onChange(next);
+        }}
+        aria-label="Minute"
+        className="h-10 w-full rounded-[8px] border border-border-hard bg-surface px-3 text-center text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+      />
+    </label>
   );
 }
 
@@ -273,14 +298,12 @@ function SchedulePopover({
                 })
               }
             />
-            <Stepper
-              label="Minute"
+            <MinuteInput
               value={slot.clock.minute}
-              options={minutes()}
               onChange={(next) =>
                 onChange({
                   ...slot,
-                  clock: { ...slot.clock, minute: Number(next) },
+                  clock: { ...slot.clock, minute: next },
                 })
               }
             />

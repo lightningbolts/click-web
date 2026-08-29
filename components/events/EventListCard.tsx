@@ -51,7 +51,10 @@ export function EventListCard({
   return (
     <Link href={eventSharePath(event.beacon_id)} className="block" data-testid="event-list-card">
       <FcCard
-        className={cn("overflow-hidden transition-colors hover:border-primary", featured ? "md:flex" : "flex")}
+        className={cn(
+          "overflow-hidden transition-colors hover:border-primary",
+          featured ? "md:flex" : "flex min-h-28",
+        )}
       >
         <CardVisualHero
           id={event.beacon_id}
@@ -61,7 +64,7 @@ export function EventListCard({
           className={
             featured
               ? "h-48 w-full shrink-0 md:h-auto md:min-h-[16rem] md:w-[42%]"
-              : "h-[5.5rem] w-[5.5rem] shrink-0 sm:h-24 sm:w-24"
+              : "w-28 shrink-0 self-stretch sm:w-32"
           }
         />
         <div className={cn("min-w-0 p-4", featured && "flex flex-1 flex-col justify-center md:p-6")}>

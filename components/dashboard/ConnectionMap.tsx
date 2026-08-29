@@ -12,6 +12,7 @@ import {
   type MapLayerToggles,
   type MapBeaconRecord,
   beaconGeoJsonFeatures,
+  mapLayerForBeacon,
   parseMapBeacon,
   rawBeaconRowsFromApiPayload,
 } from '@/lib/map/mapBeacons';
@@ -207,7 +208,12 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     mapInitCenterRef.current = mapCenter;
   }
 
-  const wantsBeaconFetch = layers.officialSoundtracks || layers.communityBeacons || layers.hazards;
+  const wantsBeaconFetch =
+    layers.events ||
+    layers.socialVibes ||
+    layers.soundtracks ||
+    layers.alertsUtilities ||
+    layers.other;
 
   /** Map viewport for beacon proximity — once the map exists, follows pan/zoom; until then uses connection center. */
   const [beaconViewport, setBeaconViewport] = useState<{ lng: number; lat: number; radiusM: number } | null>(null);
@@ -733,9 +739,10 @@ const POPUP_MAX_CONNECTIONS = 5;
       const src = m.getSource(id) as maplibregl.GeoJSONSource | undefined;
       src?.setData({ type: 'FeatureCollection', features: feats });
     };
-    setSrc(SRC_OFFICIAL, beaconGeoJsonFeatures(beacons, 'official'));
-    setSrc(SRC_COMMUNITY, beaconGeoJsonFeatures(beacons, 'community'));
-    setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(beacons, 'hazard'));
+    const visibleBeacons = beacons.filter((beacon) => layers[mapLayerForBeacon(beacon.beacon_type)]);
+    setSrc(SRC_OFFICIAL, beaconGeoJsonFeatures(visibleBeacons, 'official'));
+    setSrc(SRC_COMMUNITY, beaconGeoJsonFeatures(visibleBeacons, 'community'));
+    setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(visibleBeacons, 'hazard'));
 
     const vis = (on: boolean) => (on ? 'visible' : 'none');
     [
@@ -745,7 +752,7 @@ const POPUP_MAX_CONNECTIONS = 5;
       'official-beacon-unclustered',
       'official-beacon-unclustered-icon',
     ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.officialSoundtracks));
+      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
     });
     [
       'community-beacon-clusters',
@@ -754,7 +761,7 @@ const POPUP_MAX_CONNECTIONS = 5;
       'community-beacon-unclustered',
       'community-beacon-unclustered-icon',
     ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.communityBeacons));
+      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
     });
     [
       'hazard-beacon-clusters',
@@ -763,16 +770,22 @@ const POPUP_MAX_CONNECTIONS = 5;
       'hazard-beacon-unclustered',
       'hazard-beacon-unclustered-icon',
     ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.hazards));
+      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
     });
-  }, [mapInitialized, beacons, layers.officialSoundtracks, layers.communityBeacons, layers.hazards]);
+  }, [mapInitialized, beacons, layers]);
 
   useEffect(() => {
     const handleResize = () => { map.current?.resize(); };
     window.addEventListener('resize', handleResize);
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' && mapContainer.current
+        ? new ResizeObserver(handleResize)
+        : null;
+    if (resizeObserver && mapContainer.current) resizeObserver.observe(mapContainer.current);
     const resizeTimer = setTimeout(handleResize, 100);
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
       clearTimeout(resizeTimer);
     };
   }, [mapInitialized]);
@@ -804,7 +817,7 @@ const POPUP_MAX_CONNECTIONS = 5;
   }
 
   return (
-    <div className="relative rounded-[16px] border border-border-hard overflow-hidden bg-surface-container h-[600px]">
+    <div className="relative min-h-[420px] w-full flex-1 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container">
       <div
         className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
           mapPresentationReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -839,16 +852,24 @@ const POPUP_MAX_CONNECTIONS = 5;
             My Network
           </div>
           <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.officialSoundtracks} onCheckedChange={() => toggle('officialSoundtracks')} aria-label="Official Soundtracks" className="scale-75" />
-            Official Soundtracks
+            <Toggle checked={layers.events} onCheckedChange={() => toggle('events')} aria-label="Events" className="scale-75" />
+            Events
           </div>
           <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.communityBeacons} onCheckedChange={() => toggle('communityBeacons')} aria-label="Community Beacons" className="scale-75" />
-            Community Beacons
+            <Toggle checked={layers.socialVibes} onCheckedChange={() => toggle('socialVibes')} aria-label="Social vibes" className="scale-75" />
+            Social vibes
           </div>
           <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.hazards} onCheckedChange={() => toggle('hazards')} aria-label="Hazards" className="scale-75" />
-            Hazards
+            <Toggle checked={layers.soundtracks} onCheckedChange={() => toggle('soundtracks')} aria-label="Soundtracks" className="scale-75" />
+            Soundtracks
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.alertsUtilities} onCheckedChange={() => toggle('alertsUtilities')} aria-label="Alerts and utilities" className="scale-75" />
+            Alerts &amp; utilities
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.other} onCheckedChange={() => toggle('other')} aria-label="Other beacons" className="scale-75" />
+            Other
           </div>
         </div>
       )}

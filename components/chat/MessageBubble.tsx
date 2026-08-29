@@ -415,7 +415,7 @@ export default function MessageBubble({
       <div
         ref={messageColumnRef}
         {...{ [CHAT_HOVER_ANCHOR_ATTR]: message.id }}
-        className={`relative max-w-[72%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+        className={`relative flex max-w-[min(75%,32rem)] flex-col ${isMine ? 'items-end' : 'items-start'}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >

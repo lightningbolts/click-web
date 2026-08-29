@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import useSWR from "swr";
-import { FcButton, FcCard } from "@/components/fc";
+import { FcCard } from "@/components/fc";
 import { EventListCard, type EventListItem } from "@/components/events/EventListCard";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { eventIsPast } from "@/lib/events/eventMetadata";
@@ -27,7 +27,7 @@ function EventCardList({
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <div className="space-y-3">
+    <div className="grid gap-3 lg:grid-cols-2">
       {events.map((event) => (
         <motion.div
           key={event.beacon_id}
@@ -55,11 +55,6 @@ export default function DashboardEventsModule() {
 
   return (
     <div className="space-y-8" data-testid="dashboard-events-module">
-      <div className="flex justify-end">
-        <Link href="/events/new">
-          <FcButton type="button">Create event</FcButton>
-        </Link>
-      </div>
       {error ? <p className="text-error">Could not load your events.</p> : null}
       {isLoading && events.length === 0 ? (
         <p className="text-sm text-on-surface-variant">Loading your events…</p>
@@ -73,8 +68,8 @@ export default function DashboardEventsModule() {
             {upcomingHosted.length === 0 && !isLoading ? (
               <FcCard className="space-y-3 p-6">
                 <p className="text-sm text-on-surface-variant">You have not created an event yet.</p>
-                <Link href="/events/new" className="inline-flex">
-                  <FcButton type="button">Create event</FcButton>
+                <Link href="/events/new" className="fc-btn-primary inline-flex px-4 py-2">
+                  Create event
                 </Link>
               </FcCard>
             ) : (
