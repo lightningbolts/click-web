@@ -12,6 +12,7 @@ import {
   Mountain,
   Search,
 } from 'lucide-react';
+import { CHAT_PANEL_CLASS } from '@/lib/chat/layout';
 import { getSupabaseClient } from '@/lib/supabase';
 import { ChatView } from '@/components/chat';
 import { deleteCliqueRpc, leaveCliqueRpc } from '@/lib/chat/createVerifiedClick';
@@ -193,9 +194,9 @@ export function ChatTabSection({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="chat-thread-scroll h-full min-h-0"
+          className={`${CHAT_PANEL_CLASS} chat-thread-scroll`}
         >
-        <div className="space-y-6 px-4 py-4 md:px-8">
+        <div className="space-y-6 p-4 md:p-6">
         <div className="flex w-full items-center gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="p-2 bg-primary/20 rounded-xl">

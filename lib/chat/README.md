@@ -53,7 +53,7 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 
 ### `layout.ts`
 
-`CHAT_TRANSCRIPT_MAX_CLASS` (`max-w-6xl` via `PAGE_COLUMN_MAX_CLASS`) is the shared width token for the dashboard chat header, transcript, composer, and starters banner. Match Navbar / event pages; do not use `max-w-xl` (skinny gutters) or `max-w-none` (bubbles pinned to opposite edges). Bubble width stays on `MessageBubble` (`max-w-[min(75%,32rem)]`).
+`CHAT_PANEL_CLASS` is the bordered 16px card that wraps header, transcript, composer, and the conversation list. The dashboard pane already uses `PAGE_COLUMN_CLASS`, so the card edges match Memory Box. Do not use `max-w-xl` or `max-w-none` on the thread. Bubble width stays on `MessageBubble` (`max-w-[min(75%,32rem)]`).
 
 ### `chatGatekeeper` (server)
 

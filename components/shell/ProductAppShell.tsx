@@ -197,16 +197,30 @@ export default function ProductAppShell({
       <header
         data-navbar-root="true"
         data-testid={chromeTestId}
-        className="sticky top-0 z-40 border-b border-border-hard bg-surface px-4 py-3 md:px-10"
+        className="sticky top-0 z-40 border-b border-border-hard bg-surface py-3"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <Link href={productHref} className="flex shrink-0 items-center gap-2">
-            <ClickLogo variant="boxed" size={28} className="h-7 w-7 rounded-[8px] border border-border-hard" />
-            <span className="text-sm font-bold">{productLabel}</span>
-          </Link>
+        <div className={PAGE_COLUMN_CLASS}>
+          <div className="flex items-center gap-3">
+            <Link href={productHref} className="flex shrink-0 items-center gap-2">
+              <ClickLogo variant="boxed" size={28} className="h-7 w-7 rounded-[8px] border border-border-hard" />
+              <span className="text-sm font-bold">{productLabel}</span>
+            </Link>
+            <div className="ml-auto hidden shrink-0 items-center gap-2 md:flex">{accountBlock()}</div>
+            <button
+              type="button"
+              className="ml-auto rounded-[8px] border border-border-hard p-2 md:hidden"
+              data-testid="nav-menu-toggle"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav-drawer"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              onClick={() => setMobileOpen((o) => !o)}
+            >
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+          </div>
           <nav
-            className="hidden min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto md:flex"
+            className="mt-3 hidden flex-wrap items-center gap-1 md:flex"
             aria-label="Product"
           >
             {items.map((item) => renderItem(item))}
@@ -224,18 +238,6 @@ export default function ProductAppShell({
               );
             })}
           </nav>
-          <div className="ml-auto hidden shrink-0 items-center gap-2 md:flex">{accountBlock()}</div>
-          <button
-            type="button"
-            className="ml-auto rounded-[8px] border border-border-hard p-2 md:hidden"
-            data-testid="nav-menu-toggle"
-            aria-expanded={mobileOpen}
-            aria-controls="mobile-nav-drawer"
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            onClick={() => setMobileOpen((o) => !o)}
-          >
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
         </div>
       </header>
 
@@ -290,9 +292,9 @@ export default function ProductAppShell({
         )}
         <div
           className={cn(
+            PAGE_COLUMN_CLASS,
             "min-h-0 min-w-0 flex-1",
-            fillViewport ? "flex flex-col overflow-hidden" : "overflow-y-auto pb-8",
-            !fillViewport && PAGE_COLUMN_CLASS,
+            fillViewport ? "flex flex-col overflow-hidden py-4" : "overflow-y-auto pb-8",
           )}
         >
           {children}

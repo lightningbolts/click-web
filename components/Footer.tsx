@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import ClickLogo from '@/components/ClickLogo';
 import { useProductChrome } from '@/lib/shell/ProductChromeContext';
+import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function Footer() {
   const { user } = useAuth();
@@ -13,10 +14,10 @@ export default function Footer() {
 
   return (
     <footer
-      className="relative z-50 border-t border-border-hard bg-surface px-6 py-12 text-on-surface md:px-12"
+      className="relative z-50 border-t border-border-hard bg-surface py-12 text-on-surface"
       style={{ backgroundColor: "var(--color-surface)" }}
     >
-      <div className="mx-auto max-w-6xl">
+      <div className={PAGE_COLUMN_CLASS}>
         <div className="mb-8 flex flex-col items-center justify-center gap-6">
           <div className="flex items-center gap-3 text-2xl font-bold md:text-3xl">
             <ClickLogo size={36} className="h-9 w-9 md:h-10 md:w-10" />

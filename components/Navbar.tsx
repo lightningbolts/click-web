@@ -13,6 +13,7 @@ import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
 import useSWR from "swr";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import { cn } from "@/lib/cn";
+import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
 import {
   personalProductNavItems,
   productNavItemIsActive,
@@ -138,10 +139,10 @@ export default function Navbar({
     <>
       <nav
         data-navbar-root="true"
-        className="relative z-[99999] border-b border-border-hard bg-surface px-4 py-3 text-on-surface md:px-10 md:py-4"
+        className="relative z-[99999] border-b border-border-hard bg-surface py-3 text-on-surface md:py-4"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <div className="mx-auto grid max-w-6xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+        <div className={cn(PAGE_COLUMN_CLASS, "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[1fr_auto_1fr]")}>
           <Link
             href="/"
             className="order-1 flex shrink-0 items-center gap-2 justify-self-start text-xl font-bold md:gap-2.5 md:text-2xl"

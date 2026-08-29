@@ -10,6 +10,8 @@ import HomeAuthenticated from '@/components/HomeAuthenticated';
 import ClickLogo from '@/components/ClickLogo';
 import LandingPlayground from '@/components/landing/playground';
 import WaitlistModal from '@/components/marketing/WaitlistModal';
+import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
+import { cn } from '@/lib/cn';
 
 /**
  * Marketing homepage. Never gates on auth `loading` so SSR/crawlers receive
@@ -37,7 +39,7 @@ export default function LandingPage() {
   return (
     <>
       <div className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate">
-        <section className="relative z-10 flex min-h-[calc(100svh-var(--navbar-height))] flex-col items-center justify-center px-6 py-16 md:px-12">
+        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 flex min-h-[calc(100svh-var(--navbar-height))] flex-col items-center justify-center py-16")}>
           <motion.div
             initial={false}
             animate={{ y: 0, opacity: 1 }}
@@ -80,8 +82,8 @@ export default function LandingPage() {
           source="homepage_hero"
         />
 
-        <section id="why" className="relative z-10 px-6 pb-8 pt-16 md:px-12" aria-labelledby="why-heading">
-          <div className="mx-auto max-w-5xl">
+        <section id="why" className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-8 pt-16")} aria-labelledby="why-heading">
+          <div>
             <h2 id="why-heading" className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
               Why Click exists
             </h2>
@@ -121,8 +123,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="relative z-10 px-6 pb-16 md:px-12">
-          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
+        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-16")}>
+          <div className="grid gap-6 md:grid-cols-3">
             <div className="fc-card p-6">
               <Smartphone className="mb-4 h-6 w-6 text-primary" aria-hidden />
               <h2 className="text-lg font-bold text-on-surface">In person</h2>
@@ -152,10 +154,10 @@ export default function LandingPage() {
 
         <section
           id="how-it-works"
-          className="relative z-10 px-6 py-16 md:px-12"
+          className={cn(PAGE_COLUMN_CLASS, "relative z-10 py-16")}
           aria-labelledby="how-it-works-heading"
         >
-          <div className="mx-auto max-w-6xl">
+          <div>
             <div className="mb-10 text-center">
               <h2
                 id="how-it-works-heading"
@@ -173,7 +175,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="relative z-10 px-6 pb-8 md:px-12">
+        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-8")}>
           <p className="mx-auto max-w-2xl text-center text-sm text-on-surface-variant">
             Running a venue, campus, or event program?{' '}
             <Link href="/enterprise" className="font-semibold text-primary hover:text-primary/80">
@@ -183,7 +185,7 @@ export default function LandingPage() {
           </p>
         </section>
 
-        <section className="relative z-10 px-6 pb-8 md:px-12" aria-labelledby="mission-heading">
+        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-8")} aria-labelledby="mission-heading">
           <div className="mx-auto max-w-2xl text-center">
             <h2 id="mission-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
               Built for the moment you put your phone down
@@ -195,8 +197,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="relative z-10 px-6 pb-24 pt-8 md:px-12">
-          <div className="mx-auto max-w-xl rounded-[16px] border border-border-hard border-t-4 border-t-primary bg-surface px-8 py-12 text-center">
+        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-24 pt-8")}>
+          <div className="rounded-[16px] border border-border-hard border-t-4 border-t-primary bg-surface px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
               Launching in Fall 2026.
             </h2>
