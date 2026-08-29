@@ -1,8 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import EventRsvpPanel from "@/components/events/EventRsvpPanel";
 
 const authState: { user: { id: string } | null; loading: boolean } = { user: null, loading: false };
-const swrState: { data?: { current_user_signed_up?: boolean }; isLoading: boolean } = {
+const swrState: {
+  data?: {
+    current_user_signed_up?: boolean;
+    attendees?: Array<{ user_id: string; name: string; avatar_url: string | null }>;
+    rsvp_count?: number;
+  };
+  isLoading: boolean;
+} = {
   data: undefined,
   isLoading: false,
 };
@@ -15,10 +23,11 @@ jest.mock("@/lib/auth/freshAuthHeaders", () => ({
   getFreshAuthHeaders: async () => ({}),
 }));
 
+const mutateMock = jest.fn();
 jest.mock("swr", () => ({
   __esModule: true,
   default: () => ({ data: swrState.data, isLoading: swrState.isLoading }),
-  mutate: jest.fn(),
+  mutate: (...args: unknown[]) => mutateMock(...args),
 }));
 
 describe("EventRsvpPanel", () => {
@@ -27,6 +36,8 @@ describe("EventRsvpPanel", () => {
     authState.loading = false;
     swrState.data = undefined;
     swrState.isLoading = false;
+    mutateMock.mockReset();
+    global.fetch = jest.fn();
   });
 
   it("shows the guest form when signed out", () => {
@@ -123,5 +134,35 @@ describe("EventRsvpPanel", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Request to join" })).toBeInTheDocument();
+  });
+
+  it("writes the new attendee into the shared RSVP cache without a page reload", async () => {
+    const user = userEvent.setup();
+    authState.user = { id: "user-1" };
+    swrState.data = { current_user_signed_up: false, attendees: [], rsvp_count: 0 };
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        attendee: { user_id: "user-1", name: "Ada", avatar_url: null },
+      }),
+    });
+
+    render(<EventRsvpPanel beaconId="11111111-1111-4111-8111-111111111111" />);
+    await user.click(screen.getByRole("button", { name: "RSVP" }));
+
+    await waitFor(() => expect(mutateMock).toHaveBeenCalled());
+    const updater = mutateMock.mock.calls[0][1] as (current?: {
+      attendees?: Array<{ user_id: string; name: string; avatar_url: string | null }>;
+      rsvp_count?: number;
+      current_user_signed_up?: boolean;
+    }) => {
+      attendees?: Array<{ user_id: string; name: string; avatar_url: string | null }>;
+      rsvp_count?: number;
+      current_user_signed_up?: boolean;
+    };
+    const next = updater({ attendees: [], rsvp_count: 2, current_user_signed_up: false });
+    expect(next.attendees).toEqual([{ user_id: "user-1", name: "Ada", avatar_url: null }]);
+    expect(next.rsvp_count).toBe(3);
   });
 });

@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import { ProductChromeOn, ProductChromeProvider } from "@/lib/shell/ProductChromeContext";
 
 const navState: {
   pathname: string;
@@ -69,6 +70,22 @@ describe("Navbar", () => {
     navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
     const { container } = renderNav();
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("hides marketing chrome when product chrome is mounted even if client session is empty", async () => {
+    navState.pathname = "/";
+    navState.user = null;
+    render(
+      <ThemeProvider>
+        <ProductChromeProvider>
+          <ProductChromeOn />
+          <Navbar />
+        </ProductChromeProvider>
+      </ThemeProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByTestId("nav-login")).not.toBeInTheDocument();
+    });
   });
 
   it("shows a login CTA when logged out on marketing pages", () => {

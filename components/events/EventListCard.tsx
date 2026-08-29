@@ -9,7 +9,7 @@ import {
   eventSubtitle,
   eventWhereLabel,
 } from "@/lib/events/eventMetadata";
-import { eventSharePath } from "@/lib/events/eventUrls";
+import { eventEditPath, eventManagePath, eventSharePath } from "@/lib/events/eventUrls";
 import EventGoingAvatars, { type EventGoingPerson } from "@/components/events/EventGoingAvatars";
 import { cn } from "@/lib/cn";
 
@@ -35,11 +35,13 @@ export function EventListCard({
   featured = false,
   past,
   dense = false,
+  hostActions = false,
 }: {
   event: EventListItem;
   featured?: boolean;
   past?: boolean;
   dense?: boolean;
+  hostActions?: boolean;
 }) {
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
   const subtitle = eventSubtitle(title, event.description);
@@ -49,12 +51,16 @@ export function EventListCard({
   const isPast = past ?? eventIsPast(event);
 
   return (
-    <Link href={eventSharePath(event.beacon_id)} className="block" data-testid="event-list-card">
-      <FcCard
-        className={cn(
-          "overflow-hidden transition-colors hover:border-primary",
-          featured ? "md:flex" : "flex min-h-28",
-        )}
+    <FcCard
+      className={cn(
+        "overflow-hidden transition-colors hover:border-primary",
+        featured ? "md:flex md:flex-col" : "flex min-h-28 flex-col",
+      )}
+    >
+      <Link
+        href={eventSharePath(event.beacon_id)}
+        className={cn("block min-w-0", featured ? "md:flex" : "flex min-h-28")}
+        data-testid="event-list-card"
       >
         <CardVisualHero
           id={event.beacon_id}
@@ -107,7 +113,26 @@ export function EventListCard({
             ) : null}
           </div>
         </div>
-      </FcCard>
-    </Link>
+      </Link>
+      {hostActions ? (
+        <div
+          className="flex flex-wrap gap-2 border-t border-border-hard px-4 py-3"
+          data-testid="event-host-card-actions"
+        >
+          <Link
+            href={eventEditPath(event.beacon_id)}
+            className="text-sm font-semibold text-primary hover:underline"
+          >
+            Edit details
+          </Link>
+          <Link
+            href={eventManagePath(event.beacon_id)}
+            className="text-sm font-semibold text-primary hover:underline"
+          >
+            Host settings
+          </Link>
+        </div>
+      ) : null}
+    </FcCard>
   );
 }

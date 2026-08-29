@@ -20,6 +20,7 @@ import {
 } from "@/lib/events/eventRsvpPolicy";
 import { rsvpEnabledFromMetadata } from "@/lib/events/eventMetadata";
 import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
+import { countEventRsvps } from "@/lib/events/publicEvent";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -165,12 +166,14 @@ export async function GET(
     });
 
     const requestStatus = await loadRequestStatus(admin, beaconId, user.id);
+    const rsvpCount = await countEventRsvps(admin, beaconId);
 
     return NextResponse.json({
       beacon_id: beaconId,
       attendees,
       current_user_signed_up: attendeeRows.some((row) => row.user_id === user.id),
       request_status: requestStatus,
+      rsvp_count: rsvpCount,
     });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/rsvp:", e);

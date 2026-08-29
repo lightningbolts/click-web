@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
 import { FcButton, FcTextarea } from "@/components/fc";
@@ -11,7 +11,7 @@ import {
   COVER_IMAGE_MIME_TYPES,
 } from "@/lib/uploads/constants";
 import { useImageUpload } from "@/lib/uploads/useImageUpload";
-import { eventSharePath } from "@/lib/events/eventUrls";
+import { eventManagePath, eventSharePath } from "@/lib/events/eventUrls";
 import EventLocationPicker from "@/components/events/EventLocationPicker";
 import EventDateTimeFields from "@/components/events/EventDateTimeFields";
 import EventOptionsFields from "@/components/events/EventOptionsFields";
@@ -24,6 +24,7 @@ import {
   type GuestListVisibility,
 } from "@/lib/events/eventOptions";
 import { defaultEventWindow, resolvedTimeZone } from "@/lib/events/eventScheduleUi";
+import type { EventFormDraft } from "@/lib/events/eventFormDraft";
 import { cn } from "@/lib/cn";
 
 type EventCreateFormProps = {
@@ -31,6 +32,8 @@ type EventCreateFormProps = {
   defaultLat?: number | null;
   defaultLng?: number | null;
   defaultLocationName?: string | null;
+  beaconId?: string;
+  initial?: EventFormDraft;
 };
 
 export default function EventCreateForm({
@@ -38,33 +41,45 @@ export default function EventCreateForm({
   defaultLat = null,
   defaultLng = null,
   defaultLocationName = null,
+  beaconId,
+  initial,
 }: EventCreateFormProps) {
   const router = useRouter();
+  const isEdit = Boolean(beaconId);
   const initialWindow = useMemo(() => defaultEventWindow(), []);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [start, setStart] = useState(initialWindow.start);
-  const [end, setEnd] = useState(initialWindow.end);
-  const [timeZone] = useState(() => resolvedTimeZone());
-  const [locationName, setLocationName] = useState(defaultLocationName ?? "");
-  const [lat, setLat] = useState(defaultLat != null ? String(defaultLat) : "");
-  const [lng, setLng] = useState(defaultLng != null ? String(defaultLng) : "");
-  const [coverThemeId, setCoverThemeId] = useState<string>(EVENT_COVER_THEME_IDS[0]);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [start, setStart] = useState(() =>
+    initial?.startIso ? new Date(initial.startIso) : initialWindow.start,
+  );
+  const [end, setEnd] = useState(() =>
+    initial?.endIso ? new Date(initial.endIso) : initialWindow.end,
+  );
+  const [timeZone] = useState(() => initial?.timeZone || resolvedTimeZone());
+  const [locationName, setLocationName] = useState(initial?.locationName ?? defaultLocationName ?? "");
+  const [lat, setLat] = useState(initial?.lat ?? (defaultLat != null ? String(defaultLat) : ""));
+  const [lng, setLng] = useState(initial?.lng ?? (defaultLng != null ? String(defaultLng) : ""));
+  const [coverThemeId, setCoverThemeId] = useState<string>(
+    initial?.coverThemeId ?? EVENT_COVER_THEME_IDS[0],
+  );
   const [visibility, setVisibility] = useState<EventVisibility>(
-    DEFAULT_EVENT_LISTING_OPTIONS.event_visibility,
+    initial?.visibility ?? DEFAULT_EVENT_LISTING_OPTIONS.event_visibility,
   );
-  const [capacity, setCapacity] = useState<number | null>(null);
-  const [approvalRequired, setApprovalRequired] = useState(false);
-  const [guestListVisibility, setGuestListVisibility] = useState<GuestListVisibility>("public");
-  const [showCreatorName, setShowCreatorName] = useState(true);
+  const [capacity, setCapacity] = useState<number | null>(initial?.capacity ?? null);
+  const [approvalRequired, setApprovalRequired] = useState(initial?.approvalRequired ?? false);
+  const [guestListVisibility, setGuestListVisibility] = useState<GuestListVisibility>(
+    initial?.guestListVisibility ?? "public",
+  );
+  const [showCreatorName, setShowCreatorName] = useState(initial?.showCreatorName ?? true);
   const [venueScale, setVenueScale] = useState<"intimate" | "neighborhood" | "venue" | "campus">(
-    "neighborhood",
+    initial?.venueScale ?? "neighborhood",
   );
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>(initial?.categories ?? []);
   const {
     uploading,
     error: coverUploadError,
     url: imageUrl,
+    setUrl: setImageUrl,
     upload: uploadCover,
   } = useImageUpload({
     endpoint: BEACON_IMAGE_ENDPOINT,
@@ -76,6 +91,40 @@ export default function EventCreateForm({
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    if (initial?.imageUrl) setImageUrl(initial.imageUrl);
+  }, [initial?.imageUrl, setImageUrl]);
+
+  const writeBody = (latN: number, lngN: number) => ({
+    lat: latN,
+    lng: lngN,
+    show_creator_name: showCreatorName,
+    event_visibility: visibility,
+    event_capacity: capacity,
+    approval_required: approvalRequired,
+    guest_list_visibility: guestListVisibility,
+    cover_theme_id: coverThemeId,
+    event_timezone: timeZone,
+    ...(venueId ? { venue_id: venueId } : {}),
+    metadata: {
+      title: title.trim(),
+      description: description.trim(),
+      event_start_at: start.toISOString(),
+      event_end_at: end.toISOString(),
+      event_timezone: timeZone,
+      location_name: locationName.trim(),
+      image_url: imageUrl,
+      rsvp_enabled: true,
+      venue_scale: venueScale,
+      event_categories: categories,
+      cover_theme_id: coverThemeId,
+      event_visibility: visibility,
+      event_capacity: capacity,
+      approval_required: approvalRequired,
+      guest_list_visibility: guestListVisibility,
+    },
+  });
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,38 +151,28 @@ export default function EventCreateForm({
     setSubmitting(true);
     try {
       const headers = await getFreshAuthHeaders();
+      if (isEdit && beaconId) {
+        const res = await fetch(`/api/beacons/${beaconId}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(writeBody(latN, lngN)),
+        });
+        const json = (await res.json()) as { beacon?: { id?: string }; error?: string };
+        if (!res.ok || !json.beacon?.id) {
+          setError(json.error || "Could not save event");
+          return;
+        }
+        router.push(eventManagePath(beaconId));
+        router.refresh();
+        return;
+      }
+
       const res = await fetch("/api/beacons", {
         method: "POST",
         headers,
         body: JSON.stringify({
           kind: "event",
-          lat: latN,
-          lng: lngN,
-          show_creator_name: showCreatorName,
-          event_visibility: visibility,
-          event_capacity: capacity,
-          approval_required: approvalRequired,
-          guest_list_visibility: guestListVisibility,
-          cover_theme_id: coverThemeId,
-          event_timezone: timeZone,
-          ...(venueId ? { venue_id: venueId } : {}),
-          metadata: {
-            title: title.trim(),
-            description: description.trim(),
-            event_start_at: start.toISOString(),
-            event_end_at: end.toISOString(),
-            event_timezone: timeZone,
-            location_name: locationName.trim(),
-            image_url: imageUrl,
-            rsvp_enabled: true,
-            venue_scale: venueScale,
-            event_categories: categories,
-            cover_theme_id: coverThemeId,
-            event_visibility: visibility,
-            event_capacity: capacity,
-            approval_required: approvalRequired,
-            guest_list_visibility: guestListVisibility,
-          },
+          ...writeBody(latN, lngN),
         }),
       });
       const json = (await res.json()) as { beacon?: { id?: string }; error?: string };
@@ -150,9 +189,9 @@ export default function EventCreateForm({
       } catch {
         /* clipboard may be blocked */
       }
-      router.push(`/e/${id}/manage`);
+      router.push(eventManagePath(id));
     } catch {
-      setError("Could not create event");
+      setError(isEdit ? "Could not save event" : "Could not create event");
     } finally {
       setSubmitting(false);
     }
@@ -276,7 +315,7 @@ export default function EventCreateForm({
           />
           {error ? <p className="text-sm text-error">{error}</p> : null}
           <FcButton type="submit" className="w-full" disabled={submitting || uploading}>
-            {submitting ? "Creating…" : "Create event"}
+            {submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save changes" : "Create event"}
           </FcButton>
           {shareUrl ? (
             <p className="break-all text-xs text-on-surface-variant">

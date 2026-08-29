@@ -109,4 +109,34 @@ describe("EventListCard", () => {
     );
     expect(screen.getByText("4 went")).toBeInTheDocument();
   });
+
+  it("exposes host edit and manage links without nesting them in the card link", () => {
+    render(
+      <EventListCard
+        hostActions
+        event={{
+          beacon_id: "55555555-5555-4555-8555-555555555555",
+          title: "Host mixer",
+          description: null,
+          image_url: null,
+          host_name: null,
+          event_start_at: "2030-06-15T18:00:00.000Z",
+          event_end_at: "2030-06-15T21:00:00.000Z",
+          location_name: null,
+          rsvp_count: 2,
+          rsvp_enabled: true,
+        }}
+      />,
+    );
+    const actions = screen.getByTestId("event-host-card-actions");
+    expect(screen.getByRole("link", { name: "Edit details" })).toHaveAttribute(
+      "href",
+      "/e/55555555-5555-4555-8555-555555555555/edit",
+    );
+    expect(screen.getByRole("link", { name: "Host settings" })).toHaveAttribute(
+      "href",
+      "/e/55555555-5555-4555-8555-555555555555/manage",
+    );
+    expect(screen.getByTestId("event-list-card").contains(actions)).toBe(false);
+  });
 });

@@ -7,6 +7,7 @@ import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import UserProfileModal from "@/components/UserProfileModal";
 import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
 import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
+import { fetchEventRsvpPayload } from "@/lib/events/eventRsvpClient";
 import { cn } from "@/lib/cn";
 
 type Attendee = {
@@ -15,21 +16,9 @@ type Attendee = {
   avatar_url: string | null;
 };
 
-type DirectoryPayload = {
-  attendees: Attendee[];
-  current_user_signed_up: boolean;
-};
-
 type MutualPayload = {
   count: number;
   attendees: Attendee[];
-};
-
-const fetchDirectory = async (url: string) => {
-  const headers = await getFreshAuthHeaders();
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error("Failed to load RSVPs");
-  return res.json() as Promise<DirectoryPayload>;
 };
 
 const fetchMutual = async (url: string) => {
@@ -50,7 +39,7 @@ export default function EventRsvpDirectory({
 }) {
   const { user } = useAuth();
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
-  const { data } = useSWR(user ? eventRsvpKey(beaconId) : null, fetchDirectory);
+  const { data } = useSWR(user ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload);
   const { data: mutual } = useSWR(
     user ? `/api/beacons/${beaconId}/mutual-attendees` : null,
     fetchMutual,

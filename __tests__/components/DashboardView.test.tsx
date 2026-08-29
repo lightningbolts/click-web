@@ -7,8 +7,19 @@ import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 /* ------------------------------------------------------------------ */
 
 const mockSignOut = jest.fn();
+const authState: {
+  signOut: jest.Mock;
+  profileImageUrl: string | null;
+  user: { id: string } | null;
+  loading: boolean;
+} = {
+  signOut: mockSignOut,
+  profileImageUrl: null,
+  user: { id: 'user-123' },
+  loading: false,
+};
 jest.mock('@/lib/AuthContext', () => ({
-  useAuth: () => ({ signOut: mockSignOut, profileImageUrl: null }),
+  useAuth: () => authState,
 }));
 
 jest.mock('@/lib/supabase', () => ({
@@ -195,6 +206,8 @@ async function renderDashboard(user: Record<string, unknown> = buildMockUser()) 
 describe('DashboardView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    authState.user = { id: 'user-123' };
+    authState.loading = false;
     searchState.tab = null;
     global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -281,5 +294,18 @@ describe('DashboardView', () => {
   it('does not crash when user has no email or metadata', async () => {
     const { container } = await renderDashboard({ id: 'user-bare' });
     expect(container).toBeTruthy();
+  });
+
+  it('unmounts product chrome immediately when the session is gone', async () => {
+    authState.user = null;
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <DashboardView user={buildMockUser()} />
+        </ThemeProvider>,
+      );
+    });
+    expect(screen.queryByTestId('dashboard-root')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-tab-events')).not.toBeInTheDocument();
   });
 });

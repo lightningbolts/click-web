@@ -12,6 +12,14 @@ export function eventSharePath(beaconId: string): string {
   return `/e/${beaconId}`;
 }
 
+export function eventManagePath(beaconId: string): string {
+  return `/e/${beaconId}/manage`;
+}
+
+export function eventEditPath(beaconId: string): string {
+  return `/e/${beaconId}/edit`;
+}
+
 export function eventShareUrl(beaconId: string, origin = publicOrigin()): string {
   return `${origin}${eventSharePath(beaconId)}`;
 }

@@ -10,10 +10,11 @@
 
 - [`ProductAppShell`](../../components/shell/ProductAppShell.tsx): full-height sidebar on desktop, hamburger drawer on mobile. Flat `background`; opaque `surface` + 1px `border-hard` (no backdrop-blur).
 - Nav items: memory, events, map, chat, identity, settings (`data-testid="dashboard-tab-{id}"`). Tab state is URL-synced via `/?tab=` (`parseDashboardTab` in [`lib/shell/personalProductNav.ts`](../../lib/shell/personalProductNav.ts)). Missing or unknown `tab` defaults to Memory Box.
-- Events item: My events, RSVPs, primary **Create event** (`DashboardEventsModule` + `EventCreateForm`) as a dense date-rail list.
-- Signed-in `/events*` and `/e/*` reuse the same shell via [`AuthenticatedProductShell`](../../components/shell/AuthenticatedProductShell.tsx). Marketing Navbar is hidden on those paths when a session is present.
+- Events item: My events, RSVPs, primary **Create event** (`DashboardEventsModule` + `EventCreateForm`) as a dense date-rail list. Hosted cards include **Edit details** (`/e/{id}/edit`) and **Host settings** (`/e/{id}/manage`).
+- Signed-in `/events*` and `/e/*` reuse the same shell via [`AuthenticatedProductShell`](../../components/shell/AuthenticatedProductShell.tsx). Marketing Navbar is hidden on those paths when a session is present, while product chrome is registered (`ProductChromeOn`), and after sign-out until `router.refresh()` swaps to the landing page.
+- Sign out always clears the session, `router.replace('/')`, and `router.refresh()`. The dashboard unmounts as soon as `useAuth().user` is null so marketing "Log in" cannot sit on top of the product sidebar.
 - Active item: `bg-primary-container text-on-primary-container`.
-- Marketing Navbar is hidden while this shell is mounted.
+- Marketing Navbar is hidden while this shell is mounted (`ProductChromeOn` + `isSignedInProductPath`).
 
 ### Chat tab — message search
 

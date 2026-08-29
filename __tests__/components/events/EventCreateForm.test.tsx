@@ -38,6 +38,36 @@ describe("EventCreateForm", () => {
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
+  it("reuses the same form in edit mode and PATCHes the beacon", () => {
+    render(
+      <EventCreateForm
+        beaconId="11111111-1111-4111-8111-111111111111"
+        initial={{
+          title: "Campus picnic",
+          description: "Bring a blanket",
+          startIso: "2030-06-15T18:00:00.000Z",
+          endIso: "2030-06-15T21:00:00.000Z",
+          timeZone: "America/Los_Angeles",
+          locationName: "The Quad",
+          lat: "47.655",
+          lng: "-122.308",
+          imageUrl: null,
+          coverThemeId: "theme:purple",
+          visibility: "public",
+          capacity: null,
+          approvalRequired: false,
+          guestListVisibility: "public",
+          showCreatorName: true,
+          venueScale: "neighborhood",
+          categories: [],
+        }}
+      />,
+    );
+    expect(screen.getByDisplayValue("Campus picnic")).toBeInTheDocument();
+    expect(screen.getByText("Save changes")).toBeInTheDocument();
+    expect(screen.queryByText("Create event")).not.toBeInTheDocument();
+  });
+
   it("shows cover upload errors under the dropzone", async () => {
     const user = userEvent.setup();
     mockFetch.mockResolvedValue({

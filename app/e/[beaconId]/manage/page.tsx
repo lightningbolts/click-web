@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { FcButton, FcCard, FcSectionHeader } from "@/components/fc";
-import { eventShareUrl } from "@/lib/events/eventUrls";
+import { eventEditPath, eventShareUrl } from "@/lib/events/eventUrls";
 import GuestListUploadCard from "@/components/events/GuestListUploadCard";
 import EventPageShell from "@/components/events/EventPageShell";
 import EventRsvpRequestsCard from "@/components/events/EventRsvpRequestsCard";
@@ -67,6 +67,11 @@ export default function EventManagePage() {
     <EventPageShell className="py-10">
       <div className="space-y-6">
         <FcSectionHeader title="Event manage" subtitle="Organizer metrics, guest list, and Seed a Room." />
+        <div className="flex flex-wrap gap-2">
+          <a href={eventEditPath(beaconId)} className="fc-btn-primary inline-flex h-11 items-center px-4">
+            Edit details
+          </a>
+        </div>
         {error ? <p className="text-error">{error}</p> : null}
         <GuestListUploadCard beaconId={beaconId} />
         <EventRsvpRequestsCard beaconId={beaconId} />

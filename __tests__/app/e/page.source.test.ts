@@ -12,6 +12,7 @@ describe("event share page source", () => {
     expect(src).toContain("EventPageShell");
     expect(src).toContain("max-w-prose");
     expect(src).not.toContain("max-w-5xl");
+    expect(src).toContain("EventHostActions");
     expect(src).toContain("Get the app");
     expect(src).toContain('variant="secondary"');
     expect(src).toContain("items-center gap-3");
