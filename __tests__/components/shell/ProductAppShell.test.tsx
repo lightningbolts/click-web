@@ -41,13 +41,25 @@ describe("ProductAppShell", () => {
     navState.pathname = "/";
   });
 
-  it("renders a vertical nav with the active item marked current", () => {
+  it("renders a horizontal nav with the active item marked current", () => {
     renderShell();
     expect(screen.getByTestId("dashboard-root")).toBeInTheDocument();
     expect(screen.getByTestId("dashboard-chrome")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-chrome").tagName).toBe("HEADER");
     expect(screen.getByTestId("dashboard-tab-memory")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("dashboard-tab-map")).not.toHaveAttribute("aria-current");
     expect(screen.getByText("Shell body")).toBeInTheDocument();
+  });
+
+  it("animates the mobile drawer instead of mounting it only while open", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    const drawer = screen.getByTestId("mobile-nav-drawer");
+    expect(drawer).toHaveAttribute("data-open", "false");
+    expect(drawer.className).toMatch(/transition-transform/);
+    await user.click(screen.getByTestId("nav-menu-toggle"));
+    expect(drawer).toHaveAttribute("data-open", "true");
+    expect(drawer.className).toContain("translate-x-0");
   });
 
   it("keeps a navbar measurement hook on the mobile header", () => {
@@ -84,9 +96,9 @@ describe("ProductAppShell", () => {
     expect(screen.getByTestId("insights-nav-overview")).not.toHaveAttribute("aria-current");
   });
 
-  it("renders the user avatar beside the sidebar label when provided", () => {
+  it("renders the user avatar beside the account label when provided", () => {
     renderShell({ userLabel: "Alice", userAvatarUrl: "https://cdn.example/avatar.png" });
-    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
     expect(screen.getByTestId("dashboard-chrome").querySelector('img[src="https://cdn.example/avatar.png"]')).toBeTruthy();
   });
 });

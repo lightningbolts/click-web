@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, User } from "lucide-react";
+import { MapPin, Pencil, Settings, User } from "lucide-react";
 import { FcCard } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { formatEventWhen } from "@/lib/events/formatEventWhen";
@@ -53,10 +53,31 @@ export function EventListCard({
   return (
     <FcCard
       className={cn(
-        "overflow-hidden transition-colors hover:border-primary",
+        "relative overflow-hidden transition-colors hover:border-primary",
         featured ? "md:flex md:flex-col" : "flex min-h-28 flex-col",
       )}
     >
+      {hostActions ? (
+        <div
+          className="absolute right-2 top-2 z-10 flex gap-1"
+          data-testid="event-host-card-actions"
+        >
+          <Link
+            href={eventEditPath(event.beacon_id)}
+            aria-label="Edit details"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-border-hard bg-surface text-on-surface shadow-sm hover:border-primary hover:text-primary"
+          >
+            <Pencil className="h-4 w-4" />
+          </Link>
+          <Link
+            href={eventManagePath(event.beacon_id)}
+            aria-label="Host settings"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-border-hard bg-surface text-on-surface shadow-sm hover:border-primary hover:text-primary"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+        </div>
+      ) : null}
       <Link
         href={eventSharePath(event.beacon_id)}
         className={cn("block min-w-0", featured ? "md:flex" : "flex min-h-28")}
@@ -73,7 +94,13 @@ export function EventListCard({
               : "w-28 shrink-0 self-stretch sm:w-32"
           }
         />
-        <div className={cn("min-w-0 p-4", featured && "flex flex-1 flex-col justify-center md:p-6")}>
+        <div
+          className={cn(
+            "min-w-0 p-4",
+            featured && "flex flex-1 flex-col justify-center md:p-6",
+            hostActions && "pr-24",
+          )}
+        >
           <h3
             className={cn(
               "font-bold leading-tight text-on-surface",
@@ -114,25 +141,6 @@ export function EventListCard({
           </div>
         </div>
       </Link>
-      {hostActions ? (
-        <div
-          className="flex flex-wrap gap-2 border-t border-border-hard px-4 py-3"
-          data-testid="event-host-card-actions"
-        >
-          <Link
-            href={eventEditPath(event.beacon_id)}
-            className="text-sm font-semibold text-primary hover:underline"
-          >
-            Edit details
-          </Link>
-          <Link
-            href={eventManagePath(event.beacon_id)}
-            className="text-sm font-semibold text-primary hover:underline"
-          >
-            Host settings
-          </Link>
-        </div>
-      ) : null}
     </FcCard>
   );
 }

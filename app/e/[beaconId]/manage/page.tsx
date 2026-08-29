@@ -5,10 +5,11 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { FcButton, FcCard, FcSectionHeader } from "@/components/fc";
-import { eventEditPath, eventShareUrl } from "@/lib/events/eventUrls";
+import { eventEditPath, eventSharePath, eventShareUrl } from "@/lib/events/eventUrls";
 import GuestListUploadCard from "@/components/events/GuestListUploadCard";
 import EventPageShell from "@/components/events/EventPageShell";
 import EventRsvpRequestsCard from "@/components/events/EventRsvpRequestsCard";
+import EventBackLink from "@/components/events/EventBackLink";
 
 type GuestRow = { id: string; name: string; contact: string; created_at: string };
 type Health = {
@@ -54,7 +55,10 @@ export default function EventManagePage() {
     };
   }, [beaconId, user]);
 
-  const share = typeof window !== "undefined" ? eventShareUrl(beaconId, window.location.origin) : "";
+  const [share, setShare] = useState("");
+  useEffect(() => {
+    setShare(eventShareUrl(beaconId, window.location.origin));
+  }, [beaconId]);
 
   const publish = async () => {
     const headers = await getFreshAuthHeaders();
@@ -66,6 +70,7 @@ export default function EventManagePage() {
   return (
     <EventPageShell className="py-10">
       <div className="space-y-6">
+        <EventBackLink href={eventSharePath(beaconId)} className="mb-0" />
         <FcSectionHeader title="Event manage" subtitle="Organizer metrics, guest list, and Seed a Room." />
         <div className="flex flex-wrap gap-2">
           <a href={eventEditPath(beaconId)} className="fc-btn-primary inline-flex h-11 items-center px-4">

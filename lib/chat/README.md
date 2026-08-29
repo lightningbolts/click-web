@@ -53,7 +53,7 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 
 ### `layout.ts`
 
-`CHAT_TRANSCRIPT_MAX_CLASS` (`max-w-none`) is the shared width token for the dashboard chat header, transcript, composer, and starters banner. Fill the product pane; do not cap with `max-w-xl` (skinny gutters) or marketing `max-w-5xl`. Bubble width stays on `MessageBubble` (`max-w-[min(75%,32rem)]`).
+`CHAT_TRANSCRIPT_MAX_CLASS` (`max-w-6xl` via `PAGE_COLUMN_MAX_CLASS`) is the shared width token for the dashboard chat header, transcript, composer, and starters banner. Match Navbar / event pages; do not use `max-w-xl` (skinny gutters) or `max-w-none` (bubbles pinned to opposite edges). Bubble width stays on `MessageBubble` (`max-w-[min(75%,32rem)]`).
 
 ### `chatGatekeeper` (server)
 

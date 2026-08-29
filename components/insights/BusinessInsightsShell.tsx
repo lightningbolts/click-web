@@ -83,8 +83,8 @@ interface BusinessInsightsShellProps {
 }
 
 /**
- * BusinessInsightsShell — vertical product chrome for /insights.
- * Shares ProductAppShell with the personal dashboard.
+ * BusinessInsightsShell — horizontal product chrome for /insights.
+ * Shares ProductAppShell with Insights-only nav (personal app uses Navbar).
  */
 export default function BusinessInsightsShell({
   children,

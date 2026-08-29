@@ -30,7 +30,7 @@ describe("EventBackLink", () => {
     expect(push).toHaveBeenCalledWith("/events");
   });
 
-  it("opens the dashboard events tab when signed in from the dashboard", async () => {
+  it("opens the events list when signed in from the dashboard", async () => {
     const user = userEvent.setup();
     authState.user = { id: "u1" };
     Object.defineProperty(document, "referrer", {
@@ -39,7 +39,14 @@ describe("EventBackLink", () => {
     });
     render(<EventBackLink />);
     await user.click(screen.getByTestId("event-back-link"));
-    expect(push).toHaveBeenCalledWith("/?tab=events");
+    expect(push).toHaveBeenCalledWith("/events");
+  });
+
+  it("uses an explicit href on manage and edit", async () => {
+    const user = userEvent.setup();
+    render(<EventBackLink href="/e/abc" />);
+    await user.click(screen.getByTestId("event-back-link"));
+    expect(push).toHaveBeenCalledWith("/e/abc");
   });
 
   it("opens the events list when there is no same-origin history", async () => {

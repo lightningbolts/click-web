@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import useSWR from "swr";
 import { FcCard } from "@/components/fc";
 import { EventListCard, type EventListItem } from "@/components/events/EventListCard";
+import { EventCardSkeleton } from "@/components/events/EventRouteLoading";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { eventIsPast } from "@/lib/events/eventMetadata";
 import { fadePresence, fadeTransition } from "@/lib/motion";
@@ -28,15 +29,27 @@ function EventCardList({
   const reduceMotion = useReducedMotion();
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      {events.map((event) => (
+      {events.map((event, index) => (
         <motion.div
           key={event.beacon_id}
           {...(reduceMotion ? {} : fadePresence)}
-          transition={fadeTransition(0.16)}
+          transition={{
+            ...fadeTransition(0.2),
+            delay: reduceMotion ? 0 : index * 0.04,
+          }}
         >
           <EventListCard event={event} past={past} dense hostActions={event.role === "creator"} />
         </motion.div>
       ))}
+    </div>
+  );
+}
+
+function MineEventsSkeleton() {
+  return (
+    <div className="space-y-3" data-testid="mine-events-skeleton">
+      <EventCardSkeleton />
+      <EventCardSkeleton />
     </div>
   );
 }
@@ -57,9 +70,9 @@ export default function DashboardEventsModule() {
     <div className="space-y-8" data-testid="dashboard-events-module">
       {error ? <p className="text-error">Could not load your events.</p> : null}
       {isLoading && events.length === 0 ? (
-        <p className="text-sm text-on-surface-variant">Loading your events…</p>
-      ) : null}
-
+        <MineEventsSkeleton />
+      ) : (
+        <>
       <section className="space-y-3">
         <h3 className="text-sm font-bold uppercase tracking-wide text-on-surface-variant">Upcoming</h3>
         <div className="space-y-6">
@@ -106,6 +119,8 @@ export default function DashboardEventsModule() {
           </div>
         </section>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

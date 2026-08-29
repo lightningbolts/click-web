@@ -21,7 +21,7 @@ interface LoginModalProps {
   onClose: () => void;
   /** Open directly in sign-up mode (default: false = sign-in mode) */
   initialIsSignup?: boolean;
-  /** After OAuth, send the user here instead of /dashboard. */
+  /** After OAuth, send the user here instead of `/`. */
   nextPath?: string;
 }
 
@@ -29,7 +29,7 @@ export default function LoginModal({
   isOpen,
   onClose,
   initialIsSignup = false,
-  nextPath = "/dashboard",
+  nextPath = "/",
 }: LoginModalProps) {
   const router = useRouter();
   const [isSignup, setIsSignup] = useState(initialIsSignup);
@@ -197,10 +197,9 @@ export default function LoginModal({
           setError(error.message);
         } else {
           setSuccess('Login successful!');
-          setTimeout(() => {
-            router.push('/dashboard');
-            onClose();
-          }, 500);
+          onClose();
+          router.replace(nextPath);
+          router.refresh();
         }
       }
     } catch (err) {

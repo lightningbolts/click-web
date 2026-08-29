@@ -1,17 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, BarChart2 } from 'lucide-react';
+import { Users } from 'lucide-react';
 import useSWR from 'swr';
-import DashboardEventsModule, { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
-import ProductAppShell from '@/components/shell/ProductAppShell';
-import { fetchInsightsApiJson } from '@/lib/insights/fetchInsightsApi';
+import { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
 import { CreateVerifiedClickDialog } from '@/components/chat';
@@ -62,17 +59,14 @@ import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModal
 import { messagesForProfileConnection } from '@/lib/userProfile/profileChatContext';
 import {
   parseDashboardTab,
-  personalProductNavItems,
   type DashboardTab,
 } from '@/lib/shell/personalProductNav';
-
-type InsightsAccessPayload = { insightsAllowed: boolean };
-
-const insightsAccessFetcher = (url: string) =>
-  fetchInsightsApiJson<InsightsAccessPayload>(url);
+import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
+import { cn } from '@/lib/cn';
 
 interface DashboardViewProps {
   user: any;
+  onReady?: () => void;
 }
 
 /**
@@ -80,12 +74,13 @@ interface DashboardViewProps {
  * Combines connections, timeline, map, QR identity, and settings
  *
  * The heavy data/call/lifecycle logic lives in the sibling
- * components/dashboard/use* hooks; this component owns the shared state and
- * the tab shell.
+ * components/dashboard/use* hooks; this component owns shared state and
+ * the tab pane under the global Navbar.
  */
-export default function DashboardView({ user }: DashboardViewProps) {
-  const { user: sessionUser, loading: authLoading, signOut, onlineUserIds, profileImageUrl } = useAuth();
+export default function DashboardView({ user, onReady }: DashboardViewProps) {
+  const { user: sessionUser, loading: authLoading, onlineUserIds } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
     parseDashboardTab(searchParams.get('tab')),
   );
@@ -143,6 +138,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => getFreshAuthHeaders(), []);
 
+  const readyNotifiedRef = useRef(false);
+
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
@@ -150,6 +147,12 @@ export default function DashboardView({ user }: DashboardViewProps) {
   useEffect(() => {
     setActiveTab(parseDashboardTab(searchParams.get('tab')));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab === 'events') {
+      router.replace('/events');
+    }
+  }, [activeTab, router]);
 
   useEffect(() => {
     selectedConnectionRef.current = selectedConnection;
@@ -281,6 +284,17 @@ export default function DashboardView({ user }: DashboardViewProps) {
     setBirthdayProfileGateOpen,
   } = useOnboardingGates({ user, getAuthHeaders, setProfileUserId, setProfileConnectionId });
 
+  const waitingForData =
+    !connectionsInitialLoadComplete || !birthdayProfileGateResolved || activeTab === 'events';
+
+  useEffect(() => {
+    if (readyNotifiedRef.current) return;
+    if (waitingForData) return;
+    if (!authLoading && !sessionUser) return;
+    readyNotifiedRef.current = true;
+    onReady?.();
+  }, [waitingForData, authLoading, sessionUser, onReady]);
+
   const { loadConnections } = useConnectionsData({
     user,
     getAuthHeaders,
@@ -370,22 +384,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
 
-  const { data: insightsAccess } = useSWR(
-    user ? '/api/user/insights-access' : null,
-    insightsAccessFetcher,
-  );
   useSWR(user ? MINE_EVENTS_KEY : null, fetchMineEvents, {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
 
   useEffect(() => {
     const id = setInterval(() => setArchiveCountdownTick((t) => t + 1), 60_000);
@@ -550,45 +552,49 @@ export default function DashboardView({ user }: DashboardViewProps) {
     });
   }, []);
 
-  const tabs = personalProductNavItems();
+  const fillViewport = activeTab === 'chat' || activeTab === 'map';
+  const hideHeader = activeTab === 'chat';
 
   if (!authLoading && !sessionUser) {
     return <LoadingScreen />;
   }
 
-  if (!connectionsInitialLoadComplete || !birthdayProfileGateResolved) {
-    return <LoadingScreen />;
+  if (waitingForData) {
+    return null;
   }
 
   return (
-    <ProductAppShell
-      productLabel="Click"
-      productHref="/"
-      items={tabs}
-      activeId={activeTab}
-      title={shellHeader.title}
-      subtitle={shellHeader.subtitle}
-      extraNav={
-        insightsAccess?.insightsAllowed
-          ? [{ href: '/insights', label: 'Insights', icon: BarChart2 }]
-          : []
-      }
-      userLabel={userName}
-      userAvatarUrl={profileImageUrl}
-      onSignOut={handleSignOut}
-      rootTestId="dashboard-root"
-      chromeTestId="dashboard-chrome"
-      itemTestIdPrefix="dashboard-tab"
-      fillViewport={activeTab === 'chat' || activeTab === 'map'}
-      hideHeader={activeTab === 'chat'}
-      actions={
-        activeTab === 'events' ? (
-          <Link href="/events/new" className="fc-btn-primary inline-flex px-4 py-2">
-            Create event
-          </Link>
-        ) : null
-      }
+    <div
+      data-testid="dashboard-root"
+      data-fill-viewport={fillViewport ? 'true' : undefined}
+      className={cn(
+        'flex min-h-0 flex-col bg-background text-on-surface',
+        fillViewport
+          ? 'h-[calc(100dvh-var(--navbar-height))] overflow-hidden'
+          : 'min-h-[calc(100dvh-var(--navbar-height))]',
+      )}
     >
+      {hideHeader ? null : (
+        <div
+          className={cn(
+            PAGE_COLUMN_CLASS,
+            'flex shrink-0 flex-wrap items-start justify-between gap-4 py-6',
+          )}
+        >
+          <div>
+            <h1 className="text-2xl font-bold text-on-surface">{shellHeader.title}</h1>
+            {shellHeader.subtitle ? (
+              <p className="mt-1 text-sm text-on-surface-variant">{shellHeader.subtitle}</p>
+            ) : null}
+          </div>
+        </div>
+      )}
+      <div
+        className={cn(
+          'min-h-0 min-w-0 flex-1',
+          fillViewport ? 'flex flex-col overflow-hidden' : cn(PAGE_COLUMN_CLASS, 'pb-8'),
+        )}
+      >
       {needsTagging === true && (
         <InterestTagging
           onComplete={handleTagsComplete}
@@ -708,19 +714,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
                     🔒 Your data belongs to you. Export anytime, delete anytime.
                   </p>
                 </div>
-              </motion.div>
-            )}
-
-            {/* Events Tab */}
-            {activeTab === 'events' && (
-              <motion.div
-                key="events"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <DashboardEventsModule />
               </motion.div>
             )}
 
@@ -917,6 +910,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
         />
       ) : null}
 
-    </ProductAppShell>
+    </div>
+    </div>
   );
 }

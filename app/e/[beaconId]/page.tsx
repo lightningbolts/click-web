@@ -103,7 +103,7 @@ export default async function EventShareLandingPage({
   const going = viewerRsvp.kind === "member" && viewerRsvp.going;
   const requestStatus = viewerRsvp.kind === "member" ? viewerRsvp.request_status : null;
   const atCapacity =
-    event.listing.event_capacity != null && event.rsvp_count >= event.listing.event_capacity;
+    event.listing?.event_capacity != null && event.rsvp_count >= event.listing.event_capacity;
   const showFullCard = shouldShowEventFullCard({ atCapacity, going, requestStatus, ended });
   const showRsvpPanel = shouldShowEventRsvpPanel({
     rsvpEnabled: event.rsvp_enabled,
@@ -113,7 +113,10 @@ export default async function EventShareLandingPage({
   return (
     <EventPageShell className="py-8 md:py-12">
       <article>
-        <EventBackLink />
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <EventBackLink className="mb-0" />
+          <EventHostActions beaconId={beaconId} creatorId={event.creator_id} />
+        </div>
         <CardVisualHero
           id={beaconId}
           visualSeed={event.visual_seed}
@@ -175,7 +178,6 @@ export default async function EventShareLandingPage({
                   past={ended}
                 />
               ) : null}
-              <EventHostActions beaconId={beaconId} creatorId={event.creator_id} />
               {description ? (
                 <p
                   data-testid="event-description"
