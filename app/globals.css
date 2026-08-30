@@ -104,10 +104,30 @@
   }
 }
 
+html {
+  caret-color: var(--color-primary);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-outline) var(--color-background);
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-on-surface);
   font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background-color: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+}
+
+a {
+  text-underline-offset: 0.2em;
+}
+
+:where(a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chat-thread-scroll {
@@ -157,6 +177,12 @@ body {
   transform: translate(2px, 2px);
 }
 
+.fc-btn-primary:focus-visible,
+.fc-btn-secondary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .fc-btn-secondary {
   display: inline-flex;
   align-items: center;
@@ -200,6 +226,11 @@ body {
 
 .fc-input::placeholder {
   color: var(--color-on-surface-variant);
+}
+
+.fc-input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .fc-textarea {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle, X } from 'lucide-react';
 import { fadePresence, fadeTransition } from '@/lib/motion';
+import { FcButton, FcField, FcInput } from '@/components/fc';
 
 export type WaitlistSource = 'homepage_hero' | 'enterprise_landing';
 
@@ -126,7 +127,7 @@ export default function WaitlistModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-hard text-on-surface-variant hover:text-on-surface"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-border-hard text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                 aria-label="Close waitlist modal"
               >
                 <X className="h-4 w-4" />
@@ -134,10 +135,13 @@ export default function WaitlistModal({
             </div>
             {status === 'success' ? (
               <div className="rounded-[16px] border border-border-hard bg-primary-container p-5 text-center">
-                <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" />
-                <p className="font-medium text-on-secondary-container">
+                <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" aria-hidden />
+                <p className="font-medium text-on-primary-container">
                   You&apos;re on the list. We&apos;ll email you when the handshake app opens.
                 </p>
+                <FcButton className="mt-5 w-full" onClick={onClose}>
+                  Done
+                </FcButton>
               </div>
             ) : (
               <form
@@ -147,11 +151,8 @@ export default function WaitlistModal({
                   void submit();
                 }}
               >
-                <div>
-                  <label htmlFor="waitlist-email" className="mb-2 block text-sm font-semibold text-on-surface">
-                    Email
-                  </label>
-                  <input
+                <FcField label="Email">
+                  <FcInput
                     ref={emailRef}
                     id="waitlist-email"
                     type="email"
@@ -166,19 +167,18 @@ export default function WaitlistModal({
                       }
                     }}
                     placeholder="you@example.com"
-                    className="fc-input w-full px-4 py-3"
+                    aria-invalid={status === 'error'}
+                    aria-describedby={status === 'error' ? 'waitlist-email-error' : undefined}
                   />
-                </div>
+                </FcField>
                 {status === 'error' ? (
-                  <p className="text-sm text-error">{message}</p>
+                  <p id="waitlist-email-error" className="text-sm text-error" role="alert">
+                    {message}
+                  </p>
                 ) : null}
-                <button
-                  type="submit"
-                  disabled={status === 'loading'}
-                  className="fc-btn-primary w-full px-4 py-3 disabled:cursor-not-allowed disabled:opacity-60"
-                >
+                <FcButton type="submit" disabled={status === 'loading'} className="w-full">
                   {status === 'loading' ? 'Joining…' : 'Join the Waitlist'}
-                </button>
+                </FcButton>
               </form>
             )}
           </motion.div>

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LandingPage from '@/components/landing/LandingPage';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
@@ -19,6 +19,17 @@ jest.mock('@/components/HomeAuthenticated', () => ({
 jest.mock('@/components/landing/fold-map/FoldMapLazy', () => ({
   __esModule: true,
   default: () => <div data-testid="landing-fold-map-canvas" />,
+}));
+
+jest.mock('@/components/landing/playground/LandingPlaygroundLazy', () => ({
+  __esModule: true,
+  default: () => <div data-testid="landing-playground" />,
+}));
+
+jest.mock('@/components/marketing/WaitlistModal', () => ({
+  __esModule: true,
+  default: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="Join the Waitlist">Waitlist</div> : null,
 }));
 
 jest.mock('framer-motion', () => {
@@ -94,6 +105,8 @@ describe('LandingPage', () => {
     renderLanding();
 
     await user.click(screen.getAllByRole('button', { name: 'Join the Waitlist' })[0]);
-    expect(screen.getByRole('dialog', { name: 'Join the Waitlist' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Join the Waitlist' })).toBeInTheDocument();
+    });
   });
 });

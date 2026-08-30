@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
   experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion"],
     // Larger multipart bodies for chat/hub media when a proxy/middleware path buffers the request (see Next docs).
     proxyClientMaxBodySize: '32mb',
   },

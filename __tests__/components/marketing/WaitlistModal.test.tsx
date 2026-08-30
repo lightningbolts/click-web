@@ -32,4 +32,14 @@ describe('WaitlistModal', () => {
     rerender(<WaitlistModal open onClose={onClose} source="homepage_hero" />);
     expect(screen.getByLabelText('Email')).toHaveValue('ada@example.com');
   });
+
+  it('marks an invalid email and keeps the field labelled', async () => {
+    const user = userEvent.setup();
+    render(<WaitlistModal open onClose={jest.fn()} source="homepage_hero" />);
+
+    await user.click(screen.getByRole('button', { name: 'Join the Waitlist' }));
+    const email = screen.getByLabelText('Email');
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid email address.');
+  });
 });

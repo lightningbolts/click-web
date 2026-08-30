@@ -14,9 +14,11 @@ const DIRECTION_CONTRACT = ` THESIS: The first viewport is the city — a quiet 
 
 export default function FoldMapHero({
   onJoinWaitlist,
+  onPrefetchWaitlist,
   cells,
 }: {
   onJoinWaitlist: () => void;
+  onPrefetchWaitlist?: () => void;
   cells: readonly PresenceHeatmapCell[];
 }) {
   return (
@@ -33,7 +35,7 @@ export default function FoldMapHero({
           <ClickLogo variant="mark" size={56} className="h-14 w-14" priority />
           <h1
             id="landing-hero-heading"
-            className="mt-5 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl"
+            className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-on-surface sm:text-5xl"
           >
             <span className="text-on-surface">Click:</span>{' '}
             <span className="text-primary">from handshake to friendship.</span>
@@ -49,14 +51,16 @@ export default function FoldMapHero({
             <button
               type="button"
               onClick={onJoinWaitlist}
+              onPointerEnter={onPrefetchWaitlist}
+              onFocus={onPrefetchWaitlist}
               data-testid="waitlist-cta"
-              className="fc-btn-primary h-11 px-8 py-2.5 text-sm sm:text-base"
+              className="fc-btn-primary h-11 px-8 py-2.5"
             >
               Join the Waitlist
             </button>
             <a
               href="#why"
-              className="text-sm font-semibold text-on-surface-variant hover:text-primary"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-on-surface-variant hover:text-primary"
             >
               Why Click exists
             </a>

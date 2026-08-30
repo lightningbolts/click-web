@@ -180,7 +180,7 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
         renderWorldCopies: false,
         maxPitch: 0,
         pixelRatio: 1,
-        cooperativeGestures: false,
+        cooperativeGestures: true,
         transformRequest: playgroundTransformRequest,
       });
       mapRef.current = map;

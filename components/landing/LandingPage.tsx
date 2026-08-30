@@ -1,17 +1,55 @@
 'use client';
 
 import { CheckCircle, MapPin, Smartphone } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import HomeAuthenticated from '@/components/HomeAuthenticated';
 import FoldMapHero from '@/components/landing/fold-map/FoldMapHero';
-import LandingPlayground from '@/components/landing/playground';
-import WaitlistModal from '@/components/marketing/WaitlistModal';
+import LandingPlaygroundLazy from '@/components/landing/playground/LandingPlaygroundLazy';
 import { EMPTY_PRESENCE_HEATMAP, type PresenceHeatmapPayload } from '@/lib/landing/presenceHeatmap';
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 import { cn } from '@/lib/cn';
+
+const loadHomeAuthenticated = () => import('@/components/HomeAuthenticated');
+const HomeAuthenticated = dynamic(loadHomeAuthenticated, { ssr: false });
+
+const loadWaitlistModal = () => import('@/components/marketing/WaitlistModal');
+const WaitlistModal = dynamic(loadWaitlistModal, { ssr: false });
+
+function WaitlistLoadingShell({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[100000] flex items-center justify-center bg-on-surface/40 px-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="fc-card w-full max-w-md p-6"
+        style={{ backgroundColor: 'var(--color-surface)' }}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="waitlist-title"
+        aria-busy="true"
+      >
+        <h2 id="waitlist-title" className="text-2xl font-bold text-on-surface">
+          Join the Waitlist
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">Loading…</p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Marketing homepage. Never gates on auth `loading` so SSR/crawlers receive
@@ -26,6 +64,15 @@ export default function LandingPage({
   const router = useRouter();
   const [showWaitlist, setShowWaitlist] = useState(false);
 
+  const prefetchWaitlist = () => {
+    void loadWaitlistModal();
+  };
+
+  const openWaitlist = () => {
+    prefetchWaitlist();
+    setShowWaitlist(true);
+  };
+
   useEffect(() => {
     if (user) {
       router.refresh();
@@ -36,20 +83,24 @@ export default function LandingPage({
     return <HomeAuthenticated user={user} />;
   }
 
-  const openWaitlist = () => {
-    setShowWaitlist(true);
-  };
-
   return (
     <>
       <div className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate">
-        <FoldMapHero onJoinWaitlist={openWaitlist} cells={heatmap.cells} />
-
-        <WaitlistModal
-          open={showWaitlist}
-          onClose={() => setShowWaitlist(false)}
-          source="homepage_hero"
+        <FoldMapHero
+          onJoinWaitlist={openWaitlist}
+          onPrefetchWaitlist={prefetchWaitlist}
+          cells={heatmap.cells}
         />
+
+        {showWaitlist ? (
+          <Suspense fallback={<WaitlistLoadingShell onClose={() => setShowWaitlist(false)} />}>
+            <WaitlistModal
+              open
+              onClose={() => setShowWaitlist(false)}
+              source="homepage_hero"
+            />
+          </Suspense>
+        ) : null}
 
         <section id="why" className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-8 pt-16")} aria-labelledby="why-heading">
           <div>
@@ -62,26 +113,26 @@ export default function LandingPage({
               each other and it evaporates. Pretty soon they&apos;re just another handle in the same endless scroll.
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-2">
-              <div className="rounded-[16px] border border-border-hard bg-surface p-5">
+              <div className="fc-card p-5">
                 <h3 className="font-bold text-on-surface">The follow-back void</h3>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   You follow. They follow back. Neither of you ever sends a message.
                 </p>
               </div>
-              <div className="rounded-[16px] border border-border-hard bg-surface p-5">
+              <div className="fc-card p-5">
                 <h3 className="font-bold text-on-surface">The handle handoff</h3>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   You hunt for the right app, guess at spelling, and the person in front of you is already across the
                   room.
                 </p>
               </div>
-              <div className="rounded-[16px] border border-border-hard bg-surface p-5">
+              <div className="fc-card p-5">
                 <h3 className="font-bold text-on-surface">A name without a where</h3>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   Later they&apos;re a row in your messages with no tether to the night, the venue, or the vibe.
                 </p>
               </div>
-              <div className="rounded-[16px] border border-border-hard bg-surface p-5">
+              <div className="fc-card p-5">
                 <h3 className="font-bold text-on-surface">Apps built to scroll</h3>
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   Every other product is optimized to keep you in the feed. Click is the handshake, the memory, and the
@@ -139,7 +190,7 @@ export default function LandingPage({
                 on your phone.
               </p>
             </div>
-            <LandingPlayground />
+            <LandingPlaygroundLazy />
           </div>
         </section>
 
@@ -166,9 +217,9 @@ export default function LandingPage({
         </section>
 
         <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-24 pt-8")}>
-          <div className="rounded-[16px] border border-border-hard bg-surface px-8 py-12 text-center">
+          <div className="fc-card px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
-              The handshake app opens Fall 2026.
+              Click app launches Fall 2026.
             </h2>
             <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-on-surface-variant sm:text-base">
               No ads. No feed. Built at UW.
@@ -176,7 +227,9 @@ export default function LandingPage({
             <button
               type="button"
               onClick={openWaitlist}
-              className="fc-btn-primary mt-8 px-8 py-4 text-base"
+              onPointerEnter={prefetchWaitlist}
+              onFocus={prefetchWaitlist}
+              className="fc-btn-primary mt-8 h-11 px-8"
             >
               Join the Waitlist
             </button>

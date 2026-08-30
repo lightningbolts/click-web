@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
-import { useEffect, useRef, useState } from "react";
-import LoginModal from "@/components/LoginModal";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState, Suspense } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ClickLogo from "@/components/ClickLogo";
 import MobileNavDrawer from "@/components/shell/MobileNavDrawer";
@@ -23,6 +23,43 @@ type InsightsAccessPayload = { insightsAllowed: boolean };
 
 const insightsAccessFetcher = (url: string) =>
   fetchInsightsApiJson<InsightsAccessPayload>(url);
+
+const loadLoginModal = () => import("@/components/LoginModal");
+const LoginModal = dynamic(loadLoginModal, { ssr: false });
+
+function LoginLoadingShell({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 p-3 sm:items-center sm:p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="fc-card w-full max-w-md p-6"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-modal-title"
+        aria-busy="true"
+        data-testid="login-modal"
+      >
+        <h2 id="login-modal-title" className="text-xl font-bold text-on-surface sm:text-2xl">
+          Welcome Back
+        </h2>
+        <p className="mt-2 text-sm font-medium text-on-surface-variant">Loading…</p>
+      </div>
+    </div>
+  );
+}
 
 const navItemClass =
   "inline-flex h-9 items-center rounded-[8px] px-3 text-sm font-semibold leading-none";
@@ -228,7 +265,14 @@ export default function Navbar({
               </>
             ) : (
               <button
+                type="button"
                 onClick={() => setIsLoginOpen(true)}
+                onPointerEnter={() => {
+                  void loadLoginModal();
+                }}
+                onFocus={() => {
+                  void loadLoginModal();
+                }}
                 data-testid="nav-login"
                 className={navLoginClass}
               >
@@ -319,6 +363,9 @@ export default function Navbar({
             ) : (
               <button
                 type="button"
+                onPointerEnter={() => {
+                  void loadLoginModal();
+                }}
                 onClick={() => {
                   setMobileOpen(false);
                   setIsLoginOpen(true);
@@ -331,7 +378,11 @@ export default function Navbar({
           </div>
         </div>
       </MobileNavDrawer>
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      {isLoginOpen ? (
+        <Suspense fallback={<LoginLoadingShell onClose={() => setIsLoginOpen(false)} />}>
+          <LoginModal isOpen onClose={() => setIsLoginOpen(false)} />
+        </Suspense>
+      ) : null}
     </>
   );
 }
