@@ -28,5 +28,7 @@ describe('anonymous landing JS budget', () => {
 
     const foldMap = read('components/landing/fold-map/FoldMap.tsx');
     expect(foldMap).toContain('cooperativeGestures: true');
+    expect(foldMap).toContain('fitBoundsOptions');
+    expect(foldMap).toContain('foldMapCameraBounds');
   });
 });

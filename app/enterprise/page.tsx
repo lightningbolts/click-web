@@ -36,7 +36,7 @@ export default function EnterprisePage() {
         <h1
           id="enterprise-heading"
           data-testid="enterprise-heading"
-          className="mx-auto mb-6 max-w-4xl text-center text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
+          className="mkt-page-title mx-auto mb-6 max-w-4xl text-center text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
         >
           Did people actually meet, or did they just show up?
         </h1>
