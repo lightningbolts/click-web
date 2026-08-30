@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import maplibregl, { type ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import {
@@ -35,7 +35,7 @@ function cellsToGeoJson(cells: readonly PresenceHeatmapCell[]) {
   };
 }
 
-function heatmapColor(theme: 'light' | 'dark') {
+function heatmapColor(theme: 'light' | 'dark'): ExpressionSpecification {
   if (theme === 'dark') {
     return [
       'interpolate',

@@ -1,8 +1,9 @@
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  TextareaHTMLAttributes,
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/cn";
 
@@ -56,14 +57,17 @@ export function FcChip({
   );
 }
 
-export function FcInput({
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input className={cn("fc-input min-h-11 w-full px-3 py-2.5", className)} {...props} />
-  );
-}
+export const FcInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function FcInput({ className, ...props }, ref) {
+    return (
+      <input
+        ref={ref}
+        className={cn("fc-input min-h-11 w-full px-3 py-2.5", className)}
+        {...props}
+      />
+    );
+  },
+);
 
 export function FcTextarea({
   className,
