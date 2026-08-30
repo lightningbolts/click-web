@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle, X } from 'lucide-react';
-import { fadePresence, fadeTransition } from '@/lib/motion';
+import { fadePresence, fadeTransition, platePresence } from '@/lib/motion';
 import { FcButton, FcField, FcInput } from '@/components/fc';
 
 export type WaitlistSource = 'homepage_hero' | 'enterprise_landing';
@@ -97,15 +97,18 @@ export default function WaitlistModal({
   return (
     <AnimatePresence>
       {open ? (
-        <div
+        <motion.div
+          key="waitlist-overlay"
           className="fixed inset-0 z-[100000] flex items-center justify-center bg-on-surface/40 px-4"
+          {...(reduceMotion ? {} : fadePresence)}
+          transition={fadeTransition(0.18)}
           onClick={onClose}
           role="presentation"
         >
           <motion.div
             ref={panelRef}
-            {...(reduceMotion ? {} : fadePresence)}
-            transition={fadeTransition(0.2)}
+            {...(reduceMotion ? {} : platePresence)}
+            transition={fadeTransition(0.32)}
             className="fc-card w-full max-w-md p-6"
             style={{ backgroundColor: 'var(--color-surface)' }}
             onClick={(event) => event.stopPropagation()}
@@ -182,7 +185,7 @@ export default function WaitlistModal({
               </form>
             )}
           </motion.div>
-        </div>
+        </motion.div>
       ) : null}
     </AnimatePresence>
   );

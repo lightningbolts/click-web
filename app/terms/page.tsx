@@ -1,20 +1,10 @@
-'use client';
-
-import { motion } from 'framer-motion';
-import Link from 'next/link';
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-background text-on-surface">
-
-      {/* Content */}
       <div className={`${PAGE_COLUMN_CLASS} py-20`}>
-        <motion.div
-          initial={false}
-          animate={{ y: 0, opacity: 1 }}
-        >
-          <h1 id="terms-heading" data-testid="terms-heading" className="text-5xl md:text-6xl font-bold mb-6">
+          <h1 id="terms-heading" data-testid="terms-heading" className="mkt-page-title text-5xl md:text-6xl font-bold mb-6">
             Terms of <span className="text-primary">Service</span>
           </h1>
           <p className="text-on-surface-variant mb-12">Last updated: April 2026</p>
@@ -182,7 +172,6 @@ export default function TermsOfService() {
               </p>
             </section>
           </div>
-        </motion.div>
       </div>
     </div>
   );

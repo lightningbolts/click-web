@@ -1,20 +1,11 @@
-'use client';
-
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-background text-on-surface">
-
-      {/* Content */}
       <div className={`${PAGE_COLUMN_CLASS} py-20`}>
-        <motion.div
-          initial={false}
-          animate={{ y: 0, opacity: 1 }}
-        >
-          <h1 id="privacy-heading" data-testid="privacy-heading" className="text-5xl md:text-6xl font-bold mb-6">
+          <h1 id="privacy-heading" data-testid="privacy-heading" className="mkt-page-title text-5xl md:text-6xl font-bold mb-6">
             Privacy <span className="text-primary">Policy</span>
           </h1>
           <p className="text-on-surface-variant mb-12">Last updated: April 2026</p>
@@ -191,7 +182,6 @@ export default function PrivacyPolicy() {
               </p>
             </section>
           </div>
-        </motion.div>
       </div>
     </div>
   );

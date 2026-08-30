@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from '@/lib/theme/ThemeProvider';
+import { prefersReducedMotion } from '@/lib/motion';
 import {
   applyPlaygroundMapTheme,
   playgroundMapStyle,
@@ -11,10 +12,13 @@ import {
 } from '@/components/landing/playground/playgroundMapStyle';
 import {
   FOLD_MAP_CENTER,
+  FOLD_MAP_FIT_MAX_ZOOM,
   FOLD_MAP_MAX_BOUNDS,
   FOLD_MAP_MAX_ZOOM,
   FOLD_MAP_MIN_ZOOM,
   FOLD_MAP_ZOOM,
+  foldMapCameraBounds,
+  foldMapCameraPadding,
 } from './foldMapPins';
 import {
   PRESENCE_HEATMAP_MAX_ZOOM,
@@ -78,42 +82,11 @@ function heatmapColor(theme: 'light' | 'dark'): ExpressionSpecification {
   ];
 }
 
-function atSorted(arr: number[], t: number) {
-  return arr[Math.round((arr.length - 1) * t)];
-}
-
-/** Keep one GPS outlier from yanking the hero to an empty coastline. */
-function cameraBounds(cells: readonly PresenceHeatmapCell[]) {
-  const bounds = new maplibregl.LngLatBounds();
-  if (cells.length < 8) {
-    cells.forEach((cell) => bounds.extend([cell.lng, cell.lat]));
-    return bounds;
-  }
-  const lats = cells.map((cell) => cell.lat).sort((a, b) => a - b);
-  const lngs = cells.map((cell) => cell.lng).sort((a, b) => a - b);
-  bounds.extend([atSorted(lngs, 0.06), atSorted(lats, 0.06)]);
-  bounds.extend([atSorted(lngs, 0.94), atSorted(lats, 0.94)]);
-  return bounds;
-}
-
-/** Fit density into the map that is not covered by the offer plate. */
-function cameraPadding(container: HTMLElement) {
-  const w = container.clientWidth;
-  const h = container.clientHeight;
-  const plateW = Math.min(448 + 64, w * 0.92);
-  const plateH = Math.min(390, h * 0.5);
-  const left = Math.min(plateW, w * 0.42);
-  const bottom = Math.min(plateH, h * 0.42);
-  if (w < 720) {
-    return { top: 72, right: 16, bottom, left: 16 };
-  }
-  return { top: 88, right: Math.min(80, w * 0.12), bottom, left };
-}
-
 function paintHeatmap(
   map: maplibregl.Map,
   cells: readonly PresenceHeatmapCell[],
   theme: 'light' | 'dark',
+  inkPresence: boolean,
 ) {
   const data = cellsToGeoJson(cells);
   const existing = map.getSource(HEAT_SOURCE) as maplibregl.GeoJSONSource | undefined;
@@ -126,6 +99,8 @@ function paintHeatmap(
   if (map.getLayer('landing-presence-core')) map.removeLayer('landing-presence-core');
   if (map.getLayer('landing-presence-bands')) map.removeLayer('landing-presence-bands');
   if (map.getSource('landing-presence-bands')) map.removeSource('landing-presence-bands');
+  const reduce = prefersReducedMotion();
+  const ink = inkPresence && !reduce;
   map.addLayer({
     id: HEAT_LAYER,
     type: 'heatmap',
@@ -136,21 +111,31 @@ function paintHeatmap(
       'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.95, 13, 1.1, 16, 1.2, 18, 1.3],
       'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 16, 12, 20, 15, 24, 17, 30, 18, 38],
       'heatmap-color': heatmapColor(theme),
-      'heatmap-opacity': 0.9,
+      'heatmap-opacity': ink ? 0 : 0.9,
+      'heatmap-opacity-transition': { duration: ink ? 720 : 0 },
     },
   });
+  if (ink) {
+    requestAnimationFrame(() => {
+      if (map.getLayer(HEAT_LAYER)) {
+        map.setPaintProperty(HEAT_LAYER, 'heatmap-opacity', 0.9);
+      }
+    });
+  }
 }
 
 /**
  * First-viewport Fold Map. Carto tiles in the browser only.
  * Presence is a heatmap of real handshake points (block-offset for privacy).
+ * Camera is framed from heatmap bounds before the first paint so the view
+ * never starts closer and then snaps out.
  */
 export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const themeRef = useRef<'light' | 'dark'>('light');
   const appliedThemeRef = useRef<'light' | 'dark' | null>(null);
-  const fittedRef = useRef(false);
+  const heatInkedRef = useRef(false);
   const cellsRef = useRef(cells);
   const { theme } = useTheme();
   const [ready, setReady] = useState(false);
@@ -166,12 +151,25 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
     let resizeObserver: ResizeObserver | null = null;
     let resizeFrame = 0;
     try {
-      const hasHeat = cellsRef.current.length > 0;
+      const initialCells = cellsRef.current;
+      const hasHeat = initialCells.length > 0;
+      const bounds = foldMapCameraBounds(initialCells);
       const map = new maplibregl.Map({
         container,
         style: playgroundMapStyle(themeRef.current),
-        center: FOLD_MAP_CENTER,
-        zoom: FOLD_MAP_ZOOM,
+        ...(bounds
+          ? {
+              bounds,
+              fitBoundsOptions: {
+                padding: foldMapCameraPadding(container.clientWidth, container.clientHeight),
+                maxZoom: FOLD_MAP_FIT_MAX_ZOOM,
+                duration: 0,
+              },
+            }
+          : {
+              center: FOLD_MAP_CENTER,
+              zoom: FOLD_MAP_ZOOM,
+            }),
         minZoom: FOLD_MAP_MIN_ZOOM,
         maxZoom: Math.min(FOLD_MAP_MAX_ZOOM, PRESENCE_HEATMAP_MAX_ZOOM),
         maxBounds: hasHeat ? undefined : FOLD_MAP_MAX_BOUNDS,
@@ -185,6 +183,17 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
       });
       mapRef.current = map;
       appliedThemeRef.current = themeRef.current;
+
+      const frameCamera = () => {
+        const next = foldMapCameraBounds(cellsRef.current);
+        if (!next) return;
+        map.fitBounds(next, {
+          padding: foldMapCameraPadding(container.clientWidth, container.clientHeight),
+          maxZoom: FOLD_MAP_FIT_MAX_ZOOM,
+          duration: 0,
+        });
+      };
+
       resizeObserver = new ResizeObserver(() => {
         if (resizeFrame) cancelAnimationFrame(resizeFrame);
         resizeFrame = requestAnimationFrame(() => {
@@ -195,6 +204,7 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
       resizeObserver.observe(container);
       map.on('load', () => {
         map.resize();
+        frameCamera();
         let revealed = false;
         const reveal = () => {
           if (revealed) return;
@@ -204,10 +214,15 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
         };
         fallback = window.setTimeout(reveal, 2800);
         map.once('idle', reveal);
+        if (map.areTilesLoaded()) reveal();
       });
-      map.on('error', () => setError('Map tiles failed to load'));
+      map.on('error', () => {
+        setError('Map tiles failed to load');
+        setReady(true);
+      });
     } catch {
       setError('Map failed to start');
+      setReady(true);
     }
 
     return () => {
@@ -216,7 +231,7 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
       resizeObserver?.disconnect();
       mapRef.current?.remove();
       mapRef.current = null;
-      fittedRef.current = false;
+      heatInkedRef.current = false;
       setReady(false);
     };
   }, []);
@@ -231,19 +246,14 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    const apply = () => paintHeatmap(map, cells, themeRef.current);
+    const apply = () => {
+      const ink = !heatInkedRef.current;
+      paintHeatmap(map, cells, themeRef.current, ink);
+      if (ink) heatInkedRef.current = true;
+    };
     if (map.isStyleLoaded()) apply();
     const onStyle = () => apply();
     map.on('style.load', onStyle);
-
-    if (!fittedRef.current && cells.length > 0) {
-      map.fitBounds(cameraBounds(cells), {
-        padding: cameraPadding(map.getContainer()),
-        maxZoom: 12.4,
-        duration: 0,
-      });
-      fittedRef.current = true;
-    }
 
     return () => {
       map.off('style.load', onStyle);
@@ -254,7 +264,7 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
     <div className="absolute inset-0" data-testid="landing-fold-map-canvas">
       <div
         ref={containerRef}
-        className="absolute inset-0 bg-[#ebeef1] dark:bg-[#15121c] [&_.maplibregl-ctrl-bottom-right]:!right-2 [&_.maplibregl-ctrl-bottom-right]:!bottom-2"
+        className={`absolute inset-0 bg-[#ebeef1] dark:bg-[#15121c] mkt-map-canvas${ready ? ' is-ready' : ''} [&_.maplibregl-ctrl-bottom-right]:!right-2 [&_.maplibregl-ctrl-bottom-right]:!bottom-2`}
         aria-hidden={Boolean(error)}
       />
       {error ? (

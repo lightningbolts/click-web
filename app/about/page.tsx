@@ -15,11 +15,11 @@ export default function AboutPage() {
   return (
     <FcPageShell className="py-20">
       <div className={PAGE_COLUMN_CLASS}>
-        <h1
-          id="about-heading"
-          data-testid="about-heading"
-          className="text-center text-5xl font-bold md:text-6xl"
-        >
+          <h1
+            id="about-heading"
+            data-testid="about-heading"
+            className="mkt-page-title text-center text-5xl font-bold md:text-6xl"
+          >
           About <span className="text-primary">Click</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-center text-lg leading-relaxed text-on-surface-variant">
