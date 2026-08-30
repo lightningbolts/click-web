@@ -16,7 +16,8 @@ export const FOLD_MAP_MAX_BOUNDS: [[number, number], [number, number]] = [
 export type FoldMapLngLatBounds = [[number, number], [number, number]];
 
 function atSorted(arr: number[], t: number) {
-  return arr[Math.round((arr.length - 1) * t)];
+  const position = (arr.length - 1) * t;
+  return arr[t < 0.5 ? Math.ceil(position) : Math.floor(position)];
 }
 
 /**

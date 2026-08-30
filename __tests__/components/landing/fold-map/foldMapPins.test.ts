@@ -21,17 +21,20 @@ describe('foldMapCameraBounds', () => {
     ]);
   });
 
-  it('trims outliers so one coastline ping cannot yank the hero', () => {
-    const cells = Array.from({ length: 20 }, (_, i) => ({
-      lat: 47.6 + i * 0.002,
-      lng: -122.33 + i * 0.002,
-      weight: 1,
-    }));
-    cells.push({ lat: 20, lng: -150, weight: 1 });
-    const bounds = foldMapCameraBounds(cells);
-    expect(bounds).not.toBeNull();
-    expect(bounds![0][0]).toBeGreaterThan(-150);
-    expect(bounds![0][1]).toBeGreaterThan(20);
+  it('trims extrema once the set is large enough to trim', () => {
+    const cluster = (count: number) =>
+      Array.from({ length: count - 1 }, (_, i) => ({
+        lat: 47.6 + i * 0.002,
+        lng: -122.33 + i * 0.002,
+        weight: 1,
+      })).concat({ lat: 20, lng: -150, weight: 1 });
+
+    for (const count of [8, 9, 21]) {
+      const bounds = foldMapCameraBounds(cluster(count));
+      expect(bounds).not.toBeNull();
+      expect(bounds![0][0]).toBeGreaterThan(-150);
+      expect(bounds![0][1]).toBeGreaterThan(20);
+    }
   });
 });
 
