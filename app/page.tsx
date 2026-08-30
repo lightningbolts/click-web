@@ -1,7 +1,18 @@
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
 import HomeAuthenticated from '@/components/HomeAuthenticated';
 import LandingPage from '@/components/landing/LandingPage';
+import { EMPTY_PRESENCE_HEATMAP } from '@/lib/landing/presenceHeatmap';
+import { loadPresenceHeatmap } from '@/lib/server/presenceHeatmap';
 import type { User } from '@supabase/supabase-js';
+
+async function landingHeatmap() {
+  try {
+    return await loadPresenceHeatmap();
+  } catch (err) {
+    console.error('Presence heatmap load failed:', err);
+    return EMPTY_PRESENCE_HEATMAP;
+  }
+}
 
 /**
  * Root route: resolve the cookie session on the server so anonymous crawlers
@@ -12,7 +23,7 @@ export default async function Home() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
-    return <LandingPage />;
+    return <LandingPage heatmap={await landingHeatmap()} />;
   }
 
   let user: User | null = null;
@@ -30,5 +41,5 @@ export default async function Home() {
     return <HomeAuthenticated user={user} />;
   }
 
-  return <LandingPage />;
+  return <LandingPage heatmap={await landingHeatmap()} />;
 }

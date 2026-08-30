@@ -7,6 +7,10 @@ jest.mock('@/lib/server/supabaseServer', () => ({
   createSupabaseServerClient: jest.fn(),
 }));
 
+jest.mock('@/lib/server/presenceHeatmap', () => ({
+  loadPresenceHeatmap: jest.fn().mockResolvedValue({ cells: [], generatedAt: '2026-01-01T00:00:00.000Z' }),
+}));
+
 jest.mock('@/lib/AuthContext', () => ({
   useAuth: () => ({ user: null }),
 }));
@@ -18,6 +22,11 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/components/HomeAuthenticated', () => ({
   __esModule: true,
   default: () => <div data-testid="home-authenticated">Loading your connections</div>,
+}));
+
+jest.mock('@/components/landing/fold-map/FoldMapLazy', () => ({
+  __esModule: true,
+  default: () => <div data-testid="landing-fold-map-canvas" />,
 }));
 
 jest.mock('framer-motion', () => {

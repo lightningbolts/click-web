@@ -40,6 +40,9 @@ const navControlClass =
 const navCtaClass =
   "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
 
+const navLoginClass =
+  "fc-btn-secondary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
+
 const drawerLinkClass =
   "flex items-center gap-2 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container";
 
@@ -174,7 +177,7 @@ export default function Navbar({
             <ThemeToggle className="hidden md:inline-flex" />
 
             {loading && !user ? (
-              <div data-testid="nav-auth-loading" className={navCtaClass} aria-hidden>
+              <div data-testid="nav-auth-loading" className={navLoginClass} aria-hidden>
                 <span className="invisible">Login</span>
               </div>
             ) : user ? (
@@ -227,7 +230,7 @@ export default function Navbar({
               <button
                 onClick={() => setIsLoginOpen(true)}
                 data-testid="nav-login"
-                className={navCtaClass}
+                className={navLoginClass}
               >
                 Login
               </button>

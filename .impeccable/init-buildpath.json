@@ -1,0 +1,21 @@
+{
+  "title": "How should new surfaces start?",
+  "question": "This is a workflow default for future Impeccable builds on click-web — not product truth. Comp-first: an image sets the bar before any code; bolder composition, slower, and the build must match the image. Code-first: build directly; the ambition is written into the direction contract and audited at the finish; leaner and faster. Which should be the project default?",
+  "steer": false,
+  "options": [
+    {
+      "id": "comp",
+      "label": "Comp-first",
+      "kicker": "IMAGE SETS THE BAR",
+      "thesis": "Generate a high-fidelity image of the surface, approve it, then build code that matches.",
+      "body": "Bolder composition and a harder finish gate. Slower. Use when the screen needs a new visual world or a replacement look, not a small refinement."
+    },
+    {
+      "id": "code",
+      "label": "Code-first",
+      "kicker": "BUILD DIRECTLY",
+      "thesis": "Skip the image round. Write the ambition into the direction contract and audit it when the surface is built.",
+      "body": "Leaner and faster. Better for extending the incumbent interface. Still a full design pass — just not image-led."
+    }
+  ]
+}

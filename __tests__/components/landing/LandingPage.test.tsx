@@ -16,6 +16,11 @@ jest.mock('@/components/HomeAuthenticated', () => ({
   default: () => <div data-testid="home-authenticated" />,
 }));
 
+jest.mock('@/components/landing/fold-map/FoldMapLazy', () => ({
+  __esModule: true,
+  default: () => <div data-testid="landing-fold-map-canvas" />,
+}));
+
 jest.mock('framer-motion', () => {
   const React = require('react');
   const Forward = (tag: string) =>
@@ -38,14 +43,16 @@ function renderLanding() {
 }
 
 describe('LandingPage', () => {
-  it('renders the logo-first hero, tagline, waitlist CTA, and About link', () => {
+  it('renders the Fold Map hero, tagline, waitlist CTA, and Why Click exists', () => {
     renderLanding();
 
+    expect(screen.getByTestId('landing-fold-map')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Click' })).toBeInTheDocument();
     expect(screen.getByText(/from handshake to friendship/)).toBeInTheDocument();
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
+    expect(screen.getByText(/Your phones confirm you were in the same room/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+    expect(screen.getByRole('link', { name: 'Why Click exists' })).toHaveAttribute('href', '#why');
   });
 
   it('renders the playground and does not use product screenshot alts', () => {
@@ -74,7 +81,7 @@ describe('LandingPage', () => {
   it('points enterprise traffic at /enterprise instead of an insights carousel', () => {
     renderLanding();
 
-    expect(screen.getByRole('link', { name: /See Click for enterprise/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /See Click for Business/i })).toHaveAttribute(
       'href',
       '/enterprise',
     );

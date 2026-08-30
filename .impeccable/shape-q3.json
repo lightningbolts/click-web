@@ -1,0 +1,51 @@
+{
+  "title": "Landing composition",
+  "question": "Functional Clarity is locked. These three are structures for `/` only: prove the handshake, then Join the Waitlist. Login stays in the navbar. Insights stay off this page. Pick one; locking it approves its comp. Steer or re-roll if the job is not on the table.",
+  "steer": true,
+  "reroll": true,
+  "buildPath": { "value": "comp", "toggle": true },
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Fold Map",
+      "kicker": "THE ROLL",
+      "thesis": "The first viewport is the city: a quiet Seattle map of presence, not a feed. The handshake offer and waitlist sit on a plate over it.",
+      "palette": ["#F9F9F9", "#FFFFFF", "#7C3AED", "#1A1C1C", "#CCC3D8"],
+      "materials": ["opaque plate", "1px seam", "Carto map as content"],
+      "viewport": "Full-bleed map under the existing navbar; one violet-pinned overlay plate with the mark, handshake line, and Join the Waitlist.",
+      "risk": "Can read as a social map app if pins get chatty or the plate hides the mechanism.",
+      "raised": [
+        { "from": "sticker album", "raise": "The map stays sparse on purpose: empty space is the missing feed, not a loading state." }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "clique-strip",
+      "label": "The Clique Strip",
+      "kicker": "STRUCTURE",
+      "thesis": "The page is three lettered views — A In person, B Events, C Context. View A is the handshake demo at full scale; waitlist is the commit on the active view.",
+      "palette": ["#F9F9F9", "#FFFFFF", "#7C3AED", "#1A1C1C", "#CCC3D8"],
+      "materials": ["opaque plate", "1px seam", "Manrope labels"],
+      "viewport": "Navbar, then A/B/C view tabs; View A fills the fold with the proximity demo and one Join the Waitlist button.",
+      "risk": "Three views can feel like a product tour if A does not prove co-location immediately.",
+      "raised": [
+        { "from": "sewing pattern envelope", "raise": "A/B/C are committed views, not a feature grid: the active view’s cut line is solid, the others stay quiet." }
+      ],
+      "comp": ".impeccable/mocks/decision/clique-strip.webp"
+    },
+    {
+      "id": "night-ledger",
+      "label": "The Night Ledger",
+      "kicker": "STRUCTURE",
+      "thesis": "Why Click exists is the first viewport: stacked plates of the follow-back void, then the waitlist as the only commit. Playground is a later station, not the hero.",
+      "palette": ["#F9F9F9", "#FFFFFF", "#7C3AED", "#1A1C1C", "#CCC3D8"],
+      "materials": ["opaque plate", "1px seam", "alternating borders"],
+      "viewport": "Navbar, then a stack of Why plates filling the fold; Click Violet on the key line; Join the Waitlist on the last plate in view.",
+      "risk": "Proof delays: they may bounce before the handshake is demonstrated.",
+      "raised": [
+        { "from": "darkroom bay", "raise": "Stations in order — why, how, try, join — and the waitlist is irreversible commit, not a second hero." }
+      ],
+      "comp": ".impeccable/mocks/decision/night-ledger.webp"
+    }
+  ]
+}

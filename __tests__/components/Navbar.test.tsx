@@ -95,7 +95,8 @@ describe("Navbar", () => {
     expect(events).not.toHaveClass("bg-primary-container");
     expect(events).not.toHaveClass("fc-btn-primary");
     expect(screen.getByRole("button", { name: "How it works" })).not.toHaveClass("fc-btn-primary");
-    expect(screen.getByTestId("nav-login")).toHaveClass("fc-btn-primary");
+    expect(screen.getByTestId("nav-login")).toHaveClass("fc-btn-secondary");
+    expect(screen.getByTestId("nav-login")).not.toHaveClass("fc-btn-primary");
   });
 
   it("keeps signed-in actions as one CTA plus matching icon controls", () => {

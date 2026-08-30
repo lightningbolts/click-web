@@ -1,0 +1,40 @@
+{
+  "title": "What must this landing do?",
+  "question": "Surface is `/` (logged-out). Logged-in people already skip this for the dashboard. Functional Clarity stays. Confirm the job, success, and what a builder must not touch. Steer if the waitlist, playground, or logo-first hero is on the table.",
+  "steer": true,
+  "followup": false,
+  "options": [
+    {
+      "id": "prove-then-join",
+      "label": "Prove the handshake, then join",
+      "kicker": "LIKELY READING",
+      "thesis": "In the first viewport they know this is a digital handshake, not a feed. The only hero action is Join the Waitlist. Playground below fold is the demo, not a screenshot farm.",
+      "body": "Keep: logo mark, tagline, one CTA + About, login in the navbar, no Insights on `/`, no ads/feed claims, waitlist (app not publicly launched), playground maps as they are (Carto, Seattle clamp, no Worker tiles). Untouched: PRODUCT.md facts, DESIGN.md tokens, auth callbacks. Success: they can say “phones verify we were in the same room” and they submit the waitlist. Scope: whole landing composition may be reshaped inside Functional Clarity; this is a production-ready page brief, not a new brand.",
+      "case": "Matches current 02-landing.md and PRODUCT.md."
+    },
+    {
+      "id": "hero-only",
+      "label": "First viewport only",
+      "kicker": "NARROW",
+      "thesis": "Shape just the fold: mark, line, waitlist. Below-fold Why / How / Playground / Mission / Enterprise / close stay as-is.",
+      "body": "Success is still waitlist, but the brief will not reopen playground or enterprise placement. Smaller structural invention.",
+      "case": "Local extension of an established surface — no composition tournament later."
+    },
+    {
+      "id": "app-download",
+      "label": "Get the app, not the waitlist",
+      "kicker": "JOB CHANGE",
+      "thesis": "The landing’s job is store download / open-in-app, waitlist is secondary or gone.",
+      "body": "Only pick this if launch state has changed. PRODUCT.md still lists waitlist until NEXT_PUBLIC_APP_LAUNCHED. Use the note to name iOS/Android store facts we must not invent.",
+      "case": "Conflicts with current launch posture unless you override it."
+    },
+    {
+      "id": "something-else",
+      "label": "Different job",
+      "kicker": "STEER REQUIRED",
+      "thesis": "The landing must make someone believe or do a different thing than waitlist-after-handshake.",
+      "body": "Use the note: who arrives, what they must do, what would feel wrong even if it looked polished.",
+      "case": "For a third audience, event-first landing, or operator-first `/`."
+    }
+  ]
+}
