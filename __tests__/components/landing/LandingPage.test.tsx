@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LandingPage from '@/components/landing/LandingPage';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
@@ -14,6 +14,22 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/components/HomeAuthenticated', () => ({
   __esModule: true,
   default: () => <div data-testid="home-authenticated" />,
+}));
+
+jest.mock('@/components/landing/fold-map/FoldMapLazy', () => ({
+  __esModule: true,
+  default: () => <div data-testid="landing-fold-map-canvas" />,
+}));
+
+jest.mock('@/components/landing/playground/LandingPlaygroundLazy', () => ({
+  __esModule: true,
+  default: () => <div data-testid="landing-playground" />,
+}));
+
+jest.mock('@/components/marketing/WaitlistModal', () => ({
+  __esModule: true,
+  default: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="Join the Waitlist">Waitlist</div> : null,
 }));
 
 jest.mock('framer-motion', () => {
@@ -38,14 +54,16 @@ function renderLanding() {
 }
 
 describe('LandingPage', () => {
-  it('renders the logo-first hero, tagline, waitlist CTA, and About link', () => {
+  it('renders the Fold Map hero, tagline, waitlist CTA, and Why Click exists', () => {
     renderLanding();
 
+    expect(screen.getByTestId('landing-fold-map')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Click' })).toBeInTheDocument();
     expect(screen.getByText(/from handshake to friendship/)).toBeInTheDocument();
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
+    expect(screen.getByText(/Your phones confirm you were in the same room/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+    expect(screen.getByRole('link', { name: 'Why Click exists' })).toHaveAttribute('href', '#why');
   });
 
   it('renders the playground and does not use product screenshot alts', () => {
@@ -74,7 +92,7 @@ describe('LandingPage', () => {
   it('points enterprise traffic at /enterprise instead of an insights carousel', () => {
     renderLanding();
 
-    expect(screen.getByRole('link', { name: /See Click for enterprise/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /See Click for Business/i })).toHaveAttribute(
       'href',
       '/enterprise',
     );
@@ -87,6 +105,8 @@ describe('LandingPage', () => {
     renderLanding();
 
     await user.click(screen.getAllByRole('button', { name: 'Join the Waitlist' })[0]);
-    expect(screen.getByRole('dialog', { name: 'Join the Waitlist' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Join the Waitlist' })).toBeInTheDocument();
+    });
   });
 });

@@ -1,0 +1,40 @@
+{
+  "title": "Who is click-web for?",
+  "question": "Click Web already exists as the Next.js companion to the Click mobile app (joinclick.co): landing and waitlist, authenticated dashboard (chat, map, events, LiveKit), and Click for Business insights. Init will write PRODUCT.md from confirmed product truth — not a visual direction. Which audience should future design work treat as primary?",
+  "steer": true,
+  "followup": true,
+  "options": [
+    {
+      "id": "consumers",
+      "label": "People who met in the room",
+      "kicker": "CONSUMER COMPANION",
+      "thesis": "Primary user is someone who already connected in person and is continuing that relationship on the web.",
+      "body": "Dashboard, chat, map, events, QR, and calls. Insights stays real but secondary. Marketing exists to get them into the app and onto the web companion.",
+      "case": "Matches README: web is the consumer dashboard plus HTTP BFF; mobile owns the handshake."
+    },
+    {
+      "id": "operators",
+      "label": "Venues and promoters",
+      "kicker": "CLICK FOR BUSINESS",
+      "thesis": "Primary user is a local venue, promoter, or event operator proving who actually showed up together.",
+      "body": "Insights, heatmaps, tribes, vibe radar, social sticky score, beacons. Consumer dashboard exists but is not the design north star for this repo.",
+      "case": "Matches README: web-only B2B surface; mobile produces the verified data."
+    },
+    {
+      "id": "both",
+      "label": "Two-sided, equally first-class",
+      "kicker": "CONSUMER + OPERATOR",
+      "thesis": "click-web has two primary jobs and neither may be treated as a side quest.",
+      "body": "Personal dashboard for people continuing verified connections, and Click for Business for operators reading verified social topology. Anonymous landing and public events serve both.",
+      "case": "Matches the shipped surface split: / for people, /insights for operators, /events public."
+    },
+    {
+      "id": "acquisition",
+      "label": "Anonymous visitors first",
+      "kicker": "LANDING AND WAITLIST",
+      "thesis": "The primary job of this repo right now is converting visitors who have not yet joined.",
+      "body": "Landing, playground, waitlist, public events. Authenticated and B2B surfaces exist but are not the product-truth center for upcoming design work.",
+      "case": "Root / must SSR marketing for anonymous requests; app is not publicly launched until NEXT_PUBLIC_APP_LAUNCHED."
+    }
+  ]
+}

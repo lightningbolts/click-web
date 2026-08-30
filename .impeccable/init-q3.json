@@ -1,0 +1,36 @@
+{
+  "title": "Accessibility standard?",
+  "question": "Last product-truth question. click-web already searches generated card colors to WCAG 4.5:1 contrast. Is there a broader accessibility or inclusion requirement future work must honor? Brand, legal, or naming constraints can go in the note — otherwise those stay as shipped: Click, Click for Business, joinclick.co, “Stop scrolling. Start living.”",
+  "steer": true,
+  "followup": false,
+  "options": [
+    {
+      "id": "wcag-aa",
+      "label": "WCAG 2.2 AA",
+      "kicker": "PRODUCT STANDARD",
+      "thesis": "Ship to WCAG 2.2 AA on web surfaces: contrast, names, keyboard, focus, and targets.",
+      "body": "Generated card visuals already target 4.5:1. Elevate that to the whole product, including landing, dashboard, events, and insights."
+    },
+    {
+      "id": "cards-only",
+      "label": "Keep today’s bar",
+      "kicker": "AS SHIPPED",
+      "thesis": "No extra product-wide standard beyond what already exists in code.",
+      "body": "Preserve 4.5:1 on generated CardVisual surfaces. Do not invent a broader AA/AAA commitment in PRODUCT.md. Record accessibility as an open decision."
+    },
+    {
+      "id": "specific-needs",
+      "label": "Named user needs",
+      "kicker": "STEER REQUIRED",
+      "thesis": "There are specific inclusion needs (motor, vision, language, vestibular, etc.) that AA alone would miss.",
+      "body": "Use the note to name them. They will be written into Accessibility & Inclusion as confirmed requirements."
+    },
+    {
+      "id": "undecided",
+      "label": "Leave it undecided",
+      "kicker": "OPEN",
+      "thesis": "Do not lock a standard this round.",
+      "body": "PRODUCT.md will mark accessibility as an open decision rather than implying a commitment."
+    }
+  ]
+}

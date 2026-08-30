@@ -216,11 +216,12 @@ export function ChatHeader({
           {isGroupClique && groupHeaderSubtitle ? (
             <p className="mt-1 line-clamp-2 text-xs leading-snug text-on-surface-variant">{groupHeaderSubtitle}</p>
           ) : (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 shrink-0" /> {connection.location}
+            <div className="flex min-w-0 items-center gap-x-3 text-xs text-on-surface-variant">
+              <span className="flex min-w-0 items-center gap-1">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span className="truncate" title={connection.location}>{connection.location}</span>
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
                 <Calendar className="h-3 w-3 shrink-0" /> {metDate}
               </span>
             </div>

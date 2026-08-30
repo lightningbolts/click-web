@@ -255,7 +255,7 @@ export function ChatTabSection({
                         handleOpenChat(conn, hit.messageId);
                       }}
                     >
-                      <span className="text-sm font-semibold text-on-surface">{hit.chatName}</span>
+                      <span className="w-full truncate text-sm font-semibold text-on-surface" title={hit.chatName}>{hit.chatName}</span>
                       <span className="line-clamp-2 text-sm text-on-surface-variant">{hit.snippet}</span>
                     </button>
                   </li>
@@ -335,7 +335,7 @@ export function ChatTabSection({
                 </p>
               </div>
             ) : (
-              <div className="fc-card overflow-visible rounded-[16px] border border-border-hard divide-y divide-border-hard">
+              <div className="overflow-visible rounded-[12px] border border-border-hard divide-y divide-border-hard">
                 {visibleChatConnections.map((conn: ConnectionRecord, index) => {
                   const isUserArchived = archivedConnectionIds.has(conn.id);
                   const isServerArchived = conn.status === 'archived';
@@ -385,7 +385,7 @@ export function ChatTabSection({
                         onTouchStart={() => startLongPress(conn.id)}
                         onTouchEnd={endLongPress}
                         onTouchCancel={endLongPress}
-                        className="w-full flex cursor-pointer items-start gap-4 rounded-xl px-5 py-4 pr-16 text-left transition-colors hover:bg-surface-container/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        className="flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-surface-container/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 md:px-4"
                       >
                         {isGroupCliqueRow ? (
                           <button
@@ -431,22 +431,32 @@ export function ChatTabSection({
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-2 pr-2">
-                            <p className="truncate font-semibold text-on-surface">{conn.name}</p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="min-w-0 truncate font-semibold text-on-surface" title={conn.name}>{conn.name}</p>
                             {!isGroupCliqueRow && conn.intentOverlapLabel ? (
                               <span
-                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.28)]"
+                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300"
                                 title={`Vibes match: ${conn.intentOverlapLabel}`}
                               >
                                 <Zap className="h-3 w-3" aria-hidden />
                               </span>
                             ) : null}
+                            {isArchived ? (
+                              <span className="shrink-0 rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] text-on-surface-variant">
+                                {isServerArchived ? 'Auto-archived' : 'Archived'}
+                              </span>
+                            ) : null}
+                            {activityLabel ? (
+                              <span className="ml-auto shrink-0 text-[11px] text-on-surface-variant">
+                                {activityLabel}
+                              </span>
+                            ) : null}
                           </div>
-                          <p className="mt-0.5 truncate pr-2 text-sm text-on-surface-variant">
+                          <p className="mt-0.5 truncate text-sm text-on-surface-variant" title={previewText}>
                             {previewText}
                           </p>
-                          <p className="mt-1 truncate pr-2 text-xs text-on-surface-variant">
-                            {conn.location} · {conn.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          <p className="mt-1 truncate text-xs text-on-surface-variant" title={conn.location}>
+                            {conn.location}
                           </p>
                           {(() => {
                             const latest = conn.encounters?.[0];
@@ -472,7 +482,7 @@ export function ChatTabSection({
                                   : null;
                             if (db === null && el === null) return null;
                             return (
-                              <div className="mt-1.5 flex flex-wrap gap-1 pr-2">
+                              <div className="mt-1.5 flex flex-wrap gap-1">
                                 {db !== null ? (
                                   <span className="inline-flex items-center gap-0.5 rounded-full border border-border-hard/80 bg-surface px-1.5 py-0.5 text-[10px] font-medium text-on-surface">
                                     <Volume2 className="h-3 w-3 shrink-0 text-primary" aria-hidden />
@@ -490,7 +500,7 @@ export function ChatTabSection({
                           })()}
                           {archiveWarning && !isGroupCliqueRow && !isServerArchived && !isUserArchived ? (
                             <p
-                              className={`mt-1.5 flex items-center gap-1 truncate pr-2 text-[11px] ${
+                              className={`mt-1.5 flex items-center gap-1 truncate text-[11px] ${
                                 archiveInfo?.isUrgent ? 'text-amber-800 dark:text-amber-300' : 'text-on-surface-variant'
                               }`}
                             >
@@ -499,36 +509,19 @@ export function ChatTabSection({
                             </p>
                           ) : null}
                         </div>
-                        <div className="flex shrink-0 items-center self-start pt-0.5 pl-2">
-                          <div className="flex min-w-0 items-center justify-end gap-2">
-                            {activityLabel ? (
-                              <span className="shrink-0 rounded-full border border-border-hard/80 bg-surface px-2 py-0.5 text-[11px] text-on-surface-variant">
-                                {activityLabel}
-                              </span>
-                            ) : null}
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                              {isArchived ? (
-                                <span className="shrink-0 rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] text-on-surface-variant">
-                                  {isServerArchived ? 'Auto-archived' : 'Archived'}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openActionMenu(conn.id);
+                          }}
+                          data-connection-menu-trigger
+                          className="shrink-0 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
+                          aria-label={`Open actions for ${conn.name}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
                       </motion.div>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openActionMenu(conn.id);
-                        }}
-                        data-connection-menu-trigger
-                        className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container/70 hover:text-on-surface"
-                        aria-label={`Open actions for ${conn.name}`}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
 
                       {menuConnectionId === conn.id && (
                         <div

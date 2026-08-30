@@ -17,7 +17,7 @@ export function PhoneChrome({
 }) {
   return (
     <div className="mx-auto w-full max-w-[300px] shrink-0">
-      <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+      <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-on-surface-variant">
         {label}
       </p>
       <div className="relative overflow-hidden rounded-[28px] border border-border-hard bg-surface shadow-sm">
@@ -80,7 +80,7 @@ function PhoneNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-center gap-0.5 text-[9px] font-semibold ${
+      className={`flex min-h-11 flex-col items-center justify-center gap-0.5 px-0.5 text-center text-[14px] font-semibold leading-tight ${
         active ? 'text-primary' : 'text-on-surface-variant'
       }`}
     >
@@ -104,7 +104,7 @@ export function WebChrome({
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant md:text-left">
+      <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-on-surface-variant md:text-left">
         {label}
       </p>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-border-hard bg-surface shadow-sm">
@@ -112,7 +112,7 @@ export function WebChrome({
           <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
           <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
           <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
-          <span className="ml-2 truncate rounded-[6px] bg-background px-2 py-0.5 text-[10px] text-on-surface-variant">
+          <span className="ml-2 truncate rounded-[6px] bg-background px-2 py-0.5 text-sm text-on-surface-variant">
             {address}
           </span>
         </div>
@@ -139,7 +139,7 @@ export function PlaygroundAvatar({
   size?: 'sm' | 'md' | 'lg';
   online?: boolean;
 }) {
-  const dim = size === 'lg' ? 'h-14 w-14 text-base' : size === 'sm' ? 'h-8 w-8 text-[10px]' : 'h-10 w-10 text-xs';
+  const dim = size === 'lg' ? 'h-14 w-14 text-base' : size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm';
   return (
     <span className="relative inline-flex shrink-0">
       <span

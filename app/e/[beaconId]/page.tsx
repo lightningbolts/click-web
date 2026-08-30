@@ -13,6 +13,7 @@ import {
   eventWhereLabel,
 } from "@/lib/events/eventMetadata";
 import { eventDeepLink, eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
+import { brandShareImage } from "@/lib/brand/shareImage";
 import { formatEventPostedAt, formatEventWhen } from "@/lib/events/formatEventWhen";
 import { FcButton, FcCard } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
@@ -60,6 +61,9 @@ export async function generateMetadata({
     eventSubtitle(title, event?.description) ||
     formatEventWhen(event?.event_start_at ?? null, event?.event_end_at ?? null, event?.timezone) ||
     "Open this event in Click.";
+  const images = event?.image_url
+    ? [{ url: event.image_url }]
+    : [brandShareImage()];
   return {
     title: `${title} · Click`,
     description,
@@ -68,7 +72,11 @@ export async function generateMetadata({
       description,
       url,
       type: "website",
-      ...(event?.image_url ? { images: [{ url: event.image_url }] } : {}),
+      images,
+    },
+    twitter: {
+      card: event?.image_url ? "summary_large_image" : "summary",
+      images: event?.image_url ? [event.image_url] : [brandShareImage().url],
     },
   };
 }

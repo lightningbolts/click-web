@@ -1,7 +1,26 @@
-import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
 import HomeAuthenticated from '@/components/HomeAuthenticated';
 import LandingPage from '@/components/landing/LandingPage';
-import type { User } from '@supabase/supabase-js';
+import { EMPTY_PRESENCE_HEATMAP } from '@/lib/landing/presenceHeatmap';
+import { getServerUser } from '@/lib/server/getServerUser';
+import { loadPresenceHeatmap } from '@/lib/server/presenceHeatmap';
+
+async function landingHeatmap() {
+  try {
+    return await loadPresenceHeatmap();
+  } catch (err) {
+    console.error('Presence heatmap load failed:', err);
+    return EMPTY_PRESENCE_HEATMAP;
+  }
+}
+
+function CartoPreconnect() {
+  return (
+    <>
+      <link rel="preconnect" href="https://basemaps.cartocdn.com" crossOrigin="anonymous" />
+      <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossOrigin="anonymous" />
+    </>
+  );
+}
 
 /**
  * Root route: resolve the cookie session on the server so anonymous crawlers
@@ -9,26 +28,15 @@ import type { User } from '@supabase/supabase-js';
  * without a marketing flash.
  */
 export default async function Home() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return <LandingPage />;
-  }
-
-  let user: User | null = null;
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user: sessionUser },
-    } = await supabase.auth.getUser();
-    user = sessionUser;
-  } catch (err) {
-    console.error('Root route session check failed:', err);
-  }
-
+  const user = await getServerUser();
   if (user) {
     return <HomeAuthenticated user={user} />;
   }
 
-  return <LandingPage />;
+  return (
+    <>
+      <CartoPreconnect />
+      <LandingPage heatmap={await landingHeatmap()} />
+    </>
+  );
 }

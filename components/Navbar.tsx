@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
-import { useEffect, useRef, useState } from "react";
-import LoginModal from "@/components/LoginModal";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState, Suspense } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ClickLogo from "@/components/ClickLogo";
 import MobileNavDrawer from "@/components/shell/MobileNavDrawer";
@@ -24,6 +24,43 @@ type InsightsAccessPayload = { insightsAllowed: boolean };
 const insightsAccessFetcher = (url: string) =>
   fetchInsightsApiJson<InsightsAccessPayload>(url);
 
+const loadLoginModal = () => import("@/components/LoginModal");
+const LoginModal = dynamic(loadLoginModal, { ssr: false });
+
+function LoginLoadingShell({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 p-3 sm:items-center sm:p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="fc-card w-full max-w-md p-6"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-modal-title"
+        aria-busy="true"
+        data-testid="login-modal"
+      >
+        <h2 id="login-modal-title" className="text-xl font-bold text-on-surface sm:text-2xl">
+          Welcome Back
+        </h2>
+        <p className="mt-2 text-sm font-medium text-on-surface-variant">Loading…</p>
+      </div>
+    </div>
+  );
+}
+
 const navItemClass =
   "inline-flex h-9 items-center rounded-[8px] px-3 text-sm font-semibold leading-none";
 
@@ -39,6 +76,9 @@ const navControlClass =
 
 const navCtaClass =
   "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
+
+const navLoginClass =
+  "fc-btn-secondary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
 
 const drawerLinkClass =
   "flex items-center gap-2 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container";
@@ -148,7 +188,7 @@ export default function Navbar({
             className="order-1 flex shrink-0 items-center gap-2 justify-self-start text-xl font-bold md:gap-2.5 md:text-2xl"
           >
             <ClickLogo size={28} className="h-7 w-7 md:h-8 md:w-8" priority />
-            <span>
+            <span className="whitespace-nowrap">
               <span className="text-primary">C</span>
               <span className="text-on-surface">lick</span>
             </span>
@@ -171,10 +211,10 @@ export default function Navbar({
           </div>
 
           <div className="order-3 flex shrink-0 items-center justify-self-end gap-2">
-            <ThemeToggle />
+            <ThemeToggle className="hidden md:inline-flex" />
 
             {loading && !user ? (
-              <div data-testid="nav-auth-loading" className={navCtaClass} aria-hidden>
+              <div data-testid="nav-auth-loading" className={navLoginClass} aria-hidden>
                 <span className="invisible">Login</span>
               </div>
             ) : user ? (
@@ -183,7 +223,7 @@ export default function Navbar({
                   <Plus className="block size-4 shrink-0" aria-hidden />
                   Create event
                 </Link>
-                <div className="relative" ref={userMenuRef}>
+                <div className="relative hidden md:block" ref={userMenuRef}>
                   <button
                     type="button"
                     onClick={() => setUserMenuOpen((o) => !o)}
@@ -225,9 +265,16 @@ export default function Navbar({
               </>
             ) : (
               <button
+                type="button"
                 onClick={() => setIsLoginOpen(true)}
+                onPointerEnter={() => {
+                  void loadLoginModal();
+                }}
+                onFocus={() => {
+                  void loadLoginModal();
+                }}
                 data-testid="nav-login"
-                className={navCtaClass}
+                className={navLoginClass}
               >
                 Login
               </button>
@@ -248,8 +295,8 @@ export default function Navbar({
         </div>
       </nav>
       <MobileNavDrawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
-        <div className="flex h-full min-h-0 flex-col p-3" id="mobile-nav-drawer">
-          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Primary">
+        <div className="flex h-full min-h-0 flex-col" id="mobile-nav-drawer">
+          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary">
             {showProductLinks
               ? productItems.map((item) => (
                   <Link
@@ -282,13 +329,60 @@ export default function Navbar({
               )}
             {user ? (
               <Link href="/events/new" onClick={() => setMobileOpen(false)} className={drawerLinkClass}>
+                <Plus className="h-4 w-4 shrink-0" />
                 Create event
               </Link>
             ) : null}
           </nav>
+          <div className="space-y-1 border-t border-border-hard p-3">
+            <ThemeToggle showLabel className="h-10 w-full justify-start px-3" />
+            {user ? (
+              <>
+                {insightsAccess?.insightsAllowed ? (
+                  <Link
+                    href="/insights"
+                    onClick={() => setMobileOpen(false)}
+                    className={drawerLinkClass}
+                  >
+                    <BarChart2 className="h-4 w-4" />
+                    Insights
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    void handleSignOut();
+                  }}
+                  className={cn(drawerLinkClass, "w-full text-left hover:text-error")}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onPointerEnter={() => {
+                  void loadLoginModal();
+                }}
+                onClick={() => {
+                  setMobileOpen(false);
+                  setIsLoginOpen(true);
+                }}
+                className={cn(drawerLinkClass, "w-full text-left")}
+              >
+                Login
+              </button>
+            )}
+          </div>
         </div>
       </MobileNavDrawer>
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      {isLoginOpen ? (
+        <Suspense fallback={<LoginLoadingShell onClose={() => setIsLoginOpen(false)} />}>
+          <LoginModal isOpen onClose={() => setIsLoginOpen(false)} />
+        </Suspense>
+      ) : null}
     </>
   );
 }

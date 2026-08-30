@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-30T01:48:40Z",
+  "title": "Design System: Click Web",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Click Violet",
+        "canonical": "#7C3AED",
+        "tonalRamp": ["#2E1065", "#3B0764", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#D2BBFF", "#EDE9FE"]
+      },
+      "on-primary": {
+        "role": "primary",
+        "displayName": "On Primary",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#1A1C1C", "#4A4455", "#7B7487", "#CCC3D8", "#E2E2E2", "#EEEEEE", "#F9F9F9", "#FFFFFF"]
+      },
+      "primary-container": {
+        "role": "primary",
+        "displayName": "Primary Container",
+        "canonical": "#EDE9FE",
+        "tonalRamp": ["#2E1065", "#3B0764", "#5B21B6", "#6D28D9", "#7C3AED", "#C4B5FD", "#DDD6FE", "#EDE9FE"]
+      },
+      "on-primary-container": {
+        "role": "primary",
+        "displayName": "On Primary Container",
+        "canonical": "#5B21B6",
+        "tonalRamp": ["#2E1065", "#3B0764", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#DDD6FE", "#EDE9FE"]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Deep Violet",
+        "canonical": "#6D28D9",
+        "tonalRamp": ["#3B0764", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#C4B5FD", "#DDD6FE", "#F3E8FF"]
+      },
+      "on-secondary": {
+        "role": "secondary",
+        "displayName": "On Secondary",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#1A1C1C", "#4A4455", "#7B7487", "#CCC3D8", "#E2E2E2", "#EEEEEE", "#F9F9F9", "#FFFFFF"]
+      },
+      "secondary-container": {
+        "role": "secondary",
+        "displayName": "Secondary Container",
+        "canonical": "#F3E8FF",
+        "tonalRamp": ["#3B0764", "#5B21B6", "#6D28D9", "#7C3AED", "#A78BFA", "#C4B5FD", "#DDD6FE", "#F3E8FF"]
+      },
+      "on-secondary-container": {
+        "role": "secondary",
+        "displayName": "On Secondary Container",
+        "canonical": "#5B21B6",
+        "tonalRamp": ["#2E1065", "#3B0764", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#DDD6FE", "#F3E8FF"]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Paper Ground",
+        "canonical": "#F9F9F9",
+        "tonalRamp": ["#0B0A10", "#15121C", "#221D2C", "#4A4455", "#CCC3D8", "#EEEEEE", "#F3F3F4", "#F9F9F9"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Plate",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#15121C", "#1C1826", "#221D2C", "#2A2436", "#E2E2E2", "#EEEEEE", "#F3F3F4", "#FFFFFF"]
+      },
+      "surface-container-low": {
+        "role": "neutral",
+        "displayName": "Tone Low",
+        "canonical": "#F3F3F4",
+        "tonalRamp": ["#1C1826", "#221D2C", "#2A2436", "#322C40", "#E2E2E2", "#E8E8E8", "#EEEEEE", "#F3F3F4"]
+      },
+      "surface-container": {
+        "role": "neutral",
+        "displayName": "Tone",
+        "canonical": "#EEEEEE",
+        "tonalRamp": ["#221D2C", "#2A2436", "#322C40", "#4A3D5C", "#E2E2E2", "#E8E8E8", "#EEEEEE", "#F3F3F4"]
+      },
+      "surface-container-high": {
+        "role": "neutral",
+        "displayName": "Tone High",
+        "canonical": "#E8E8E8",
+        "tonalRamp": ["#2A2436", "#322C40", "#4A3D5C", "#7B7487", "#E2E2E2", "#E8E8E8", "#EEEEEE", "#F3F3F4"]
+      },
+      "surface-container-highest": {
+        "role": "neutral",
+        "displayName": "Tone Highest",
+        "canonical": "#E2E2E2",
+        "tonalRamp": ["#322C40", "#4A3D5C", "#7B7487", "#CCC3D8", "#E2E2E2", "#E8E8E8", "#EEEEEE", "#F3F3F4"]
+      },
+      "on-surface": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1A1C1C",
+        "tonalRamp": ["#1A1C1C", "#4A4455", "#7B7487", "#9B8FB0", "#CFC4E0", "#E2E2E2", "#F0F1F1", "#FFFFFF"]
+      },
+      "on-surface-variant": {
+        "role": "neutral",
+        "displayName": "Ink Mute",
+        "canonical": "#4A4455",
+        "tonalRamp": ["#4A4455", "#7B7487", "#9B8FB0", "#CCC3D8", "#CFC4E0", "#E2E2E2", "#F0F1F1", "#FFFFFF"]
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Outline",
+        "canonical": "#7B7487",
+        "tonalRamp": ["#2E2838", "#4A3D5C", "#7B7487", "#9B8FB0", "#CCC3D8", "#CFC4E0", "#E2E2E2", "#F3F3F4"]
+      },
+      "border-hard": {
+        "role": "neutral",
+        "displayName": "Seam",
+        "canonical": "#CCC3D8",
+        "tonalRamp": ["#2E2838", "#4A3D5C", "#7B7487", "#9B8FB0", "#CCC3D8", "#CFC4E0", "#E2E2E2", "#F3F3F4"]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Error",
+        "canonical": "#BA1A1A",
+        "tonalRamp": ["#93000A", "#BA1A1A", "#DE3730", "#FF5449", "#FF8A80", "#FFDAD6", "#FFEDEA", "#FFF8F7"]
+      },
+      "surface-tint": {
+        "role": "primary",
+        "displayName": "Surface Tint",
+        "canonical": "#8B5CF6",
+        "tonalRamp": ["#2E1065", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#A78BFA", "#D2BBFF", "#EDE9FE"]
+      },
+      "inverse-primary": {
+        "role": "primary",
+        "displayName": "Inverse Primary",
+        "canonical": "#D2BBFF",
+        "tonalRamp": ["#2E1065", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#C4B5FD", "#D2BBFF", "#EDE9FE"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Event titles only (create headline, featured list, detail hero). Not landing, nav, dashboard, or insights."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page and section titles (FcSectionHeader). Manrope 32px / 700."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Smaller section and card titles. Manrope 24px / 700."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default reading. Manrope 16px / 500. Floor 14px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, nav, chips, field labels. Manrope 14px / 700."
+      }
+    },
+    "shadows": [
+      {
+        "name": "none-chrome",
+        "value": "none",
+        "purpose": "Cards, inputs, buttons, nav, page. Flat by default."
+      },
+      {
+        "name": "overlay",
+        "value": "0 10px 40px rgba(0,0,0,0.18)",
+        "purpose": "Floating menus, popovers, date pickers, map overlays only. Opaque plate + 1px seam still required."
+      }
+    ],
+    "motion": [
+      {
+        "name": "none-hover",
+        "value": "transition: none",
+        "purpose": "Buttons do not ease or lift. Hover is brightness; active is a 2px press."
+      },
+      {
+        "name": "press",
+        "value": "transform: translate(2px, 2px)",
+        "purpose": "Primary and secondary button :active."
+      },
+      {
+        "name": "reduced",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Kill .motion-fade animation and transition."
+      }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "page", "value": "1152px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action. Click Violet, 44px, 8px corners, 2px press.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Join the Waitlist</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 44px; padding: 10px 16px; background: var(--color-primary, #7C3AED); color: var(--color-on-primary, #fff); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 1; border: none; border-radius: 8px; cursor: pointer; transition: none; } .ds-btn-primary:hover { filter: brightness(0.92); } .ds-btn-primary:active { filter: brightness(0.9); transform: translate(2px, 2px); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-primary, #7C3AED); } .ds-btn-primary:disabled { opacity: 0.4; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Plate + 1px seam. Same press as primary. Not a second hue.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">About</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 44px; padding: 10px 16px; background: var(--color-surface, #fff); color: var(--color-on-surface, #1A1C1C); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 1; border: 1px solid var(--color-border-hard, #CCC3D8); border-radius: 8px; cursor: pointer; transition: none; } .ds-btn-secondary:hover { background: var(--color-surface-container-low, #F3F3F4); } .ds-btn-secondary:active { transform: translate(2px, 2px); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-primary, #7C3AED); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "16px field radius, 44px min height, 1px seam, 2px primary focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Email</span><input class=\"ds-input\" type=\"email\" placeholder=\"you@example.com\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; width: 100%; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-field-label { font-size: 14px; font-weight: 600; color: var(--color-on-surface, #1A1C1C); } .ds-input { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; background: var(--color-surface, #fff); color: var(--color-on-surface, #1A1C1C); border: 1px solid var(--color-border-hard, #CCC3D8); border-radius: 16px; font-size: 14px; line-height: 20px; font-family: inherit; } .ds-input::placeholder { color: var(--color-on-surface-variant, #4A4455); } .ds-input:focus { outline: none; } .ds-input:focus-visible { box-shadow: 0 0 0 2px var(--color-primary, #7C3AED); }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill seam, primary-container well, 14px label.",
+      "html": "<span class=\"ds-chip\">Indie Rock</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 4px 12px; background: var(--color-on-primary-container, #5B21B6); color: var(--color-primary, #7C3AED); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 600; line-height: 20px; border: 1px solid var(--color-border-hard, #CCC3D8); border-radius: 9999px; } .ds-chip:hover { filter: brightness(1.05); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Opaque plate, 16px corners, 1px seam, no shadow.",
+      "html": "<article class=\"ds-card\"><h3 class=\"ds-card-title\">Memory Box</h3><p class=\"ds-card-body\">Verified connections stay here — not in a feed.</p></article>",
+      "css": ".ds-card { background: var(--color-surface, #fff); border: 1px solid var(--color-border-hard, #CCC3D8); border-radius: 16px; padding: 24px; box-shadow: none; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-card-title { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--color-on-surface, #1A1C1C); } .ds-card-body { margin: 8px 0 0; font-size: 16px; font-weight: 500; line-height: 1.5; color: var(--color-on-surface-variant, #4A4455); }"
+    },
+    {
+      "name": "Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "36px Manrope label. Active is violet type, not a filled pill.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" href=\"#\">Events</a><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\">Map</a><a class=\"ds-nav-item\" href=\"#\">Chat</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 4px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-nav-item { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 600; line-height: 1; color: var(--color-on-surface, #1A1C1C); text-decoration: none; } .ds-nav-item:hover { background: var(--color-surface-container-low, #F3F3F4); color: var(--color-primary, #7C3AED); } .ds-nav-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-primary, #7C3AED); } .ds-nav-item-active { color: var(--color-primary, #7C3AED); }"
+    },
+    {
+      "name": "Section Header",
+      "kind": "custom",
+      "refersTo": "headline",
+      "description": "Oversized Manrope headline plus muted support line.",
+      "html": "<header class=\"ds-section\"><h2 class=\"ds-section-title\">Why Click exists</h2><p class=\"ds-section-sub\">The follow-back void, and apps built to scroll.</p></header>",
+      "css": ".ds-section { margin-bottom: 24px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; } .ds-section-title { margin: 0; font-size: 32px; font-weight: 700; line-height: 1.2; letter-spacing: -0.025em; color: var(--color-on-surface, #1A1C1C); } .ds-section-sub { margin: 8px 0 0; font-size: 16px; font-weight: 500; color: var(--color-on-surface-variant, #4A4455); }"
+    },
+    {
+      "name": "Event Title",
+      "kind": "custom",
+      "refersTo": "display",
+      "description": "Source Serif 4 for named events only.",
+      "html": "<h1 class=\"ds-event-title\">Open mic at The Tractor</h1>",
+      "css": ".ds-event-title { margin: 0; font-family: \"Source Serif 4\", Georgia, \"Times New Roman\", serif; font-size: clamp(1.875rem, 4vw, 3rem); font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--color-on-surface, #1A1C1C); } .ds-event-title:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-primary, #7C3AED); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Functional Clarity",
+    "overview": "Click Web is a neo-brutal desk, not a social atmosphere. Every chrome surface is an opaque plate. Seams are 1px outline-variant lines you can count. Depth is a stack of grey-violet tones, never blur, glass, or drop shadow on product chrome. One violet switch does all interactive work: CTAs, active nav, text links, map pins, selected pills, focus rings.\n\nThe system is de-AI-ified on purpose. It refuses ethereal gradients, synthetic glows, neon text-shadow, and dual-accent palettes. Personality lives in weight and structure: heavy Manrope, modular bordered panels, a 2px press nudge on buttons. The only sanctioned non-flat paint is entity identity — beacons, event covers, capsules — generated from the entity id so the same thing looks the same on map, list, and phone.\n\nLight is the default room. Dark is the same room at night: purple-black walls, still opaque, still one switch. Marketing, dashboard, events, and insights share one page column and one navbar language so the companion never splits into a “pretty site” and an “app.”",
+    "keyCharacteristics": [
+      "Opaque plates, never glass",
+      "One interactive accent (Click Violet)",
+      "Quiet 1px seams; 2px reserved for focus and the button press",
+      "Manrope for all UI; Source Serif 4 only on event titles",
+      "Entity gradients through CardVisualHero only",
+      "Shared max-w-6xl page column with the navbar"
+    ],
+    "rules": [
+      { "name": "The One Switch Rule", "body": "Click Violet is the only interactive hue. If a control, link, pin, or selected state is not violet, it is wrong.", "section": "colors" },
+      { "name": "The Chrome Is Not the Content Rule", "body": "Gradients, patterns, and hue families belong on generated entity surfaces. Chrome stays flat color + 1px seam.", "section": "colors" },
+      { "name": "The Event Serif Rule", "body": "Source Serif 4 appears only on event titles. Everywhere else is Manrope, including the marketing hero.", "section": "typography" },
+      { "name": "The Weight Hierarchy Rule", "body": "There is one family for UI. Size and weight do the ranking. Do not add a second sans.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. A shadow means the object is floating above the desk (a menu), not that the card is fancy.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use bg-background, bg-surface, text-on-surface, border-border-hard, text-primary / bg-primary (or var(--color-primary)).",
+      "Do build with FcCard, FcButton, FcInput, FcTextarea, FcChip, FcPageShell, FcSectionHeader.",
+      "Do keep one page column (PAGE_COLUMN_CLASS) shared with the navbar.",
+      "Do route entity paint through CardVisualHero / cardVisualStyle, seeded with the raw id.",
+      "Do ship WCAG 2.2 AA: 14px floor, 4.5:1 on generated scrims and chrome text, visible 2px focus rings, 44px primary controls."
+    ],
+    "donts": [
+      "Don't reintroduce glass, backdrop-blur, neon glow, gradient text, or gradient borders on chrome.",
+      "Don't add a second interactive accent (legacy blue #224cff / #3A86FF, extra purples #8338EC / #630ed4 on chrome).",
+      "Don't put Source Serif on landing, nav, dashboard, or insights.",
+      "Don't drop shadows on cards to “add depth.”",
+      "Don't invent a per-component entity gradient or seed with a list-key prefix.",
+      "Don't hardcode zinc-950 / #121212 page chrome (call overlay #101212 is the listed exception).",
+      "Don't fork this web border/accent language back onto mobile Compose’s 2px brutal frames."
+    ]
+  }
+}

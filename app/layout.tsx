@@ -9,7 +9,9 @@ import Footer from "@/components/Footer";
 import AppToaster from "@/components/AppToaster";
 import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/lib/theme/ThemeProvider";
 import { ProductChromeProvider } from "@/lib/shell/ProductChromeContext";
-import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
+import { getServerUser } from "@/lib/server/getServerUser";
+import { publicOrigin } from "@/lib/events/eventUrls";
+import { brandShareImage } from "@/lib/brand/shareImage";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -23,10 +25,13 @@ const manrope = Manrope({
 const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
   display: "swap",
+  // Event titles only — do not compete with Manrope on landing LCP.
+  preload: false,
   variable: "--font-source-serif",
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(publicOrigin()),
   title: "Click - From Handshake to Friendship",
   description:
     "Stop collecting followers. Start building real connections. Click transforms fleeting in-person moments into lasting friendships.",
@@ -39,6 +44,16 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/site.webmanifest",
+  openGraph: {
+    title: "Click - From Handshake to Friendship",
+    description:
+      "Stop collecting followers. Start building real connections. Click transforms fleeting in-person moments into lasting friendships.",
+    images: [brandShareImage()],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [brandShareImage().url],
+  },
   other: {
     "theme-color": "#f9f9f9",
   },
@@ -49,18 +64,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let initialHasSession = false;
-  try {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      initialHasSession = Boolean(user);
-    }
-  } catch {
-    initialHasSession = false;
-  }
+  const initialHasSession = Boolean(await getServerUser());
 
   return (
     <html lang="en" suppressHydrationWarning>

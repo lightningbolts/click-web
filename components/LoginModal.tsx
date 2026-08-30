@@ -258,7 +258,7 @@ export default function LoginModal({
                   type="button"
                   onClick={onClose}
                   data-testid="login-modal-close"
-                  className="shrink-0 rounded-[8px] border border-border-hard p-2 text-on-surface-variant hover:text-on-surface"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-border-hard text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />

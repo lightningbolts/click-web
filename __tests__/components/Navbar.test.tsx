@@ -95,7 +95,8 @@ describe("Navbar", () => {
     expect(events).not.toHaveClass("bg-primary-container");
     expect(events).not.toHaveClass("fc-btn-primary");
     expect(screen.getByRole("button", { name: "How it works" })).not.toHaveClass("fc-btn-primary");
-    expect(screen.getByTestId("nav-login")).toHaveClass("fc-btn-primary");
+    expect(screen.getByTestId("nav-login")).toHaveClass("fc-btn-secondary");
+    expect(screen.getByTestId("nav-login")).not.toHaveClass("fc-btn-primary");
   });
 
   it("keeps signed-in actions as one CTA plus matching icon controls", () => {
@@ -120,6 +121,17 @@ describe("Navbar", () => {
     await user.click(screen.getByRole("button", { name: /Ada Lovelace/i }));
     expect(screen.getByTestId("nav-sign-out")).toBeInTheDocument();
     expect(screen.getByTestId("nav-sign-out").tagName).toBe("BUTTON");
+  });
+
+  it("keeps signed-in mobile chrome to logo plus the menu button", () => {
+    navState.pathname = "/";
+    navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
+    renderNav();
+    const theme = screen.getByRole("button", { name: /Switch to (light|dark) mode/i });
+    expect(theme.className).toMatch(/hidden/);
+    expect(theme.className).toMatch(/md:inline-flex/);
+    expect(screen.getByRole("button", { name: /Ada Lovelace/i }).closest("div")).toHaveClass("hidden");
+    expect(screen.getByTestId("nav-menu-toggle")).toBeInTheDocument();
   });
 
   it("animates the mobile drawer open and closed", async () => {
