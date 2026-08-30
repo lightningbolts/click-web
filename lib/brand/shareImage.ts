@@ -1,6 +1,6 @@
 import { publicOrigin } from "@/lib/events/eventUrls";
 
-/** Current Click mark served by `app/opengraph-image.tsx`. */
+/** Current Click mark served by `app/opengraph-image.png`. */
 export const BRAND_SHARE_IMAGE_PATH = "/opengraph-image";
 
 export function brandShareImage(origin = publicOrigin()) {
