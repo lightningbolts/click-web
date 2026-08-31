@@ -27,6 +27,7 @@ import {
   SQUAD_PIN_MULTIPLIER,
 } from "@/lib/collaboration/collaborationTtl";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
+import { createHubForEventBeacon } from "@/lib/server/eventHubLifecycle";
 import { parseBody } from "@/lib/api/parseBody";
 import { beaconCreateBodySchema } from "@/lib/api/schemas/beacons";
 import {
@@ -445,7 +446,7 @@ export async function POST(request: NextRequest) {
           : {}),
       })
       .select(
-        "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
+        "id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
       )
       .maybeSingle();
 
@@ -454,17 +455,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
-    const beacon = parseInsertedBeacon(inserted, lon, lat);
+    let insertedRow = inserted as Record<string, unknown> | null;
+    if (beacon_type === "event" && insertedRow != null && typeof insertedRow.id === "string") {
+      const admin = createAdminSupabaseClient();
+      const created = await createHubForEventBeacon(admin, {
+        beaconId: insertedRow.id,
+        creatorId: user.id,
+        lat,
+        lng: lon,
+        metadata,
+      });
+      if ("error" in created) {
+        await admin.from("map_beacons").delete().eq("id", insertedRow.id);
+        console.error("POST /api/beacons event hub:", created.error);
+        return NextResponse.json({ error: "Failed to create event hub" }, { status: 500 });
+      }
+      insertedRow = {
+        ...insertedRow,
+        hub_id: created.hubId,
+        metadata: { ...metadata, hub_id: created.hubId },
+      };
+    }
+
+    const beacon = parseInsertedBeacon(insertedRow, lon, lat);
     if (beacon == null) {
       // Insert succeeded but PostGIS location was opaque — never 500 after a write.
-      if (inserted == null || typeof inserted !== "object") {
+      if (insertedRow == null || typeof insertedRow !== "object") {
         return NextResponse.json({ error: "Insert failed" }, { status: 500 });
       }
-      const row = inserted as Record<string, unknown>;
+      const row = insertedRow;
       const fallbackBeacon = {
         id: typeof row.id === "string" ? row.id : "",
         creator_id: typeof row.creator_id === "string" ? row.creator_id : user.id,
         venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
+        hub_id: typeof row.hub_id === "string" ? row.hub_id : null,
         beacon_type: typeof row.beacon_type === "string" ? row.beacon_type : beacon_type,
         show_creator_name: showCreatorName,
         visibility_audience: visibilityAudience,

@@ -88,6 +88,32 @@ function makeAdmin(handlers: TableHandlers) {
   };
 }
 
+const EVENT_HUB_ID = "hub_event_test";
+
+function eventHubTables(hubId = EVENT_HUB_ID) {
+  return {
+    hub_venues: {
+      select: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          maybeSingle: jest.fn().mockResolvedValue({
+            data: {
+              id: hubId,
+              name: "Test Event",
+              creator_id: USER_ID,
+              event_beacon_id: BEACON_ID,
+              expires_at: futureIso(),
+            },
+            error: null,
+          }),
+        }),
+      }),
+    },
+    hub_participants: {
+      upsert: jest.fn().mockResolvedValue({ error: null }),
+    },
+  };
+}
+
 describe("event engagement API contracts", () => {
   beforeEach(() => {
     mockGetSupabaseFromRouteRequest.mockReset();
@@ -261,6 +287,7 @@ describe("event engagement API contracts", () => {
         event_engagement_events: {
           insert: jest.fn().mockResolvedValue({ error: null }),
         },
+        ...eventHubTables(),
       }),
     );
 
@@ -273,6 +300,7 @@ describe("event engagement API contracts", () => {
     );
     expect(res.status).toBe(200);
     expect(upsert).toHaveBeenCalled();
+    expect((await res.json()).hub_id).toBe(EVENT_HUB_ID);
   });
 
   it("engagement GET returns bookmark + check-in flags", async () => {

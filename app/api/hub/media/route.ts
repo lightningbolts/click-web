@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createChatGatekeeperAdmin();
-  const denied = await assertHubGeofenceFromCoords(admin, hubId, userLat, userLong);
+  const denied = await assertHubGeofenceFromCoords(admin, hubId, userLat, userLong, auth.user.id);
   if (denied) return denied;
 
   // Keep the uploader registered as a participant (participant-scoped hub_messages RLS).

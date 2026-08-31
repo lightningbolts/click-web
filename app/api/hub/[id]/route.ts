@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const admin = createChatGatekeeperAdmin();
   const { data: hub, error } = await admin
     .from('hub_venues')
-    .select('id, name, category, creator_id')
+    .select('id, name, category, creator_id, event_beacon_id, expires_at')
     .eq('id', trimmedId)
     .maybeSingle();
 

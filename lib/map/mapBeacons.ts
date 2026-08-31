@@ -26,6 +26,7 @@ export type MapBeaconRecord = {
   id: string;
   creator_id: string;
   venue_id: string | null;
+  hub_id?: string | null;
   beacon_type: MapBeaconType;
   show_creator_name: boolean;
   visibility_audience: BeaconVisibilityAudience;
@@ -124,6 +125,23 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+/**
+ * Prefer the `map_beacons.hub_id` column when the field is present, including an
+ * explicit SQL NULL after `ON DELETE SET NULL`. Fall back to `metadata.hub_id`
+ * only for older payloads that omit the column.
+ */
+export function resolveBeaconHubId(row: Record<string, unknown>): string | null {
+  if (Object.prototype.hasOwnProperty.call(row, "hub_id")) {
+    const col = row.hub_id;
+    return typeof col === "string" && col.trim() ? col.trim() : null;
+  }
+  const meta = isRecord(row.metadata) ? row.metadata : null;
+  if (meta && typeof meta.hub_id === "string" && meta.hub_id.trim()) {
+    return meta.hub_id.trim();
+  }
+  return null;
+}
+
 export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
   if (!isRecord(row)) return null;
   const id = typeof row.id === "string" ? row.id : null;
@@ -170,6 +188,7 @@ export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
     id,
     creator_id,
     venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
+    hub_id: resolveBeaconHubId(row),
     beacon_type: beacon_type as MapBeaconType,
     show_creator_name,
     visibility_audience,

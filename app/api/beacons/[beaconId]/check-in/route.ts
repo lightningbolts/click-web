@@ -10,6 +10,11 @@ import {
   parseEngagementTelemetryBody,
   resolveCheckInRadiusMeters,
 } from "@/lib/server/eventEngagement";
+import {
+  findHubForEventBeacon,
+  grantEventHubOnCheckIn,
+  revokeEventHubOnCheckOut,
+} from "@/lib/server/eventHubLifecycle";
 import { parseBody } from "@/lib/api/parseBody";
 import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 
@@ -58,11 +63,14 @@ export async function GET(
     const checkedIn =
       mine != null && (mine.checked_out_at == null || mine.checked_out_at === undefined);
 
+    const hub = await findHubForEventBeacon(admin, beaconId);
+
     return NextResponse.json({
       beacon_id: beaconId,
       checked_in: checkedIn,
       checked_in_at: checkedIn && typeof mine?.checked_in_at === "string" ? mine.checked_in_at : null,
       check_in_count: typeof count === "number" ? count : 0,
+      hub_id: hub?.id ?? null,
     });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/check-in:", e);
@@ -237,11 +245,14 @@ export async function POST(
       .eq("beacon_id", beaconId)
       .is("checked_out_at", null);
 
+    const hubId = await grantEventHubOnCheckIn(admin, beaconId, user.id);
+
     return NextResponse.json({
       ok: true,
       checked_in: true,
       checked_in_at: nowIso,
       check_in_count: typeof count === "number" ? count : 0,
+      hub_id: hubId,
     });
   } catch (e) {
     console.error("POST /api/beacons/[beaconId]/check-in:", e);
@@ -284,6 +295,8 @@ export async function DELETE(
       venue_id: beacon.venue_id,
       event_type: "check_out",
     });
+
+    await revokeEventHubOnCheckOut(admin, beaconId, user.id);
 
     return NextResponse.json({ ok: true, checked_in: false });
   } catch (e) {

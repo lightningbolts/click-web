@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconType } from "@/lib/map/mapBeacons";
 import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
+import { syncEventHubFromBeacon } from "@/lib/server/eventHubLifecycle";
 import { parseBody } from "@/lib/api/parseBody";
 import { beaconPatchBodySchema } from "@/lib/api/schemas/beacons";
 import {
@@ -26,7 +27,7 @@ async function resolveBeaconAndVerifyCreator(
 ) {
   const { data, error } = await admin
     .from("map_beacons")
-    .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+    .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
     .eq("id", beaconId)
     .maybeSingle();
 
@@ -112,7 +113,7 @@ export async function GET(
     const admin = createAdminSupabaseClient();
     const { data, error } = await admin
       .from("map_beacons")
-      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+      .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .eq("id", beaconId)
       .maybeSingle();
 
@@ -284,7 +285,7 @@ export async function PATCH(
       .update(patch)
       .eq("id", beaconId)
       .eq("creator_id", user.id)
-      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+      .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .maybeSingle();
 
     if (updateError) {
@@ -298,6 +299,15 @@ export async function PATCH(
     const beacon = await enrichBeaconRow(admin, updated as Record<string, unknown>);
     if (beacon == null) {
       return NextResponse.json({ error: "Malformed beacon" }, { status: 500 });
+    }
+
+    if (beaconType === "event") {
+      await syncEventHubFromBeacon(admin, {
+        beaconId,
+        lat: beacon.lat,
+        lng: beacon.lng,
+        metadata: beacon.metadata,
+      });
     }
 
     return NextResponse.json({ beacon });
