@@ -84,6 +84,19 @@ export const hubMessagesBodySchema = z.preprocess((raw) => {
   metadata: z.unknown().optional(),
 }).passthrough());
 
+export const hubJoinBodySchema = z.preprocess((raw) => {
+  if (!isRecord(raw)) return raw;
+  const hub_id =
+    typeof raw.hub_id === 'string'
+      ? raw.hub_id
+      : typeof raw.hubId === 'string'
+        ? raw.hubId
+        : undefined;
+  return { ...raw, hub_id };
+}, z.object({
+  hub_id: nonEmptyString,
+}).passthrough());
+
 export const hubLeaveBodySchema = z.preprocess((raw) => {
   if (!isRecord(raw)) return raw;
   const hub_id =

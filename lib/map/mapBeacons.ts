@@ -26,6 +26,7 @@ export type MapBeaconRecord = {
   id: string;
   creator_id: string;
   venue_id: string | null;
+  hub_id?: string | null;
   beacon_type: MapBeaconType;
   show_creator_name: boolean;
   visibility_audience: BeaconVisibilityAudience;
@@ -144,10 +145,15 @@ export function parseMapBeacon(row: unknown): MapBeaconRecord | null {
     else if (v === "core_connections" || v === "core") visibility_audience = "core_connections";
   }
 
+  const hubFromCol = typeof row.hub_id === "string" && row.hub_id.trim() ? row.hub_id.trim() : null;
+  const hubFromMeta =
+    typeof metadata.hub_id === "string" && metadata.hub_id.trim() ? metadata.hub_id.trim() : null;
+
   return {
     id,
     creator_id,
     venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
+    hub_id: hubFromCol ?? hubFromMeta,
     beacon_type: beacon_type as MapBeaconType,
     show_creator_name,
     visibility_audience,

@@ -42,17 +42,14 @@ export async function POST(request: NextRequest) {
   if (!bodyText) {
     return NextResponse.json({ error: 'body is required' }, { status: 400 });
   }
-  if (
-    typeof userLat !== 'number' ||
-    typeof userLong !== 'number' ||
-    Number.isNaN(userLat) ||
-    Number.isNaN(userLong)
-  ) {
-    return NextResponse.json({ error: 'user_lat and user_long are required' }, { status: 400 });
-  }
-
   const admin = createChatGatekeeperAdmin();
-  const denied = await assertHubGeofenceFromCoords(admin, hubId, userLat, userLong);
+  const denied = await assertHubGeofenceFromCoords(
+    admin,
+    hubId,
+    typeof userLat === 'number' ? userLat : Number.NaN,
+    typeof userLong === 'number' ? userLong : Number.NaN,
+    auth.user.id,
+  );
   if (denied) return denied;
 
   // Geofence passed — make sure the sender is registered as a participant so
