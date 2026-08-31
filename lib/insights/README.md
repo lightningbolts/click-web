@@ -10,6 +10,7 @@ B2B analytics helpers for venue operators: **Vibe Radar** hexbins, **widget vibe
 |--------|------|
 | `vibeRadar.ts` | Parse `insights_vibe_radar_data` RPC — anonymized intent hexbins near a venue |
 | `widgetVibePayload.ts` | Lightweight “how busy is Click” widget for embeds |
+| `analytics.ts` | Handshake vs Prior Connection split — never mix into one vanity total |
 | `connectionEncounterClustering.ts` | Client-side centroid clustering of raw encounter GPS for maps |
 | `advancedMetrics.ts` | Types for VLC, AMS, ACR, CPR, WRI, PSV RPCs |
 | `microCommunities.ts` | Verified group faction analytics |
@@ -27,7 +28,9 @@ proxy.ts → userMayAccessBusinessInsights
     │
     ├─ /insights/heatmap          → connectionEncounterClustering
     ├─ /insights/vibe-stream      → Vibe Radar live
+    ├─ /insights/events            → create/list event beacons (not BeaconDeployModal)
     ├─ /insights/event-engagement → funnel / arrival / rejects / dwell
+    ├─ GET /api/insights/[venueId]/network-health-trend → recap-summary per completed event
     ├─ app/api/insights/[venueId] → venue metrics + augmentation
     ├─ app/api/insights/[venueId]/event-engagement → aggregates from event_engagement_events
     ├─ app/api/insights/widget-vibe → widgetVibePayload
@@ -43,7 +46,7 @@ proxy.ts → userMayAccessBusinessInsights
 - `venueCenter`, `radiusMeters` (default ~160.934 m / 0.1 mi)
 - `trendingVibes[]` — beacon type density (managers only) via `insights_vibe_radar_beacon_density`
 
-**Privacy:** No user IDs in radar payloads — only anonymized `anonymized_cell_id` / hex aggregates from `availability_intents`.
+**Privacy:** No user IDs in radar payloads — only anonymized `anonymized_cell_id` / hex aggregates from `availability_intents`. Venue connection counts query `source = 'handshake'` (see `lib/insights/analytics.ts`); prior connections are never mixed into handshake vanity totals.
 
 ### Business insights billing / Stripe
 
@@ -104,7 +107,8 @@ Advanced RPCs (types in `advancedMetrics.ts`):
 | `app/api/insights/intents/route.ts` | Intent analytics |
 | `lib/server/eventEngagement.ts` | Telemetry insert + venue scale helpers |
 | `components/insights/VibeRadarMap.tsx` | Hexbin map UI |
-| `components/insights/BusinessInsightsShell.tsx` | Shell layout (includes Event engagement nav) |
+| `components/insights/BusinessInsightsShell.tsx` | Shell layout (Events + Event engagement nav) |
+| `app/insights/events/page.tsx` | Venue event create/list + network-health trend |
 | `app/insights/heatmap/page.tsx` | Heatmap page |
 | `app/insights/event-engagement/page.tsx` | Event engagement charts |
 
@@ -148,16 +152,20 @@ Advanced RPCs (types in `advancedMetrics.ts`):
 
 ## Event engagement (bookmarks, RSVP, check-ins, impressions)
 
-Raw capture (service-role inserts into `event_engagement_events` via `lib/server/eventEngagement.ts`). Current-state tables: `event_bookmarks`, `event_check_ins`. Migration: `supabase/migrations/20260718140000_event_engagement.sql`.
+Raw capture (service-role inserts into `event_engagement_events` via `lib/server/eventEngagement.ts`). Current-state tables: `event_bookmarks`, `event_check_ins`. Migration: `supabase/migrations/20260718140000_event_engagement.sql`. Additive unused tables: `event_participation`, `event_beacon_daily_stats`, `beacon_share_tokens` — see [`docs/event-schema-scaling-followups.md`](../../docs/event-schema-scaling-followups.md).
 
 | `event_type` | Meaning |
 |--------------|---------|
-| `event_view` | Impression (detail open; 2s debounce) |
+| `event_view` | Detail / microsite open (`POST /api/beacons/{id}/impressions`, 2s debounce). Live “view” signal. |
+| `impression` | Schema-accepted card-render type. **Unused** until a follow-up PR. |
 | `bookmark_set` / `bookmark_unset` | Saved interest |
 | `rsvp_set` / `rsvp_unset` | Attendance intent |
 | `check_in` / `check_out` | On-site presence |
 | `check_in_rejected` | Friction (`no_location`, `out_of_bounds`, `not_live`, …) |
-| `share` | Optional / future |
+| `share` | Share tap (`POST /api/beacons/{id}/share`) |
+| `link_click` | Schema-accepted shared-link open. **Unused** until share tokens are wired. |
+
+`user_id` is nullable. `anonymous_session_id` exists for logged-out de-dupe and is unused until follow-up.
 
 ### KPI catalog (operator charts)
 
@@ -173,7 +181,7 @@ Raw capture (service-role inserts into `event_engagement_events` via `lib/server
 
 **Website charts:** `/insights/event-engagement?venue_id=…` — funnel bars, arrival histogram, reject breakdown, dwell p50/p90. Aggregates only (no user ids / raw coords). Demo mocks: `mockEventEngagement` in `mockData.ts`. Nav: `BusinessInsightsShell`.
 
-**Mobile:** captures telemetry; does **not** show operator charts. Handoff: `click/docs/handoff/event-engagement-api.md`.
+**Mobile:** captures telemetry; does **not** show operator charts. Shipped handoff (archive): `click/docs/archive/handoff/event-engagement-api.md`. Schema follow-ups: `click-web/docs/event-schema-scaling-followups.md`.
 
 ---
 

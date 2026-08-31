@@ -99,7 +99,7 @@ export async function GET(
     const [userRes, availRes] = await Promise.all([
       supabase
         .from('users')
-        .select('id, first_name, last_name, name, full_name, birthday, image, email')
+        .select('id, first_name, last_name, name, full_name, birthday, image, email, personality_tags')
         .eq('id', userId)
         .maybeSingle(),
       supabase.from('user_availability').select('*').eq('user_id', userId).maybeSingle(),
@@ -272,6 +272,9 @@ export async function GET(
     return NextResponse.json({
       user: userRes.data,
       tags: profileTags,
+      personality_tags: Array.isArray((userRes.data as { personality_tags?: unknown } | null)?.personality_tags)
+        ? (userRes.data as { personality_tags: string[] }).personality_tags
+        : [],
       availability: normalizeLegacyAvailabilityRecord(availRes.data ?? null),
       availabilityIntents,
       viewerInterestTags,
@@ -399,11 +402,23 @@ export async function PATCH(
     tags = parseProfileTagsInput(body.tags);
   }
 
+  let personalityTags: string[] | null = null;
+  if (Object.prototype.hasOwnProperty.call(body, 'personality_tags')) {
+    if (!Array.isArray(body.personality_tags)) {
+      return NextResponse.json({ error: 'personality_tags must be an array of strings' }, { status: 400 });
+    }
+    personalityTags = parseProfileTagsInput(body.personality_tags);
+    if (personalityTags.length !== 5) {
+      return NextResponse.json({ error: 'personality_tags must contain exactly 5 traits' }, { status: 400 });
+    }
+    updates.personality_tags = personalityTags;
+  }
+
   if (Object.keys(updates).length === 0 && tags == null) {
     return NextResponse.json(
       {
         error:
-          'No supported fields to update. Provide first_name, last_name, full_name, name, image, birthday, and/or tags.',
+          'No supported fields to update. Provide first_name, last_name, full_name, name, image, birthday, tags, and/or personality_tags.',
       },
       { status: 400 },
     );
@@ -438,7 +453,7 @@ export async function PATCH(
 
     const { data: userRow, error: readErr } = await supabase
       .from('users')
-      .select('id, first_name, last_name, name, full_name, birthday, image, email')
+      .select('id, first_name, last_name, name, full_name, birthday, image, email, personality_tags')
       .eq('id', userId)
       .maybeSingle();
 

@@ -1,0 +1,40 @@
+{
+  "title": "What must future work preserve?",
+  "question": "Primary audiences are confirmed: people continuing verified in-person connections, and venue/promoter operators on Click for Business. Neither is a side quest. Which product facts are inviolable for click-web? (Use the note if something below is wrong or missing.)",
+  "steer": true,
+  "followup": true,
+  "options": [
+    {
+      "id": "handshake-integrity",
+      "label": "Presence over the feed",
+      "kicker": "RECOMMENDED FROM THE REPO",
+      "thesis": "Click exists to turn verified in-person encounters into lasting connection — not to recreate a scroll loop on the web.",
+      "body": "Preserve: no ads, no infinite feed, 48-hour archive as hygiene not punishment. Web cannot fake Tri-Factor or Multi-Tap. Insights may only claim verified cliques and anonymized topology. Do not invent testimonials, ROI numbers, or customers. Landing stays honest: handshake → friendship, built at UW.",
+      "case": "Matches README, landing, and mobile product thesis."
+    },
+    {
+      "id": "operator-proof",
+      "label": "Prove who showed up together",
+      "kicker": "B2B EMPHASIS",
+      "thesis": "The inviolable job is operator proof: verified factions, sticky score, vibe radar — still no fake graphs, but consumer calmness is secondary to operator clarity.",
+      "body": "Preserve handshake integrity in the data. Design pressure sits on Insights: heatmaps, tribes, beacons, events engagement. Consumer dashboard stays correct and quiet rather than campaign-led.",
+      "case": "Still two-sided, but success is cited community ROI for venues."
+    },
+    {
+      "id": "companion-parity",
+      "label": "Web as a true companion",
+      "kicker": "CONSUMER EMPHASIS",
+      "thesis": "The inviolable job is that a person can continue the relationship on the web with parity where hardware is not required.",
+      "body": "Preserve chat/E2EE, LiveKit, map, events, QR, connections inbox. Insights stays truthful but is not the success definition. Still no feed, still no fabricated proof.",
+      "case": "Matches the parity matrix: yes for post-connection, no for sensors."
+    },
+    {
+      "id": "something-else",
+      "label": "Correct the thesis",
+      "kicker": "STEER REQUIRED",
+      "thesis": "The repo framing is stale or incomplete — tell us what actually must be preserved.",
+      "body": "Use the note. Examples: positioning has changed, launch state matters more than thesis, legal/brand constraints not in the repo, a third audience, or a capability we must not claim.",
+      "case": "Choose this if any recommended fact would be wrong in PRODUCT.md."
+    }
+  ]
+}

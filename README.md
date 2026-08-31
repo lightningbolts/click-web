@@ -23,7 +23,9 @@ Click Web is the **Next.js** companion to the **Kotlin Multiplatform (KMP)** mob
 |------|----------------|
 | **Web-based VoIP** | In-browser calling via **LiveKit**: short-lived token from `/api/livekit/token`, `livekit-client` rooms, payloads aligned with mobile push shapes. |
 | **Real-time chat** | Chat UI syncs with Supabase-backed data; API routes under `app/api/chat/` support messages, reactions, and related flows. |
-| **User profile** | Profile viewing and management via `app/api/users/` and shared UI (e.g. `UserProfileModal`). |
+| **Home recap** | `GET /api/me/recap?window=day\|week` returns a zeroed 200 payload when the caller has no active handshake records in the window (archived / hidden connections and missing columns do not 500). |
+| **Map beacons** | `GET/POST /api/beacons`, plus `POST /api/beacons/image` for unencrypted beacon photos (max 2 MB; **optional**, as on mobile). Pin/popup and card identity uses `lib/ui/generateCardVisual.ts` + `components/ui/CardVisualSurface.tsx` (mirrors mobile). |
+| **Events** | Public `/events` directory and `/e/{id}` microsite (guest RSVP, no account). Create from dashboard Events tab, `/events/new`, or Insights Events (not Vibe Radar deploy). |
 | **Business insights & heatmaps** | Insights under `app/insights/` (heatmap, live metrics, vibe stream, tribes, social activity) with APIs under `app/api/insights/`. |
 | **Secure auth callbacks** | Email verification, PKCE, token-hash, and legacy hash flows—see `app/auth/callback/page.tsx` and `app/api/auth/callback/route.ts`. |
 
@@ -87,7 +89,7 @@ npm install
 
 ### Environment variables
 
-Create **`.env.local`** in the `click-web` directory (never commit secrets). See `.env.local.example` and `.env.example`.
+Create **`.env.local`** in the `click-web` directory (never commit secrets). **`.env.example`** and **`.env.local.example`** list every documented variable and are committed so GitHub Actions and Cloudflare Workers Builds can materialize a complete env (`scripts/materialize-ci-env.sh`) without empty keys. Overlay real values from repo/dashboard secrets when they are set.
 
 **Required (core app + Supabase client)**
 
@@ -108,7 +110,23 @@ Create **`.env.local`** in the `click-web` directory (never commit secrets). See
 |----------|---------|
 | `LIVEKIT_API_KEY` | LiveKit API key |
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
-| `LIVEKIT_WS_URL` or `LIVEKIT_URL` | WebSocket URL for the LiveKit server |
+| `LIVEKIT_WS_URL` or `LIVEKIT_URL` | WebSocket URL for the LiveKit server. Host-only values from the LiveKit Cloud dashboard (`click-….livekit.cloud`) are normalized to `wss://`. |
+
+These must be set on the **Cloudflare Worker** `click-web` (Workers dashboard → Settings → Variables and secrets), **not** GitHub Actions Variables. GitHub Actions env does not reach production. Deploy with `npm run deploy` (`opennextjs-cloudflare deploy -- --keep-vars`) so dashboard secrets are not wiped.
+
+Unauthenticated `POST /api/livekit/token` returns 401 and does **not** prove these vars are set. After deploy:
+
+1. `GET /api/health/env` — `keys.LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_WS_URL` should be `true` (presence only; values are never returned).
+2. Authenticated probe:
+
+```bash
+curl -i -X POST https://joinclick.co/api/livekit/token \
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"connection_id":"<id>","room_name":"click-<id>-x","participant_name":"probe"}'
+```
+
+`500 LiveKit environment is not configured` means the Worker still cannot see the vars (wrong surface, or deploy without `--keep-vars`). `200` + JWT means minting works; remaining call failures are client-side.
 
 **Optional**
 
@@ -129,9 +147,32 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### Tests
 
+Unit / component (Jest):
+
 ```bash
 npm test
 ```
+
+End-to-end UI ([Maestro](https://docs.maestro.dev/get-started/supported-platform/web-browser.md), Chromium; Beta). Install the CLI (Java 17+), start the app, then:
+
+```bash
+curl -fsSL "https://get.maestro.mobile.dev" | bash
+npm run dev   # or npm run build && npm start
+npm run test:e2e
+```
+
+Flows set a **literal** `url: http://localhost:3000` (Maestro 2.8 leaves `${BASE_URL}` unexpanded in the `url:` field, which opens Chromium at `data:`). They then `launchApp.appId=${BASE_URL}` (same-tab CDP navigation). Do not use `openLink` on web (second window; Maestro reads the leftover blank tab) or `launchApp.clearState` (wipes the tab back to `data:`). Text asserts must match accessibility-tree nodes: styled spans split strings such as "About Click", so smoke flows use unsplit copy (`Stop scrolling. Start living.`) and heading ids.
+
+Override the origin after that with `-e BASE_URL=https://joinclick.co` (or a preview URL). Authenticated dashboard chrome:
+
+```bash
+maestro test .maestro/auth --include-tags auth \
+  -e BASE_URL=http://localhost:3000 \
+  -e TEST_EMAIL=you@example.com \
+  -e TEST_PASSWORD=secret
+```
+
+Flows live in [`.maestro/`](./.maestro/). Jest stays the unit suite; Maestro covers real browser journeys (landing — including **not** showing `Loading your connections` for anonymous `/` — legal pages, playground). CI: [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml) pins Chrome 151 to match Maestro's bundled ChromeDriver, wraps `/usr/bin/google-chrome` with **prepended** `--no-sandbox`, and runs Maestro **headed under Xvfb** (`maestro test --headless` makes Chrome `--headless=new`, which leaves Maestro querying an empty CDP target). Local `npm run test:e2e` stays headed. Do not Maestro LiveKit rooms. Cloudflare deploys need `npm run build:worker`. GitHub `build-worker` proves the artifact. Workers Builds production uses dashboard `npm run deploy` (empty build command). `npm run build` must stay `next build` because OpenNext invokes it; do not switch it to OpenNext when `WORKERS_CI=1`.
 
 ---
 
@@ -168,6 +209,7 @@ Mobile is the primary **data producer** for B2B insights (connections, encounter
 | Voice/video | LiveKit native | Web parity — `/api/livekit/token` |
 | Availability intents | Yes | Partial (UI yes; match pushes mobile-first) |
 | Memory Capsules | Capture + display | Display only |
+| Prior Connections | On-device contact hashing + skippable onboarding | Discover / request / respond APIs + profile badge |
 | Community Hubs | Mobile-first UI | API-only — `lib/hub/README.md` |
 | Home connection insights | `ReconnectHelper` | Gap (not on web dashboard) |
 | B2B Click Insights | `widget-vibe` consumer | Web-only — `lib/insights/README.md` |
@@ -188,7 +230,7 @@ The browser calls Supabase Edge Functions with `supabase.functions.invoke()`. **
 
 ## Deploy notes
 
-Production deployments (e.g. Vercel) must define the same environment variables as `.env.local`, using the host’s secret store. Ensure Supabase **Auth → URL configuration** (site URL, redirect URLs) includes your deployed web origin.
+Production is the Cloudflare Worker `click-web`. Set runtime variables on the **Workers dashboard** (not GitHub Actions Variables). `npm run deploy` uses `--keep-vars` so dashboard secrets survive the upload. Ensure Supabase **Auth → URL configuration** (site URL, redirect URLs) includes `https://joinclick.co`.
 
 ---
 

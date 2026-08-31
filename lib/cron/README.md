@@ -17,28 +17,30 @@ pg_cron (hourly) ──► cron-hourly-maintenance Edge Function
                            │
 Vercel cron ──────────────┼──► /api/cron/hourly
                            ├──► /api/cron/event-reminders
+                           ├──► /api/cron/availability-matches
                            ├──► /api/cron/disposable-reveal
                            └──► /api/cron/friction-intent-expirations
                                         │
                                         ▼
                               lib/cron/eventReminders.ts
-                              (shared logic with Edge)
+                              (canonical; Edge Function HTTP-calls this via /api/cron/event-reminders)
 ```
 
 Configured in `vercel.json` for Vercel paths; Supabase schedule in `20260607120000_pg_cron_hourly_maintenance.sql`.
 
 ### `eventReminders.ts`
 
-`runEventReminders(admin, pushUrl, authBearer, nowMs?)`:
+`runEventReminders(admin, pushUrl, authBearer, nowMs?)` — **canonical implementation**. The Edge Function does **not** duplicate this logic; `cron-hourly-maintenance` HTTP-GETs `/api/cron/event-reminders` with `CRON_SECRET`.
 
 1. Query `map_beacons` where `beacon_type = 'event'`
-2. Parse `metadata.event_start_at` / `event_end_at`
+2. Parse `metadata.event_start_at` / `event_end_at` (first-class `starts_at` / `ends_at` / `event_timezone` columns exist but cron does **not** use them yet; see `docs/event-schema-scaling-followups.md`)
 3. Skip ended events
-4. Within **15-minute** windows:
-   - **day_of** — morning of event day
-   - **one_hour** — 60 minutes before start
+4. Due-by-timestamp (hourly sweep still catches `:30` starts):
+   - **day_of** — local calendar day of the event (`metadata.event_timezone`, else UTC)
+   - **thirty_min** — 30 minutes before start (also honors legacy `one_hour_notification_sent`)
+   - **recap_ready** — after `event_end_at` (`recap_notification_sent`), push to Click RSVPs/check-ins
 5. POST `send-push-notification` with `type: event_reminder`
-6. Set `day_of_notification_sent` / `one_hour_notification_sent` in beacon metadata
+6. Set `day_of_notification_sent` / `thirty_min_notification_sent` in beacon metadata
 
 ### Hourly maintenance (Edge + `/api/cron/hourly`)
 
@@ -49,6 +51,7 @@ Bundled jobs:
 | Disposable reveal | Sessions past `collaboration_ttl` with revealed disposable messages → push |
 | Event reminders | Same as `eventReminders.ts` |
 | Friction expirations | Expired `availability_intents` without encounter → `system_friction_logs` |
+| Event daily stats | **Not scheduled.** Future `GET /api/cron/event-daily-stats` will upsert `event_beacon_daily_stats` (schema exists, unused). |
 
 ### Friction intent expirations
 
@@ -76,7 +79,8 @@ Connection archive transitions are **not** implemented in `lib/cron` — they li
 | Path | Role |
 |------|------|
 | `app/api/cron/hourly/route.ts` | Vercel hourly bundle |
-| `app/api/cron/event-reminders/route.ts` | Event-only cron |
+| `app/api/cron/availability-matches/route.ts` | Availability-intent match pushes |
+| `lib/cron/availabilityMatches.ts` | Canonical match + `send-push-notification` |
 | `app/api/cron/disposable-reveal/route.ts` | Drops-only cron |
 | `app/api/cron/friction-intent-expirations/route.ts` | Friction-only cron |
 | `supabase/functions/cron-hourly-maintenance/index.ts` | Supabase primary scheduler |
@@ -101,7 +105,7 @@ Connection archive transitions are **not** implemented in `lib/cron` — they li
 - **Rate the vibe** — Unaffected.
 - **QR identity card** — Unaffected.
 - **Availability intents** — **Friction logging** when intent expires unused.
-- **Match alerts** — Independent scheduler (match-availability).
+- **Match alerts** — Hourly `availabilityMatches` cron; respects `availability_match_push_enabled`.
 - **Community Hubs** — Hub TTL is 24h fixed at create.
 - **Map beacons** — Event reminders **from cron**.
 - **Global search** — Unaffected.

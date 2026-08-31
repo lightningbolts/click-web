@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import {
   formatCallDuration,
+  gridChunks,
   initialsFor,
   pickActiveSpeaker,
   resolveCallLayoutMode,
@@ -127,7 +128,7 @@ function ParticipantTile({
 
   return (
     <div
-      className={`relative h-full min-h-[120px] w-full overflow-hidden rounded-[18px] border-2 bg-[#1a1c1c] ${
+      className={`relative h-full min-h-0 w-full overflow-hidden rounded-[18px] border bg-[#1a1c1c] ${
         isActiveSpeaker ? 'border-primary' : 'border-border-hard'
       }`}
     >
@@ -135,7 +136,7 @@ function ParticipantTile({
         <VideoTrackSurface track={participant.videoTrack} mirror={participant.isLocal} />
       ) : (
         <div className="flex h-full min-h-[120px] w-full items-center justify-center bg-[#2a2c2c]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-lg font-bold text-on-primary">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border-hard bg-primary text-lg font-bold text-on-primary">
             {initialsFor(participant.displayName)}
           </div>
         </div>
@@ -168,7 +169,7 @@ function CallControlCapsule({
   onEndCall: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-full border-2 border-border-hard bg-[#101212] px-4 py-3">
+    <div className="flex items-center gap-3 rounded-full border border-border-hard bg-[#101212] px-4 py-3">
       <button
         type="button"
         onClick={onToggleMicrophone}
@@ -230,54 +231,65 @@ function ActiveCallStage({
   onToggleMicrophone: () => void;
   onToggleCamera: () => void;
 }) {
+  const lastRosterRef = useRef<CallParticipant[]>([]);
   const roster = useMemo(() => {
-    if (activeCall.participants.length > 0) return activeCall.participants;
-    const fallback: CallParticipant[] = [];
-    if (activeCall.localVideoTrack != null || activeCall.cameraEnabled) {
-      fallback.push({
-        identity: 'local',
-        displayName: 'You',
-        isLocal: true,
-        isMuted: !activeCall.microphoneEnabled,
-        isSpeaking: false,
-        cameraEnabled: activeCall.cameraEnabled,
-        videoTrack: activeCall.localVideoTrack,
-      });
+    let next: CallParticipant[];
+    if (activeCall.participants.length > 0) {
+      next = activeCall.participants;
+    } else {
+      const fallback: CallParticipant[] = [];
+      if (activeCall.localVideoTrack != null || activeCall.cameraEnabled) {
+        fallback.push({
+          identity: 'local',
+          displayName: 'You',
+          isLocal: true,
+          isMuted: !activeCall.microphoneEnabled,
+          isSpeaking: false,
+          cameraEnabled: activeCall.cameraEnabled,
+          videoTrack: activeCall.localVideoTrack,
+        });
+      }
+      if (activeCall.remoteVideoTrack != null) {
+        fallback.push({
+          identity: 'remote',
+          displayName: title,
+          isLocal: false,
+          isMuted: false,
+          isSpeaking: false,
+          cameraEnabled: true,
+          videoTrack: activeCall.remoteVideoTrack,
+        });
+      }
+      next =
+        fallback.length > 0
+          ? fallback
+          : [
+              {
+                identity: 'local',
+                displayName: 'You',
+                isLocal: true,
+                isMuted: !activeCall.microphoneEnabled,
+                isSpeaking: false,
+                cameraEnabled: activeCall.cameraEnabled,
+                videoTrack: activeCall.localVideoTrack,
+              },
+              {
+                identity: 'remote',
+                displayName: title,
+                isLocal: false,
+                isMuted: false,
+                isSpeaking: false,
+                cameraEnabled: false,
+                videoTrack: null,
+              },
+            ];
     }
-    if (activeCall.remoteVideoTrack != null) {
-      fallback.push({
-        identity: 'remote',
-        displayName: title,
-        isLocal: false,
-        isMuted: false,
-        isSpeaking: false,
-        cameraEnabled: true,
-        videoTrack: activeCall.remoteVideoTrack,
-      });
-    }
-    return fallback.length > 0
-      ? fallback
-      : [
-          {
-            identity: 'local',
-            displayName: 'You',
-            isLocal: true,
-            isMuted: !activeCall.microphoneEnabled,
-            isSpeaking: false,
-            cameraEnabled: activeCall.cameraEnabled,
-            videoTrack: activeCall.localVideoTrack,
-          },
-          {
-            identity: 'remote',
-            displayName: title,
-            isLocal: false,
-            isMuted: false,
-            isSpeaking: false,
-            cameraEnabled: false,
-            videoTrack: null,
-          },
-        ];
+    return next.length > 0 ? next : lastRosterRef.current;
   }, [activeCall, title]);
+
+  useEffect(() => {
+    if (roster.length > 0) lastRosterRef.current = roster;
+  }, [roster]);
 
   const [manualOverride, setManualOverride] = useState<CallLayoutMode | null>(null);
   const [overrideAtCount, setOverrideAtCount] = useState(0);
@@ -297,10 +309,8 @@ function ActiveCallStage({
   const remotes = roster.filter((p) => !p.isLocal);
   const local = roster.find((p) => p.isLocal);
   const primary = activeSpeaker && !activeSpeaker.isLocal ? activeSpeaker : remotes[0];
-  const secondary = remotes.find((p) => p.identity !== primary?.identity);
-  const pipRemote = remotes.find(
-    (p) => p.identity !== primary?.identity && p.identity !== secondary?.identity,
-  );
+  const otherRemotes = remotes.filter((p) => p.identity !== primary?.identity);
+  const gridRows = gridChunks(roster);
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-[90] flex flex-col bg-[#101212] text-white">
@@ -321,53 +331,55 @@ function ActiveCallStage({
             setManualOverride(next);
             setOverrideAtCount(roster.length);
           }}
-          className="flex h-10 w-10 items-center justify-center rounded-[10px] border-2 border-border-hard bg-[#1a1c1c]"
+          className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-border-hard bg-[#1a1c1c]"
           aria-label={layoutMode === 'grid' ? 'Speaker view' : 'Grid view'}
         >
           {layoutMode === 'grid' ? <Rows3 className="h-5 w-5" /> : <Grid2X2 className="h-5 w-5" />}
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 sm:px-6">
+      <div className="relative min-h-0 flex-1 px-4 pb-28 sm:px-6">
         {layoutMode === 'grid' ? (
-          <div className="grid grid-cols-2 gap-3">
-            {roster.map((p) => (
-              <div key={p.identity} className="aspect-square">
-                <ParticipantTile
-                  participant={p}
-                  isActiveSpeaker={p.identity === activeSpeaker?.identity}
-                />
+          <div className="flex h-full min-h-0 flex-col gap-2.5">
+            {gridRows.map((row, rowIdx) => (
+              <div key={`row-${rowIdx}`} className="flex min-h-0 flex-1 gap-2.5">
+                {row.map((p) => (
+                  <div key={p.identity} className="min-h-0 min-w-0 flex-1">
+                    <ParticipantTile
+                      participant={p}
+                      isActiveSpeaker={p.identity === activeSpeaker?.identity}
+                    />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex h-full min-h-[420px] flex-col gap-3">
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
-              {primary ? (
+          <div className="relative flex h-full min-h-0 flex-col gap-2.5">
+            {primary ? (
+              <div className={`min-h-0 ${otherRemotes.length > 0 ? 'flex-[1.6]' : 'flex-1'}`}>
                 <ParticipantTile participant={primary} isActiveSpeaker />
-              ) : null}
-              {secondary ? (
-                <ParticipantTile
-                  participant={secondary}
-                  isActiveSpeaker={secondary.identity === activeSpeaker?.identity}
-                />
-              ) : null}
-            </div>
-            {local ? (
-              <div className="relative min-h-[200px] flex-[1.15]">
-                <ParticipantTile
-                  participant={local}
-                  isActiveSpeaker={local.identity === activeSpeaker?.identity}
-                  labelOverride={selfLabel(local.displayName)}
-                />
-                {pipRemote ? (
-                  <div className="absolute right-3 top-3 h-32 w-24 overflow-hidden rounded-[14px] border-2 border-border-hard shadow-lg">
+              </div>
+            ) : null}
+            {otherRemotes.length > 0 ? (
+              <div className="flex min-h-0 flex-1 gap-2.5">
+                {otherRemotes.map((remote) => (
+                  <div key={remote.identity} className="min-h-0 min-w-0 flex-1">
                     <ParticipantTile
-                      participant={pipRemote}
-                      isActiveSpeaker={pipRemote.identity === activeSpeaker?.identity}
+                      participant={remote}
+                      isActiveSpeaker={remote.identity === activeSpeaker?.identity}
                     />
                   </div>
-                ) : null}
+                ))}
+              </div>
+            ) : null}
+            {local && primary?.identity !== local.identity ? (
+              <div className="pointer-events-none absolute bottom-3 right-3 h-36 w-[108px] overflow-hidden rounded-[14px] border border-border-hard shadow-lg">
+                <ParticipantTile
+                  participant={local}
+                  isActiveSpeaker={false}
+                  labelOverride={selfLabel(local.displayName)}
+                />
               </div>
             ) : null}
           </div>
@@ -407,8 +419,10 @@ export default function CallOverlay({
   const invite = overlayState.mode === 'idle' ? activeCall.invite : overlayState.invite;
   const name = otherParticipantName(invite, currentUserId);
   const isVideo = invite?.videoEnabled === true;
-  const showPreview = overlayState.mode !== 'idle';
-  const showActive = !showPreview && activeCall.status !== 'idle';
+  const showActive =
+    activeCall.status === 'connected' ||
+    (overlayState.mode === 'ended' && activeCall.status === 'ended');
+  const showPreview = overlayState.mode !== 'idle' && !showActive;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -476,22 +490,22 @@ export default function CallOverlay({
               dragMomentum={false}
               className="pointer-events-auto w-full max-w-sm"
             >
-              <div className="relative overflow-hidden rounded-[28px] border-2 border-border-hard bg-[#101212] p-6 text-center">
+              <div className="relative overflow-hidden rounded-[28px] border border-border-hard bg-[#101212] p-6 text-center">
                 <DragHandle
                   label="Move call panel"
                   onPointerDown={(event) => previewDragControls.start(event)}
                 />
-                <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-3xl font-bold text-on-primary">
+                <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border border-border-hard bg-primary text-3xl font-bold text-on-primary">
                   {initialsFor(name)}
                 </div>
-                <p className="relative text-sm font-medium uppercase tracking-[0.18em] text-on-primary-container">
+                <p className="relative text-sm font-medium uppercase tracking-[0.18em] text-white/80">
                   {overlayState.mode === 'outgoing' && (isVideo ? 'Starting video ring' : 'Starting voice ring')}
                   {overlayState.mode === 'incoming' && (isVideo ? 'Incoming video call' : 'Incoming voice call')}
                   {overlayState.mode === 'connecting' && (isVideo ? 'Joining video call' : 'Joining voice call')}
                   {overlayState.mode === 'ended' && 'Call ended'}
                 </p>
                 <h3 className="relative mt-2 text-2xl font-semibold text-white">{name}</h3>
-                <p className="relative mt-2 text-sm text-zinc-400">
+                <p className="relative mt-2 text-sm text-white/70">
                   {overlayState.mode === 'ended'
                     ? overlayState.reason
                     : isVideo
@@ -500,7 +514,7 @@ export default function CallOverlay({
                 </p>
 
                 {overlayState.mode === 'connecting' ? (
-                  <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-zinc-300">
+                  <div className="relative mt-6 flex items-center justify-center gap-3 text-sm text-white">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Connecting…
                   </div>
@@ -512,7 +526,7 @@ export default function CallOverlay({
                       <button
                         type="button"
                         onClick={onDecline}
-                        className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-red-600 text-white"
+                        className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-red-600 text-white"
                         aria-label="Decline call"
                       >
                         <PhoneOff className="h-6 w-6" />
@@ -520,7 +534,7 @@ export default function CallOverlay({
                       <button
                         type="button"
                         onClick={onAccept}
-                        className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-white"
+                        className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-primary text-white"
                         aria-label="Accept call"
                       >
                         {isVideo ? <Video className="h-6 w-6" /> : <Phone className="h-6 w-6" />}
@@ -531,7 +545,7 @@ export default function CallOverlay({
                     <button
                       type="button"
                       onClick={onCancel}
-                      className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-red-600 text-white"
+                      className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-red-600 text-white"
                       aria-label="Cancel call"
                     >
                       <PhoneOff className="h-6 w-6" />
@@ -541,7 +555,7 @@ export default function CallOverlay({
                     <button
                       type="button"
                       onClick={onDismissEnded}
-                      className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border-hard bg-primary text-white"
+                      className="flex h-14 w-14 items-center justify-center rounded-full border border-border-hard bg-primary text-white"
                       aria-label="Dismiss"
                     >
                       <Check className="h-6 w-6" />

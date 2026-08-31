@@ -21,6 +21,15 @@ export type SharedConnectionPayload = {
   context_tag_id?: string | null;
   last_message_at?: number | null;
   connection_encounters?: unknown;
+  source?: 'handshake' | 'prior' | string | null;
+  confirmed_by_a?: boolean | null;
+  confirmed_by_b?: boolean | null;
+  known_since?: string | null;
+  context_tag?: string | null;
+  connection_method?: string | null;
+  initiator_id?: string | null;
+  responder_id?: string | null;
+  status?: string | null;
 };
 
 export type ProfileConnectionLines = {
@@ -336,7 +345,7 @@ function extractStrictOriginElevation(origin: ProfileOriginEncounter): string | 
   const m =
     typeof origin.relativeAltitudeM === 'number' && Number.isFinite(origin.relativeAltitudeM)
       ? origin.relativeAltitudeM
-      : origin.exactBarometricElevationM;
+      : null;
   if (typeof m === 'number' && Number.isFinite(m)) parts.push(`${Math.round(m)} m`);
   return parts.length > 0 ? parts.join(' · ') : undefined;
 }

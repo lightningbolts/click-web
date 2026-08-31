@@ -16,7 +16,7 @@ Patterns & conventions (repo-specific)
 - App Router server/client split: Assume server components unless file uses `"use client"`. Client components use React hooks, Framer Motion, or browser-only libs (e.g., `maplibre-gl`).
 - Data flow: Server components or API route handlers fetch from Supabase or other services; client components call `app/api/*` endpoints (or use `swr`) for live data. Example: `app/api/insights/venue/route.ts` exposes insights endpoints.
 - Auth flows: Authentication is mediated via Supabase and route handlers under `app/api/auth/*`. Inspect `app/api/auth/callback/route.ts` for OAuth callback patterns.
-- Maps & visualizations: `maplibre-gl` is used in `components/dashboard/ConnectionMap.tsx`; this is browser-only — keep those imports in client components.
+- Maps & visualizations: `maplibre-gl` is used in `components/dashboard/ConnectionMap.tsx` (Carto tiles + beacon APIs) and `components/landing/playground/PlaygroundMap.tsx` (Carto tiles in the browser, no `/api/map`, lazy via `PlaygroundMapLazy`). Keep those imports in client components. Never proxy playground tiles through the Worker.
 
 Developer workflows & checks
 - Local dev: `npm run dev` to start Next dev on default port. Use browser to verify pages under `app/`.

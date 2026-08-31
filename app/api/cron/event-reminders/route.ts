@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { runEventReminders } from '@/lib/cron/eventReminders';
+import { runEventTeaserPushes } from '@/lib/cron/eventTeasers';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   try {
     const result = await runEventReminders(admin, pushFunctionUrl, CRON_SECRET);
-    return NextResponse.json({ ok: true, ...result });
+    const teasers = await runEventTeaserPushes(admin, pushFunctionUrl, CRON_SECRET);
+    return NextResponse.json({ ok: true, ...result, teasers });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error('[cron/event-reminders]', message);

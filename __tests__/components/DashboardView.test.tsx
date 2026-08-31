@@ -7,16 +7,37 @@ import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 /* ------------------------------------------------------------------ */
 
 const mockSignOut = jest.fn();
+const authState: {
+  signOut: jest.Mock;
+  profileImageUrl: string | null;
+  user: { id: string } | null;
+  loading: boolean;
+} = {
+  signOut: mockSignOut,
+  profileImageUrl: null,
+  user: { id: 'user-123' },
+  loading: false,
+};
 jest.mock('@/lib/AuthContext', () => ({
-  useAuth: () => ({ signOut: mockSignOut }),
+  useAuth: () => authState,
 }));
 
 jest.mock('@/lib/supabase', () => ({
   getSupabaseClient: () => null,
 }));
 
+jest.mock('@/components/dashboard/DashboardEventsModule', () => ({
+  __esModule: true,
+  default: () => <div data-testid="dashboard-events-module" />,
+}));
+
+const searchState: { tab: string | null } = { tab: null };
+const navFns = { push: jest.fn(), replace: jest.fn() };
+
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => navFns,
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(searchState.tab ? `tab=${searchState.tab}` : ''),
 }));
 
 jest.mock('livekit-client', () => ({
@@ -97,10 +118,20 @@ jest.mock('@/lib/notifications/preferences', () => ({
   DEFAULT_NOTIFICATION_PREFERENCES: {
     messagePushEnabled: true,
     callPushEnabled: true,
+    eventReminderPushEnabled: true,
+    availabilityMatchPushEnabled: true,
+    hubMessagePushEnabled: true,
+    eventTeaserPushEnabled: true,
+    reconnectNudgePushEnabled: true,
   },
   loadNotificationPreferences: jest.fn(async () => ({
     messagePushEnabled: true,
     callPushEnabled: true,
+    eventReminderPushEnabled: true,
+    availabilityMatchPushEnabled: true,
+    hubMessagePushEnabled: true,
+    eventTeaserPushEnabled: true,
+    reconnectNudgePushEnabled: true,
   })),
   saveNotificationPreferences: jest.fn(async () => ({ success: true })),
 }));
@@ -122,6 +153,14 @@ jest.mock('@/lib/dashboard/userMetrics', () => ({
     reward: 'Badge',
   })),
   getUnlockedAchievements: jest.fn(() => []),
+  getAllAchievements: jest.fn(() => [
+    {
+      id: 'first_connection',
+      title: 'First Connection',
+      description: 'Met someone on Click',
+      unlocked: false,
+    },
+  ]),
 }));
 
 /* ------------------------------------------------------------------ */
@@ -168,6 +207,11 @@ async function renderDashboard(user: Record<string, unknown> = buildMockUser()) 
 describe('DashboardView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    authState.user = { id: 'user-123' };
+    authState.loading = false;
+    searchState.tab = null;
+    navFns.replace.mockClear();
+    navFns.push.mockClear();
     global.fetch = jest.fn((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/api/users/') && url.includes('/profile')) {
@@ -187,14 +231,14 @@ describe('DashboardView', () => {
 
   it('displays the user name in the welcome header', async () => {
     await renderDashboard();
-    expect(await screen.findByText(/Alice Smith/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Alice Smith/)).length).toBeGreaterThan(0);
   });
 
   it('falls back to the email prefix when full_name is absent', async () => {
     await renderDashboard(
       buildMockUser({ user_metadata: {}, email: 'bob@example.com' }),
     );
-    expect(await screen.findByText(/bob/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/bob/)).length).toBeGreaterThan(0);
   });
 
   it('prefers first_name and last_name in user_metadata over full_name', async () => {
@@ -207,16 +251,13 @@ describe('DashboardView', () => {
         },
       }),
     );
-    expect(await screen.findByText(/Pat Lee/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Pat Lee/)).length).toBeGreaterThan(0);
   });
 
-  it('renders all five navigation tabs', async () => {
+  it('does not render product tabs inside the dashboard pane', async () => {
     await renderDashboard();
-
-    const expectedLabels = ['Memory Box', 'Map', 'Chat', 'QR Identity', 'Settings'];
-    for (const label of expectedLabels) {
-      expect(await screen.findByText(label)).toBeInTheDocument();
-    }
+    expect(screen.queryByTestId('dashboard-tab-memory')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-tab-events')).not.toBeInTheDocument();
   });
 
   it('shows the Memory Box tab content by default (stats + milestones)', async () => {
@@ -228,11 +269,25 @@ describe('DashboardView', () => {
     expect(screen.getByTestId('connection-table')).toBeInTheDocument();
   });
 
-  it('shows "No achievements yet" when the achievements list is empty', async () => {
+  it('redirects ?tab=events to /events', async () => {
+    searchState.tab = 'events';
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <DashboardView user={buildMockUser()} />
+        </ThemeProvider>,
+      );
+    });
+    await waitFor(() => {
+      expect(navFns.replace).toHaveBeenCalledWith('/events');
+    });
+    expect(screen.queryByTestId('dashboard-events-module')).not.toBeInTheDocument();
+  });
+
+  it('lists achievement badges on the Memory Box tab', async () => {
     await renderDashboard();
-    expect(
-      await screen.findByText(/No achievements yet/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Achievements')).toBeInTheDocument();
+    expect(screen.getByTestId('achievement-badge')).toHaveTextContent('First Connection');
   });
 
   it('renders the data sovereignty notice', async () => {
@@ -248,5 +303,18 @@ describe('DashboardView', () => {
   it('does not crash when user has no email or metadata', async () => {
     const { container } = await renderDashboard({ id: 'user-bare' });
     expect(container).toBeTruthy();
+  });
+
+  it('unmounts product chrome immediately when the session is gone', async () => {
+    authState.user = null;
+    await act(async () => {
+      render(
+        <ThemeProvider>
+          <DashboardView user={buildMockUser()} />
+        </ThemeProvider>,
+      );
+    });
+    expect(screen.queryByTestId('dashboard-root')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-tab-events')).not.toBeInTheDocument();
   });
 });

@@ -35,7 +35,7 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 
 | Export | Description |
 |--------|-------------|
-| `MessageType` | `'text' \| 'image' \| 'audio' \| 'file' \| 'call_log'` — matches `public.messages.message_type` and KMP `ChatMessageType` |
+| `MessageType` | `'text' \| 'image' \| 'audio' \| 'file' \| 'call_log' \| 'beacon'` — matches `public.messages.message_type` and KMP `ChatMessageType`. Beacon rows render as `BeaconChatCard` in the timeline (not plaintext `Beacon: …`). |
 | `Message` | Full row shape including `local_sent_at`, `delivered_at`, `read_at`, `metadata` |
 | `MessageMediaMetadata` | `media_url`, `is_encrypted_media`, `original_mime_type`, `duration_seconds`, reply threading |
 | `REACTION_EMOJIS` | Quick reaction strip defaults |
@@ -44,11 +44,16 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 
 | Function | Role |
 |----------|------|
-| `normalizeDbMessage(row)` | Safe coercion from DB/Realtime records; handles new columns with defaults |
+| `normalizeDbMessage(row)` | Safe coercion from DB/Realtime records; handles new columns with defaults; coerces `text` + `beacon_id` metadata to `message_type: 'beacon'` |
+| `isBeaconChatMessage` / `shouldSkipChatDecrypt` | Beacon detection (type or metadata) and E2EE skip, matching KMP |
 | `buildMessageInsertRow(params)` | Builds insert payload; when `metadata.disposable_roll === true`, sets `collaboration_ttl` and `reveal_at` via `computeClickDropRevealTtlIso` (24h) |
 | `coerceMessageType` / `coerceMetadata` | Defensive parsing |
 | `insertCallLogMessage` | POST call_log rows through messages API |
 | `notifyMessagesDelivered` | PATCH `/api/chat/messages/delivered` for sender "Delivered" state |
+
+### `layout.ts`
+
+`CHAT_PANEL_CLASS` is the bordered 16px card that wraps header, transcript, composer, and the conversation list. The dashboard pane already uses `PAGE_COLUMN_CLASS`, so the card edges match Memory Box. Do not use `max-w-xl` or `max-w-none` on the thread. Bubble width stays on `MessageBubble` (`max-w-[min(75%,32rem)]`).
 
 ### `chatGatekeeper` (server)
 
@@ -114,6 +119,7 @@ Collaboration session TTL (local “Squad window”) is separate — computed in
 | Path | Role |
 |------|------|
 | `lib/server/chatGatekeeper.ts` | Write authorization |
+| `app/api/chat/search/route.ts` | GET message search across 1:1, cliques, and hubs; skips `e2e:` / `e2e_grp:` bodies |
 | `app/api/chat/messages/route.ts` | POST messages + push on new message |
 | `app/api/chat/messages/read/route.ts` | Read receipts |
 | `app/api/chat/messages/delivered/route.ts` | Delivery receipts |

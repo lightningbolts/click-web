@@ -2,48 +2,128 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
-import UserProfile from "@/components/UserProfile";
-import { useEffect, useRef, useState } from "react";
-import LoginModal from "@/components/LoginModal";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState, Suspense } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ClickLogo from "@/components/ClickLogo";
-import { usePathname, useRouter } from "next/navigation";
-import { User, LogOut, BarChart2, Menu, X } from "lucide-react";
+import MobileNavDrawer from "@/components/shell/MobileNavDrawer";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { User, LogOut, BarChart2, Menu, X, ChevronDown, Plus } from "lucide-react";
 import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
 import useSWR from "swr";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
+import { cn } from "@/lib/cn";
+import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
+import {
+  personalProductNavItems,
+  productNavItemIsActive,
+} from "@/lib/shell/personalProductNav";
 
 type InsightsAccessPayload = { insightsAllowed: boolean };
 
 const insightsAccessFetcher = (url: string) =>
   fetchInsightsApiJson<InsightsAccessPayload>(url);
 
-export default function Navbar() {
-  const { user, signOut } = useAuth();
+const loadLoginModal = () => import("@/components/LoginModal");
+const LoginModal = dynamic(loadLoginModal, { ssr: false });
+
+function LoginLoadingShell({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-on-surface/40 p-3 sm:items-center sm:p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="fc-card w-full max-w-md p-6"
+        style={{ backgroundColor: "var(--color-surface)" }}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="login-modal-title"
+        aria-busy="true"
+        data-testid="login-modal"
+      >
+        <h2 id="login-modal-title" className="text-xl font-bold text-on-surface sm:text-2xl">
+          Welcome Back
+        </h2>
+        <p className="mt-2 text-sm font-medium text-on-surface-variant">Loading…</p>
+      </div>
+    </div>
+  );
+}
+
+const navItemClass =
+  "inline-flex h-9 items-center rounded-[8px] px-3 text-sm font-semibold leading-none";
+
+function navLinkClass(active: boolean) {
+  return cn(
+    navItemClass,
+    active ? "text-primary" : "text-on-surface hover:bg-surface-container-low hover:text-primary",
+  );
+}
+
+const navControlClass =
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold leading-snug text-on-surface hover:bg-surface-container-low";
+
+const navCtaClass =
+  "fc-btn-primary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
+
+const navLoginClass =
+  "fc-btn-secondary h-9 shrink-0 whitespace-nowrap px-4 text-sm leading-none";
+
+const drawerLinkClass =
+  "flex items-center gap-2 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container";
+
+export default function Navbar({
+  initialHasSession = false,
+}: {
+  initialHasSession?: boolean;
+}) {
+  const { user, signOut, loading } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const menuRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const tab = searchParams.get("tab");
 
   const { data: insightsAccess } = useSWR(
     user ? "/api/user/insights-access" : null,
     insightsAccessFetcher,
   );
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  const showProductLinks = Boolean(user) || (loading && initialHasSession);
+  const productItems = personalProductNavItems();
 
   useEffect(() => {
-    if (!mobileOpen) return;
+    setMobileOpen(false);
+    setUserMenuOpen(false);
+  }, [pathname, tab]);
+
+  useEffect(() => {
+    if (!mobileOpen && !userMenuOpen) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMobileOpen(false);
+      const target = e.target as Node;
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileOpen(false);
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        setUserMenuOpen(false);
+      }
     };
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
@@ -51,12 +131,9 @@ export default function Navbar() {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [mobileOpen]);
+  }, [mobileOpen, userMenuOpen]);
 
   if (pathname.startsWith("/insights")) return null;
-
-  const isLoggedInView =
-    user && (pathname === "/" || pathname === "/dashboard");
 
   const handleSignOut = async () => {
     try {
@@ -69,142 +146,243 @@ export default function Navbar() {
     }
   };
 
-  const scrollToMission = () => {
+  const scrollToHowItWorks = () => {
     setMobileOpen(false);
-    const missionSection = document.getElementById("mission");
-    if (missionSection) {
-      missionSection.scrollIntoView({ behavior: "smooth" });
+    const section = document.getElementById("how-it-works");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth" });
     } else {
-      window.location.href = "/#mission";
+      window.location.href = "/#how-it-works";
     }
   };
+
+  const userLabel = displayNameFromUserMetadata(user?.user_metadata) || user?.email || "Account";
+
+  const marketingLinks = (
+    <>
+      <Link href="/events" className={navLinkClass(pathname === "/events" || pathname.startsWith("/e/"))}>
+        Events
+      </Link>
+      <button type="button" onClick={scrollToHowItWorks} className={navLinkClass(false)}>
+        How it works
+      </button>
+      <Link href="/enterprise" className={navLinkClass(pathname === "/enterprise")}>
+        Enterprise
+      </Link>
+      <Link href="/about" className={navLinkClass(pathname === "/about")}>
+        About
+      </Link>
+    </>
+  );
 
   return (
     <>
       <nav
         data-navbar-root="true"
-        className="relative z-[99999] border-b-2 border-border-hard bg-surface px-4 py-4 text-on-surface md:px-12 md:py-5"
+        className="relative z-[99999] border-b border-border-hard bg-surface py-3 text-on-surface md:py-4"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className={cn(PAGE_COLUMN_CLASS, "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[1fr_auto_1fr]")}>
           <Link
             href="/"
-            className="flex shrink-0 items-center gap-2 text-xl font-bold md:gap-2.5 md:text-2xl"
+            className="order-1 flex shrink-0 items-center gap-2 justify-self-start text-xl font-bold md:gap-2.5 md:text-2xl"
           >
             <ClickLogo size={28} className="h-7 w-7 md:h-8 md:w-8" priority />
-            <span>
+            <span className="whitespace-nowrap">
               <span className="text-primary">C</span>
               <span className="text-on-surface">lick</span>
             </span>
           </Link>
 
-          <div className="flex items-center gap-2 md:gap-4">
-            <ThemeToggle />
-
-            {isLoggedInView ? (
-              <>
-                {insightsAccess?.insightsAllowed ? (
+          <div className="order-2 hidden min-w-0 max-w-full items-center justify-self-center overflow-x-auto md:flex">
+            {showProductLinks
+              ? productItems.map((item) => (
                   <Link
-                    href="/insights"
-                    className="fc-btn-secondary flex items-center gap-1 whitespace-nowrap px-2 py-2 text-xs md:gap-2 md:px-4 md:text-sm"
+                    key={item.id}
+                    href={item.href}
+                    data-testid={`dashboard-tab-${item.id}`}
+                    aria-current={productNavItemIsActive(item, pathname, tab) ? "page" : undefined}
+                    className={navLinkClass(productNavItemIsActive(item, pathname, tab))}
                   >
-                    <BarChart2 className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="hidden sm:inline">Insights</span>
+                    {item.label}
                   </Link>
-                ) : null}
-                <div className="hidden items-center gap-2 text-sm font-medium text-on-surface-variant sm:flex">
-                  <User className="h-4 w-4 shrink-0" />
-                  <span className="max-w-[200px] truncate">
-                    {displayNameFromUserMetadata(user?.user_metadata) || user?.email}
-                  </span>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="fc-btn-secondary flex items-center gap-1 whitespace-nowrap px-2 py-2 text-xs hover:border-error hover:text-error md:gap-2 md:px-4 md:text-sm"
-                >
-                  <LogOut className="h-3 w-3 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </button>
-              </>
-            ) : (
+                ))
+              : marketingLinks}
+          </div>
+
+          <div className="order-3 flex shrink-0 items-center justify-self-end gap-2">
+            <ThemeToggle className="hidden md:inline-flex" />
+
+            {loading && !user ? (
+              <div data-testid="nav-auth-loading" className={navLoginClass} aria-hidden>
+                <span className="invisible">Login</span>
+              </div>
+            ) : user ? (
               <>
-                {/* Desktop links */}
-                <div className="hidden items-center gap-4 md:flex">
+                <Link href="/events/new" className={cn(navCtaClass, "hidden md:inline-flex")}>
+                  <Plus className="block size-4 shrink-0" aria-hidden />
+                  Create event
+                </Link>
+                <div className="relative hidden md:block" ref={userMenuRef}>
                   <button
                     type="button"
-                    onClick={scrollToMission}
-                    className="text-sm font-semibold text-on-surface hover:text-primary"
+                    onClick={() => setUserMenuOpen((o) => !o)}
+                    className={navControlClass}
+                    aria-expanded={userMenuOpen}
+                    aria-haspopup="menu"
                   >
-                    Mission
+                    <User className="block size-4 shrink-0" aria-hidden />
+                    <span className="hidden max-w-[160px] truncate sm:inline">{userLabel}</span>
+                    <ChevronDown className="block size-4 shrink-0" aria-hidden />
                   </button>
-                  <Link
-                    href="/enterprise"
-                    className="text-sm font-semibold text-on-surface hover:text-primary"
-                  >
-                    Enterprise
-                  </Link>
-                  <Link
-                    href="/about"
-                    className="text-sm font-semibold text-on-surface hover:text-primary"
-                  >
-                    About
-                  </Link>
-                </div>
-
-                {user ? (
-                  <UserProfile />
-                ) : (
-                  <button
-                    onClick={() => setIsLoginOpen(true)}
-                    className="fc-btn-secondary px-3 py-2 text-xs md:px-4 md:text-sm"
-                  >
-                    Login
-                  </button>
-                )}
-
-                {/* Mobile menu toggle */}
-                <div className="relative md:hidden" ref={menuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setMobileOpen((o) => !o)}
-                    className="rounded-[8px] border-2 border-border-hard p-2 text-on-surface"
-                    aria-expanded={mobileOpen}
-                    aria-label={mobileOpen ? "Close menu" : "Open menu"}
-                  >
-                    {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-                  </button>
-                  {mobileOpen ? (
-                    <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-[12px] border-2 border-border-hard bg-surface p-2 shadow-lg">
+                  {userMenuOpen ? (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-52 rounded-[12px] border border-border-hard bg-surface p-2"
+                    >
+                      {insightsAccess?.insightsAllowed ? (
+                        <Link
+                          href="/insights"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container"
+                        >
+                          <BarChart2 className="h-4 w-4" />
+                          Insights
+                        </Link>
+                      ) : null}
                       <button
                         type="button"
-                        onClick={scrollToMission}
-                        className="block w-full rounded-[8px] px-3 py-2.5 text-left text-sm font-semibold text-on-surface hover:bg-surface-container"
+                        onClick={handleSignOut}
+                        data-testid="nav-sign-out"
+                        className="flex w-full items-center gap-2 rounded-[8px] px-3 py-2.5 text-left text-sm font-semibold text-on-surface hover:bg-surface-container hover:text-error"
                       >
-                        Mission
+                        <LogOut className="h-4 w-4" />
+                        Sign out
                       </button>
-                      <Link
-                        href="/enterprise"
-                        onClick={() => setMobileOpen(false)}
-                        className="block rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container"
-                      >
-                        Enterprise
-                      </Link>
-                      <Link
-                        href="/about"
-                        onClick={() => setMobileOpen(false)}
-                        className="block rounded-[8px] px-3 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container"
-                      >
-                        About
-                      </Link>
                     </div>
                   ) : null}
                 </div>
               </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsLoginOpen(true)}
+                onPointerEnter={() => {
+                  void loadLoginModal();
+                }}
+                onFocus={() => {
+                  void loadLoginModal();
+                }}
+                data-testid="nav-login"
+                className={navLoginClass}
+              >
+                Login
+              </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setMobileOpen((o) => !o)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-border-hard text-on-surface hover:bg-surface-container-low md:hidden"
+              data-testid="nav-menu-toggle"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav-drawer"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
       </nav>
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <MobileNavDrawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
+        <div className="flex h-full min-h-0 flex-col" id="mobile-nav-drawer">
+          <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Primary">
+            {showProductLinks
+              ? productItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    data-testid={`dashboard-tab-${item.id}-mobile`}
+                    aria-current={productNavItemIsActive(item, pathname, tab) ? "page" : undefined}
+                    className={drawerLinkClass}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {item.label}
+                  </Link>
+                ))
+              : (
+                <>
+                  <Link href="/events" onClick={() => setMobileOpen(false)} className={drawerLinkClass}>
+                    Events
+                  </Link>
+                  <button type="button" onClick={scrollToHowItWorks} className={cn(drawerLinkClass, "w-full text-left")}>
+                    How it works
+                  </button>
+                  <Link href="/enterprise" onClick={() => setMobileOpen(false)} className={drawerLinkClass}>
+                    Enterprise
+                  </Link>
+                  <Link href="/about" onClick={() => setMobileOpen(false)} className={drawerLinkClass}>
+                    About
+                  </Link>
+                </>
+              )}
+            {user ? (
+              <Link href="/events/new" onClick={() => setMobileOpen(false)} className={drawerLinkClass}>
+                <Plus className="h-4 w-4 shrink-0" />
+                Create event
+              </Link>
+            ) : null}
+          </nav>
+          <div className="space-y-1 border-t border-border-hard p-3">
+            <ThemeToggle showLabel className="h-10 w-full justify-start px-3" />
+            {user ? (
+              <>
+                {insightsAccess?.insightsAllowed ? (
+                  <Link
+                    href="/insights"
+                    onClick={() => setMobileOpen(false)}
+                    className={drawerLinkClass}
+                  >
+                    <BarChart2 className="h-4 w-4" />
+                    Insights
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    void handleSignOut();
+                  }}
+                  className={cn(drawerLinkClass, "w-full text-left hover:text-error")}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onPointerEnter={() => {
+                  void loadLoginModal();
+                }}
+                onClick={() => {
+                  setMobileOpen(false);
+                  setIsLoginOpen(true);
+                }}
+                className={cn(drawerLinkClass, "w-full text-left")}
+              >
+                Login
+              </button>
+            )}
+          </div>
+        </div>
+      </MobileNavDrawer>
+      {isLoginOpen ? (
+        <Suspense fallback={<LoginLoadingShell onClose={() => setIsLoginOpen(false)} />}>
+          <LoginModal isOpen onClose={() => setIsLoginOpen(false)} />
+        </Suspense>
+      ) : null}
     </>
   );
 }

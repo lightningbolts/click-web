@@ -74,7 +74,7 @@ export default function CurrentAvailabilitySection({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.28, delay: 0.06 + i * 0.05, ease: easeOut }}
-                className="flex flex-wrap items-center gap-2 rounded-[12px] border-2 border-border-hard bg-surface-container px-3 py-2"
+                className="flex flex-wrap items-center gap-2 rounded-[12px] border border-border-hard bg-surface-container px-3 py-2"
               >
                 <span className="fc-chip text-xs">
                   {row.intent_tag.trim()}
@@ -93,7 +93,7 @@ export default function CurrentAvailabilitySection({
           </p>
           <div className="space-y-2">
             {legacy.is_free_this_week === true ? (
-              <p className="rounded-[8px] border-2 border-border-hard bg-surface-container px-3 py-2 text-sm font-medium text-on-surface">
+              <p className="rounded-[8px] border border-border-hard bg-surface-container px-3 py-2 text-sm font-medium text-on-surface">
                 Free to meet this week
               </p>
             ) : null}

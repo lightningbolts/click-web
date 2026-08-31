@@ -1,8 +1,10 @@
 /**
- * Terrain elevation (m above sea level) at a point from Open-Elevation (SRTM-backed DEM).
- * Mirrors `fetchTerrainElevationM` in `supabase/functions/bind-proximity-connection` (bind uses a shorter timeout).
+ * Terrain elevation (m above sea level) from Open-Meteo forecast DEM (`elevation`).
+ * Mirrors `fetchTerrainElevationM` in `supabase/functions/bind-proximity-connection`.
  */
-export const OPEN_ELEVATION_LOOKUP_TIMEOUT_MS = 8_000;
+export const OPEN_METEO_ELEVATION_TIMEOUT_MS = 8_000;
+/** @deprecated Use OPEN_METEO_ELEVATION_TIMEOUT_MS — Open-Elevation is no longer used. */
+export const OPEN_ELEVATION_LOOKUP_TIMEOUT_MS = OPEN_METEO_ELEVATION_TIMEOUT_MS;
 
 export type HeightCategoryName =
   | 'BELOW_GROUND'
@@ -26,14 +28,16 @@ export function deriveHeightCategoryFromRelativeAltitudeM(
 }
 
 export async function fetchTerrainElevationMeters(lat: number, lon: number): Promise<number | null> {
-  const url = `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`;
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    '&current=temperature_2m';
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPEN_ELEVATION_LOOKUP_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), OPEN_METEO_ELEVATION_TIMEOUT_MS);
   try {
     const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
     if (!res.ok) return null;
-    const data = (await res.json()) as { results?: { elevation?: unknown }[] };
-    const raw = data.results?.[0]?.elevation;
+    const data = (await res.json()) as { elevation?: unknown };
+    const raw = data.elevation;
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
   } catch {
     return null;

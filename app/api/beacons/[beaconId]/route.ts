@@ -7,6 +7,12 @@ import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
 import { syncEventHubFromBeacon } from "@/lib/server/eventHubLifecycle";
 import { parseBody } from "@/lib/api/parseBody";
 import { beaconPatchBodySchema } from "@/lib/api/schemas/beacons";
+import {
+  eventListingMetadataPatch,
+  eventTimeColumnsFromMetadata,
+  eventVisibilityToMapAudience,
+  parseEventListingOptionsFromBody,
+} from "@/lib/events/eventOptions";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -46,10 +52,13 @@ async function resolveBeaconAndVerifyCreator(
     };
   }
 
-  const expRaw = row.expires_at;
-  const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
-  if (!Number.isFinite(exp) || exp <= Date.now()) {
-    return { row: null, errorResponse: NextResponse.json({ error: "Expired" }, { status: 404 }) };
+  const beaconType = typeof row.beacon_type === "string" ? row.beacon_type : "";
+  if (beaconType !== "event") {
+    const expRaw = row.expires_at;
+    const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
+    if (!Number.isFinite(exp) || exp <= Date.now()) {
+      return { row: null, errorResponse: NextResponse.json({ error: "Expired" }, { status: 404 }) };
+    }
   }
 
   return { row, errorResponse: null };
@@ -190,6 +199,8 @@ export async function PATCH(
         if (titlePatch.length > 0) {
           nextMeta.title = titlePatch;
         }
+        const descPresent =
+          "description" in metaPatch || "text" in metaPatch || "message" in metaPatch;
         const desc =
           (typeof metaPatch.description === "string" && metaPatch.description.trim()) ||
           (typeof metaPatch.text === "string" && metaPatch.text.trim()) ||
@@ -198,12 +209,62 @@ export async function PATCH(
         if (desc.length > 500) {
           return NextResponse.json({ error: "metadata.description is too long" }, { status: 400 });
         }
-        if (desc.length > 0) {
+        if (descPresent) {
           nextMeta.description = desc;
         }
       }
       patch.metadata =
         beaconType === "event" ? applyVenueScaleToMetadata(nextMeta) : nextMeta;
+    }
+
+    if (beaconType === "event") {
+      const metaSource = isRecord(body.metadata) ? body.metadata : {};
+      const listingTouched = [
+        "event_visibility",
+        "event_capacity",
+        "approval_required",
+        "guest_list_visibility",
+        "cover_theme_id",
+      ].some((key) => key in body || key in metaSource);
+      if (listingTouched) {
+        const eventListing = parseEventListingOptionsFromBody(body);
+        const nextMeta = isRecord(patch.metadata)
+          ? { ...patch.metadata, ...eventListingMetadataPatch(eventListing) }
+          : { ...existingMeta, ...eventListingMetadataPatch(eventListing) };
+        if (typeof body.event_timezone === "string" && body.event_timezone.trim()) {
+          nextMeta.event_timezone = body.event_timezone.trim();
+        }
+        patch.metadata = applyVenueScaleToMetadata(nextMeta);
+        patch.event_visibility = eventListing.event_visibility;
+        patch.event_capacity = eventListing.event_capacity;
+        patch.approval_required = eventListing.approval_required;
+        patch.guest_list_visibility = eventListing.guest_list_visibility;
+        patch.cover_theme_id = eventListing.cover_theme_id;
+        patch.visibility_audience = eventVisibilityToMapAudience(eventListing.event_visibility);
+      }
+      const timeMeta = isRecord(patch.metadata) ? patch.metadata : existingMeta;
+      if (
+        "event_start_at" in metaSource ||
+        "event_end_at" in metaSource ||
+        "event_timezone" in body ||
+        "event_timezone" in metaSource
+      ) {
+        const eventTimes = eventTimeColumnsFromMetadata(timeMeta);
+        patch.starts_at = eventTimes.starts_at;
+        patch.ends_at = eventTimes.ends_at;
+        patch.event_timezone = eventTimes.event_timezone;
+      }
+
+      const lat = typeof body.lat === "number" ? body.lat : Number(body.lat);
+      const lon =
+        typeof body.lon === "number"
+          ? body.lon
+          : typeof body.lng === "number"
+            ? body.lng
+            : Number(body.lon ?? body.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        patch.location = `POINT(${lon} ${lat})`;
+      }
     }
 
     if (typeof body.expires_at === "string") {

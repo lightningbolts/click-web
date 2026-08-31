@@ -10,6 +10,7 @@ import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import { buildEncounterInsertFromSensor } from '@/lib/connections/encounterSensorPayload';
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
+import { fireEncounterGeoEnrichment } from '@/lib/server/proximity/encounterEnrichment';
 import {
   applyLiveEventBeaconToEncounterRow,
   resolveLiveEventBeaconForReportingUser,
@@ -205,6 +206,23 @@ export async function POST(request: NextRequest) {
             ? insertRow.encountered_at
             : new Date().toISOString(),
       });
+      const baro =
+        typeof insertRow.exact_barometric_elevation_m === 'number'
+          ? insertRow.exact_barometric_elevation_m
+          : null;
+      const locName = typeof insertRow.location_name === 'string' ? insertRow.location_name : null;
+      const weather =
+        typeof insertRow.weather_snapshot === 'string' ? insertRow.weather_snapshot : null;
+      fireEncounterGeoEnrichment(
+        createAdminClient(),
+        connectionId,
+        userId,
+        gpsLat,
+        gpsLon,
+        baro,
+        locName,
+        weather,
+      );
     }
 
     return NextResponse.json({

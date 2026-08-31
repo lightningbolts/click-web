@@ -1,0 +1,27 @@
+url: http://localhost:3000
+name: Anonymous landing smoke
+tags:
+  - smoke
+  - web
+env:
+  BASE_URL: http://localhost:3000
+---
+# Maestro web matches accessibility nodes, not painted pixels. Styled spans
+# split "Click: from handshake to friendship." into three nodes, so a
+# substring assert on that phrase fails even when the screenshot is correct.
+# Use unsplit text and data-testid (exposed as resource-id).
+- runFlow:
+    file: ../subflows/open_origin.yaml
+- extendedWaitUntil:
+    visible: "Stop scrolling. Start living."
+    timeout: 15000
+- assertVisible: "Stop scrolling. Start living."
+- assertNotVisible: "Loading your connections"
+- assertVisible: "Join the Waitlist"
+- assertVisible:
+    id: waitlist-cta
+- runFlow:
+    file: ../subflows/open_login.yaml
+- tapOn:
+    css: "[data-testid='login-modal-close']"
+- assertVisible: "Stop scrolling. Start living."

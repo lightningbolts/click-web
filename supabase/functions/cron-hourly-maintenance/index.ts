@@ -1,7 +1,8 @@
 /**
  * Hourly maintenance (Supabase pg_cron — not Vercel):
  *   1. Click Drops reveal pushes after collaboration_ttl
- *   2. Event beacon day-of + one-hour-before reminders
+ *   2. Event beacon day-of + 30-minutes-before reminders and Seed-a-Room teasers (via click-web /api/cron/event-reminders)
+ *   2b. Encounter reconnect / shared-event nudges (via click-web /api/cron/nudges-reconnect)
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
  *   4. Delete expired pending_handshakes (expires_at < now())
  *
@@ -234,103 +235,40 @@ async function runFrictionIntentExpirations(
   return { logged: frictionRows.length };
 }
 
-type EventBeaconRow = {
-  id: string;
-  creator_id: string | null;
-  metadata: Record<string, unknown> | null;
-};
-
-function parseEventEpochMs(raw: unknown): number | null {
-  if (typeof raw !== 'string' || !raw.trim()) return null;
-  const ms = Date.parse(raw.trim());
-  return Number.isFinite(ms) ? ms : null;
+async function runClickWebCron(path: string, label: string): Promise<Record<string, unknown>> {
+  const base = (
+    Deno.env.get('CLICK_WEB_URL') ??
+    Deno.env.get('CLICK_WEB_BASE_URL') ??
+    'https://joinclick.co'
+  ).replace(/\/$/, '');
+  const secret = CRON_SECRET;
+  if (!secret) {
+    throw new Error(`${label}: missing CRON_SECRET`);
+  }
+  const response = await fetch(`${base}${path}`, {
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  const body = await response.json().catch(() => ({ error: 'invalid json' }));
+  if (!response.ok) {
+    throw new Error(
+      `${label} web: ${response.status} ${typeof body === 'object' ? JSON.stringify(body) : String(body)}`,
+    );
+  }
+  return typeof body === 'object' && body != null ? (body as Record<string, unknown>) : {};
 }
 
-function eventMetadataFlag(meta: Record<string, unknown>, key: string): boolean {
-  return meta[key] === true || meta[key] === 'true';
+async function runEventRemindersViaWeb(): Promise<{ scanned: number; pushAttempts: number }> {
+  const body = await runClickWebCron('/api/cron/event-reminders', 'event-reminders');
+  const scanned = typeof body.scanned === 'number' ? body.scanned : 0;
+  const pushAttempts = typeof body.pushAttempts === 'number' ? body.pushAttempts : 0;
+  return { scanned, pushAttempts };
 }
 
-async function runEventReminders(
-  admin: ReturnType<typeof createClient>,
-): Promise<{ scanned: number; pushAttempts: number }> {
-  const pushUrl = `${SUPABASE_URL}/functions/v1/send-push-notification`;
-  const nowMs = Date.now();
-  const windowMs = 15 * 60 * 1000;
-
-  const { data, error } = await admin
-    .from('map_beacons')
-    .select('id, creator_id, metadata')
-    .eq('beacon_type', 'event');
-
-  if (error) {
-    throw new Error(`event-reminders fetch: ${error.message}`);
-  }
-
-  const rows = (data ?? []) as EventBeaconRow[];
-  let pushAttempts = 0;
-
-  for (const row of rows) {
-    const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
-    const startMs = parseEventEpochMs(meta.event_start_at ?? meta.eventStartAt);
-    const endMs = parseEventEpochMs(meta.event_end_at ?? meta.eventEndAt);
-    if (startMs == null || endMs == null || endMs <= nowMs) continue;
-
-    const description =
-      (typeof meta.description === 'string' && meta.description.trim()) ||
-      (typeof meta.text === 'string' && meta.text.trim()) ||
-      'Your event';
-
-    const dayOfStart = Math.floor(startMs / (24 * 60 * 60 * 1000)) * 24 * 60 * 60 * 1000;
-    const kinds: Array<'day_of' | 'one_hour'> = [];
-    if (nowMs >= dayOfStart && nowMs < dayOfStart + windowMs) kinds.push('day_of');
-    const oneHourBefore = startMs - 60 * 60 * 1000;
-    if (nowMs >= oneHourBefore && nowMs < oneHourBefore + windowMs) kinds.push('one_hour');
-
-    for (const kind of kinds) {
-      const sentKey = kind === 'day_of' ? 'day_of_notification_sent' : 'one_hour_notification_sent';
-      if (eventMetadataFlag(meta, sentKey)) continue;
-
-      const creatorId = row.creator_id?.trim();
-      if (!creatorId) continue;
-
-      const title = kind === 'day_of' ? 'Event today' : 'Event starting soon';
-      const body =
-        kind === 'day_of'
-          ? `${description.slice(0, 80)} starts today — tap to view on the map.`
-          : `${description.slice(0, 80)} starts in about an hour.`;
-
-      try {
-        const response = await fetch(pushUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            recipient_user_id: creatorId,
-            title,
-            body,
-            data: {
-              type: 'event_reminder',
-              beacon_id: row.id,
-              reminder_kind: kind,
-            },
-          }),
-        });
-        if (response.ok) {
-          pushAttempts += 1;
-          const nextMeta = { ...meta, [sentKey]: true };
-          await admin.from('map_beacons').update({ metadata: nextMeta }).eq('id', row.id);
-        } else {
-          console.warn('[cron-hourly] event push failed:', row.id, kind, await response.text());
-        }
-      } catch (e) {
-        console.warn('[cron-hourly] event push error:', row.id, kind, e);
-      }
-    }
-  }
-
-  return { scanned: rows.length, pushAttempts };
+async function runAvailabilityMatchesViaWeb(): Promise<{ scanned: number; pushAttempts: number }> {
+  const body = await runClickWebCron('/api/cron/availability-matches', 'availability-matches');
+  const scanned = typeof body.scanned === 'number' ? body.scanned : 0;
+  const pushAttempts = typeof body.pushAttempts === 'number' ? body.pushAttempts : 0;
+  return { scanned, pushAttempts };
 }
 
 async function runPendingHandshakesCleanup(
@@ -380,10 +318,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     const disposable = await runDisposableReveal(admin);
-    const events = await runEventReminders(admin);
+    const events = await runEventRemindersViaWeb();
+    const availability = await runAvailabilityMatchesViaWeb();
     const friction = await runFrictionIntentExpirations(admin);
     const pendingHandshakes = await runPendingHandshakesCleanup(admin);
-    const body = { ok: true, disposable, events, friction, pendingHandshakes };
+    const nudges = await runClickWebCron('/api/cron/nudges-reconnect', 'nudges-reconnect');
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,

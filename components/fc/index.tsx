@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from "react";
 import { cn } from "@/lib/cn";
 
 export function FcCard({
@@ -28,7 +34,7 @@ export function FcButton({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-40",
+        "inline-flex h-11 items-center justify-center gap-2 px-4 py-2.5 disabled:opacity-40",
         variant === "primary" ? "fc-btn-primary" : "fc-btn-secondary",
         className,
       )}
@@ -51,11 +57,45 @@ export function FcChip({
   );
 }
 
-export function FcInput({
+export const FcInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function FcInput({ className, ...props }, ref) {
+    return (
+      <input
+        ref={ref}
+        className={cn("fc-input min-h-11 w-full px-3 py-2.5", className)}
+        {...props}
+      />
+    );
+  },
+);
+
+export function FcTextarea({
   className,
   ...props
-}: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn("fc-input px-3 py-2", className)} {...props} />;
+}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      className={cn("fc-input fc-textarea w-full px-3 py-2.5", className)}
+      {...props}
+    />
+  );
+}
+
+export function FcField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={cn("flex w-full min-w-0 flex-col gap-1.5", className)}>
+      <span className="text-sm font-semibold text-on-surface">{label}</span>
+      {children}
+    </label>
+  );
 }
 
 export function FcPageShell({

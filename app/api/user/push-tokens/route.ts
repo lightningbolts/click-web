@@ -11,6 +11,7 @@ type PushTokensBody = {
   token?: unknown;
   platform?: unknown;
   token_type?: unknown;
+  device_id?: unknown;
 };
 
 export type PushTokensSuccessResponse = {
@@ -28,7 +29,9 @@ function isPushTokenType(v: unknown): v is PushTokenType {
 /**
  * POST /api/user/push-tokens
  *
- * Registers or moves an FCM / APNs token to the authenticated user (service-role upsert on `token`).
+ * Registers an FCM / APNs token for the authenticated user.
+ * Upserts on `token`. When `device_id` is present, other rows for the same
+ * (user, device, token_type) are removed so re-registration replaces.
  */
 export async function POST(request: NextRequest) {
   const { user, authError } = await getSupabaseFromRouteRequest(request);
@@ -50,9 +53,23 @@ export async function POST(request: NextRequest) {
   }
 
   const tokenType: PushTokenType = isPushTokenType(body.token_type) ? body.token_type : 'standard';
+  const deviceId = typeof body.device_id === 'string' ? body.device_id.trim() : '';
 
   const admin = createAdminSupabaseClient();
   const updatedAt = Date.now();
+
+  if (deviceId) {
+    const { error: pruneError } = await admin
+      .from('push_tokens')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('device_id', deviceId)
+      .eq('token_type', tokenType)
+      .neq('token', token);
+    if (pruneError) {
+      console.error('[push-tokens] device prune:', pruneError.message);
+    }
+  }
 
   const { error } = await admin.from('push_tokens').upsert(
     {
@@ -60,6 +77,7 @@ export async function POST(request: NextRequest) {
       token,
       platform: body.platform,
       token_type: tokenType,
+      device_id: deviceId || null,
       updated_at: updatedAt,
     },
     { onConflict: 'token' },

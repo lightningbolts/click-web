@@ -62,7 +62,7 @@ function IntensityBadge({ intensity }: { intensity: number }) {
       ? 'text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/20'
       : pct >= 50
       ? 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20'
-      : 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+      : 'text-primary bg-primary/10 border-primary/20';
   return (
     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${color}`}>
       {pct}% heat

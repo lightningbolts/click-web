@@ -70,7 +70,8 @@ export async function GET(
             .from('connections')
             .select('id, created, expiry_state, last_message_at, vibe_rating')
             .or(`venue_id.eq.${venueId},location_id.eq.${venueId}`)
-            .eq('include_in_business_insights', true);
+            .eq('include_in_business_insights', true)
+            .eq('source', 'handshake');
 
         if (connError) {
             console.error('Error fetching connections:', connError.message);

@@ -23,7 +23,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
   // Get zone color based on intensity
   const getZoneColor = (intensity: number, type: HeatmapZone['type']) => {
     const baseColors = {
-      bar: { r: 131, g: 56, b: 236 },    // Purple
+      bar: { r: 124, g: 58, b: 237 },    // Purple (primary accent)
       dance: { r: 255, g: 56, b: 100 },   // Pink/Red
       lounge: { r: 58, g: 134, b: 255 },  // Blue
       stage: { r: 255, g: 193, b: 7 },    // Gold
@@ -38,7 +38,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
 
   const getZoneGlow = (intensity: number, type: HeatmapZone['type']) => {
     const glowColors = {
-      bar: '131, 56, 236',
+      bar: '124, 58, 237',
       dance: '255, 56, 100',
       lounge: '58, 134, 255',
       stage: '255, 193, 7',
@@ -200,9 +200,9 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-border-hard">
         {[
-          { type: 'bar', label: 'Bar', color: '#630ed4' },
+          { type: 'bar', label: 'Bar', color: '#7c3aed' },
           { type: 'dance', label: 'Dance', color: '#FF3864' },
-          { type: 'lounge', label: 'Lounge', color: '#630ed4' },
+          { type: 'lounge', label: 'Lounge', color: '#3a86ff' },
           { type: 'vip', label: 'VIP', color: '#FF6B6B' },
         ].map((item) => (
           <div key={item.type} className="flex items-center gap-1.5 text-xs text-on-surface-variant">

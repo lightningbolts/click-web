@@ -1,0 +1,74 @@
+"use client";
+
+import { useState } from "react";
+import useSWR from "swr";
+import EventGoingAvatars, { type EventGoingPerson } from "@/components/events/EventGoingAvatars";
+import EventRsvpDirectory from "@/components/events/EventRsvpDirectory";
+import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
+import { useAuth } from "@/lib/AuthContext";
+import type { EventListingOptions } from "@/lib/events/eventOptions";
+import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
+import { fetchEventRsvpPayload } from "@/lib/events/eventRsvpClient";
+
+export default function EventGuestPreview({
+  beaconId,
+  people,
+  count,
+  listing,
+  creatorId,
+  past = false,
+}: {
+  beaconId: string;
+  people: EventGoingPerson[];
+  count: number;
+  listing: EventListingOptions;
+  creatorId: string | null;
+  past?: boolean;
+}) {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const { data } = useSWR(user ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload, {
+    fallbackData: {
+      attendees: people
+        .filter((person): person is EventGoingPerson & { user_id: string } => Boolean(person.user_id))
+        .map((person) => ({
+          user_id: person.user_id,
+          name: person.name,
+          avatar_url: person.avatar_url ?? null,
+        })),
+      rsvp_count: count,
+    },
+    revalidateOnFocus: false,
+  });
+  const livePeople: EventGoingPerson[] = data?.attendees ?? people;
+  const liveCount = data?.rsvp_count ?? count;
+  const hostsOnly = listing.guest_list_visibility === "hosts_only";
+  const isHost = Boolean(user?.id && creatorId && user.id === creatorId);
+  const showAvatars = !hostsOnly || isHost;
+  const canOpen = liveCount > 0 && showAvatars;
+
+  return (
+    <div data-testid="event-guest-preview">
+      <EventGoingAvatars
+        people={showAvatars ? livePeople : []}
+        count={liveCount}
+        past={past}
+        onOpen={canOpen ? () => setOpen((value) => !value) : undefined}
+      />
+      {open && canOpen ? (
+        user ? (
+          <EventRsvpDirectory beaconId={beaconId} allowPeek />
+        ) : (
+          <ul className="mt-3 space-y-2" data-testid="event-guest-preview-list">
+            {livePeople.map((person, index) => (
+              <li key={person.user_id || `${person.name}-${index}`} className="flex items-center gap-2">
+                <ConnectionPeerAvatar label={person.name} imageUrl={person.avatar_url} size="sm" />
+                <span className="text-sm text-on-surface">{person.name}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+    </div>
+  );
+}

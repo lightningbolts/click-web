@@ -36,8 +36,9 @@ ConnectionMap.tsx (MapLibre)
 | Property | Use |
 |----------|-----|
 | `beacon_type` | Cluster aggregation field |
-| `tint` | Pin color from `beaconTint()` |
+| `tint` | Pin color from `beaconTint()` / `generateCardVisual` |
 | `icon_char` | Unicode glyph per type |
+| `pin_shape` | Distinct silhouette per beacon type (mobile + popup identity) |
 | `title` | `displayTitleForBeacon()` |
 | `spotify` | Safe playlist URI for soundtrack beacons |
 
@@ -55,7 +56,7 @@ ConnectionMap.tsx (MapLibre)
 
 - Every `MapBeaconRecord` has `expires_at` ISO timestamp
 - PostGIS RPC / API filter `expires_at > now()`
-- Event beacons additionally use `metadata.event_end_at` for reminders (`lib/map/eventSchedule.ts`)
+- Event beacons additionally use `metadata.event_end_at` for reminders (`lib/map/eventSchedule.ts`). `map_beacons.starts_at` / `ends_at` exist but are unused until dual-write.
 
 ### Beacon types
 
@@ -67,7 +68,7 @@ ConnectionMap.tsx (MapLibre)
 
 ### Event engagement (related APIs)
 
-Event beacons support server-backed bookmarks / check-ins / impressions (not MapLibre layers). Routes under `app/api/beacons/[beaconId]/{bookmark,check-in,engagement,impressions}` plus `GET /api/me/event-bookmarks`. Create/edit may set `metadata.venue_scale` + `check_in_radius_meters`. See `lib/server/eventEngagement.ts` and `click/docs/handoff/event-engagement-api.md`.
+Event beacons support server-backed bookmarks / check-ins / impressions (not MapLibre layers). Routes under `app/api/beacons/[beaconId]/{bookmark,check-in,engagement,impressions}` plus `GET /api/me/event-bookmarks`. Public directory: `GET /api/beacons/public-events`. Share landing: `GET /api/beacons/[beaconId]/public` (selects `creator_id`, cover, description, `rsvp_count`). Guest RSVP: `POST /api/beacons/[beaconId]/rsvp/guest`. Create/edit may set `metadata.venue_scale` + `check_in_radius_meters`. See `lib/server/eventEngagement.ts`, `lib/events/`, and `docs/ui-ux/05-events.md`.
 
 ---
 
@@ -84,10 +85,14 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 | Path | Role |
 |------|------|
 | `components/dashboard/ConnectionMap.tsx` | MapLibre UI + clustering config |
+| `components/landing/playground/PlaygroundMap.tsx` | Landing demo map — mock pins, Carto CDN tiles, **no Click APIs** |
+| `components/landing/playground/playgroundMapStyle.ts` | Seattle bounds, Carto URLs, Worker-safe `transformRequest` |
+| `components/landing/playground/PlaygroundMapLazy.tsx` | `next/dynamic` so MapLibre is not on anonymous `/` |
 | `app/api/map/beacons/route.ts` | List beacons |
 | `app/api/map/beacons/[beaconId]/route.ts` | Single beacon |
 | `app/api/map/drop/route.ts` | Create beacon |
 | `app/api/beacons/route.ts` | Alternate list endpoint (+ venue scale on event create) |
+| `app/api/beacons/image/route.ts` | Unencrypted beacon photo upload (JWT, 2 MB) to `avatars/{userId}/beacons/...` (RLS-safe) |
 | `app/api/beacons/[beaconId]/bookmark/route.ts` | Event bookmark |
 | `app/api/beacons/[beaconId]/check-in/route.ts` | Event check-in (geofenced) |
 | `app/api/beacons/[beaconId]/engagement/route.ts` | Bookmark + check-in state |

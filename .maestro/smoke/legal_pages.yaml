@@ -1,0 +1,36 @@
+url: http://localhost:3000
+name: Legal and marketing pages
+tags:
+  - smoke
+  - web
+env:
+  BASE_URL: http://localhost:3000
+---
+# Headings like "About Click" are split across styled spans, so text
+# asserts miss them. data-testid on the heading becomes Maestro id.
+- runFlow:
+    file: ../subflows/open_origin.yaml
+- launchApp:
+    appId: ${BASE_URL}/about
+- extendedWaitUntil:
+    visible:
+      id: about-heading
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/privacy
+- extendedWaitUntil:
+    visible:
+      id: privacy-heading
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/terms
+- extendedWaitUntil:
+    visible:
+      id: terms-heading
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/enterprise
+- extendedWaitUntil:
+    visible:
+      id: enterprise-heading
+    timeout: 15000

@@ -1,0 +1,32 @@
+{
+  "title": "Name this visual system",
+  "question": "Scan found a coherent incumbent: Functional Clarity — opaque plates, 1px outline-variant seams, Manrope, one violet interactive accent (#7C3AED), no glass/blur/gradient chrome. Entity identity (beacons, capsules) may use generated gradients; chrome may not. Light default, purple-tinted dark. This round only names the atmosphere — tokens are already extracted. Which Creative North Star should DESIGN.md lead with?",
+  "steer": true,
+  "followup": true,
+  "options": [
+    {
+      "id": "functional-clarity",
+      "label": "Functional Clarity",
+      "kicker": "INCUMBENT NAME",
+      "thesis": "Keep the shipped name. The system is a neo-brutal desk: solid fills, quiet seams, one violet switch.",
+      "body": "Overview voice: de-AI-ified, modular bordered panels, depth by tone not blur. Primary color character: Click Violet. Anti-references: glass, neon glow, gradient text, a second interactive accent, Space Grotesk.",
+      "case": "Matches docs/ui-ux/01-design-system-web.md and AI.md."
+    },
+    {
+      "id": "opaque-room",
+      "label": "The Opaque Room",
+      "kicker": "MATERIAL METAPHOR",
+      "thesis": "Same system, named as a physical room: walls you cannot see through, seams you can count, one light switch.",
+      "body": "Overview voice: presence over atmosphere; every chrome surface is a plate. Primary color character: Electric Violet. Same bans as Functional Clarity; the name just makes the no-glass rule unforgettable.",
+      "case": "Honors PRODUCT.md presence-over-feed without inventing a new look."
+    },
+    {
+      "id": "handshake-ledger",
+      "label": "The Handshake Ledger",
+      "kicker": "PRODUCT METAPHOR",
+      "thesis": "Same system, named as a ledger of verified encounters: cards as entries, violet as the only stamp.",
+      "body": "Overview voice: facts on plates, not moods in glass. Primary color character: Handshake Violet. Same tokens and bans; the metaphor ties chrome to verified cliques.",
+      "case": "Honors PRODUCT.md handshake positioning; still documents the incumbent, not a redesign."
+    }
+  ]
+}

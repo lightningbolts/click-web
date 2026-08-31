@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QrCode, Copy, Check, Share2, Download, Loader2, RefreshCw, Clock } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 
 interface QRIdentityCardProps {
   userId: string;
@@ -21,6 +21,12 @@ interface QRData {
 
 const TOKEN_TTL_MS = 90_000; // 90 seconds
 const QR_LOCATION_TIMEOUT_MS = 1_500;
+
+function readPrimaryColor(): string {
+  if (typeof document === 'undefined') return '#7c3aed';
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim();
+  return value || '#7c3aed';
+}
 
 async function resolveQrLocationParams(): Promise<string> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) return '';
@@ -66,8 +72,13 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(TOKEN_TTL_MS / 1000);
+  const [primaryColor, setPrimaryColor] = useState(readPrimaryColor);
   const qrRef = useRef<HTMLDivElement>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setPrimaryColor(readPrimaryColor());
+  }, []);
 
   const fetchToken = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) setRefreshing(true);
@@ -75,14 +86,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
     setError(null);
 
     try {
-      const supabase = getSupabaseClient();
-      const session = supabase
-        ? (await supabase.auth.getSession()).data.session
-        : null;
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      };
+      const headers = await getFreshAuthHeaders();
       const locationParams = await resolveQrLocationParams();
       const response = await fetch(`/api/qr${locationParams}`, { headers, credentials: 'include' });
       const data = await response.json();
@@ -201,7 +205,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
       canvas.width = 256;
       canvas.height = 256;
       if (ctx) {
-        ctx.fillStyle = '#121212';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 28, 28, 200, 200);
         const link = document.createElement('a');
@@ -218,19 +222,15 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-[16px]"
+      className="relative mx-auto w-full max-w-md overflow-hidden rounded-[16px] border border-border-hard bg-surface shadow-sm"
     >
-      {/* Card background with gradient border */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4] via-[#630ed4] to-[#630ed4] opacity-20" />
-      <div className="absolute inset-[1px] bg-surface-container rounded-[16px]" />
-
       {/* Content */}
-      <div className="relative p-6 space-y-6">
+      <div className="relative space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#630ed4]/20 rounded-xl">
-              <QrCode className="w-5 h-5 text-[#630ed4]" />
+            <div className="rounded-xl bg-primary/20 p-2">
+              <QrCode className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-bold text-on-surface">Your Click ID</h3>
@@ -239,26 +239,32 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handleShare}
-              className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-              title="Share"
+              className="rounded-lg p-2 transition-colors hover:bg-white/5"
+              title="Share Click ID"
+              aria-label="Share Click ID"
             >
-              <Share2 className="w-4 h-4 text-on-surface-variant" />
+              <Share2 className="h-4 w-4 text-on-surface-variant" />
             </button>
             <button
+              type="button"
               onClick={handleDownload}
-              className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-              title="Download QR"
+              className="rounded-lg p-2 transition-colors hover:bg-white/5"
+              title="Download QR code"
+              aria-label="Download QR code"
             >
-              <Download className="w-4 h-4 text-on-surface-variant" />
+              <Download className="h-4 w-4 text-on-surface-variant" />
             </button>
             <button
+              type="button"
               onClick={() => fetchToken(true)}
               disabled={refreshing}
-              className="p-2 hover:bg-white/5 rounded-lg transition-colors disabled:opacity-40"
-              title="Refresh token"
+              className="rounded-lg p-2 transition-colors hover:bg-white/5 disabled:opacity-40"
+              title="Refresh QR token"
+              aria-label="Refresh QR token"
             >
-              <RefreshCw className={`w-4 h-4 text-on-surface-variant ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-on-surface-variant ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -266,11 +272,9 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         {/* QR Code */}
         <div className="flex justify-center">
           <div className="relative">
-            {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#630ed4]/30 to-[#630ed4]/30 blur-xl" />
+            <div className="absolute inset-2 bg-primary/15 blur-2xl" />
 
-            {/* QR Container */}
-            <div ref={qrRef} className="relative bg-background p-4 rounded-2xl border border-border-hard">
+            <div ref={qrRef} className="relative rounded-2xl border border-border-hard bg-white p-4 shadow-md">
               <AnimatePresence mode="wait">
                 {(loading || refreshing) ? (
                   <motion.div
@@ -278,9 +282,9 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-3"
+                    className="flex h-[200px] w-[200px] flex-col items-center justify-center gap-3"
                   >
-                    <Loader2 className="w-8 h-8 text-[#630ed4] animate-spin" />
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p className="text-xs text-on-surface-variant">Generating secure token…</p>
                   </motion.div>
                 ) : error ? (
@@ -288,12 +292,13 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                     key="error"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-center"
+                    className="flex h-[200px] w-[200px] flex-col items-center justify-center gap-2 text-center"
                   >
                     <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
                     <button
+                      type="button"
                       onClick={() => fetchToken()}
-                      className="text-xs text-[#630ed4] hover:underline"
+                      className="text-xs text-primary hover:underline"
                     >
                       Try again
                     </button>
@@ -309,8 +314,8 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                       value={qrContent}
                       size={200}
                       level="M"
-                      bgColor="#121212"
-                      fgColor="#630ed4"
+                      bgColor="#ffffff"
+                      fgColor="#17121f"
                       marginSize={0}
                       title={`Click QR Code for ${userName || userEmail || userId}`}
                     />
@@ -318,11 +323,10 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
                 ) : null}
               </AnimatePresence>
 
-              {/* Center logo overlay */}
               {!loading && !refreshing && qrContent && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-background px-2 py-1 rounded-lg">
-                    <span className="text-lg font-bold text-on-surface tracking-wide">Click</span>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="rounded-lg border border-primary/20 bg-white px-2 py-1 shadow-sm">
+                    <span className="text-lg font-bold tracking-wide" style={{ color: primaryColor }}>Click</span>
                   </div>
                 </div>
               )}
@@ -333,9 +337,9 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         {/* Countdown timer */}
         {!loading && !error && qrContent && (
           <div className="flex items-center justify-center gap-2">
-            <Clock className="w-3.5 h-3.5" style={{ color: timerColor }} />
+            <Clock className="h-3.5 w-3.5" style={{ color: timerColor }} />
             <span
-              className="text-xs font-mono font-medium tabular-nums transition-colors"
+              className="font-mono text-xs font-medium tabular-nums transition-colors"
               style={{ color: timerColor }}
             >
               {secondsLeft > 0 ? `${secondsLeft}s` : 'Refreshing…'}
@@ -347,49 +351,52 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
         {/* Click ID Display */}
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-3">
-            <code className="rounded-[8px] border-2 border-border-hard bg-surface-container px-4 py-2 font-mono text-lg tracking-wider text-primary">
+            <code className="rounded-[8px] border border-border-hard bg-surface-container px-4 py-2 font-mono text-lg tracking-wider text-primary">
               {clickId}
             </code>
             <motion.button
+              type="button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleCopy}
-              className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors"
+              className="rounded-xl bg-primary p-2 text-on-primary transition-colors hover:brightness-110"
+              title="Copy Click ID"
+              aria-label="Copy Click ID"
             >
               {copied ? (
-                <Check className="w-5 h-5 text-green-500" />
+                <Check className="h-5 w-5 text-green-500" />
               ) : (
-                <Copy className="w-5 h-5 text-on-surface-variant" />
+                <Copy className="h-5 w-5" />
               )}
             </motion.button>
           </div>
-          <p className="text-xs text-on-surface-variant text-center">
+          <p className="text-center text-xs text-on-surface-variant">
             {copied ? 'Copied to clipboard!' : 'Share this ID or scan the QR code'}
           </p>
         </div>
 
         {/* User info */}
         {(userName || userEmail) && (
-          <div className="pt-4 border-t border-border-hard text-center">
-            {userName && <p className="text-on-surface font-medium">{userName}</p>}
+          <div className="border-t border-border-hard pt-4 text-center">
+            {userName && <p className="font-medium text-on-surface">{userName}</p>}
             {userEmail && <p className="text-xs text-on-surface-variant">{userEmail}</p>}
           </div>
         )}
 
         {/* Usage instructions */}
-        <div className="bg-zinc-800/50 rounded-xl p-4 space-y-2">
+        <div className="space-y-2 rounded-xl border border-border-hard bg-surface-container-low p-4">
           <p className="text-xs font-medium text-on-surface-variant">How to use:</p>
-          <ul className="text-xs text-on-surface-variant space-y-1">
+          <ul className="space-y-1 text-xs text-on-surface-variant">
             <li className="flex items-start gap-2">
-              <span className="text-[#630ed4]">1.</span>
+              <span className="text-primary">1.</span>
               <span>Show this QR code when meeting someone new</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#630ed4]">2.</span>
+              <span className="text-primary">2.</span>
               <span>They scan it with the Click app; it expires in 90s</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-[#630ed4]">3.</span>
+              <span className="text-primary">3.</span>
               <span>Important: each code is single-use!</span>
             </li>
           </ul>

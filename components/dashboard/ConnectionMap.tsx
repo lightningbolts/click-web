@@ -12,12 +12,14 @@ import {
   type MapLayerToggles,
   type MapBeaconRecord,
   beaconGeoJsonFeatures,
+  mapLayerForBeacon,
   parseMapBeacon,
   rawBeaconRowsFromApiPayload,
 } from '@/lib/map/mapBeacons';
 import { beaconPopupErrorHtml, formatBeaconPopupHtml } from '@/lib/map/beaconPopupHtml';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { mapStyleForTheme } from '@/lib/theme/mapStyles';
+import { Toggle } from '@/components/ui/Toggle';
 
 function atmosphereHtml(conn: ConnectionRecord): string {
   const bits = [conn.weatherSummary, conn.noiseSummary].filter((b): b is string => typeof b === 'string' && b.length > 0);
@@ -206,7 +208,12 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     mapInitCenterRef.current = mapCenter;
   }
 
-  const wantsBeaconFetch = layers.officialSoundtracks || layers.communityBeacons || layers.hazards;
+  const wantsBeaconFetch =
+    layers.events ||
+    layers.socialVibes ||
+    layers.soundtracks ||
+    layers.alertsUtilities ||
+    layers.other;
 
   /** Map viewport for beacon proximity — once the map exists, follows pan/zoom; until then uses connection center. */
   const [beaconViewport, setBeaconViewport] = useState<{ lng: number; lat: number; radiusM: number } | null>(null);
@@ -305,30 +312,35 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     beaconAuthEpoch,
   ]);
 
+  const chatButtonBackground = 'var(--color-primary)';
+
+const POPUP_MAX_CONNECTIONS = 5;
+
   const buildConnectionPopupHtml = useCallback((connIdsCsv: string) => {
     const ids = connIdsCsv.split(',').filter(Boolean);
     const groupedConnections = ids
       .map((id) => connectionsRef.current.find((c) => c.id === id))
-      .filter((c): c is ConnectionRecord => c != null);
+      .filter((c): c is ConnectionRecord => c != null)
+      .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
     if (groupedConnections.length === 0) return '';
 
-    const connection = groupedConnections
-      .slice()
-      .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime())[0];
+    const connection = groupedConnections[0];
+    const displayedConnections = groupedConnections.slice(0, POPUP_MAX_CONNECTIONS);
+    const overflowCount = groupedConnections.length - displayedConnections.length;
 
-    const groupedRows = groupedConnections
+    const groupedRows = displayedConnections
       .map((conn) => {
         const date = conn.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
         const ctx = conn.context
-          ? `<span style="color:#630ed4; font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(131,56,236,0.2); border-radius:9999px;">${escapeHtml(conn.context)}</span>`
+          ? `<span style="color:var(--color-primary,#7c3aed); font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(124,58,237,0.2); border-radius:9999px;">${escapeHtml(conn.context)}</span>`
           : '';
         const atm = atmosphereHtml(conn);
         return `<div style="padding:8px 0; border-bottom:1px solid rgba(63,63,70,0.35);">
-          <strong style="color:#630ed4; font-size:13px; display:block; margin-bottom:2px;">${escapeHtml(conn.name)}</strong>
+          <strong style="color:var(--color-primary,#7c3aed); font-size:13px; display:block; margin-bottom:2px;">${escapeHtml(conn.name)}</strong>
           <span style="color:#a1a1aa; font-size:11px; display:block;">${escapeHtml(conn.location)}</span>
           <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${escapeHtml(date)}</span>
           ${ctx}${atm}
-          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:linear-gradient(135deg, #630ed4, #6520c0); color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
+          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:${chatButtonBackground}; color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
             Chat →
           </button>
         </div>`;
@@ -338,17 +350,21 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     const single = groupedConnections.length === 1;
     const singleDate = connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const singleCtx = connection.context
-      ? `<span style="color: #630ed4; font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(131, 56, 236, 0.2); border-radius: 9999px;">${escapeHtml(connection.context)}</span>`
+      ? `<span style="color: var(--color-primary,#7c3aed); font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(124, 58, 237, 0.2); border-radius: 9999px;">${escapeHtml(connection.context)}</span>`
       : '';
     const singleAtm = atmosphereHtml(connection);
+    const overflowNote =
+      overflowCount > 0
+        ? `<p style="margin-top:8px; color:#a1a1aa; font-size:11px; font-weight:600;">+${overflowCount} more</p>`
+        : '';
 
     return `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-height: 260px; overflow-y: auto;">
-      ${single ? `<strong style="color: #630ed4; font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(connection.name)}</strong>
+      ${single ? `<strong style="color: var(--color-primary,#7c3aed); font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(connection.name)}</strong>
       <span style="color: #a1a1aa; font-size: 12px; display: block;">${escapeHtml(connection.location)}</span>
       <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${escapeHtml(singleDate)}</span>
       ${singleCtx}${singleAtm}
-      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: linear-gradient(135deg, #630ed4, #6520c0); color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
-      : `<strong style="color:#630ed4; font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connections at this location</strong>${groupedRows}`}
+      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: ${chatButtonBackground}; color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
+      : `<strong style="color:var(--color-primary,#7c3aed); font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connection${groupedConnections.length === 1 ? '' : 's'} at this location</strong>${groupedRows}${overflowNote}`}
     </div>`;
   }, []);
 
@@ -487,7 +503,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
           source: SRC_CONNECTIONS,
           filter: ['has', 'point_count'],
           paint: {
-            'circle-color': '#6520c0',
+            'circle-color': '#7c3aed',
             'circle-radius': ['step', ['get', 'point_count'], 20, 10, 24, 28, 30],
             'circle-opacity': 0.92,
             'circle-stroke-width': 2,
@@ -511,7 +527,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
           source: SRC_CONNECTIONS,
           filter: ['!', ['has', 'point_count']],
           paint: {
-            'circle-color': '#630ed4',
+            'circle-color': '#7c3aed',
             'circle-radius': 14,
             'circle-opacity': 0.95,
             'circle-stroke-width': 3,
@@ -723,9 +739,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       const src = m.getSource(id) as maplibregl.GeoJSONSource | undefined;
       src?.setData({ type: 'FeatureCollection', features: feats });
     };
-    setSrc(SRC_OFFICIAL, beaconGeoJsonFeatures(beacons, 'official'));
-    setSrc(SRC_COMMUNITY, beaconGeoJsonFeatures(beacons, 'community'));
-    setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(beacons, 'hazard'));
+    const visibleBeacons = beacons.filter((beacon) => layers[mapLayerForBeacon(beacon.beacon_type)]);
+    setSrc(SRC_OFFICIAL, beaconGeoJsonFeatures(visibleBeacons, 'official'));
+    setSrc(SRC_COMMUNITY, beaconGeoJsonFeatures(visibleBeacons, 'community'));
+    setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(visibleBeacons, 'hazard'));
 
     const vis = (on: boolean) => (on ? 'visible' : 'none');
     [
@@ -735,7 +752,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       'official-beacon-unclustered',
       'official-beacon-unclustered-icon',
     ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.officialSoundtracks));
+      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
     });
     [
       'community-beacon-clusters',
@@ -744,7 +761,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       'community-beacon-unclustered',
       'community-beacon-unclustered-icon',
     ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.communityBeacons));
+      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
     });
     [
       'hazard-beacon-clusters',
@@ -753,16 +770,22 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       'hazard-beacon-unclustered',
       'hazard-beacon-unclustered-icon',
     ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(layers.hazards));
+      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
     });
-  }, [mapInitialized, beacons, layers.officialSoundtracks, layers.communityBeacons, layers.hazards]);
+  }, [mapInitialized, beacons, layers]);
 
   useEffect(() => {
     const handleResize = () => { map.current?.resize(); };
     window.addEventListener('resize', handleResize);
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' && mapContainer.current
+        ? new ResizeObserver(handleResize)
+        : null;
+    if (resizeObserver && mapContainer.current) resizeObserver.observe(mapContainer.current);
     const resizeTimer = setTimeout(handleResize, 100);
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver?.disconnect();
       clearTimeout(resizeTimer);
     };
   }, [mapInitialized]);
@@ -794,7 +817,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   }
 
   return (
-    <div className="relative rounded-[16px] border border-border-hard overflow-hidden bg-surface-container h-[600px]">
+    <div className="relative min-h-[420px] w-full flex-1 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container">
       <div
         className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
           mapPresentationReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -802,7 +825,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         aria-hidden={mapPresentationReady}
       >
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-[#630ed4] animate-spin mx-auto mb-2" />
+          <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-2" />
           <p className="text-sm text-on-surface-variant">Loading map...</p>
         </div>
       </div>
@@ -815,34 +838,46 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
       />
 
       {mapPresentationReady && (
-        <div className="absolute top-4 left-4 z-[6] max-w-[220px] rounded-[16px] border-2 border-border-hard bg-surface p-3 text-xs text-on-surface shadow-lg">
+        <div className="absolute top-4 left-4 z-[6] max-w-[240px] rounded-[16px] border border-border-hard bg-surface p-3 text-xs text-on-surface shadow-lg">
           <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
-            <Layers className="w-3.5 h-3.5 text-[#630ed4]" />
+            <Layers className="w-3.5 h-3.5 text-primary" />
             Map layers
           </div>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#630ed4]" checked={layers.myNetwork} onChange={() => toggle('myNetwork')} />
+          <p className="mb-2 text-[10px] leading-snug text-on-surface-variant">
+            <span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-primary align-middle" aria-hidden />
+            Purple numbered circles = connection clusters (people count).
+          </p>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.myNetwork} onCheckedChange={() => toggle('myNetwork')} aria-label="My Network" className="scale-75" />
             My Network
-          </label>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#630ed4]" checked={layers.officialSoundtracks} onChange={() => toggle('officialSoundtracks')} />
-            Official Soundtracks
-          </label>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#630ed4]" checked={layers.communityBeacons} onChange={() => toggle('communityBeacons')} />
-            Community Beacons
-          </label>
-          <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
-            <input type="checkbox" className="accent-[#630ed4]" checked={layers.hazards} onChange={() => toggle('hazards')} />
-            Hazards
-          </label>
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.events} onCheckedChange={() => toggle('events')} aria-label="Events" className="scale-75" />
+            Events
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.socialVibes} onCheckedChange={() => toggle('socialVibes')} aria-label="Social vibes" className="scale-75" />
+            Social vibes
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.soundtracks} onCheckedChange={() => toggle('soundtracks')} aria-label="Soundtracks" className="scale-75" />
+            Soundtracks
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.alertsUtilities} onCheckedChange={() => toggle('alertsUtilities')} aria-label="Alerts and utilities" className="scale-75" />
+            Alerts &amp; utilities
+          </div>
+          <div className="flex items-center gap-2 py-1 select-none">
+            <Toggle checked={layers.other} onCheckedChange={() => toggle('other')} aria-label="Other beacons" className="scale-75" />
+            Other
+          </div>
         </div>
       )}
 
       {mapPresentationReady && (
         <div className="absolute bottom-4 left-4 bg-surface-container/90 px-4 py-2 rounded-xl border border-border-hard">
           <span className="text-sm text-on-surface-variant">
-            <span className="text-[#630ed4] font-bold">{geoConnections.length}</span> locations mapped
+            <span className="text-primary font-bold">{geoConnections.length}</span> locations mapped
           </span>
         </div>
       )}

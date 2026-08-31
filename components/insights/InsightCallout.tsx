@@ -137,7 +137,7 @@ export function InsightCallout({
           togglePin();
         }
       }}
-      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(131,56,236,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-[#630ed4]/40"
+      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(124,58,237,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-primary/40"
       aria-expanded={expanded}
     >
       <Lightbulb

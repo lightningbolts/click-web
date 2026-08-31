@@ -74,9 +74,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const userIdRef = { current: null as string | null };
+
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
+      userIdRef.current = u?.id ?? null;
       setUser(u);
       setLoading(false);
       if (u?.id) {
@@ -89,6 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for changes on auth state (including USER_UPDATED and PASSWORD_RECOVERY events)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const next = session?.user ?? null;
+      const nextId = next?.id ?? null;
+      if (
+        (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") &&
+        nextId &&
+        nextId === userIdRef.current
+      ) {
+        setLoading(false);
+        return;
+      }
+      userIdRef.current = nextId;
       setUser(next);
       setLoading(false);
       if (next?.id) {
@@ -175,13 +188,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Sign out error or timeout:', error);
       } finally {
-        // Always clear local state
         setUser(null);
         setProfileImageUrl(null);
+        router.replace('/');
+        router.refresh();
       }
     } else {
       setUser(null);
       setProfileImageUrl(null);
+      router.replace('/');
+      router.refresh();
     }
   };
 

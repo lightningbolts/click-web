@@ -1,0 +1,163 @@
+name: E2E
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: click-web-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maestro-web-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Materialize build env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_LAUNCHED: ${{ secrets.NEXT_PUBLIC_APP_LAUNCHED }}
+          NEXT_PUBLIC_IOS_STORE_URL: ${{ secrets.NEXT_PUBLIC_IOS_STORE_URL }}
+          NEXT_PUBLIC_ANDROID_STORE_URL: ${{ secrets.NEXT_PUBLIC_ANDROID_STORE_URL }}
+          NEXT_PUBLIC_IOS_APP_ID: ${{ secrets.NEXT_PUBLIC_IOS_APP_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          LIVEKIT_WS_URL: ${{ secrets.LIVEKIT_WS_URL }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ENRICHMENT_WEBHOOK_SECRET: ${{ secrets.ENRICHMENT_WEBHOOK_SECRET }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          BUSINESS_INSIGHTS_DEV_EMAILS: ${{ secrets.BUSINESS_INSIGHTS_DEV_EMAILS }}
+        run: bash scripts/materialize-ci-env.sh
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Maestro's bundled ChromeDriver must match Chrome's major version
+      # (session not created if they drift). Latest Maestro CLI ships
+      # ChromeDriver 151; 131 made the driver refuse to start. Pin both
+      # together if you bump Maestro.
+      - name: Set up Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 151
+          install-dependencies: true
+
+      # Maestro Selenium hardcodes binary: /usr/bin/google-chrome (maestro#2576).
+      # setup-chrome installs under /opt/hostedtoolcache, so wrapping only
+      # /usr/bin/google-chrome is a no-op when that path is missing. Point the
+      # hardcoded path at Chrome-for-Testing and prepend sandbox flags — extra
+      # args after "$@" are treated as more URLs (blank tabs). Do not inject a
+      # second --user-data-dir; ChromeDriver already sets one, and a wrapper dir
+      # spawned extra windows that Maestro's CDP client never queried.
+      - name: Wrap Chrome with --no-sandbox
+        run: |
+          real="${{ steps.chrome.outputs.chrome-path }}"
+          echo "Wrapping $real"
+          "$real" --version
+          if [ -e /usr/bin/google-chrome ] && [ ! -e /usr/bin/google-chrome.original ]; then
+            sudo mv /usr/bin/google-chrome /usr/bin/google-chrome.original
+          fi
+          sudo tee /usr/bin/google-chrome >/dev/null <<EOF
+          #!/bin/sh
+          exec "$real" --no-sandbox --disable-dev-shm-usage "\$@"
+          EOF
+          sudo chmod +x /usr/bin/google-chrome
+          /usr/bin/google-chrome --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Maestro CLI
+        env:
+          MAESTRO_VERSION: "2.8.0"
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: Start Next.js
+        run: |
+          npm start -- --port 3000 &
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000 >/dev/null; then
+              echo "Next.js is ready"
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Next.js did not become ready on :3000"
+            exit 1
+          fi
+
+      - name: Confirm homepage HTML is marketing copy
+        run: |
+          html=$(curl -sf http://localhost:3000)
+          echo "$html" | grep -q "from handshake to friendship" || {
+            echo "Homepage HTML is missing marketing copy (SSR regression)"
+            echo "$html" | head -c 4000
+            exit 1
+          }
+          echo "$html" | grep -q "landing-playground" || {
+            echo "Homepage HTML is missing landing-playground test id"
+            exit 1
+          }
+          about=$(curl -sf http://localhost:3000/about)
+          echo "$about" | grep -q "about-heading" || {
+            echo "/about HTML is missing about-heading test id"
+            exit 1
+          }
+          echo "Homepage HTML contains marketing copy; /about exposes about-heading"
+
+      - name: Install Xvfb
+        run: sudo apt-get update -y && sudo apt-get install -y xvfb
+
+      - name: Maestro smoke
+        # Maestro --headless uses Chrome --headless=new. CDP listTargets().first()
+        # then hits a non-page target, so assertVisible fails while screenshots
+        # still show the real tab (maestro#2573). Headed Chrome under Xvfb keeps
+        # a single page target.
+        # Text asserts must match AX-tree nodes. Styled spans split "About Click"
+        # and the handshake tagline, so substring text checks fail even when the
+        # screenshot is correct. Smoke flows use unsplit copy and heading ids.
+        run: xvfb-run --auto-servernum maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
+
+      - name: Upload Maestro artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-web-smoke
+          path: ~/.maestro
+          if-no-files-found: ignore
+          include-hidden-files: true

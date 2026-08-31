@@ -1,0 +1,71 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { runtimeEnv } from '@/lib/server/runtimeEnv';
+
+function hubPushFunctionUrl(): string | null {
+  const base = runtimeEnv('NEXT_PUBLIC_SUPABASE_URL');
+  return base ? `${base}/functions/v1/send-push-notification` : null;
+}
+
+/**
+ * Fan-out hub message pushes to other participants. Failures are logged, never thrown,
+ * so chat insert success is independent of APNs/FCM.
+ */
+export async function notifyHubMessageParticipants(args: {
+  admin: SupabaseClient;
+  hubId: string;
+  messageId: string;
+  senderUserId: string;
+  preview: string;
+}): Promise<number> {
+  const pushUrl = hubPushFunctionUrl();
+  const serviceKey = runtimeEnv('SUPABASE_SERVICE_ROLE_KEY');
+  if (!pushUrl || !serviceKey) return 0;
+
+  const { data, error } = await args.admin
+    .from('hub_participants')
+    .select('user_id')
+    .eq('hub_id', args.hubId);
+  if (error) {
+    console.warn('[hub/messages] participant fan-out lookup:', error.message);
+    return 0;
+  }
+
+  const recipients = (data ?? [])
+    .map((row) => (typeof row.user_id === 'string' ? row.user_id.trim() : ''))
+    .filter((id) => id.length > 0 && id !== args.senderUserId);
+
+  let sent = 0;
+  const preview = args.preview.trim().slice(0, 120) || 'New hub message';
+  await Promise.all(
+    recipients.map(async (recipient) => {
+      try {
+        const response = await fetch(pushUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            recipient_user_id: recipient,
+            title: 'Hub message',
+            body: preview,
+            data: {
+              type: 'hub_message',
+              hub_id: args.hubId,
+              message_id: args.messageId,
+              sender_user_id: args.senderUserId,
+            },
+          }),
+        });
+        if (response.ok) sent += 1;
+        else {
+          const text = await response.text().catch(() => '');
+          console.warn('[hub/messages] push failed', response.status, text);
+        }
+      } catch (e) {
+        console.warn('[hub/messages] push error', e);
+      }
+    }),
+  );
+  return sent;
+}

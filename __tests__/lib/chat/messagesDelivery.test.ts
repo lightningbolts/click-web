@@ -1,4 +1,4 @@
-import { buildMessageInsertRow, normalizeDbMessage, parseLocalSentAtMs } from '@/lib/chat/messages';
+import { buildMessageInsertRow, isBeaconChatMessage, normalizeDbMessage, parseLocalSentAtMs } from '@/lib/chat/messages';
 
 describe('parseLocalSentAtMs', () => {
   it('returns null for non-numbers', () => {
@@ -110,5 +110,42 @@ describe('normalizeDbMessage', () => {
       metadata: {},
     });
     expect(m.delivered_at).toBe(900);
+  });
+
+  it('coerces text rows with beacon_id metadata to beacon type', () => {
+    const m = normalizeDbMessage({
+      id: 'm1',
+      chat_id: 'c1',
+      user_id: 'u1',
+      content: 'Beacon: Testing',
+      time_created: 1,
+      is_read: false,
+      message_type: 'text',
+      metadata: { beacon_id: 'b-1', title: 'Testing' },
+    });
+    expect(m.message_type).toBe('beacon');
+  });
+});
+
+describe('isBeaconChatMessage', () => {
+  it('detects beacon type and metadata fallback', () => {
+    expect(
+      isBeaconChatMessage({
+        message_type: 'beacon',
+        metadata: {},
+      }),
+    ).toBe(true);
+    expect(
+      isBeaconChatMessage({
+        message_type: 'text',
+        metadata: { beaconId: 'b-2' },
+      }),
+    ).toBe(true);
+    expect(
+      isBeaconChatMessage({
+        message_type: 'text',
+        metadata: {},
+      }),
+    ).toBe(false);
   });
 });

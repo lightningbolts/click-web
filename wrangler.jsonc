@@ -15,6 +15,19 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Preview Workers Builds uses `npx wrangler versions upload` with an empty
+  // dashboard build command, so wrangler must produce `.open-next/worker.js`.
+  // Production `npm run deploy` already ran OpenNext — skip a second build.
+  // Never point `npm run build` at OpenNext: OpenNext itself invokes it as
+  // `next build`, and WORKERS_CI=1 would recurse until the job times out.
+  "build": {
+    "command": "bash scripts/materialize-ci-env.sh && (test -f .open-next/worker.js || npx opennextjs-cloudflare build)"
+  },
+  // Non-secret public site URL. Supabase / LiveKit / Stripe stay in the
+  // Workers dashboard so `deploy -- --keep-vars` does not wipe them.
+  "vars": {
+    "NEXT_PUBLIC_BASE_URL": "https://joinclick.co"
+  },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",

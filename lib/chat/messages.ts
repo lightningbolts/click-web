@@ -22,12 +22,45 @@ export function coerceMetadata(value: unknown): Message['metadata'] {
   return {};
 }
 
+export function beaconIdFromMetadata(
+  metadata: Message['metadata'] | null | undefined,
+): string | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const rec = metadata as Record<string, unknown>;
+  for (const key of ['beacon_id', 'beaconId']) {
+    const v = rec[key];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+/** Mirrors KMP `Message.isBeaconChatMessage()` — type or metadata. */
+export function isBeaconChatMessage(
+  message: Pick<Message, 'message_type' | 'metadata'>,
+): boolean {
+  if (message.message_type === 'beacon') return true;
+  return beaconIdFromMetadata(message.metadata) != null;
+}
+
+export function shouldSkipChatDecrypt(messageType: string | undefined | null): boolean {
+  const t = typeof messageType === 'string' ? messageType.toLowerCase() : '';
+  return t === 'call_log' || t === 'beacon';
+}
+
+function withCoercedBeaconType(message: Message): Message {
+  if (message.message_type === 'beacon') return message;
+  if (beaconIdFromMetadata(message.metadata)) {
+    return { ...message, message_type: 'beacon' };
+  }
+  return message;
+}
+
 /** Normalize a row from PostgREST / Realtime into a [Message] (safe defaults for new columns). */
 export function normalizeDbMessage(row: Record<string, unknown>): Message {
   const localSentRaw = row.local_sent_at;
   const readAtRaw = row.read_at;
   const deliveredAtRaw = row.delivered_at;
-  return {
+  const message: Message = {
     id: String(row.id),
     chat_id: String(row.chat_id),
     user_id: String(row.user_id),
@@ -48,6 +81,7 @@ export function normalizeDbMessage(row: Record<string, unknown>): Message {
       ? { reactions: row.reactions as Message['reactions'] }
       : {}),
   };
+  return withCoercedBeaconType(message);
 }
 
 export type MessageInsertRow = {

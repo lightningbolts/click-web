@@ -70,3 +70,50 @@ export function formatCallDuration(elapsedMs: number): string {
 export function participantHasVideo(participant: CallParticipant): boolean {
   return participant.videoTrack != null || (participant.cameraEnabled && participant.isLocal);
 }
+
+/**
+ * FaceTime-style row sizes that fill the stage instead of a sparse 2-column square grid.
+ * 1: full; 2: side-by-side; 3: 1+2; 4: 2x2; 5: 2+3; 6: 3x2; 7: 3+2+2; 8: 3+3+2.
+ */
+export function gridRowSizes(participantCount: number): number[] {
+  const n = Math.max(0, participantCount);
+  switch (n) {
+    case 0:
+      return [];
+    case 1:
+      return [1];
+    case 2:
+      return [2];
+    case 3:
+      return [1, 2];
+    case 4:
+      return [2, 2];
+    case 5:
+      return [2, 3];
+    case 6:
+      return [3, 3];
+    case 7:
+      return [3, 2, 2];
+    default: {
+      const rows: number[] = [];
+      let remaining = n;
+      while (remaining > 0) {
+        const take = remaining === 4 ? 2 : remaining >= 3 ? 3 : remaining;
+        rows.push(take);
+        remaining -= take;
+      }
+      return rows;
+    }
+  }
+}
+
+export function gridChunks<T>(items: T[]): T[][] {
+  const sizes = gridRowSizes(items.length);
+  const rows: T[][] = [];
+  let index = 0;
+  for (const size of sizes) {
+    rows.push(items.slice(index, index + size));
+    index += size;
+  }
+  return rows;
+}

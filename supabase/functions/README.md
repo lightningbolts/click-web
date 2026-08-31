@@ -109,7 +109,7 @@ Authorized server job (pg_cron). Three sub-routines per run:
 | Step | Behavior |
 |------|----------|
 | **Disposable reveal** | Find `collaboration_sessions` where `collaboration_ttl` ≤ now and `notification_sent = false`. If a disposable message exists in chat (`metadata.disposable_roll`, `encounter_id`, `collaboration_ttl`), send **Click Drops** push via `send-push-notification`, then mark `notification_sent`. |
-| **Event reminders** | Scan `map_beacons` where `beacon_type = 'event'`. Within 15-min windows: **day-of** and **one-hour-before** pushes to `creator_id`; set `day_of_notification_sent` / `one_hour_notification_sent` in metadata. |
+| **Event reminders** | HTTP GET `{CLICK_WEB_URL}/api/cron/event-reminders` with `CRON_SECRET`. Canonical logic in `lib/cron/eventReminders.ts`: **day-of** (event timezone) and **30-minutes-before** due-by-timestamp; sets `day_of_notification_sent` / `thirty_min_notification_sent`. |
 | **Friction intent expirations** | Availability intents that expired in the last hour with **no** encounter during their window → insert `system_friction_logs` rows (`event_type: failed_conversion`) for B2B friction analytics. |
 
 ### 48-hour gentle archive

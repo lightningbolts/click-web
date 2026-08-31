@@ -34,6 +34,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!.env.local.example
 
 # vercel
 .vercel
@@ -49,3 +51,8 @@ next-env.d.ts
 # Vendored package tarballs
 *.tgz
 decode-ico-0.4.1.tgz
+
+# Maestro local artifacts (keep .maestro/**/*.yaml)
+.maestro/**/*.png
+.maestro/**/*.mp4
+.maestro/.screenshots/

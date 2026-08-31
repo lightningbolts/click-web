@@ -6,7 +6,7 @@ Web notification **preferences** and integration patterns for **`send-push-notif
 
 ## Purpose
 
-- Persist per-user push preferences (message vs call)
+- Persist per-user push preferences (messages, calls, event reminders, event teasers, reconnect nudges, availability matches, hub messages)
 - Align web-initiated pushes with KMP mobile handlers
 - Centralize localStorage fallback when `notification_preferences` table unavailable
 
@@ -30,7 +30,7 @@ FCM / APNs → Mobile app
 
 | Function | Role |
 |----------|------|
-| `DEFAULT_NOTIFICATION_PREFERENCES` | `{ messagePushEnabled: true, callPushEnabled: true }` |
+| `DEFAULT_NOTIFICATION_PREFERENCES` | `{ messagePushEnabled, callPushEnabled, eventReminderPushEnabled, availabilityMatchPushEnabled, hubMessagePushEnabled, eventTeaserPushEnabled, reconnectNudgePushEnabled }` all default `true` |
 | `loadNotificationPreferences(supabase, userId)` | DB first, fallback localStorage |
 | `saveNotificationPreferences` | Dual-write DB + local |
 | `readLocalNotificationPreferences` | Offline / missing table fallback |
@@ -42,16 +42,18 @@ Storage key: `click:web-notification-preferences:{userId}`
 | Caller | Trigger | `data.type` |
 |--------|---------|-------------|
 | `app/api/chat/messages/route.ts` | New message (recipient offline) | `new_message` |
-| `DashboardView.tsx` | Outgoing web call | `incoming_call` |
+| `components/dashboard/useDashboardCalls.ts` | Outgoing web call | `incoming_call` |
 | `cron-hourly-maintenance` | Disposable reveal | `disposable_reveal` |
 | `cron-hourly-maintenance` | Event reminder | `event_reminder` |
+| `cron-hourly-maintenance` | Seed-a-Room teaser (24–48h before start) | `event_teaser` |
+| `cron-hourly-maintenance` | Reconnect lull / shared upcoming event | `reconnect_nudge` / `shared_upcoming_event` |
 | `match-availability` (client invoke) | Intent overlap | `availability_match` |
 
 All server callers use service role bearer to invoke the Edge Function.
 
 ### `incoming_call` payload contract (mobile parity)
 
-Defined in `components/DashboardView.tsx` → `buildIncomingCallPushPayload`:
+Defined in `lib/calls/incomingCallPushPayload.ts` → `buildIncomingCallPushPayload`:
 
 ```typescript
 {
@@ -74,6 +76,8 @@ Defined in `components/DashboardView.tsx` → `buildIncomingCallPushPayload`:
 ```
 
 **Must stay aligned with** KMP `CallPushNotifier.kt` — changing keys requires mobile update.
+
+Incoming-call delivery groups tokens by `device_id`. iOS sends **VoIP first**, then standard APNs only if VoIP failed. Android tokens on that device still send. Dead tokens (APNs 410 / Unregistered / BadDeviceToken, FCM NOT_FOUND) are pruned.
 
 Web invokes:
 
@@ -99,7 +103,8 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 
 | Path | Role |
 |------|------|
-| `components/DashboardView.tsx` | `buildIncomingCallPushPayload`, call push invoke |
+| `lib/calls/incomingCallPushPayload.ts` | `buildIncomingCallPushPayload` (KMP parity) |
+| `components/dashboard/useDashboardCalls.ts` | Call push invoke |
 | `app/api/chat/messages/route.ts` | New message push |
 | `app/api/user/push-tokens/route.ts` | Device token storage |
 | `app/api/livekit/token/route.ts` | Room token before call push |
@@ -127,7 +132,7 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 - **Availability intents** — **availability_match** push.
 - **Match alerts** — Push from match flow.
 - **Community Hubs** — Hub messages (client-dependent).
-- **Map beacons** — event_reminder push.
+- **Map beacons** — event_reminder and event_teaser push.
 - **Global search** — N/A.
 - **Core connections** — Same push rules.
 - **Collaboration sessions & disposable rolls** — **disposable_reveal** push.
@@ -141,4 +146,6 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 - **Web dashboard** — Web calls trigger mobile push.
 - **Business insights** — No consumer pushes.
 - **Event reminders** — **event_reminder** push.
+- **Seed a Room teasers** — **event_teaser** push (pref `event_teaser_push_enabled`).
+- **Reconnect nudges** — **reconnect_nudge** / **shared_upcoming_event** (pref `reconnect_nudge_push_enabled`).
 - **Achievements & stats** — Optional future pushes.

@@ -97,9 +97,9 @@ export default function UserProfile() {
       <button
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 md:gap-2 rounded-[8px] border-2 border-border-hard bg-surface px-2 py-2 text-on-surface transition-colors hover:bg-surface-container md:px-4"
+        className="flex items-center gap-1 md:gap-2 rounded-[8px] border border-border-hard bg-surface px-2 py-2 text-on-surface transition-colors hover:bg-surface-container md:px-4"
       >
-        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-border-hard bg-primary text-xs font-bold text-on-primary">
+        <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-hard bg-primary text-xs font-bold text-on-primary">
           {profileImageUrl ? (
             <img src={profileImageUrl} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -139,7 +139,7 @@ export default function UserProfile() {
                   backgroundColor: 'var(--color-surface)',
                 }}
               >
-                <div className="border-b-2 border-border-hard p-4">
+                <div className="border-b border-border-hard p-4">
                   <p className="text-sm font-bold text-on-surface">{user.email}</p>
                   <p className="mt-1 text-xs font-medium text-on-surface-variant">Signed in</p>
                 </div>
@@ -168,7 +168,7 @@ export default function UserProfile() {
                   </button>
                 </div>
 
-                <div className="border-t-2 border-border-hard p-2">
+                <div className="border-t border-border-hard p-2">
                   <button
                     onClick={handleSignOut}
                     className="flex w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-on-surface transition-colors hover:bg-surface-container hover:text-error"

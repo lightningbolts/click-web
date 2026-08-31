@@ -198,7 +198,7 @@ export function parseInsertedBeacon(
   return parseMapBeacon(rowFromInsertWithLocation(inserted, fallbackLng, fallbackLat));
 }
 
-function displayNameFromUserRow(user: {
+export function displayNameFromUserRow(user: {
   name: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -211,23 +211,22 @@ function displayNameFromUserRow(user: {
   return name != null && name.length > 0 ? name : null;
 }
 
-/** Attach `creator_name` for proximity list rows when `show_creator_name` is true. */
-export async function enrichBeaconCreatorNames(
+/** Batch-load display names for user ids. Shared by proximity beacons and saved-event bookmarks. */
+export async function loadUserDisplayNames(
   admin: SupabaseClient,
-  beacons: MapBeaconRecord[],
-): Promise<MapBeaconRecord[]> {
-  const flagged = beacons.filter((b) => b.show_creator_name);
-  if (flagged.length === 0) return beacons;
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(userIds.filter((id) => id.trim().length > 0))];
+  const nameById = new Map<string, string>();
+  if (ids.length === 0) return nameById;
 
-  const creatorIds = [...new Set(flagged.map((b) => b.creator_id))];
   const { data, error } = await admin
     .from("users")
     .select("id, name, first_name, last_name")
-    .in("id", creatorIds);
+    .in("id", ids);
 
-  if (error != null || !Array.isArray(data)) return beacons;
+  if (error != null || !Array.isArray(data)) return nameById;
 
-  const nameById = new Map<string, string>();
   for (const row of data) {
     if (row == null || typeof row !== "object" || typeof (row as { id?: unknown }).id !== "string") {
       continue;
@@ -240,6 +239,21 @@ export async function enrichBeaconCreatorNames(
     });
     if (label != null) nameById.set(userRow.id, label);
   }
+  return nameById;
+}
+
+/** Attach `creator_name` for proximity list rows when `show_creator_name` is true. */
+export async function enrichBeaconCreatorNames(
+  admin: SupabaseClient,
+  beacons: MapBeaconRecord[],
+): Promise<MapBeaconRecord[]> {
+  const flagged = beacons.filter((b) => b.show_creator_name);
+  if (flagged.length === 0) return beacons;
+
+  const nameById = await loadUserDisplayNames(
+    admin,
+    flagged.map((b) => b.creator_id),
+  );
 
   return beacons.map((b) =>
     b.show_creator_name

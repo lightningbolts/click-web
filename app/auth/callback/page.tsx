@@ -76,7 +76,7 @@ export default function AuthCallbackPage() {
   const pageShell = (children: ReactNode) => (
     <div className="min-h-[calc(100vh-1px)] relative flex items-center justify-center p-4 bg-[#121212] text-white overflow-hidden">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_-25%,rgba(131,56,236,0.14),transparent)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_-25%,rgba(124,58,237,0.14),transparent)]"
         aria-hidden
       />
       <div
@@ -89,7 +89,7 @@ export default function AuthCallbackPage() {
 
   if (status === 'loading') {
     return pageShell(
-      <div className="glass max-w-md w-full p-10 rounded-3xl border border-zinc-800 ring-1 ring-white/5 text-center shadow-[0_0_60px_-12px_rgba(131,56,236,0.35)]">
+      <div className="glass max-w-md w-full p-10 rounded-3xl border border-zinc-800 ring-1 ring-white/5 text-center shadow-[0_0_60px_-12px_rgba(124,58,237,0.35)]">
         <div className="w-14 h-14 rounded-2xl bg-[#8338EC]/10 flex items-center justify-center mx-auto mb-5 border border-[#8338EC]/20">
           <Loader2 className="w-7 h-7 text-[#8338EC] animate-spin" aria-hidden />
         </div>
@@ -128,7 +128,7 @@ export default function AuthCallbackPage() {
 
   if (status === 'success') {
     return pageShell(
-      <div className="glass max-w-md w-full p-10 rounded-3xl border border-zinc-800 ring-1 ring-white/5 text-center shadow-[0_0_60px_-12px_rgba(131,56,236,0.4)]">
+      <div className="glass max-w-md w-full p-10 rounded-3xl border border-zinc-800 ring-1 ring-white/5 text-center shadow-[0_0_60px_-12px_rgba(124,58,237,0.4)]">
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

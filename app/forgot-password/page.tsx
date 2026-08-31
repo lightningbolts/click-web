@@ -51,7 +51,7 @@ function ForgotPasswordForm() {
 
   return (
     <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-4">
-      <div className="fc-card w-full max-w-md rounded-[16px] border-2 border-border-hard bg-surface p-8">
+      <div className="fc-card w-full max-w-md rounded-[16px] border border-border-hard bg-surface p-8">
         <p className="mb-1 text-sm font-semibold uppercase tracking-wider text-primary">Click</p>
         <h1 className="mb-2 text-3xl font-bold tracking-tight">Forgot password</h1>
         <p className="mb-8 text-on-surface-variant">
@@ -84,7 +84,7 @@ function ForgotPasswordForm() {
           )}
 
           {success && (
-            <div className="rounded-[8px] border-2 border-border-hard bg-surface-container px-3 py-2 text-sm text-on-surface">
+            <div className="rounded-[8px] border border-border-hard bg-surface-container px-3 py-2 text-sm text-on-surface">
               {success}
             </div>
           )}
@@ -116,7 +116,7 @@ export default function ForgotPasswordPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-background text-on-surface flex items-center justify-center p-4">
-          <div className="fc-card w-full max-w-md rounded-[16px] border-2 border-border-hard bg-surface p-8">
+          <div className="fc-card w-full max-w-md rounded-[16px] border border-border-hard bg-surface p-8">
             <p className="text-on-surface-variant">Loading…</p>
           </div>
         </div>

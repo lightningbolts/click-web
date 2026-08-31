@@ -19,6 +19,7 @@ import type { NoiseLevelKey } from '@/lib/dashboard/connectionExtras';
 import type { ConnectionDisplayStatus } from '@/lib/dashboard/connectionStatus';
 import { MomentBlock } from '@/components/dashboard/MomentIndicators';
 import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
+import { PriorConnectionBadge } from '@/components/profile/PriorConnectionBadge';
 import { useAuth } from '@/lib/AuthContext';
 
 export interface ConnectionEncounterBrief {
@@ -85,6 +86,9 @@ export interface ConnectionRecord {
   encounters?: ConnectionEncounterBrief[];
   /** When viewer and peer share an active intent tag or timeframe */
   intentOverlapLabel?: string | null;
+  /** handshake (default) vs self-reported prior */
+  source?: 'handshake' | 'prior' | string | null;
+  knownSince?: string | null;
 }
 
 interface ConnectionTableProps {
@@ -241,7 +245,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
     <div className="space-y-4">
       {/* Header with stats */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <div className="text-sm">
             <span className="text-on-surface-variant">Total:</span>{' '}
             <span className="text-on-surface font-semibold">{stats.total}</span>
@@ -265,7 +269,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onExport}
-          className="flex items-center gap-2 px-4 py-2 bg-[#630ed4] hover:bg-[#732ee4] rounded-xl text-sm font-medium transition-colors"
+          className="flex shrink-0 items-center gap-2 self-start px-4 py-2 bg-primary hover:bg-primary/90 rounded-xl text-sm font-medium text-on-primary transition-colors"
         >
           <Download className="w-4 h-4" />
           Export to CSV
@@ -281,7 +285,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
             placeholder="Search by name, location, event, weather, or noise..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-[#630ed4] transition-colors text-sm"
+            className="w-full pl-10 pr-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors text-sm"
           />
         </div>
         
@@ -290,7 +294,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-[#630ed4] transition-colors text-sm appearance-none cursor-pointer"
+            className="px-4 py-3 bg-surface-container/50 border border-border-hard rounded-xl focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
           >
             <option value="all">All Status</option>
             <option value="kept">Kept</option>
@@ -303,13 +307,64 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-border-hard">
-        <table className="w-full">
+      {/* Mobile / tablet: stacked rows. Desktop: fixed columns with single-line truncation. */}
+      <div className="lg:hidden divide-y divide-border-hard overflow-hidden rounded-xl border border-border-hard">
+        {filteredConnections.length === 0 ? (
+          <p className="px-4 py-12 text-center text-sm text-on-surface-variant">
+            {searchQuery || statusFilter !== 'all'
+              ? 'No connections match your search'
+              : 'No connections yet. Start meeting people!'}
+          </p>
+        ) : (
+          filteredConnections.map((connection) => {
+            const selfId = authUser?.id;
+            const peerId =
+              connection.otherUserId ??
+              (selfId ? connection.userIds?.find((id) => id !== selfId) : undefined);
+            const peerOnline = !!(peerId && onlineUserIds.has(peerId));
+            return (
+              <button
+                key={connection.id}
+                type="button"
+                onClick={() => onSelect?.(connection)}
+                className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface-container/30"
+                data-testid="connection-card"
+              >
+                <ConnectionPeerAvatar
+                  label={connection.name}
+                  imageUrl={connection.avatarUrl}
+                  size="sm"
+                  showOnline={peerOnline}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate font-medium text-on-surface" title={connection.name}>
+                      {connection.name}
+                    </p>
+                    {getStatusBadge(connection.status)}
+                  </div>
+                  {connection.chatPreview?.trim() ? (
+                    <p className="mt-0.5 truncate text-xs text-on-surface-variant" title={connection.chatPreview.trim()}>
+                      {connection.chatPreview.trim()}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 truncate text-xs text-on-surface-variant" title={connection.location}>
+                    {formatDate(connection.dateMet)}
+                    {connection.location ? ` · ${connection.location}` : ''}
+                  </p>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-xl border border-border-hard lg:block">
+        <table className="w-full table-fixed">
           <thead>
             <tr className="bg-surface-container/50 border-b border-border-hard">
-              <th 
-                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
+              <th
+                className="w-[28%] text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center gap-1">
@@ -317,8 +372,8 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                   <SortIcon field="name" />
                 </div>
               </th>
-              <th 
-                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
+              <th
+                className="w-[14%] text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('dateMet')}
               >
                 <div className="flex items-center gap-1">
@@ -326,8 +381,8 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                   <SortIcon field="dateMet" />
                 </div>
               </th>
-              <th 
-                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
+              <th
+                className="w-[24%] text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('location')}
               >
                 <div className="flex items-center gap-1">
@@ -335,11 +390,11 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                   <SortIcon field="location" />
                 </div>
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider min-w-[11rem] w-[22%]">
+              <th className="w-[20%] text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider">
                 Moment
               </th>
-              <th 
-                className="text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
+              <th
+                className="w-[14%] text-left px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider cursor-pointer hover:text-on-surface transition-colors"
                 onClick={() => handleSort('status')}
               >
                 <div className="flex items-center gap-1">
@@ -347,15 +402,14 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                   <SortIcon field="status" />
                 </div>
               </th>
-              <th className="px-4 py-3 text-xs font-medium text-on-surface-variant uppercase tracking-wider" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-border-hard">
             <AnimatePresence>
               {filteredConnections.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-on-surface-variant">
-                    {searchQuery || statusFilter !== 'all' 
+                  <td colSpan={5} className="px-4 py-12 text-center text-on-surface-variant">
+                    {searchQuery || statusFilter !== 'all'
                       ? 'No connections match your search'
                       : 'No connections yet. Start meeting people!'}
                   </td>
@@ -375,10 +429,11 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ delay: index * 0.02 }}
                     className="hover:bg-surface-container/30 transition-colors cursor-pointer group"
-                  onClick={() => onSelect?.(connection)}
+                    onClick={() => onSelect?.(connection)}
+                    data-testid="connection-row"
                   >
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-3">
+                    <td className="overflow-hidden px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
                         {onOpenProfile && peerId ? (
                           <button
                             type="button"
@@ -386,7 +441,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                               e.stopPropagation();
                               onOpenProfile(peerId, connection.id);
                             }}
-                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#630ed4]"
+                            className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             aria-label={`View ${connection.name}'s profile`}
                           >
                             <ConnectionPeerAvatar
@@ -406,39 +461,45 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                         )}
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="font-medium text-on-surface group-hover:text-[#630ed4] transition-colors leading-snug truncate">
+                            <p className="truncate font-medium text-on-surface group-hover:text-primary transition-colors" title={connection.name}>
                               {connection.name}
                             </p>
                             {connection.intentOverlapLabel ? (
                               <span
-                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                                className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
                                 title={`Vibes match: ${connection.intentOverlapLabel}`}
                               >
                                 <Zap className="h-3 w-3 text-amber-800 dark:text-amber-300" aria-hidden />
                               </span>
                             ) : null}
+                            {connection.source === 'prior' ? (
+                              <PriorConnectionBadge className="!px-1.5 !py-0.5 text-[10px]" />
+                            ) : null}
                           </div>
                           {connection.chatPreview != null && connection.chatPreview.trim() !== '' ? (
-                            <p className="mt-0.5 truncate text-xs text-on-surface-variant">{connection.chatPreview.trim()}</p>
+                            <p className="mt-0.5 truncate text-xs text-on-surface-variant" title={connection.chatPreview.trim()}>
+                              {connection.chatPreview.trim()}
+                            </p>
                           ) : null}
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-2 text-sm text-on-surface">
+                    <td className="overflow-hidden px-4 py-3 whitespace-nowrap text-sm text-on-surface">
+                      <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-on-surface-variant shrink-0" />
                         {formatDate(connection.dateMet)}
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-2 text-sm text-on-surface">
+                    <td className="overflow-hidden px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-2 text-sm text-on-surface">
                         <MapPin className="w-4 h-4 text-on-surface-variant shrink-0" />
-                        <span className="leading-snug">{connection.location}</span>
+                        <span className="truncate" title={connection.location}>{connection.location}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top border-l border-border-hard/80">
+                    <td className="overflow-hidden px-4 py-3">
                       {connection.context || connection.weatherSummary || connection.noiseSummary ? (
                         <MomentBlock
+                          compact
                           context={connection.context}
                           weatherSummary={connection.weatherSummary}
                           noiseSummary={connection.noiseSummary}
@@ -448,17 +509,8 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
                         <span className="text-sm text-on-surface-variant">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-4 align-top">
+                    <td className="overflow-hidden px-4 py-3 whitespace-nowrap">
                       {getStatusBadge(connection.status)}
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onSelect?.(connection); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 bg-[#630ed4]/10 hover:bg-[#630ed4]/20 border border-[#630ed4]/30 rounded-xl text-xs text-[#630ed4] font-medium"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        Chat
-                      </button>
                     </td>
                   </motion.tr>
                   );

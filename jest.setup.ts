@@ -23,3 +23,99 @@ if (!(globalThis as unknown as { crypto?: unknown }).crypto) {
     configurable: true,
   });
 }
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+jest.mock('maplibre-gl', () => {
+  const map = {
+    addControl: jest.fn(),
+    on: jest.fn((event: string, cb: () => void) => {
+      if (event === 'load') cb();
+    }),
+    once: jest.fn((event: string, cb: () => void) => {
+      if (event === 'idle' || event === 'style.load') cb();
+    }),
+    addSource: jest.fn(),
+    addLayer: jest.fn(),
+    getSource: jest.fn(() => ({ setData: jest.fn() })),
+    getLayer: jest.fn(() => true),
+    setLayoutProperty: jest.fn(),
+    setPaintProperty: jest.fn(),
+    setStyle: jest.fn(),
+    getCenter: jest.fn(() => ({ lng: -122.3085, lat: 47.6554 })),
+    getZoom: jest.fn(() => 14.2),
+    jumpTo: jest.fn(),
+    fitBounds: jest.fn(),
+    resize: jest.fn(),
+    remove: jest.fn(),
+    getCanvas: jest.fn(() => ({ style: {} })),
+    project: jest.fn(() => ({ x: 140, y: 220 })),
+  };
+  return {
+    __esModule: true,
+    default: {
+      Map: jest.fn(() => map),
+      NavigationControl: jest.fn(),
+      Marker: jest.fn().mockImplementation(({ element }: { element?: HTMLElement } = {}) => {
+        const el = element ?? document.createElement('div');
+        const api: {
+          setLngLat: jest.Mock;
+          addTo: jest.Mock;
+          remove: jest.Mock;
+          getElement: jest.Mock;
+        } = {
+          setLngLat: jest.fn(),
+          addTo: jest.fn(),
+          remove: jest.fn(),
+          getElement: jest.fn(() => el),
+        };
+        api.setLngLat.mockReturnValue(api);
+        api.addTo.mockImplementation(() => {
+          document.body.appendChild(el);
+          return api;
+        });
+        api.remove.mockImplementation(() => {
+          el.remove();
+        });
+        return api;
+      }),
+      Popup: jest.fn().mockImplementation(() => {
+        const host = document.createElement('div');
+        const api: {
+          setLngLat: jest.Mock;
+          setHTML: jest.Mock;
+          addTo: jest.Mock;
+          remove: jest.Mock;
+        } = {
+          setLngLat: jest.fn(),
+          setHTML: jest.fn(),
+          addTo: jest.fn(),
+          remove: jest.fn(),
+        };
+        api.setLngLat.mockReturnValue(api);
+        api.setHTML.mockImplementation((html: string) => {
+          host.innerHTML = html;
+          return api;
+        });
+        api.addTo.mockImplementation(() => {
+          document.body.appendChild(host);
+          return api;
+        });
+        api.remove.mockImplementation(() => {
+          host.remove();
+        });
+        return api;
+      }),
+      LngLatBounds: jest.fn().mockImplementation(() => ({
+        extend: jest.fn().mockReturnThis(),
+      })),
+    },
+  };
+});
+

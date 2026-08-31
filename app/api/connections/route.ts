@@ -1,31 +1,56 @@
-import { type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import type { ConnectionLifecycleStatus } from '@/types/connection';
-import { ACTIVE_CONNECTIONS_DB_OR_FILTER } from '@/lib/dashboard/connectionStatus';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
-import {
-  deriveHeightCategoryFromRelativeAltitudeM,
-  fetchTerrainElevationMeters,
-} from '@/lib/server/terrainElevation';
 import {
   normalizeContextTag,
   normalizeContextTagsArray,
   normalizeNoiseLevelCategory,
   resolveContextTagId,
-  type ContextTagPayload,
 } from '@/lib/server/connectionEncounterContextTag';
 import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import {
   applyLiveEventBeaconToEncounterRow,
-  collectEventBeaconIdsFromConnections,
-  filterBeaconIdsWithActiveEngagement,
   resolveLiveEventBeaconForReportingUser,
-  stripConnectionEncountersEventFieldsForViewer,
 } from '@/lib/server/resolveLiveEventBeaconAt';
 import { parseBody } from '@/lib/api/parseBody';
 import { connectionsCreateBodySchema, connectionsPatchBodySchema } from '@/lib/api/schemas/connections';
+import {
+  redactEventFieldsForViewer,
+  redactSingleConnectionForViewer,
+} from '@/lib/server/connections/redaction';
+import {
+  DISPLAY_LOCATION_FALLBACK,
+  computeProximityScore,
+  fetchNominatimReverseGeocode,
+  finiteNumber,
+  haversineMeters,
+  isEncounterRateLimitError,
+  isRecord,
+  normalizeClientNoiseLevelString,
+  normalizeElevationCategoryString,
+} from '@/lib/server/connections/geo';
+import {
+  buildUtcTimeOfDayLabel,
+  enrichEncounterRelativeAltitude,
+  enrichEncounterWeather,
+  type MemoryCapsulePayload,
+} from '@/lib/server/connections/encounterEnrichment';
+import {
+  BUNDLE_PARAM,
+  DASHBOARD_ENCOUNTERS_PER_CONNECTION,
+  STATUS_SCOPE_PARAM,
+  dedupeIds,
+  executeActiveConnectionsQuery,
+  executeArchivedConnectionsQuery,
+  executeMapConnectionsQuery,
+  fetchJunctionConnectionIds,
+  isInsightsScope,
+  isJunctionTableOptionalError,
+  parseActiveConnectionsPagination,
+  sweepStaleConnectionsForUser,
+} from '@/lib/server/connections/queries';
 
 /**
  * Connections API
@@ -34,566 +59,11 @@ import { connectionsCreateBodySchema, connectionsPatchBodySchema } from '@/lib/a
  * POST   → Create a new connection with proximity validation (Layers 2 & 3)
  * DELETE → Per-user hide: insert into `connection_hidden` (no `connections` row delete, no `status = removed`)
  * PATCH  → Restore from archive: delete `connection_archives` row (legacy `status = archived` fallback)
- */
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Hide event_beacon_* / at_event on embedded encounters unless the viewer has
- * RSVP + active check-in for that beacon (per-person event attachment).
- */
-async function redactEventFieldsForViewer(
-  viewerUserId: string,
-  connections: Record<string, unknown>[],
-): Promise<Record<string, unknown>[]> {
-  const beaconIds = collectEventBeaconIdsFromConnections(connections);
-  if (beaconIds.length === 0) return connections;
-  const admin = createAdminClient();
-  const eligible = await filterBeaconIdsWithActiveEngagement(admin, viewerUserId, beaconIds);
-  return stripConnectionEncountersEventFieldsForViewer(connections, eligible);
-}
-
-async function redactSingleConnectionForViewer(
-  viewerUserId: string,
-  connection: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const [redacted] = await redactEventFieldsForViewer(viewerUserId, [connection]);
-  return redacted ?? connection;
-}
-
-const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
-const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
-const DISPLAY_LOCATION_FALLBACK = 'A new city';
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-function finiteNumber(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
-}
-
-function normalizeClientNoiseLevelString(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function normalizeElevationCategoryString(value: unknown): string | null {
-  return normalizeClientNoiseLevelString(value);
-}
-
-function firstNonEmptyString(values: unknown[]): string | null {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return null;
-}
-
-function isEncounterRateLimitError(err: { message?: string; details?: string; hint?: string } | null): boolean {
-  if (!err) return false;
-  const combined = [
-    err.message ?? '',
-    err.details ?? '',
-    err.hint ?? '',
-  ].join(' ');
-  return combined.includes('encounter_rate_limit_3h');
-}
-
-function extractDisplayLocation(semanticLocation: Record<string, unknown>): string {
-  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
-  if (!address) return DISPLAY_LOCATION_FALLBACK;
-  const city = firstNonEmptyString([
-    address.city,
-    address.town,
-    address.village,
-    address.hamlet,
-  ]);
-  if (!city) return DISPLAY_LOCATION_FALLBACK;
-  const state = firstNonEmptyString([address.state]);
-  return state ? `${city}, ${state}` : city;
-}
-
-function extractSpecificLocationName(semanticLocation: Record<string, unknown>): string | null {
-  const topLevelName = firstNonEmptyString([semanticLocation.name]);
-  if (topLevelName) return topLevelName;
-
-  const address = isRecord(semanticLocation.address) ? semanticLocation.address : null;
-  if (!address) return null;
-
-  return firstNonEmptyString([
-    address.amenity,
-    address.building,
-    address.residential,
-    address.road,
-  ]);
-}
-
-async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
-  semanticLocation: Record<string, unknown> | null;
-  displayLocation: string;
-  specificLocationName: string | null;
-}> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), NOMINATIM_REVERSE_TIMEOUT_MS);
-  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
-  try {
-    const response = await fetch(url, {
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': NOMINATIM_USER_AGENT,
-      },
-    });
-    if (!response.ok) {
-      return {
-        semanticLocation: null,
-        displayLocation: DISPLAY_LOCATION_FALLBACK,
-        specificLocationName: null,
-      };
-    }
-    const payload = (await response.json()) as unknown;
-    if (!isRecord(payload)) {
-      return {
-        semanticLocation: null,
-        displayLocation: DISPLAY_LOCATION_FALLBACK,
-        specificLocationName: null,
-      };
-    }
-    return {
-      semanticLocation: payload,
-      displayLocation: extractDisplayLocation(payload),
-      specificLocationName: extractSpecificLocationName(payload),
-    };
-  } catch {
-    return {
-      semanticLocation: null,
-      displayLocation: DISPLAY_LOCATION_FALLBACK,
-      specificLocationName: null,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * Haversine distance in meters between two lat/lon coordinate pairs.
- */
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6_371_000; // Earth radius in meters
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
-
-/**
- * Compute the Proximity Confidence Score (0–100).
  *
- * | Signal                          | Points |
- * |─────────────────────────────────|────────|
- * | NFC connection method           | +50    |
- * | GPS distance < 10m              | +30    |
- * | GPS distance 10–50m             | +15    |
- * | GPS distance 50–100m            | +5     |
- * | GPS distance > 100m             | −40    |
- * | QR token age < 30s              | +10    |
- * | QR token age 30–60s             | +5     |
- * | QR token age > 60s              |  0     |
- * | Same WiFi BSSID                 | +15    |
+ * Shared helpers live in `lib/server/connections/` (redaction, geo, encounterEnrichment, queries).
  */
-function computeProximityScore(params: {
-  connectionMethod: string;
-  gpsDistanceMeters: number | null;
-  tokenAgeSeconds: number | null;
-  sharedBssid: boolean;
-  gpsAvailable: boolean;
-}): { score: number; signals: Record<string, unknown> } {
-  const { connectionMethod, gpsDistanceMeters, tokenAgeSeconds, sharedBssid, gpsAvailable } = params;
-
-  let score = 0;
-
-  // Connection method baseline
-  if (connectionMethod === 'nfc' || connectionMethod === 'proximity') {
-    score += 50;
-  }
-
-  // GPS distance scoring
-  if (gpsDistanceMeters !== null && gpsAvailable) {
-    if (gpsDistanceMeters < 10) score += 30;
-    else if (gpsDistanceMeters <= 50) score += 15;
-    else if (gpsDistanceMeters <= 100) score += 5;
-    else score -= 40;
-  }
-
-  // QR token age scoring
-  if (tokenAgeSeconds !== null) {
-    if (tokenAgeSeconds < 30) score += 10;
-    else if (tokenAgeSeconds <= 60) score += 5;
-    // > 60s = 0 points
-  }
-
-  // WiFi BSSID match
-  if (sharedBssid) {
-    score += 15;
-  }
-
-  // Clamp to [0, 100]
-  score = Math.max(0, Math.min(100, score));
-
-  const signals: Record<string, unknown> = {
-    gps_distance_meters: gpsDistanceMeters !== null ? Math.round(gpsDistanceMeters * 10) / 10 : null,
-    token_age_seconds: tokenAgeSeconds !== null ? Math.round(tokenAgeSeconds) : null,
-    shared_bssid: sharedBssid,
-    connection_method: connectionMethod,
-    gps_available: gpsAvailable,
-  };
-
-  return { score, signals };
-}
-
-type MemoryCapsulePayload = {
-  connectionId: string;
-  locationName: string | null;
-  geoLocation: { lat: number; lon: number } | null;
-  connectedAtMs: number;
-  weatherSnapshot: {
-    condition: string;
-    temperatureCelsius: number;
-    iconCode: string | null;
-  } | null;
-  contextTag: ContextTagPayload | null;
-  photoUri: string | null;
-  noiseLevelCategory: 'VERY_QUIET' | 'QUIET' | 'MODERATE' | 'LOUD' | 'VERY_LOUD' | null;
-};
-
-function buildUtcTimeOfDayLabel(isoTimestamp: string): string {
-  return `${isoTimestamp.slice(11, 19)} UTC`;
-}
-
-function toConditionLabel(weatherCode: number): string {
-  if (weatherCode === 0) return 'Sunny';
-  if ([1, 2, 3].includes(weatherCode)) return 'Cloudy';
-  if ([45, 48].includes(weatherCode)) return 'Foggy';
-  if ([51, 53, 55, 56, 57].includes(weatherCode)) return 'Drizzly';
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) return 'Rainy';
-  if ([71, 73, 75, 77, 85, 86].includes(weatherCode)) return 'Snowy';
-  if ([95, 96, 99].includes(weatherCode)) return 'Stormy';
-  return 'Clear';
-}
-
-function toIconCode(weatherCode: number): string {
-  if (weatherCode === 0) return 'clear';
-  if ([1, 2, 3].includes(weatherCode)) return 'cloudy';
-  if ([45, 48].includes(weatherCode)) return 'fog';
-  if ([51, 53, 55, 56, 57].includes(weatherCode)) return 'drizzle';
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) return 'rain';
-  if ([71, 73, 75, 77, 85, 86].includes(weatherCode)) return 'snow';
-  if ([95, 96, 99].includes(weatherCode)) return 'thunder';
-  return 'clear';
-}
-
-async function enrichEncounterWeather(
-  adminClient: ReturnType<typeof createAdminClient>,
-  connectionId: string,
-  lat: number,
-  lon: number,
-  memoryCapsule: MemoryCapsulePayload,
-) {
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) {
-    return;
-  }
-
-  try {
-    const weatherResponse = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`,
-      { cache: 'no-store' }
-    );
-
-    if (!weatherResponse.ok) {
-      return;
-    }
-
-    const weatherJson = await weatherResponse.json() as {
-      current_weather?: { temperature?: number; weathercode?: number };
-    };
-    const currentWeather = weatherJson.current_weather;
-    if (
-      currentWeather?.temperature == null ||
-      currentWeather.weathercode == null
-    ) {
-      return;
-    }
-
-    const enrichedCapsule: MemoryCapsulePayload = {
-      ...memoryCapsule,
-      weatherSnapshot: {
-        condition: toConditionLabel(currentWeather.weathercode),
-        temperatureCelsius: currentWeather.temperature,
-        iconCode: toIconCode(currentWeather.weathercode),
-      },
-    };
-
-    const { data: latestEnc, error: encLookupErr } = await adminClient
-      .from('connection_encounters')
-      .select('id')
-      .eq('connection_id', connectionId)
-      .order('encountered_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (encLookupErr || !latestEnc?.id) {
-      if (encLookupErr) console.error('Encounter lookup for weather:', encLookupErr);
-      return;
-    }
-
-    const { error } = await adminClient
-      .from('connection_encounters')
-      .update({
-        weather_snapshot: enrichedCapsule.weatherSnapshot,
-      })
-      .eq('id', latestEnc.id);
-
-    if (error) {
-      console.error('Encounter weather update error:', error);
-    }
-  } catch (error) {
-    console.error('Memory capsule weather fetch error:', error);
-  }
-}
-
-/**
- * Computes terrain-relative altitude after insert so Open-Elevation latency never delays the POST response.
- */
-async function enrichEncounterRelativeAltitude(
-  adminClient: ReturnType<typeof createAdminClient>,
-  connectionId: string,
-  barometricElevationM: number,
-  lat: number,
-  lon: number,
-) {
-  if (
-    !Number.isFinite(barometricElevationM) ||
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lon) ||
-    (lat === 0 && lon === 0)
-  ) {
-    return;
-  }
-
-  try {
-    const terrainM = await fetchTerrainElevationMeters(lat, lon);
-    if (terrainM == null) return;
-
-    const { data: latestEnc, error: encLookupErr } = await adminClient
-      .from('connection_encounters')
-      .select('id')
-      .eq('connection_id', connectionId)
-      .order('encountered_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (encLookupErr || !latestEnc?.id) {
-      if (encLookupErr) console.error('Encounter lookup for relative altitude:', encLookupErr);
-      return;
-    }
-
-    const relativeAltitudeM = barometricElevationM - terrainM;
-    const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
-    const { error } = await adminClient
-      .from('connection_encounters')
-      .update({
-        relative_altitude_m: relativeAltitudeM,
-        ...(elevationCategory != null ? { elevation_category: elevationCategory } : {}),
-      })
-      .eq('id', latestEnc.id);
-
-    if (error) {
-      console.error('Encounter relative altitude update error:', error);
-    }
-  } catch (error) {
-    console.error('Relative altitude enrichment error:', error);
-  }
-}
 
 // ─── GET — fetch user's connections ──────────────────────────────────────────
-
-const INSIGHTS_QUERY_PARAM = 'includeInsights';
-/** `active` (default) | `archived` — ignored when `includeInsights` is set */
-const STATUS_SCOPE_PARAM = 'statusScope';
-/** Dashboard: one HTTP round-trip for active + archived + map (`?bundle=dashboard`). */
-const BUNDLE_PARAM = 'bundle';
-
-function isInsightsScope(searchParams: URLSearchParams): boolean {
-  const v = searchParams.get(INSIGHTS_QUERY_PARAM);
-  return v === '1' || v?.toLowerCase() === 'true';
-}
-
-type UserScopedSupabase = SupabaseClient;
-
-/**
- * Per-user junction rows (`connection_archives`, `connection_hidden`).
- * If a table is missing from the schema cache, return [] so the main connections query still works.
- */
-function isJunctionTableOptionalError(error: { code?: string; message?: string }): boolean {
-  const code = error.code;
-  const msg = String(error.message || '').toLowerCase();
-  return (
-    code === 'PGRST205' ||
-    msg.includes('schema cache') ||
-    msg.includes('does not exist')
-  );
-}
-
-/**
- * Lazy-sweep stale rows into `connection_archives` for this user before any connections read.
- * Must run while the caller still holds a valid JWT so `auth.uid()` matches in the RPC.
- */
-async function sweepStaleConnectionsForUser(
-  supabase: UserScopedSupabase,
-  userId: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { error } = await supabase.rpc('sweep_stale_connections_for_user', {
-    target_user_id: userId,
-  });
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-  return { ok: true };
-}
-
-async function fetchJunctionConnectionIds(
-  supabase: UserScopedSupabase,
-  table: 'connection_archives' | 'connection_hidden' | 'connection_core',
-  userId: string,
-): Promise<string[]> {
-  const { data, error } = await supabase.from(table).select('connection_id').eq('user_id', userId);
-
-  if (!error) {
-    const ids = (data ?? [])
-      .map((row: { connection_id?: string }) => row.connection_id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0);
-    return [...new Set(ids)];
-  }
-
-  if (isJunctionTableOptionalError(error)) {
-    console.warn(`[connections GET] ${table} optional junction unavailable:`, error.message);
-    return [];
-  }
-
-  console.error(`[connections GET] ${table} query failed:`, error.message);
-  return [];
-}
-
-function dedupeIds(ids: string[]): string[] {
-  return [...new Set(ids)];
-}
-
-/**
- * Dashboard surfaces only show the most recent encounters per connection; capping the
- * embedded rows keeps long-lived connections (hundreds of encounters) from inflating
- * every dashboard payload. Insights mode intentionally stays uncapped for analytics.
- */
-const DASHBOARD_ENCOUNTERS_PER_CONNECTION = 25;
-
-async function executeActiveConnectionsQuery(
-  supabase: UserScopedSupabase,
-  userId: string,
-  excludedIds: string[],
-  cursorLastMessageAt: number | null = null,
-  limit = 50,
-) {
-  const cappedLimit = Math.min(200, Math.max(1, limit));
-  let query = supabase
-    .from('connections')
-    .select('*, connection_encounters(*)')
-    .contains('user_ids', [userId])
-    .or(ACTIVE_CONNECTIONS_DB_OR_FILTER)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .order('created', { ascending: false })
-    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
-    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' })
-    .limit(cappedLimit);
-
-  if (cursorLastMessageAt != null && Number.isFinite(cursorLastMessageAt)) {
-    query = query.or(
-      `last_message_at.lt.${cursorLastMessageAt},and(last_message_at.is.null,created.lt.${cursorLastMessageAt})`,
-    );
-  }
-
-  if (excludedIds.length > 0) {
-    query = query.not('id', 'in', `(${excludedIds.join(',')})`);
-  }
-
-  return await query;
-}
-
-function parseActiveConnectionsPagination(searchParams: URLSearchParams): {
-  cursor: number | null;
-  limit: number;
-} {
-  const limitRaw = searchParams.get('limit');
-  let limit = 50;
-  if (limitRaw != null) {
-    const parsed = Number.parseInt(limitRaw, 10);
-    if (Number.isFinite(parsed)) {
-      limit = Math.min(200, Math.max(1, parsed));
-    }
-  }
-  const cursorRaw = searchParams.get('cursor')?.trim();
-  const cursor =
-    cursorRaw != null && /^\d+$/.test(cursorRaw) ? Number.parseInt(cursorRaw, 10) : null;
-  return { cursor, limit };
-}
-
-async function executeArchivedConnectionsQuery(
-  supabase: UserScopedSupabase,
-  userId: string,
-  includeIds: string[],
-) {
-  if (includeIds.length === 0) {
-    return { data: [], error: null };
-  }
-
-  return await supabase
-    .from('connections')
-    .select('*, connection_encounters(*)')
-    .contains('user_ids', [userId])
-    .in('id', includeIds)
-    .order('created', { ascending: false })
-    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
-    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' });
-}
-
-async function executeMapConnectionsQuery(
-  supabase: UserScopedSupabase,
-  userId: string,
-  hiddenForUser: string[],
-) {
-  const hiddenSet = new Set(hiddenForUser);
-  let mapQuery = supabase
-    .from('connections')
-    .select('*, connection_encounters(*)')
-    .contains('user_ids', [userId])
-    .order('created', { ascending: false })
-    .order('encountered_at', { ascending: false, referencedTable: 'connection_encounters' })
-    .limit(DASHBOARD_ENCOUNTERS_PER_CONNECTION, { referencedTable: 'connection_encounters' });
-
-  if (hiddenSet.size > 0) {
-    mapQuery = mapQuery.not('id', 'in', `(${[...hiddenSet].join(',')})`);
-  }
-
-  return await mapQuery;
-}
 
 export async function GET(request: NextRequest) {
   try {

@@ -9,11 +9,17 @@ export const pushTokensBodySchema = z.object({
   token: nonEmptyString,
   platform: optionalNonEmptyString,
   token_type: optionalNonEmptyString,
+  device_id: optionalNonEmptyString,
 }).passthrough();
 
 export const preferencesBodySchema = z.object({
   message_push_enabled: z.boolean().optional(),
   call_push_enabled: z.boolean().optional(),
+  event_reminder_push_enabled: z.boolean().optional(),
+  availability_match_push_enabled: z.boolean().optional(),
+  hub_message_push_enabled: z.boolean().optional(),
+  event_teaser_push_enabled: z.boolean().optional(),
+  reconnect_nudge_push_enabled: z.boolean().optional(),
 }).passthrough();
 
 export const availabilityBodySchema = z.object({
@@ -131,3 +137,7 @@ export const insightsBeaconCreateBodySchema = z.object({
 export const insightsVenueBeaconBodySchema = z.object({
   spotify_playlist_uri: optionalNonEmptyString,
 }).passthrough();
+
+export const ghostModeBodySchema = z.object({
+  enabled: z.boolean(),
+});

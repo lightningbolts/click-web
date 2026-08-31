@@ -300,7 +300,7 @@ export default function SocialActivityPage() {
                       <Cell
                         key={i}
                         fill={isTop ? '#8338EC' : chart.barMuted}
-                        style={isTop ? { filter: 'drop-shadow(0 0 8px rgba(131,56,236,0.5))' } : {}}
+                        style={isTop ? { filter: 'drop-shadow(0 0 8px rgba(124,58,237,0.5))' } : {}}
                       />
                     );
                   })}
@@ -351,7 +351,7 @@ export default function SocialActivityPage() {
                 />
                 <Bar dataKey="lastWeek" fill={chart.barMutedStrong} radius={[4, 4, 0, 0]} name="Last week" />
                 <Bar dataKey="thisWeek" fill="#8338EC" radius={[4, 4, 0, 0]} name="This week"
-                  style={{ filter: 'drop-shadow(0 0 6px rgba(131,56,236,0.4))' }}
+                  style={{ filter: 'drop-shadow(0 0 6px rgba(124,58,237,0.4))' }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -409,7 +409,7 @@ export default function SocialActivityPage() {
                     <Cell
                       key={hour}
                       fill={hour === data?.peakHour ? '#8338EC' : chart.barMuted}
-                      style={hour === data?.peakHour ? { filter: 'drop-shadow(0 0 8px rgba(131,56,236,0.5))' } : {}}
+                      style={hour === data?.peakHour ? { filter: 'drop-shadow(0 0 8px rgba(124,58,237,0.5))' } : {}}
                     />
                   ))}
                 </Bar>

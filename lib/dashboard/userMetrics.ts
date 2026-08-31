@@ -1,6 +1,11 @@
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { LucideIcon } from 'lucide-react';
 import { Award, Flame, Heart, Network, Sparkles, Star, Users } from 'lucide-react';
+import { isPriorSource } from '@/lib/insights/analytics';
+
+function handshakeOnly(connections: ConnectionRecord[]): ConnectionRecord[] {
+  return connections.filter((c) => !isPriorSource(c.source));
+}
 
 /** Local calendar day key for streak / grouping */
 function dateKey(d: Date): string {
@@ -91,11 +96,12 @@ export interface UserDashboardMetrics {
 }
 
 export function buildDashboardMetrics(connections: ConnectionRecord[], now = new Date()): UserDashboardMetrics {
-  const totalConnections = connections.length;
-  const thisMonth = countConnectionsThisMonth(connections, now);
-  const lastMonth = countConnectionsLastMonth(connections, now);
-  const streak = computeConnectionStreak(connections);
-  const keptCount = connections.filter(
+  const handshake = handshakeOnly(connections);
+  const totalConnections = handshake.length;
+  const thisMonth = countConnectionsThisMonth(handshake, now);
+  const lastMonth = countConnectionsLastMonth(handshake, now);
+  const streak = computeConnectionStreak(handshake);
+  const keptCount = handshake.filter(
     (c) => c.status === 'kept' || c.status === 'active',
   ).length;
   const retentionRate =
@@ -202,6 +208,25 @@ export function getUnlockedAchievements(metrics: UserDashboardMetrics): Unlocked
       priority,
     }))
     .sort((a, b) => b.priority - a.priority);
+}
+
+export interface AchievementStatus extends UnlockedAchievement {
+  unlocked: boolean;
+}
+
+/** All achievement rules with earned vs locked state (earned first). */
+export function getAllAchievements(metrics: UserDashboardMetrics): AchievementStatus[] {
+  return ACHIEVEMENT_RULES.map(({ id, title, description, icon, priority, unlocked }) => ({
+    id,
+    title,
+    description,
+    icon,
+    priority,
+    unlocked: unlocked(metrics),
+  })).sort((a, b) => {
+    if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
+    return b.priority - a.priority;
+  });
 }
 
 export interface NextMilestone {

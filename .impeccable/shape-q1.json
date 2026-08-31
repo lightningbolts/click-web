@@ -1,0 +1,40 @@
+{
+  "title": "What are we shaping?",
+  "question": "Shape writes a confirmed UX/UI brief, then stops — no code. PRODUCT.md and Functional Clarity (DESIGN.md) already exist, so this is not a rebrand unless you say so. Which surface should the brief cover? Use the note for a different route, a new feature, or if this is actually a visual-world replacement.",
+  "steer": true,
+  "followup": true,
+  "options": [
+    {
+      "id": "landing",
+      "label": "Landing / waitlist",
+      "kicker": "PERSUADE · /",
+      "thesis": "A first-time visitor must understand the handshake, want in, and join the waitlist — without a feed costume.",
+      "body": "Anonymous SSR marketing, logo-first hero, playground, About, waitlist. Primary audience is people who have not joined yet. Operator proof stays off this page (Enterprise is a link).",
+      "case": "Usual first surface for a full upgrade. Mode: Persuade."
+    },
+    {
+      "id": "dashboard",
+      "label": "Personal dashboard",
+      "kicker": "OPERATE · AUTHENTICATED /",
+      "thesis": "Someone who already connected in the room continues that relationship: Memory Box, map, chat, QR, calls.",
+      "body": "Post-handshake companion. Success is continuing a real connection, not lingering. Hardware handshake stays on the phone.",
+      "case": "Mode: Operate. Inherits Functional Clarity; composition may still be open."
+    },
+    {
+      "id": "insights",
+      "label": "Click for Business",
+      "kicker": "OPERATE · /insights",
+      "thesis": "A venue or promoter must see who actually showed up together — verified factions, not door counts.",
+      "body": "Heatmap, tribes, vibe radar, sticky score, events engagement. Anonymized topology. Consumer chrome stays out of the way.",
+      "case": "Mode: Operate. Web-only operator surface."
+    },
+    {
+      "id": "events",
+      "label": "Public events",
+      "kicker": "PERSUADE + OPERATE · /events",
+      "thesis": "Find, understand, and RSVP to a real night — guest-friendly, no account required on the microsite.",
+      "body": "Directory, create, /e/{id} guest RSVP, Source Serif titles, CardVisual covers. Mix of public conversion and operator publishing.",
+      "case": "Mode depends on the exact route you name in the note."
+    }
+  ]
+}

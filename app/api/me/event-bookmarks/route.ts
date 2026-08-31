@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
+import { loadUserDisplayNames, parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
 import { parseEventCategoryTags } from "@/lib/events/connectionEventRecommendation";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -61,7 +61,9 @@ export async function GET(request: NextRequest) {
     if (beaconIds.length > 0) {
       const { data: beacons, error: beaconErr } = await admin
         .from("map_beacons")
-        .select("id, metadata, expires_at, location, beacon_type")
+        .select(
+          "id, creator_id, created_at, show_creator_name, metadata, expires_at, location, beacon_type",
+        )
         .in("id", beaconIds);
       if (beaconErr) {
         console.error("GET /api/me/event-bookmarks beacons:", beaconErr.message);
@@ -72,6 +74,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const creatorIds = [...beaconById.values()]
+      .map((b) => (typeof b.creator_id === "string" ? b.creator_id : null))
+      .filter((id): id is string => id != null);
+    const nameById = await loadUserDisplayNames(admin, creatorIds);
+
     const items = rows
       .map((row) => {
         if (!isRecord(row) || typeof row.beacon_id !== "string") return null;
@@ -81,6 +88,8 @@ export async function GET(request: NextRequest) {
           beacon != null
             ? parseLatLngFromLocationField(beacon.location, Number.NaN, Number.NaN)
             : { lat: Number.NaN, lng: Number.NaN };
+        const creatorId =
+          beacon != null && typeof beacon.creator_id === "string" ? beacon.creator_id : null;
         return {
           beacon_id: row.beacon_id,
           bookmarked_at: typeof row.created_at === "string" ? row.created_at : null,
@@ -101,6 +110,11 @@ export async function GET(request: NextRequest) {
           longitude: Number.isFinite(coords.lng) ? coords.lng : null,
           expires_at:
             beacon != null && typeof beacon.expires_at === "string" ? beacon.expires_at : null,
+          creator_id: creatorId,
+          creator_name: creatorId != null ? (nameById.get(creatorId) ?? null) : null,
+          created_at:
+            beacon != null && typeof beacon.created_at === "string" ? beacon.created_at : null,
+          show_creator_name: beacon != null && beacon.show_creator_name === true,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x != null);

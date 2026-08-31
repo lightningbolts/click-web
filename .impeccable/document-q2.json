@@ -1,0 +1,32 @@
+{
+  "title": "Two system facts to lock",
+  "question": "North star is Functional Clarity. Tokens are extracted. Two facts in the code conflict with older docs — DESIGN.md needs your call. Use the note if the color name “Click Violet” for #7C3AED is wrong.",
+  "steer": true,
+  "followup": false,
+  "options": [
+    {
+      "id": "manrope-serif-flat",
+      "label": "Manrope + event serif, flat chrome",
+      "kicker": "AS SHIPPED IN CODE",
+      "thesis": "UI is Manrope. Source Serif 4 is the display face for event titles only. Chrome is flat: 1px seams, tonal stacking, no drop shadows on cards.",
+      "body": "Shadows may exist on menus, popovers, and map overlays — those are floating layers, not product chrome. Primary buttons keep the 2px press nudge. CardVisual gradients stay the only sanctioned non-flat paint, and only on entity identity.",
+      "case": "Matches globals.css, EventListCard, EventCreateForm, and the 01-design-system-web bans."
+    },
+    {
+      "id": "manrope-only-flat",
+      "label": "Manrope only, serif is drift",
+      "kicker": "OLDER WEB DOCS",
+      "thesis": "The system is Manrope only. Source Serif 4 on events is a local exception to record as drift, not a display token.",
+      "body": "Same flat chrome, same 2px press, same CardVisual exception. DESIGN.md will not list a display serif.",
+      "case": "Matches AI.md and 01-design-system-web.md “Manrope only — no Space Grotesk.”"
+    },
+    {
+      "id": "manrope-serif-lifted",
+      "label": "Keep the serif; shadows are in-system",
+      "kicker": "HYBRID DEPTH",
+      "thesis": "Manrope + Source Serif 4 for event titles, and existing shadows (menus, chat, QR, radar) are part of elevation — not drift.",
+      "body": "Document a small shadow vocabulary for overlays while cards stay bordered and opaque. Still no glass, glow, or gradient chrome.",
+      "case": "Matches scattered shadow-lg / shadow-xl usage in chat, events, insights."
+    }
+  ]
+}

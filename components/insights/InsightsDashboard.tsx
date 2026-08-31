@@ -221,7 +221,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+            className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
           >
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-on-surface mb-2">
@@ -246,7 +246,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-on-surface mb-2">
@@ -273,7 +273,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border-2 border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <Users className="w-16 h-16 text-outline mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-on-surface mb-2">
@@ -387,8 +387,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <GlassPanel className="lg:col-span-2 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-                <Activity className="w-4 h-4 text-[#630ed4]" />
+              <div className="p-2 bg-primary/20 rounded-lg">
+                <Activity className="w-4 h-4 text-primary" />
               </div>
               <span className="text-sm font-medium text-on-surface-variant">
                 Social Activity
@@ -412,8 +412,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#630ed4" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#630ed4" stopOpacity={0} />
+                    <stop offset="5%" stopColor={chart.primary} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={chart.primary} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -459,20 +459,14 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="#630ed4"
+                  stroke={chart.primary}
                   strokeWidth={2}
                   dot={false}
                   activeDot={{
                     r: 6,
-                    fill: "#630ed4",
+                    fill: chart.primary,
                     stroke: chartDotStroke,
                     strokeWidth: 2,
-                    style: {
-                      filter: "drop-shadow(0 0 8px rgba(131, 56, 236, 0.8))",
-                    },
-                  }}
-                  style={{
-                    filter: "drop-shadow(0 0 8px rgba(131, 56, 236, 0.5))",
                   }}
                 />
               </LineChart>
@@ -491,8 +485,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       >
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-              <Users className="w-4 h-4 text-[#630ed4]" />
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Users className="w-4 h-4 text-primary" />
             </div>
             <span className="text-sm font-medium text-on-surface-variant">
               Total Connections
@@ -506,8 +500,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-green-500/20 rounded-lg">
-              <TrendingUp className="w-4 h-4 text-green-500" />
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <TrendingUp className="w-4 h-4 text-primary" />
             </div>
             <span className="text-sm font-medium text-on-surface-variant">
               Retention Rate
@@ -521,8 +515,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-orange-500/20 rounded-lg">
-              <Calendar className="w-4 h-4 text-orange-500" />
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Calendar className="w-4 h-4 text-on-surface-variant" />
             </div>
             <span className="text-sm font-medium text-on-surface-variant">
               Busiest Day
@@ -536,8 +530,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-              <Clock className="w-4 h-4 text-[#630ed4]" />
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Clock className="w-4 h-4 text-primary" />
             </div>
             <span className="text-sm font-medium text-on-surface-variant">Peak Hour</span>
           </div>
@@ -553,8 +547,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-[#630ed4]/20 rounded-lg">
-                <BarChart3 className="w-4 h-4 text-[#630ed4]" />
+              <div className="p-2 bg-primary/20 rounded-lg">
+                <BarChart3 className="w-4 h-4 text-primary" />
               </div>
               <span className="text-sm font-medium text-on-surface-variant">
                 Popular Times
@@ -592,16 +586,8 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
                       key={`cell-${index}`}
                       fill={
                         index === displayInsights?.peakHour
-                          ? "#630ed4"
+                          ? chart.primary
                           : chart.barMuted
-                      }
-                      style={
-                        index === displayInsights?.peakHour
-                          ? {
-                            filter:
-                              "drop-shadow(0 0 8px rgba(131, 56, 236, 0.5))",
-                          }
-                          : {}
                       }
                     />
                   ))}
@@ -611,7 +597,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           </div>
           <div className="mt-4 text-center text-xs text-on-surface-variant">
             Peak activity is around{" "}
-            <span className="text-[#630ed4] font-bold">
+            <span className="text-primary font-bold">
               {displayInsights?.peakHour}:00
             </span>
           </div>

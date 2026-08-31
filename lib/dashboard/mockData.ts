@@ -5,6 +5,7 @@
 
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
+import { pluralize } from '@/lib/format/pluralize';
 import {
   extractEventContext,
   extractNoiseSummary,
@@ -239,6 +240,8 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
     noiseSummary: extractNoiseSummary(raw),
     noiseCategory: normalizeNoiseCategory(raw),
     status: rawConnection.status || 'kept',
+    source: typeof rawConnection.source === 'string' ? rawConnection.source : 'handshake',
+    knownSince: typeof rawConnection.known_since === 'string' ? rawConnection.known_since : null,
     // Include geo_location from the connection schema
     geo_location: hasValidGeo
       ? {
@@ -282,7 +285,7 @@ export function generateChaptersFromConnections(connections: ConnectionRecord[])
       },
       location: locations.length <= 2 ? locations.join(', ') : `${locations.length} locations`,
       connectionCount: conns.length,
-      description: `${conns.length} new connections made this month`,
+      description: `${pluralize(conns.length, 'new connection')} made this month`,
       highlights: locations.slice(0, 4),
       connections: conns,
     });

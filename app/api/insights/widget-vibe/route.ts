@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('connections')
-    .select('id, status, expiry_state, has_begun, user_ids')
-    .contains('user_ids', [user.id]);
+    .select('id, status, expiry_state, has_begun, user_ids, source')
+    .contains('user_ids', [user.id])
+    .eq('source', 'handshake');
 
   if (error) {
     console.error('widget-vibe connections:', error.message);
