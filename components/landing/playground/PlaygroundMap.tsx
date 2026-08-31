@@ -268,7 +268,7 @@ export default function PlaygroundMap({
       initialFitDoneRef.current = false;
       setReady(false);
     };
-    // Mount once. Theme swaps Carto styles in place — remounting resets the camera.
+    // Mount once. Theme swaps Carto styles in place; remounting resets the camera.
   }, []);
 
   useEffect(() => {

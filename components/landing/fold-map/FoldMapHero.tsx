@@ -4,7 +4,7 @@ import ClickLogo from '@/components/ClickLogo';
 import FoldMapLazy from '@/components/landing/fold-map/FoldMapLazy';
 import type { PresenceHeatmapCell } from '@/lib/landing/presenceHeatmap';
 
-const DIRECTION_CONTRACT = ` THESIS: The first viewport is the city — a quiet map of real handshake density — not a logo splash and not a feed. The handshake offer sits on one plate over that place.
+const DIRECTION_CONTRACT = ` THESIS: The first viewport is the city: a quiet map of real handshake density, not a logo splash and not a feed. The handshake offer sits on one plate over that place.
  OWN-WORLD: Functional Clarity: opaque plate, 1px seam, Click Violet #7C3AED, Manrope, 8px buttons and 16px card, Carto map as content not chrome.
  STORY: A first-time visitor sees they are invited into a real city of verified presence, understands this is an in-person handshake (phone), and joins the mobile-app waitlist. The web companion is already live.
  FIRST VIEWPORT: Full-bleed map under the existing navbar; violet heatmap of real handshake GPS (block-offset); zoom 9–18 to building; lower-left plate with mark, handshake line, tagline, proof sentence, Join the Waitlist, Why Click exists.
@@ -44,7 +44,7 @@ export default function FoldMapHero({
             Stop scrolling. Start living.
           </p>
           <p className="mt-3 max-w-sm text-sm font-medium leading-relaxed text-on-surface-variant">
-            Your phones confirm you were in the same room. No feed — just the people you actually
+            Your phones confirm you were in the same room. No feed. Just the people you actually
             met.
           </p>
           <div className="mt-6 flex flex-col items-start gap-4">

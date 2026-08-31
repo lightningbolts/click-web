@@ -249,7 +249,7 @@ export default function DashboardScene({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-on-surface-variant">{person.dateMet}</td>
-                          <td className="px-3 py-2.5 text-on-surface-variant">{memory?.place ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-on-surface-variant">{memory?.place ?? '-'}</td>
                           <td className="px-3 py-2.5">
                             {memory ? (
                               <span className="flex flex-col gap-0.5 text-xs">
@@ -259,7 +259,7 @@ export default function DashboardScene({
                                 </span>
                               </span>
                             ) : (
-                              '—'
+                              '-'
                             )}
                           </td>
                           <td className="px-3 py-2.5">

@@ -108,7 +108,7 @@ export default function LandingPage({
               Why Click exists
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed text-on-surface-variant">
-              You&apos;ve had that conversation at a party, a class, a show — the kind where you think,{' '}
+              You&apos;ve had that conversation at a party, a class, a show, the kind where you think,{' '}
               <span className="font-semibold text-primary">I should actually know this person</span>. Then you follow
               each other and it evaporates. Pretty soon they&apos;re just another handle in the same endless scroll.
             </p>

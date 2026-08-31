@@ -191,7 +191,7 @@ export default function ConnectScene({
             <ScanLine className="h-8 w-8 text-primary" />
             <p className="mt-2 text-sm font-semibold text-on-surface">Point at their Click QR</p>
             <p className="mt-1 px-6 text-center text-xs text-on-surface-variant">
-              Demo only — use Tap above to form a connection.
+              Demo only. Use Tap above to form a connection.
             </p>
           </div>
         </div>

@@ -273,7 +273,7 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
         </p>
       ) : (
         <p className="pointer-events-none absolute right-4 top-4 z-[1] max-w-[16rem] rounded-[8px] border border-border-hard bg-surface px-3 py-2 text-sm text-on-surface-variant shadow-sm">
-          Approximate handshake locations — each glow is offset by a block so nobody can be found.
+          Approximate handshake locations. Each glow is offset by a block so nobody can be found.
         </p>
       )}
     </div>
