@@ -3,15 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseEventScheduleFromMetadata } from '@/lib/map/eventSchedule';
 import { resolveCheckInRadiusMeters } from '@/lib/server/eventEngagement';
 import { eventHubExpiresAtIso } from '@/lib/server/eventHubAccess';
+import { resolveBeaconHubId } from '@/lib/map/mapBeacons';
 
 export { EVENT_HUB_TTL_AFTER_END_MS, eventHubExpiresAtIso } from '@/lib/server/eventHubAccess';
 
 export function newEventHubId(): string {
   return `hub_${randomUUID().replace(/-/g, '')}`;
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 function eventTitleFromMetadata(metadata: Record<string, unknown>): string {
@@ -167,8 +164,5 @@ export async function revokeEventHubOnCheckOut(
 }
 
 export function hubIdFromBeaconRow(row: Record<string, unknown>): string | null {
-  if (typeof row.hub_id === 'string' && row.hub_id.trim()) return row.hub_id.trim();
-  const meta = isRecord(row.metadata) ? row.metadata : null;
-  if (meta && typeof meta.hub_id === 'string' && meta.hub_id.trim()) return meta.hub_id.trim();
-  return null;
+  return resolveBeaconHubId(row);
 }
