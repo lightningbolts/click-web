@@ -126,15 +126,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Prefer the `map_beacons.hub_id` column when the field is present, including an
- * explicit SQL NULL after `ON DELETE SET NULL`. Fall back to `metadata.hub_id`
- * only for older payloads that omit the column.
+ * Hub id for API JSON. There is no `map_beacons.hub_id` column — use a
+ * non-empty injected value (RPC join / lookup) or `metadata.hub_id`.
  */
 export function resolveBeaconHubId(row: Record<string, unknown>): string | null {
-  if (Object.prototype.hasOwnProperty.call(row, "hub_id")) {
-    const col = row.hub_id;
-    return typeof col === "string" && col.trim() ? col.trim() : null;
-  }
+  const col = row.hub_id;
+  if (typeof col === "string" && col.trim()) return col.trim();
   const meta = isRecord(row.metadata) ? row.metadata : null;
   if (meta && typeof meta.hub_id === "string" && meta.hub_id.trim()) {
     return meta.hub_id.trim();

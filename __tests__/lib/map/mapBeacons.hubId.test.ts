@@ -14,16 +14,7 @@ const liveBeacon = {
 };
 
 describe('resolveBeaconHubId', () => {
-  it('keeps an explicit SQL NULL instead of falling back to metadata', () => {
-    expect(
-      resolveBeaconHubId({
-        hub_id: null,
-        metadata: { hub_id: 'hub_stale' },
-      }),
-    ).toBeNull();
-  });
-
-  it('uses the column when it is set', () => {
+  it('uses an injected JSON hub_id when set', () => {
     expect(
       resolveBeaconHubId({
         hub_id: 'hub_live',
@@ -32,18 +23,23 @@ describe('resolveBeaconHubId', () => {
     ).toBe('hub_live');
   });
 
-  it('falls back to metadata only when the column is omitted', () => {
+  it('falls back to metadata when the JSON field is missing or null', () => {
     expect(resolveBeaconHubId({ metadata: { hub_id: 'hub_legacy' } })).toBe('hub_legacy');
+    expect(
+      resolveBeaconHubId({
+        hub_id: null,
+        metadata: { hub_id: 'hub_from_meta' },
+      }),
+    ).toBe('hub_from_meta');
   });
 });
 
 describe('parseMapBeacon hub_id', () => {
-  it('does not revive a deleted hub from metadata', () => {
+  it('reads hub_id from metadata when the column is absent', () => {
     const parsed = parseMapBeacon({
       ...liveBeacon,
-      hub_id: null,
-      metadata: { title: 'Show', hub_id: 'hub_stale' },
+      metadata: { title: 'Show', hub_id: 'hub_from_meta' },
     });
-    expect(parsed?.hub_id).toBeNull();
+    expect(parsed?.hub_id).toBe('hub_from_meta');
   });
 });

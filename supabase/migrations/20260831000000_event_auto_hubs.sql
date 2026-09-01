@@ -1,23 +1,16 @@
 -- Link each user event beacon to an auto-created community hub.
 -- Event hubs are excluded from nearby-hub discovery (the event pin is the surface).
+-- Do not add map_beacons.hub_id — that column does not exist. The reverse
+-- pointer is hub_venues.event_beacon_id; clients also read metadata.hub_id.
 
 ALTER TABLE public.hub_venues
     ADD COLUMN IF NOT EXISTS event_beacon_id uuid UNIQUE REFERENCES public.map_beacons (id) ON DELETE CASCADE;
 
-ALTER TABLE public.map_beacons
-    ADD COLUMN IF NOT EXISTS hub_id text REFERENCES public.hub_venues (id) ON DELETE SET NULL;
-
 CREATE INDEX IF NOT EXISTS hub_venues_event_beacon_id_idx
     ON public.hub_venues (event_beacon_id);
 
-CREATE INDEX IF NOT EXISTS map_beacons_hub_id_idx
-    ON public.map_beacons (hub_id);
-
 COMMENT ON COLUMN public.hub_venues.event_beacon_id IS
     'When set, this hub was created for a map event beacon. Access is check-in (or host), not geofence.';
-
-COMMENT ON COLUMN public.map_beacons.hub_id IS
-    'Auto-created event hub id. Distinct from venue_id (B2B venues).';
 
 CREATE OR REPLACE FUNCTION public.get_hubs_nearby(
     lat DOUBLE PRECISION,
@@ -108,7 +101,7 @@ AS $$
                 'id', b.id,
                 'creator_id', b.creator_id,
                 'venue_id', b.venue_id,
-                'hub_id', b.hub_id,
+                'hub_id', hv.id,
                 'beacon_type', b.beacon_type,
                 'show_creator_name', b.show_creator_name,
                 'visibility_audience', b.visibility_audience,
@@ -120,6 +113,7 @@ AS $$
             ) AS row_data,
             b.created_at
         FROM public.map_beacons b
+        LEFT JOIN public.hub_venues hv ON hv.event_beacon_id = b.id
         WHERE b.expires_at > now()
           AND ST_DWithin (
               b.location,
@@ -176,7 +170,7 @@ AS $$
                 'id', b.id,
                 'creator_id', b.creator_id,
                 'venue_id', b.venue_id,
-                'hub_id', b.hub_id,
+                'hub_id', hv.id,
                 'beacon_type', b.beacon_type,
                 'show_creator_name', b.show_creator_name,
                 'visibility_audience', b.visibility_audience,
@@ -188,6 +182,7 @@ AS $$
             ) AS row_data,
             b.created_at
         FROM public.map_beacons b
+        LEFT JOIN public.hub_venues hv ON hv.event_beacon_id = b.id
         WHERE b.creator_id = p_creator_id
           AND b.expires_at > now()
         ORDER BY b.created_at DESC

@@ -90,7 +90,7 @@ export async function createHubForEventBeacon(
   const nextMeta = { ...args.metadata, hub_id: hubId };
   const { error: linkErr } = await admin
     .from('map_beacons')
-    .update({ hub_id: hubId, metadata: nextMeta })
+    .update({ metadata: nextMeta })
     .eq('id', args.beaconId);
   if (linkErr) {
     console.error('[eventHubLifecycle] beacon hub_id:', linkErr.message);

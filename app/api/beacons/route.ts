@@ -446,7 +446,7 @@ export async function POST(request: NextRequest) {
           : {}),
       })
       .select(
-        "id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
+        "id, creator_id, venue_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
       )
       .maybeSingle();
 

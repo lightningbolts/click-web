@@ -343,6 +343,7 @@ describe("event engagement API contracts", () => {
             }),
           ),
         },
+        ...eventHubTables(),
       }),
     );
 
@@ -354,6 +355,7 @@ describe("event engagement API contracts", () => {
     const json = await res.json();
     expect(json.bookmarked).toBe(true);
     expect(json.checked_in).toBe(true);
+    expect(json.hub_id).toBe(EVENT_HUB_ID);
   });
 
   it("impressions POST writes event_view", async () => {
