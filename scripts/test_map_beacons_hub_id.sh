@@ -131,6 +131,13 @@ run_sql() {
     psql "$DB_URL" -v ON_ERROR_STOP=1 -X -f "$SQL"
     return
   fi
+  if [[ "$QUERY_TARGET" == local ]] && command -v docker >/dev/null 2>&1; then
+    local_container="${SUPABASE_DB_CONTAINER:-supabase_db_click-web}"
+    if docker inspect "$local_container" >/dev/null 2>&1; then
+      docker exec -i "$local_container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X < "$SQL"
+      return
+    fi
+  fi
   if command -v npx >/dev/null 2>&1; then
     (cd "$ROOT" && npx --no-install supabase db query "--${QUERY_TARGET}" --file "$SQL")
     return

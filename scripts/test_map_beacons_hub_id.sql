@@ -101,9 +101,11 @@ BEGIN
             JOIN pg_namespace n ON n.oid = p.pronamespace
             WHERE n.nspname = 'public'
               AND p.proname = 'fetch_map_beacons_within'
-              AND pg_get_functiondef(p.oid) ~ 'b\.hub_id'
+              AND pg_get_functiondef(p.oid) ~ '''hub_id'''
+              AND pg_get_functiondef(p.oid) ~ 'hub_venues'
+              AND pg_get_functiondef(p.oid) ~ 'event_beacon_id'
         ),
-        'fetch_map_beacons_within reads b.hub_id'
+        'fetch_map_beacons_within emits the canonical hub id'
     );
     PERFORM pg_temp.assert(
         EXISTS (
@@ -112,9 +114,11 @@ BEGIN
             JOIN pg_namespace n ON n.oid = p.pronamespace
             WHERE n.nspname = 'public'
               AND p.proname = 'fetch_creator_active_map_beacons'
-              AND pg_get_functiondef(p.oid) ~ 'b\.hub_id'
+              AND pg_get_functiondef(p.oid) ~ '''hub_id'''
+              AND pg_get_functiondef(p.oid) ~ 'hub_venues'
+              AND pg_get_functiondef(p.oid) ~ 'event_beacon_id'
         ),
-        'fetch_creator_active_map_beacons reads b.hub_id'
+        'fetch_creator_active_map_beacons emits the canonical hub id'
     );
     PERFORM pg_temp.assert(
         EXISTS (
