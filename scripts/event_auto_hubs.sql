@@ -1,17 +1,49 @@
--- Link each user event beacon to an auto-created community hub.
--- Event hubs are excluded from nearby-hub discovery (the event pin is the surface).
--- map_beacons.hub_id is added in 20260901200000_map_beacons_hub_id.sql
--- (this file originally shipped without it). The reverse pointer is
--- hub_venues.event_beacon_id.
+-- Event auto-hubs schema. Paste into the Supabase SQL Editor and run.
+-- Official copies:
+--   supabase/migrations/20260831000000_event_auto_hubs.sql
+--   supabase/migrations/20260901200000_map_beacons_hub_id.sql
+--
+-- What this does:
+--   * Adds hub_venues.event_beacon_id (uuid UNIQUE → map_beacons.id)
+--   * Adds map_beacons.hub_id (text → hub_venues.id, ON DELETE SET NULL)
+--   * Excludes event hubs from get_hubs_nearby
+--   * Emits hub_id on fetch_map_beacons_within / fetch_creator_active_map_beacons
+--
+-- Safe to re-run (ADD COLUMN IF NOT EXISTS, CREATE OR REPLACE FUNCTION).
 
 ALTER TABLE public.hub_venues
     ADD COLUMN IF NOT EXISTS event_beacon_id uuid UNIQUE REFERENCES public.map_beacons (id) ON DELETE CASCADE;
 
+ALTER TABLE public.map_beacons
+    ADD COLUMN IF NOT EXISTS hub_id text REFERENCES public.hub_venues (id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS hub_venues_event_beacon_id_idx
     ON public.hub_venues (event_beacon_id);
 
+CREATE INDEX IF NOT EXISTS map_beacons_hub_id_idx
+    ON public.map_beacons (hub_id);
+
 COMMENT ON COLUMN public.hub_venues.event_beacon_id IS
     'When set, this hub was created for a map event beacon. Access is check-in (or host), not geofence.';
+
+COMMENT ON COLUMN public.map_beacons.hub_id IS
+    'Auto-created event hub id. Distinct from venue_id (B2B venues). Cleared when the hub is deleted.';
+
+UPDATE public.map_beacons b
+SET hub_id = hv.id
+FROM public.hub_venues hv
+WHERE hv.event_beacon_id = b.id
+  AND b.hub_id IS NULL;
+
+UPDATE public.map_beacons b
+SET hub_id = b.metadata->>'hub_id'
+WHERE b.hub_id IS NULL
+  AND NULLIF(btrim(b.metadata->>'hub_id'), '') IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM public.hub_venues hv
+      WHERE hv.id = b.metadata->>'hub_id'
+  );
 
 CREATE OR REPLACE FUNCTION public.get_hubs_nearby(
     lat DOUBLE PRECISION,
@@ -102,7 +134,7 @@ AS $$
                 'id', b.id,
                 'creator_id', b.creator_id,
                 'venue_id', b.venue_id,
-                'hub_id', hv.id,
+                'hub_id', COALESCE(b.hub_id, hv.id),
                 'beacon_type', b.beacon_type,
                 'show_creator_name', b.show_creator_name,
                 'visibility_audience', b.visibility_audience,
@@ -171,7 +203,7 @@ AS $$
                 'id', b.id,
                 'creator_id', b.creator_id,
                 'venue_id', b.venue_id,
-                'hub_id', hv.id,
+                'hub_id', COALESCE(b.hub_id, hv.id),
                 'beacon_type', b.beacon_type,
                 'show_creator_name', b.show_creator_name,
                 'visibility_audience', b.visibility_audience,

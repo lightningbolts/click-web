@@ -4,7 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconType } from "@/lib/map/mapBeacons";
 import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
-import { syncEventHubFromBeacon } from "@/lib/server/eventHubLifecycle";
+import { findHubForEventBeacon, syncEventHubFromBeacon } from "@/lib/server/eventHubLifecycle";
 import { parseBody } from "@/lib/api/parseBody";
 import { beaconPatchBodySchema } from "@/lib/api/schemas/beacons";
 import {
@@ -71,6 +71,11 @@ async function enrichBeaconRow(
   // Never fall back to (0,0) — that poisons mobile map pins (null island).
   // Prefer NaN so parseMapBeacon rejects unparseable locations instead of inventing coords.
   const normalized = rowFromInsertWithLocation(row, Number.NaN, Number.NaN) as Record<string, unknown>;
+  const beaconId = typeof row.id === "string" ? row.id : "";
+  if (beaconId) {
+    const hub = await findHubForEventBeacon(admin, beaconId);
+    if (hub?.id) normalized.hub_id = hub.id;
+  }
   if (row.show_creator_name === true) {
     const { data: creator } = await admin
       .from("users")

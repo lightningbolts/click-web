@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadEventBeaconOrResponse } from "@/lib/server/eventEngagement";
+import { findHubForEventBeacon } from "@/lib/server/eventHubLifecycle";
 
 /**
  * GET /api/beacons/{id}/engagement — bookmark + check-in hydrate bundle (RSVP stays on /rsvp).
@@ -44,6 +45,8 @@ export async function GET(
     const checkedIn =
       checkIn != null && (checkIn.checked_out_at == null || checkIn.checked_out_at === undefined);
 
+    const hub = await findHubForEventBeacon(admin, beaconId);
+
     return NextResponse.json({
       beacon_id: beaconId,
       bookmarked: bookmark != null,
@@ -51,6 +54,7 @@ export async function GET(
       checked_in_at:
         checkedIn && typeof checkIn?.checked_in_at === "string" ? checkIn.checked_in_at : null,
       check_in_count: typeof countRes.count === "number" ? countRes.count : 0,
+      hub_id: hub?.id ?? null,
     });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/engagement:", e);
