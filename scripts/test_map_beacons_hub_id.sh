@@ -10,13 +10,16 @@ SECURITY_MIGRATION="$ROOT/supabase/migrations/20260901300000_event_hub_security_
 SQL="$ROOT/scripts/test_map_beacons_hub_id.sql"
 LIVE=false
 APPLY=false
+QUERY_TARGET=linked
 DB_URL="${SUPABASE_DB_URL:-${DATABASE_URL:-}}"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/test_map_beacons_hub_id.sh [--live] [--apply] [--db-url URL]
+Usage: scripts/test_map_beacons_hub_id.sh [--live] [--local|--linked] [--apply] [--db-url URL]
 
-  --live       Run scripts/test_map_beacons_hub_id.sql against a database.
+  --live       Run scripts/test_map_beacons_hub_id.sql against the linked database.
+  --local      With --live, target the local Supabase database instead.
+  --linked     With --live, target the linked Supabase database (default).
   --apply      Apply click-web's tracked migrations before the live checks.
   --db-url     Postgres URI (else SUPABASE_DB_URL or DATABASE_URL).
 
@@ -27,6 +30,8 @@ EOF
 while (($# > 0)); do
   case "$1" in
     --live) LIVE=true ;;
+    --local) QUERY_TARGET=local ;;
+    --linked) QUERY_TARGET=linked ;;
     --apply) APPLY=true; LIVE=true ;;
     --db-url)
       shift
@@ -127,7 +132,7 @@ run_sql() {
     return
   fi
   if command -v npx >/dev/null 2>&1; then
-    (cd "$ROOT" && npx --no-install supabase db query --linked --file "$SQL")
+    (cd "$ROOT" && npx --no-install supabase db query "--${QUERY_TARGET}" --file "$SQL")
     return
   fi
   echo "Need psql + SUPABASE_DB_URL/DATABASE_URL, or a linked Supabase CLI." >&2

@@ -113,7 +113,7 @@ jobs:
         run: bash scripts/run-supabase-db-tests.sh
 
       - name: Verify source migration contract
-        run: bash scripts/test_map_beacons_hub_id.sh
+        run: bash scripts/test_map_beacons_hub_id.sh --live --local
 
       - name: Stop local Supabase stack
         if: always()

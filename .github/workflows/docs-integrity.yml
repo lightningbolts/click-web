@@ -70,7 +70,8 @@ jobs:
               target = target.split(/[?#]/, 1)[0];
               if (!target) continue;
               const resolved = path.resolve(path.dirname(file), target);
-              if (!resolved.startsWith(`${root}${path.sep}`) || !fs.existsSync(resolved)) {
+              const insideRepo = resolved === root || resolved.startsWith(`${root}${path.sep}`);
+              if (!insideRepo || !fs.existsSync(resolved)) {
                 failures.push(`${file}: broken local link ${target}`);
               }
             }
