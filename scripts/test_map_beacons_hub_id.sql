@@ -24,7 +24,7 @@ $$;
 DO $$
 DECLARE
     v_user uuid;
-    v_beacon uuid := '00000000-0000-4000-8000-00b0eac0n001';
+    v_beacon uuid := '00000000-0000-4000-8000-00b0eac0a001';
     v_hub text := 'hub_migtest_map_beacons_hub_id';
     v_col_type text;
     v_nullable text;

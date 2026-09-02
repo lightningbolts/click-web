@@ -127,7 +127,7 @@ run_sql() {
     return
   fi
   if command -v npx >/dev/null 2>&1; then
-    (cd "$ROOT" && npx --no-install supabase db execute --file "$SQL")
+    (cd "$ROOT" && npx --no-install supabase db query --linked --file "$SQL")
     return
   fi
   echo "Need psql + SUPABASE_DB_URL/DATABASE_URL, or a linked Supabase CLI." >&2
