@@ -46,6 +46,11 @@ describe('tracked Supabase migration chain', () => {
     }
   });
 
+  it('uses a unique timestamp for every tracked migration', () => {
+    const versions = migrationNames.map((name) => name.split('_', 1)[0]);
+    expect(new Set(versions).size).toBe(versions.length);
+  });
+
   it('keeps the foundation upgrade-safe and additive', () => {
     const bootstrap = readMigration(bootstrapName);
     expect(bootstrap).not.toMatch(/^\s*(DROP|TRUNCATE|DELETE)\b/im);
