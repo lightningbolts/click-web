@@ -4,9 +4,5 @@ ALTER TYPE public.map_beacon_type ADD VALUE IF NOT EXISTS 'hazard';
 
 ALTER TYPE public.map_beacon_type ADD VALUE IF NOT EXISTS 'utility';
 
--- Legacy combined rows: default to `hazard` (cannot infer original user intent server-side).
-UPDATE public.map_beacons
-SET
-    beacon_type = 'hazard'::public.map_beacon_type
-WHERE
-    beacon_type::text = 'hazard_utility';
+-- The enum values must be committed before they can be used in a typed
+-- expression. The idempotent legacy-row backfill runs in the next migration.

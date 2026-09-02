@@ -51,6 +51,23 @@ describe('tracked Supabase migration chain', () => {
     expect(new Set(versions).size).toBe(versions.length);
   });
 
+  it('commits new beacon enum values before the legacy backfill uses them', () => {
+    const enumMigration = migrationNames.indexOf(
+      '20260502000000_split_hazard_utility_beacon_types.sql',
+    );
+    const backfillMigration = migrationNames.indexOf(
+      '20260502120000_backfill_hazard_utility_beacon_types.sql',
+    );
+    expect(enumMigration).toBeGreaterThanOrEqual(0);
+    expect(backfillMigration).toBeGreaterThan(enumMigration);
+    expect(readMigration('20260502000000_split_hazard_utility_beacon_types.sql')).not.toContain(
+      "'hazard'::public.map_beacon_type",
+    );
+    expect(readMigration('20260502120000_backfill_hazard_utility_beacon_types.sql')).toContain(
+      "'hazard'::public.map_beacon_type",
+    );
+  });
+
   it('keeps the foundation upgrade-safe and additive', () => {
     const bootstrap = readMigration(bootstrapName);
     expect(bootstrap).not.toMatch(/^\s*(DROP|TRUNCATE|DELETE)\b/im);
