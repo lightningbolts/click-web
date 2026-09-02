@@ -57,14 +57,13 @@ jobs:
           java-version: "17"
 
       # Maestro's bundled ChromeDriver must match Chrome's major version
-      # (session not created if they drift). Latest Maestro CLI ships
-      # ChromeDriver 151; 131 made the driver refuse to start. Pin both
-      # together if you bump Maestro.
+      # (session not created if they drift). Maestro CLI 2.8.0 ships
+      # ChromeDriver 152; pin both together if you bump Maestro.
       - name: Set up Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
-          chrome-version: 151
+          chrome-version: 152
           install-dependencies: true
 
       # Maestro Selenium hardcodes binary: /usr/bin/google-chrome (maestro#2576).
