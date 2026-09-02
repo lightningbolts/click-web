@@ -27,7 +27,7 @@ async function resolveBeaconAndVerifyCreator(
 ) {
   const { data, error } = await admin
     .from("map_beacons")
-    .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+    .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
     .eq("id", beaconId)
     .maybeSingle();
 
@@ -118,7 +118,7 @@ export async function GET(
     const admin = createAdminSupabaseClient();
     const { data, error } = await admin
       .from("map_beacons")
-      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+      .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .eq("id", beaconId)
       .maybeSingle();
 
@@ -290,7 +290,7 @@ export async function PATCH(
       .update(patch)
       .eq("id", beaconId)
       .eq("creator_id", user.id)
-      .select("id, creator_id, venue_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+      .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .maybeSingle();
 
     if (updateError) {

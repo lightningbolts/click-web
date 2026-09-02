@@ -1,30 +1,12 @@
--- Event auto-hubs schema. Paste into the Supabase SQL Editor and run.
--- Official copies:
---   supabase/migrations/20260831000000_event_auto_hubs.sql
---   supabase/migrations/20260901200000_map_beacons_hub_id.sql
---
--- What this does:
---   * Adds hub_venues.event_beacon_id (uuid UNIQUE → map_beacons.id)
---   * Adds map_beacons.hub_id (text → hub_venues.id, ON DELETE SET NULL)
---   * Excludes event hubs from get_hubs_nearby
---   * Emits hub_id on fetch_map_beacons_within / fetch_creator_active_map_beacons
---
--- Safe to re-run (ADD COLUMN IF NOT EXISTS, CREATE OR REPLACE FUNCTION).
-
-ALTER TABLE public.hub_venues
-    ADD COLUMN IF NOT EXISTS event_beacon_id uuid UNIQUE REFERENCES public.map_beacons (id) ON DELETE CASCADE;
+-- First-class map_beacons.hub_id (text → hub_venues.id, ON DELETE SET NULL).
+-- 20260831000000 only added the reverse pointer hub_venues.event_beacon_id.
+-- Safe to re-run.
 
 ALTER TABLE public.map_beacons
     ADD COLUMN IF NOT EXISTS hub_id text REFERENCES public.hub_venues (id) ON DELETE SET NULL;
 
-CREATE INDEX IF NOT EXISTS hub_venues_event_beacon_id_idx
-    ON public.hub_venues (event_beacon_id);
-
 CREATE INDEX IF NOT EXISTS map_beacons_hub_id_idx
     ON public.map_beacons (hub_id);
-
-COMMENT ON COLUMN public.hub_venues.event_beacon_id IS
-    'When set, this hub was created for a map event beacon. Access is check-in (or host), not geofence.';
 
 COMMENT ON COLUMN public.map_beacons.hub_id IS
     'Auto-created event hub id. Distinct from venue_id (B2B venues). Cleared when the hub is deleted.';
@@ -44,73 +26,6 @@ WHERE b.hub_id IS NULL
       FROM public.hub_venues hv
       WHERE hv.id = b.metadata->>'hub_id'
   );
-
-CREATE OR REPLACE FUNCTION public.get_hubs_nearby(
-    lat DOUBLE PRECISION,
-    lng DOUBLE PRECISION,
-    radius_meters DOUBLE PRECISION DEFAULT 15000,
-    p_limit INTEGER DEFAULT 50
-)
-RETURNS TABLE (
-    id text,
-    name text,
-    category text,
-    geofence_lat double precision,
-    geofence_long double precision,
-    radius_meters integer,
-    expires_at timestamptz,
-    distance_meters double precision,
-    participant_count bigint
-)
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-    WITH nearby AS (
-        SELECT
-            h.id,
-            h.name,
-            h.category,
-            h.geofence_lat,
-            h.geofence_long,
-            h.radius_meters,
-            h.expires_at,
-            ST_Distance(
-                h.location,
-                ST_SetSRID (ST_MakePoint (lng, lat), 4326)::geography
-            ) AS distance_meters
-        FROM public.hub_venues h
-        WHERE (h.expires_at IS NULL OR h.expires_at > now())
-          AND h.event_beacon_id IS NULL
-          AND ST_DWithin (
-              h.location,
-              ST_SetSRID (ST_MakePoint (lng, lat), 4326)::geography,
-              radius_meters
-          )
-        ORDER BY distance_meters ASC
-        LIMIT GREATEST(1, LEAST(COALESCE(p_limit, 50), 100))
-    )
-    SELECT
-        n.id,
-        n.name,
-        n.category,
-        n.geofence_lat,
-        n.geofence_long,
-        n.radius_meters,
-        n.expires_at,
-        n.distance_meters,
-        COALESCE(pc.cnt, 0::bigint) AS participant_count
-    FROM nearby n
-    LEFT JOIN (
-        SELECT hub_id, COUNT(*)::bigint AS cnt
-        FROM public.hub_participants
-        GROUP BY hub_id
-    ) pc ON pc.hub_id = n.id;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_hubs_nearby(double precision, double precision, double precision, integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_hubs_nearby(double precision, double precision, double precision, integer) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.fetch_map_beacons_within (
     lat DOUBLE PRECISION,

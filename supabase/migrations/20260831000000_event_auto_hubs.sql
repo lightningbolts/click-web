@@ -1,7 +1,8 @@
 -- Link each user event beacon to an auto-created community hub.
 -- Event hubs are excluded from nearby-hub discovery (the event pin is the surface).
--- Do not add map_beacons.hub_id — that column does not exist. The reverse
--- pointer is hub_venues.event_beacon_id; clients also read metadata.hub_id.
+-- map_beacons.hub_id is added in 20260901200000_map_beacons_hub_id.sql
+-- (this file originally shipped without it). The reverse pointer is
+-- hub_venues.event_beacon_id.
 
 ALTER TABLE public.hub_venues
     ADD COLUMN IF NOT EXISTS event_beacon_id uuid UNIQUE REFERENCES public.map_beacons (id) ON DELETE CASCADE;
