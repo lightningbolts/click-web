@@ -75,6 +75,8 @@ const corsHeaders = {
 
 **POST** JSON body includes `my_token`, `tokens` / `heard_tokens`, GPS (`gps_lat` / `gps_lon` or `latitude` / `longitude`), sensor fields (`lux_level`, `motion_variance`, `compass_azimuth`, `battery_level`, barometric elevation, noise), `context_tags`, `timezone_offset_minutes`, optional `simulator_mock`.
 
+`simulator_mock` is ignored unless the nonproduction deployment explicitly sets `CLICK_ENABLE_SIMULATOR_MOCK=true` and `CLICK_APP_ENV` is not `production`. Never set this capability in production.
+
 ### Matching pipeline
 
 1. **Insert** row into `proximity_handshake_events` (ghost tap buffer).

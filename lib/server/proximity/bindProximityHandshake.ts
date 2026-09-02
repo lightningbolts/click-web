@@ -37,6 +37,7 @@ import {
   insertOrDebounceEncounter,
   memberSensorValues,
 } from '@/lib/server/proximity/encounterPersistence';
+import { simulatorProximityMocksEnabled } from '@/lib/server/runtimeEnv';
 
 export async function bindProximityHandshake(
   admin: SupabaseClient,
@@ -57,7 +58,12 @@ export async function bindProximityHandshake(
     .filter((t): t is string => t != null);
   const combinedEvidenceTokens = [...new Set([...heardTokens, ...detectedDevices])];
 
-  if (body.simulator_mock === true && myToken === '1234' && heardTokens.includes('5678')) {
+  if (
+    body.simulator_mock === true &&
+    simulatorProximityMocksEnabled() &&
+    myToken === '1234' &&
+    heardTokens.includes('5678')
+  ) {
     const connectionId = '00000000-0000-4000-8000-000000000123';
     const mockUserId = '00000000-0000-4000-8000-000000000567';
     return {

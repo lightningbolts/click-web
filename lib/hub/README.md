@@ -1,6 +1,6 @@
 # Community Hub library (`lib/hub`)
 
-Place-scoped chat spaces with geofenced participation and thin API routes for create/nearby/messages/media/leave. Hubs are **not** E2EE connection chats — they are location-bound rooms with server-enforced proximity. **Hubs do not expire** (`hub_venues.expires_at` is null).
+Place-scoped chat spaces with thin API routes for create/nearby/messages/media/leave. Standalone hubs use a geofence; event hubs use active event check-in (or host status) and expire after their configured event window. Hubs are **not** E2EE connection chats.
 
 ---
 
@@ -23,9 +23,9 @@ POST /api/hub/create
 hub_venues + hub_participants
     │
     ├─ GET  /api/hub/nearby        (discover within radius)
-    ├─ GET  /api/hub/messages      (participant-gated thread + participant_ids)
-    ├─ POST /api/hub/messages      (assertHubGeofenceFromCoords)
-    ├─ POST /api/hub/media         (geofenced uploads)
+    ├─ GET  /api/hub/messages      (authoritative access + privacy-safe participant data)
+    ├─ POST /api/hub/messages      (fresh geofence or active event check-in)
+    ├─ GET/POST /api/hub/media     (authorized short-lived media URLs)
     ├─ POST /api/hub/leave
     └─ GET  /api/hub/[id]          (hub detail)
 ```
@@ -38,7 +38,7 @@ hub_venues + hub_participants
 2. Reject if `expires_at` is set and past (**410** `HUB_EXPIRED`) — rare; new hubs never set expiry
 3. `haversineMeters(user, venue) > radius` → **400** `OUT_OF_BOUNDS` with `distance_meters`
 
-Matches mobile `verify-hub-proximity` Edge Function semantics (geofence; that function does not gate on expiry).
+`assertHubReadable(admin, hubId, userId)` is the shared read/search gate. It rechecks event check-in and expiry for event hubs instead of trusting a stale `hub_participants` row. Standalone hubs require current participant membership.
 
 ---
 
@@ -48,11 +48,12 @@ Matches mobile `verify-hub-proximity` Edge Function semantics (geofence; that fu
 |-------|--------|-------------|
 | `/api/hub/create` | POST | `{ name, category, location: { lat, lng, radius_meters? } }` — inserts venue + creator participant |
 | `/api/hub/nearby` | GET | Query lat/lng/radius — list hubs (`expires_at` null or future) |
-| `/api/hub/[id]` | GET | Hub metadata + participant counts |
+| `/api/hub/[id]` | GET | Hub metadata after authoritative access check; event-owned hubs cannot be patched/deleted directly |
 | `/api/hub/[id]/participants/me` | GET/PATCH | Self participant row |
-| `/api/hub/messages` | GET | `hubId` + optional `aroundMessageId` — participant-gated timeline + `participant_ids` |
-| `/api/hub/messages` | POST | Text message (geofence required). No per-send timed cooldown. |
-| `/api/hub/media` | POST | Media attachment (geofence required) |
+| `/api/hub/messages` | GET | `hubId` + optional `aroundMessageId` — active event access or current standalone membership. `hosts_only` events return occupant count without participant IDs. |
+| `/api/hub/messages` | POST | Text message (fresh geofence or active event check-in), limited to 30 sends per user/hub per minute. |
+| `/api/hub/media` | POST | Private media upload; maximum 25 MiB and 6 uploads per user/hub per minute; returns object path, bucket, and a five-minute signed URL. |
+| `/api/hub/media` | GET | `hubId` + object path — rechecks access and mints a five-minute signed URL. |
 | `/api/hub/leave` | POST | Leave hub |
 
 Auth: `requireBearerUser` from `chatGatekeeper` (JWT validation only; hub writes use geofence, not connection membership).
@@ -61,9 +62,10 @@ Auth: `requireBearerUser` from `chatGatekeeper` (JWT validation only; hub writes
 
 ## E2EE / API constraints
 
-- Hub messages are **not** connection-scoped E2EE; treat as venue chat at rest with RLS.
+- Hub messages are **not** connection-scoped E2EE; treat as server-readable venue chat at rest.
 - Geofence coordinates are sent per request — server does not trust cached client location without fresh lat/lng.
-- Venue lifetime is permanent unless an admin sets `expires_at`.
+- New hub media uses the private `hub-media` bucket. Persist `media_path` and `media_bucket`, never signed URLs. Legacy `media_url` records remain readable during migration.
+- Event hubs are inaccessible after expiry or check-out. Event hosts must edit/delete the event rather than its linked hub.
 
 ---
 

@@ -14,10 +14,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { assertHubGeofenceFromCoords } from '@/lib/server/hubGatekeeper';
+import { assertHubGeofenceFromCoords, assertHubReadable } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubMessagesBodySchema } from '@/lib/api/schemas/beacons';
+import {
+  HUB_MESSAGE_RATE_LIMIT,
+  HUB_MESSAGE_RATE_LIMIT_BINDING,
+  HUB_MUTATION_RATE_WINDOW_MS,
+  isRateLimited,
+} from '@/lib/server/rateLimit';
 import { notifyHubMessageParticipants } from '@/lib/hub/notifyHubMessage';
 import {
   HUB_AROUND_WINDOW,
@@ -50,22 +56,10 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createChatGatekeeperAdmin();
-  const { data: participant, error: partErr } = await admin
-    .from('hub_participants')
-    .select('user_id')
-    .eq('hub_id', hubId)
-    .eq('user_id', auth.user.id)
-    .maybeSingle();
-  if (partErr) {
-    console.error('[hub/messages GET] participant:', partErr.message);
-    return NextResponse.json({ error: 'Failed to load hub' }, { status: 500 });
-  }
-  if (!participant) {
-    return NextResponse.json(
-      { error: 'NOT_A_PARTICIPANT', messages: [] as HubThreadMessage[], participant_ids: [] as string[] },
-      { status: 403 },
-    );
-  }
+  // A participant row is not sufficient for event hubs: a checked-out or
+  // expired attendee can otherwise keep reading through a stale row.
+  const denied = await assertHubReadable(admin, hubId, auth.user.id);
+  if (denied) return denied;
 
   const { data: partRows, error: partsErr } = await admin
     .from('hub_participants')
@@ -74,13 +68,49 @@ export async function GET(request: NextRequest) {
   if (partsErr) {
     console.error('[hub/messages GET] participants:', partsErr.message);
   }
-  const participantIds = [
+  const allParticipantIds = [
     ...new Set(
       (partRows ?? [])
         .map((row) => (typeof row.user_id === 'string' ? row.user_id : ''))
         .filter(Boolean),
     ),
   ];
+
+  // Event hosts may opt out of publishing a guest list. Participants can still
+  // read the room, but only receive its occupant count, not a directory of ids.
+  let participantIds = allParticipantIds;
+  const { data: hubVenue, error: venueErr } = await admin
+    .from('hub_venues')
+    .select('event_beacon_id')
+    .eq('id', hubId)
+    .maybeSingle();
+  if (venueErr) {
+    console.error('[hub/messages GET] event venue:', venueErr.message);
+    return NextResponse.json({ error: 'Failed to load hub' }, { status: 500 });
+  }
+  const eventBeaconId =
+    hubVenue != null && typeof (hubVenue as { event_beacon_id?: unknown }).event_beacon_id === 'string'
+      ? (hubVenue as { event_beacon_id: string }).event_beacon_id
+      : null;
+  if (eventBeaconId) {
+    const { data: eventBeacon, error: eventErr } = await admin
+      .from('map_beacons')
+      .select('creator_id, guest_list_visibility')
+      .eq('id', eventBeaconId)
+      .maybeSingle();
+    if (eventErr) {
+      console.error('[hub/messages GET] event guest visibility:', eventErr.message);
+      return NextResponse.json({ error: 'Failed to load hub' }, { status: 500 });
+    }
+    const hostId =
+      eventBeacon != null && typeof (eventBeacon as { creator_id?: unknown }).creator_id === 'string'
+        ? (eventBeacon as { creator_id: string }).creator_id
+        : null;
+    const hostsOnly =
+      eventBeacon != null &&
+      (eventBeacon as { guest_list_visibility?: unknown }).guest_list_visibility === 'hosts_only';
+    if (hostsOnly && hostId !== auth.user.id) participantIds = [];
+  }
 
   let messages: HubThreadMessage[] = [];
   if (aroundMessageId) {
@@ -92,7 +122,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     if (targetErr) {
       console.error('[hub/messages GET] around target:', targetErr.message);
-      return NextResponse.json({ error: targetErr.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to load hub messages' }, { status: 500 });
     }
     const target = normalizeHubMessageRow(targetRow as Record<string, unknown> | null);
     const window = target ? HUB_AROUND_WINDOW : limit;
@@ -137,7 +167,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     messages,
     participant_ids: participantIds,
-    occupant_count: Math.max(participantIds.length, 1),
+    occupant_count: Math.max(allParticipantIds.length, 1),
     channel: hubRealtimeChannel(hubId),
   });
 }
@@ -160,6 +190,19 @@ export async function POST(request: NextRequest) {
   }
   if (!bodyText) {
     return NextResponse.json({ error: 'body is required' }, { status: 400 });
+  }
+  if (
+    await isRateLimited({
+      bindingName: HUB_MESSAGE_RATE_LIMIT_BINDING,
+      key: `hub-message:${auth.user.id}:${hubId}`,
+      limit: HUB_MESSAGE_RATE_LIMIT,
+      windowMs: HUB_MUTATION_RATE_WINDOW_MS,
+    })
+  ) {
+    return NextResponse.json(
+      { error: 'RATE_LIMITED', message: 'Too many messages. Please wait a moment and try again.' },
+      { status: 429 },
+    );
   }
   const admin = createChatGatekeeperAdmin();
   const denied = await assertHubGeofenceFromCoords(
@@ -203,7 +246,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error('[hub/messages] insert:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: 'Failed to send hub message' }, { status: 400 });
   }
 
   const insertedId =
@@ -216,7 +259,6 @@ export async function POST(request: NextRequest) {
       hubId,
       messageId: insertedId,
       senderUserId: auth.user.id,
-      preview: bodyText,
     });
   }
 

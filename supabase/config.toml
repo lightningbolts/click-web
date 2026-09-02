@@ -1,8 +1,8 @@
-# Click web Supabase project (link with `supabase link --project-ref <ref>`).
-# Migrations in ./migrations are applied in timestamp order via `supabase db push`.
+# Local Supabase stack identifier only; production linkage is stored separately
+# by `supabase link --project-ref <explicit-ref>`.
+project_id = "click-web"
 
-[project]
-# Set by `supabase link` in .supabase/ or SUPABASE_PROJECT_ID env at apply time.
+# Migrations in ./migrations are applied in timestamp order via `supabase db push`.
 
 [api]
 enabled = true

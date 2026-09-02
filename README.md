@@ -116,7 +116,7 @@ These must be set on the **Cloudflare Worker** `click-web` (Workers dashboard �
 
 Unauthenticated `POST /api/livekit/token` returns 401 and does **not** prove these vars are set. After deploy:
 
-1. `GET /api/health/env` — `keys.LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_WS_URL` should be `true` (presence only; values are never returned).
+1. `GET /api/health/env` with `x-click-health-secret: <HEALTH_DIAGNOSTICS_SECRET>` — `keys.LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_WS_URL` should be `true` (presence only; values are never returned). Without that header the endpoint returns coarse liveness only.
 2. Authenticated probe:
 
 ```bash
@@ -136,6 +136,8 @@ curl -i -X POST https://joinclick.co/api/livekit/token \
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth if enabled |
 | `NEXT_PUBLIC_IOS_STORE_URL` / `NEXT_PUBLIC_ANDROID_STORE_URL` | Store links (`lib/config.ts`) |
 | `NEXT_PUBLIC_APP_LAUNCHED` | Set to `true` when the app is publicly launched |
+| `HEALTH_DIAGNOSTICS_SECRET` | Protects detailed `/api/health/env` diagnostics; without the matching `x-click-health-secret` header callers receive coarse liveness only |
+| `CLICK_ENABLE_SIMULATOR_MOCK` + `CLICK_APP_ENV` | Nonproduction-only proximity fixture gate. Set `CLICK_ENABLE_SIMULATOR_MOCK=true` only when `CLICK_APP_ENV` is not `production`. |
 
 ### Run the dev server
 

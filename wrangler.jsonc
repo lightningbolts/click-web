@@ -61,6 +61,22 @@
         "limit": 60,
         "period": 60
       }
+    },
+    {
+      "name": "HUB_MESSAGE_RATE_LIMITER",
+      "namespace_id": "1003",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "HUB_UPLOAD_RATE_LIMITER",
+      "namespace_id": "1004",
+      "simple": {
+        "limit": 6,
+        "period": 60
+      }
     }
   ]
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Apply pending Supabase migrations safely (validates only not-yet-applied files, then db push).
+# Apply pending Supabase migrations safely with the repository-pinned Supabase CLI.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,14 +15,13 @@ for arg in "$@"; do
 Usage: scripts/apply-supabase-migrations.sh [--dry-run]
 
 Validates pending (not-yet-applied) migration SQL for destructive patterns, then runs:
-  npx supabase@latest db push --include-all
+  npx --no-install supabase db push --include-all
 
 Setup:
-  cd click-web && npx supabase@latest link --project-ref <ref>
-  # or set SUPABASE_DB_URL for direct Postgres
+  cd click-web && npx --no-install supabase link --project-ref <ref>
 
 Safety:
-  Only scans migrations not marked Applied on the linked remote.
+  Requires a linked Supabase project so every pending migration is checked.
   Blocks DROP TABLE, TRUNCATE, DELETE FROM, and DROP COLUMN without IF EXISTS.
 EOF
       exit 1
@@ -39,10 +38,19 @@ if [[ ! -d "$MIGRATIONS_DIR" ]]; then
   exit 1
 fi
 
-CLI=(npx -y supabase@latest)
+CLI=(npx --no-install supabase)
 
 migration_version() {
   basename "$1" .sql | cut -d_ -f1
+}
+
+parse_applied_versions() {
+  # Supabase prints LOCAL | REMOTE | TIME. A row is remotely applied only when
+  # the second column is a numeric migration version; headers and blank cells
+  # are ignored. Accept both ASCII and Unicode table separators.
+  sed 's/│/|/g' "$1" \
+    | awk -F '|' '{ remote=$2; gsub(/[[:space:]]/, "", remote); if (remote ~ /^[0-9]+$/) print remote }' \
+    | sort -u
 }
 
 is_disallowed_sql() {
@@ -66,12 +74,11 @@ is_disallowed_sql() {
 list_file="$(mktemp)"
 if ! "${CLI[@]}" migration list --linked >"$list_file" 2>/dev/null; then
   rm -f "$list_file"
-  echo "Supabase project not linked; validating known scale migration only." >&2
-  pending_files=()
-  scale_file="$MIGRATIONS_DIR/20260701120000_scale_remediation_rpcs.sql"
-  [[ -f "$scale_file" ]] && pending_files=("$scale_file")
+  echo "Unable to read linked Supabase migration history." >&2
+  echo "Link the intended project before applying or dry-running migrations." >&2
+  exit 1
 else
-  applied_versions=$(awk '$0 ~ /Applied/ { print $1 }' "$list_file" | sort -u)
+  applied_versions=$(parse_applied_versions "$list_file")
   rm -f "$list_file"
   pending_files=()
   for file in "$MIGRATIONS_DIR"/*.sql; do
@@ -107,17 +114,15 @@ if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
 fi
 
 if $DRY_RUN; then
-  echo "[dry-run] Would run: ${CLI[*]} db push --include-all"
-  "${CLI[@]}" migration list --linked 2>/dev/null || true
+  echo "Running Supabase CLI dry run..."
+  "${CLI[@]}" db push --dry-run --include-all
   exit 0
 fi
 
-if [[ -z "${SUPABASE_DB_URL:-}" ]] \
-  && [[ ! -f "$ROOT/.supabase/project-ref" ]] \
+if [[ ! -f "$ROOT/.supabase/project-ref" ]] \
   && [[ ! -f "$ROOT/supabase/.temp/project-ref" ]]; then
   echo "No linked Supabase project found." >&2
-  echo "Run: npx supabase@latest link --project-ref <ref>" >&2
-  echo "Or set SUPABASE_DB_URL." >&2
+  echo "Run: npx --no-install supabase link --project-ref <ref>" >&2
   exit 1
 fi
 

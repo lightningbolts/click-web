@@ -1,8 +1,28 @@
 import { createServerClient } from '@supabase/ssr';
+import type { User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseBody } from '@/lib/api/parseBody';
 import { authBodySchema } from '@/lib/api/schemas/user';
+
+/** Deliberately excludes session tokens and mutable auth metadata from JSON. */
+function publicAuthUser(user: User | null) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    email_confirmed_at: user.email_confirmed_at ?? null,
+    created_at: user.created_at ?? null,
+  };
+}
+
+function hasValidPassword(password: unknown): password is string {
+  return typeof password === 'string' && password.length >= 8;
+}
+
+function hasLoginPassword(password: unknown): password is string {
+  return typeof password === 'string' && password.length > 0;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +53,8 @@ export async function POST(request: NextRequest) {
     );
 
     if (action === 'signup') {
-      if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
-        return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+      if (typeof email !== 'string' || !email.trim() || !hasValidPassword(password)) {
+        return NextResponse.json({ error: 'Use an email address and a password with at least 8 characters' }, { status: 400 });
       }
       const fn = typeof first_name === 'string' ? first_name.trim() : '';
       const ln = typeof last_name === 'string' ? last_name.trim() : '';
@@ -55,16 +75,17 @@ export async function POST(request: NextRequest) {
       });
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        console.warn('[auth] signup failed:', error.message);
+        return NextResponse.json({ error: 'Unable to create this account' }, { status: 400 });
       }
 
       return NextResponse.json({
         success: true,
         message: 'Check your email to confirm your account!',
-        user: data.user
+        user: publicAuthUser(data.user),
       });
     } else if (action === 'login') {
-      if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
+      if (typeof email !== 'string' || !email.trim() || !hasLoginPassword(password)) {
         return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
       }
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -73,19 +94,18 @@ export async function POST(request: NextRequest) {
       });
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+        console.warn('[auth] login failed:', error.message);
+        return NextResponse.json({ error: 'Unable to sign in with those credentials' }, { status: 400 });
       }
 
       return NextResponse.json({
         success: true,
-        user: data.user,
-        session: data.session
+        user: publicAuthUser(data.user),
       });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

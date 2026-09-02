@@ -140,7 +140,17 @@ Deno.serve(async (req) => {
     .map(normalizeToken)
     .filter((t): t is string => t != null);
 
-  if (body.simulator_mock === true && myToken === '1234' && heardTokens.includes('5678')) {
+  // Test-only fixtures must be explicitly enabled by a non-production deployment.
+  // Never infer this from a client-supplied field: production clients are untrusted.
+  const simulatorMockEnabled =
+    Deno.env.get('CLICK_ENABLE_SIMULATOR_MOCK') === 'true' &&
+    Deno.env.get('CLICK_APP_ENV') !== 'production';
+  if (
+    body.simulator_mock === true &&
+    simulatorMockEnabled &&
+    myToken === '1234' &&
+    heardTokens.includes('5678')
+  ) {
     const connectionId = '00000000-0000-4000-8000-000000000123';
     const mockUserId = '00000000-0000-4000-8000-000000000567';
     const mockUser: UserProfile = {

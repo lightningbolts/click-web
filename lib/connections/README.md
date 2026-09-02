@@ -20,12 +20,12 @@ Proximity **matching algorithms** live in `lib/server/proximity/` and `supabase/
 | **Tri-Factor proximity** | `ConnectionViewModel` + BLE/ultrasonic/GPS | `POST /api/connections/proximity` (async 202) | **Initiation: mobile only.** Web route exists for bind/poll; browsers lack hardware mesh. |
 | **Multi-Tap cliques (3+)** | In-room simultaneous handshakes | BFS in `matching.ts` / Edge Function | **Initiation: mobile only.** Web can persist clique results. |
 | **QR connect** | Scans via `CLICK_WEB_BASE_URL` | `GET/POST /api/qr`, `QRIdentityCard` | **Full parity** — primary web-native connect path. |
-| **Simulator mock** | `MockProximityManager` | `simulator_mock: true`, tokens `1234`/`5678` | **Dev/test only** — `bindProximityHandshake.ts`; seeds connections without hardware. |
+| **Simulator mock** | `MockProximityManager` | `simulator_mock: true`, tokens `1234`/`5678` | **Dev/test only.** It runs only when `CLICK_ENABLE_SIMULATOR_MOCK=true` and `CLICK_APP_ENV` is not `production`; production treats the client field as untrusted input. |
 | **Manual encounter** | Reconnect flows | `POST /api/connections/encounter` | Parity for logging encounters with sensor JSON. |
 | **Insights opt-in** | `includeInInsightsEnabled` setting | `include_in_business_insights` on bind | Mobile setting drives B2B aggregate eligibility. |
 | **Prior Connections** | On-device SHA-256 contact hashes | `POST /api/contacts/discover`, `/api/connections/prior/*` | Optional skippable onboarding. `source=prior` never counts as a verified handshake. |
 
-Mobile calls web for QR issuance and redemption; Tri-Factor payloads typically hit the Edge Function from the app, with Next.js `bindProximityHandshake` as an alternate path. For local insights pilot testing without devices, use `simulator_mock` (documented in `lib/insights/README.md` § Real-world testing).
+Mobile calls web for QR issuance and redemption; Tri-Factor payloads typically hit the Edge Function from the app, with Next.js `bindProximityHandshake` as an alternate path. For local nonproduction testing without devices, set both explicit simulator variables before sending `simulator_mock`; never configure them in production.
 
 ---
 

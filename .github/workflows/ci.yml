@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: click-web-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -62,6 +65,59 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  production-dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  supabase-database-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install pinned Supabase CLI
+        run: npm ci
+
+      - name: Start clean local Supabase stack
+        run: npx --no-install supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector
+
+      - name: Apply every migration to a fresh database
+        run: npx --no-install supabase db reset --local
+
+      - name: Run database authorization and invariant tests
+        run: npx --no-install supabase test db
+
+      - name: Verify source migration contract
+        run: bash scripts/test_map_beacons_hub_id.sh
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx --no-install supabase stop --no-backup
 
   # OpenNext worker is what Cloudflare Workers Builds deploys (wrangler main:
   # .open-next/worker.js). Next `npm run build` alone does not prove that artifact.
