@@ -102,7 +102,7 @@ describe('tracked Supabase migration chain', () => {
       path.join(repoRoot, 'supabase/tests/migration_paths.sql'),
       'utf8',
     );
-    expect(upgradeFixture).toContain('\\ir ../migrations/20260330000000_legacy_schema_bootstrap.sql');
+    expect(upgradeFixture).toContain('\\ir .migration_paths_bootstrap_fixture');
     expect(upgradeFixture).toContain('migration_paths_upgrade_sentinel');
     expect(upgradeFixture).toContain('upgrade rerun preserves pre-existing waitlist data');
     expect(upgradeFixture).toContain('upgrade rerun preserves pre-existing waitlist policy');

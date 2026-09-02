@@ -4,8 +4,9 @@ SELECT plan(29);
 
 -- Upgrade-path fixture: the complete chain has already run, so these objects
 -- and this sentinel row/policy are pre-existing when the tracked bootstrap is
--- included below. pg_prove (used by `supabase test db`) delegates SQL files to
--- psql, which resolves \ir relative to this test file.
+-- included below. The test runner materializes the exact tracked bootstrap as
+-- a sibling fixture because the `supabase test db` container mounts tests but
+-- not the repository's migrations directory.
 INSERT INTO public.waitlist (email, source)
 VALUES ('migration-paths-upgrade-sentinel@example.invalid', 'upgrade-sentinel');
 
@@ -18,7 +19,7 @@ CREATE POLICY migration_paths_upgrade_sentinel
     USING (email = 'migration-paths-upgrade-sentinel@example.invalid');
 
 -- Execute the exact tracked bootstrap against those existing objects/data.
-\ir ../migrations/20260330000000_legacy_schema_bootstrap.sql
+\ir .migration_paths_bootstrap_fixture
 
 -- Fresh-reset coverage: these legacy relations now exist before the first
 -- feature migration and remain present after the complete chain.

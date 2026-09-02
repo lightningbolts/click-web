@@ -110,7 +110,7 @@ jobs:
         run: npx --no-install supabase db reset --local
 
       - name: Run database authorization and invariant tests
-        run: npx --no-install supabase test db
+        run: bash scripts/run-supabase-db-tests.sh
 
       - name: Verify source migration contract
         run: bash scripts/test_map_beacons_hub_id.sh
