@@ -57,6 +57,18 @@ import {
   deriveHeightCategoryFromRelativeAltitudeM,
 } from './bindSupport.ts';
 
+const APPROVED_SIMULATOR_ENVIRONMENTS = new Set(['development', 'test', 'staging']);
+
+function simulatorMockIsEnabled(): boolean {
+  const enabled = Deno.env.get('CLICK_ENABLE_SIMULATOR_MOCK') === 'true';
+  const appEnvironment = (Deno.env.get('CLICK_APP_ENV') ?? '').trim().toLowerCase();
+  return (
+    enabled &&
+    Deno.env.get('CLICK_APP_ENV') !== 'production' &&
+    APPROVED_SIMULATOR_ENVIRONMENTS.has(appEnvironment)
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -142,9 +154,7 @@ Deno.serve(async (req) => {
 
   // Test-only fixtures must be explicitly enabled by a non-production deployment.
   // Never infer this from a client-supplied field: production clients are untrusted.
-  const simulatorMockEnabled =
-    Deno.env.get('CLICK_ENABLE_SIMULATOR_MOCK') === 'true' &&
-    Deno.env.get('CLICK_APP_ENV') !== 'production';
+  const simulatorMockEnabled = simulatorMockIsEnabled();
   if (
     body.simulator_mock === true &&
     simulatorMockEnabled &&

@@ -26,10 +26,16 @@ jobs:
             echo "A comparison base is required to validate changed documentation."
             exit 1
           }
-          git cat-file -e "${BASE_SHA}^{commit}" || {
-            echo "Documentation comparison base is unavailable: $BASE_SHA"
-            exit 1
-          }
+          if [[ "$BASE_SHA" =~ ^0{40}$ ]]; then
+            # The first push to a branch has no parent commit. Compare it to
+            # Git's empty tree so all newly added Markdown is still checked.
+            BASE_SHA="$(git hash-object -t tree /dev/null)"
+          else
+            git cat-file -e "${BASE_SHA}^{commit}" || {
+              echo "Documentation comparison base is unavailable: $BASE_SHA"
+              exit 1
+            }
+          fi
           changed_docs="$RUNNER_TEMP/changed-docs.txt"
           git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$GITHUB_SHA" -- '*.md' > "$changed_docs"
           node - "$changed_docs" <<'NODE'
@@ -46,8 +52,8 @@ jobs:
           const root = process.cwd();
           const failures = [];
           const forbiddenClaims = [
-            /messages, photos, and files are encrypted on your device.*we (?:can't|cannot) read them/i,
-            /end-to-end encrypted.*only you and your connection can read them/i,
+            /messages, photos, and files are encrypted on your device.*we (?:can't|cannot) read them/is,
+            /end-to-end encrypted.*only you and your connection can read them/is,
           ];
 
           for (const file of changed) {

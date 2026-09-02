@@ -25,7 +25,66 @@ export const runtime = 'nodejs';
 export const HUB_MEDIA_BUCKET = 'hub-media';
 export const HUB_MEDIA_MAX_BYTES = 25 * 1024 * 1024;
 export const HUB_MEDIA_SIGNED_URL_TTL_SECONDS = 5 * 60;
-const MAX_MULTIPART_REQUEST_BYTES = HUB_MEDIA_MAX_BYTES + 1024 * 1024;
+export const MAX_MULTIPART_REQUEST_BYTES = HUB_MEDIA_MAX_BYTES + 1024 * 1024;
+
+type BoundedBodyResult =
+  | { kind: 'ok'; body: Uint8Array }
+  | { kind: 'too-large' }
+  | { kind: 'read-error' };
+
+/**
+ * Consume an unknown-length request body with a hard cap before formData()
+ * can materialize all multipart parts. The returned bytes are replayed into a
+ * new Request because a Web Request body is single-use.
+ */
+async function readBoundedRequestBody(request: Request): Promise<BoundedBodyResult> {
+  if (!request.body) return { kind: 'ok', body: new Uint8Array() };
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_MULTIPART_REQUEST_BYTES) {
+        await reader.cancel();
+        return { kind: 'too-large' };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return { kind: 'read-error' };
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { kind: 'ok', body };
+}
+
+async function readHubMediaForm(request: NextRequest): Promise<FormData | null | 'too-large' | 'read-error'> {
+  const rawContentLength = request.headers.get('content-length');
+  const contentLength = Number.parseInt(rawContentLength ?? '', 10);
+  if (Number.isFinite(contentLength)) {
+    if (contentLength > MAX_MULTIPART_REQUEST_BYTES) return 'too-large';
+    return request.formData().catch(() => null);
+  }
+
+  const bounded = await readBoundedRequestBody(request);
+  if (bounded.kind !== 'ok') return bounded.kind;
+  const replayRequest = new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: bounded.body.buffer as ArrayBuffer,
+  });
+  return replayRequest.formData().catch(() => null);
+}
 
 function readHubMediaPath(
   path: string,
@@ -94,13 +153,11 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (!auth.ok) return auth.response;
 
-  const contentLength = Number.parseInt(request.headers.get('content-length') ?? '', 10);
-  if (Number.isFinite(contentLength) && contentLength > MAX_MULTIPART_REQUEST_BYTES) {
+  const form = await readHubMediaForm(request);
+  if (form === 'too-large') {
     return NextResponse.json({ error: 'Hub media must be 25 MiB or smaller' }, { status: 413 });
   }
-
-  const form = await request.formData().catch(() => null);
-  if (!form) {
+  if (form === 'read-error' || !form) {
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 });
   }
 

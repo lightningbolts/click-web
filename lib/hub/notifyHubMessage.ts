@@ -2,6 +2,29 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 import { assertHubReadable } from '@/lib/server/hubGatekeeper';
 
+export const HUB_NOTIFICATION_AUTH_CONCURRENCY = 8;
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), values.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= values.length) return;
+        results[index] = await mapper(values[index]);
+      }
+    }),
+  );
+  return results;
+}
+
 function hubPushFunctionUrl(): string | null {
   const base = runtimeEnv('NEXT_PUBLIC_SUPABASE_URL');
   return base ? `${base}/functions/v1/send-push-notification` : null;
@@ -36,11 +59,13 @@ export async function notifyHubMessageParticipants(args: {
 
   // A stale event-hub participant row is not notification authorization. Use
   // the same access gate as reads/search before emitting a deep link.
-  const recipientChecks = await Promise.all(
-    participantRecipients.map(async (recipient) => ({
+  const recipientChecks = await mapWithConcurrency(
+    participantRecipients,
+    HUB_NOTIFICATION_AUTH_CONCURRENCY,
+    async (recipient) => ({
       recipient,
       denied: await assertHubReadable(args.admin, args.hubId, recipient),
-    })),
+    }),
   );
   const recipients = recipientChecks.filter(({ denied }) => denied == null).map(({ recipient }) => recipient);
 

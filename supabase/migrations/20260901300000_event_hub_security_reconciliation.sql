@@ -94,58 +94,65 @@ CREATE UNIQUE INDEX IF NOT EXISTS hub_venues_event_beacon_id_unique_idx
     ON public.hub_venues (event_beacon_id)
     WHERE event_beacon_id IS NOT NULL;
 
--- Validate the required delete behavior even if a divergent deployment created
--- the columns without their foreign keys. Avoid duplicating an equivalent key
--- that already exists under PostgreSQL's generated constraint name.
+-- Reconcile the required delete behavior even if a divergent deployment
+-- created a differently named or differently configured FK. Identify keys by
+-- their table, referenced table, and constrained column rather than assuming
+-- PostgreSQL's generated constraint names.
 DO $$
+DECLARE
+    constraint_row record;
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint AS constraint_row
-        WHERE constraint_row.conrelid = 'public.hub_venues'::regclass
-          AND constraint_row.contype = 'f'
-          AND constraint_row.confrelid = 'public.map_beacons'::regclass
-          AND constraint_row.confdeltype = 'c'
-          AND constraint_row.conkey = ARRAY[
+    FOR constraint_row IN
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'public.hub_venues'::regclass
+          AND contype = 'f'
+          AND confrelid = 'public.map_beacons'::regclass
+          AND conkey = ARRAY[
               (SELECT attnum FROM pg_attribute
                WHERE attrelid = 'public.hub_venues'::regclass AND attname = 'event_beacon_id')
           ]::smallint[]
-    ) THEN
-        ALTER TABLE public.hub_venues
-            DROP CONSTRAINT IF EXISTS hub_venues_event_beacon_id_fkey;
-        ALTER TABLE public.hub_venues
-            ADD CONSTRAINT hub_venues_event_beacon_id_fkey
-            FOREIGN KEY (event_beacon_id)
-            REFERENCES public.map_beacons (id)
-            ON DELETE CASCADE
-            NOT VALID;
-        ALTER TABLE public.hub_venues
-            VALIDATE CONSTRAINT hub_venues_event_beacon_id_fkey;
-    END IF;
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE public.hub_venues DROP CONSTRAINT %I',
+            constraint_row.conname
+        );
+    END LOOP;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint AS constraint_row
-        WHERE constraint_row.conrelid = 'public.map_beacons'::regclass
-          AND constraint_row.contype = 'f'
-          AND constraint_row.confrelid = 'public.hub_venues'::regclass
-          AND constraint_row.confdeltype = 'n'
-          AND constraint_row.conkey = ARRAY[
+    ALTER TABLE public.hub_venues
+        ADD CONSTRAINT hub_venues_event_beacon_id_fkey
+        FOREIGN KEY (event_beacon_id)
+        REFERENCES public.map_beacons (id)
+        ON DELETE CASCADE
+        NOT VALID;
+    ALTER TABLE public.hub_venues
+        VALIDATE CONSTRAINT hub_venues_event_beacon_id_fkey;
+
+    FOR constraint_row IN
+        SELECT conname
+        FROM pg_constraint
+        WHERE conrelid = 'public.map_beacons'::regclass
+          AND contype = 'f'
+          AND confrelid = 'public.hub_venues'::regclass
+          AND conkey = ARRAY[
               (SELECT attnum FROM pg_attribute
                WHERE attrelid = 'public.map_beacons'::regclass AND attname = 'hub_id')
           ]::smallint[]
-    ) THEN
-        ALTER TABLE public.map_beacons
-            DROP CONSTRAINT IF EXISTS map_beacons_hub_id_fkey;
-        ALTER TABLE public.map_beacons
-            ADD CONSTRAINT map_beacons_hub_id_fkey
-            FOREIGN KEY (hub_id)
-            REFERENCES public.hub_venues (id)
-            ON DELETE SET NULL
-            NOT VALID;
-        ALTER TABLE public.map_beacons
-            VALIDATE CONSTRAINT map_beacons_hub_id_fkey;
-    END IF;
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE public.map_beacons DROP CONSTRAINT %I',
+            constraint_row.conname
+        );
+    END LOOP;
+
+    ALTER TABLE public.map_beacons
+        ADD CONSTRAINT map_beacons_hub_id_fkey
+        FOREIGN KEY (hub_id)
+        REFERENCES public.hub_venues (id)
+        ON DELETE SET NULL
+        NOT VALID;
+    ALTER TABLE public.map_beacons
+        VALIDATE CONSTRAINT map_beacons_hub_id_fkey;
 END;
 $$;
 

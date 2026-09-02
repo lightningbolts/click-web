@@ -2,7 +2,10 @@
  * @jest-environment node
  */
 
-import { notifyHubMessageParticipants } from '@/lib/hub/notifyHubMessage';
+import {
+  HUB_NOTIFICATION_AUTH_CONCURRENCY,
+  notifyHubMessageParticipants,
+} from '@/lib/hub/notifyHubMessage';
 
 const mockAssertHubReadable = jest.fn();
 
@@ -85,5 +88,41 @@ describe('notifyHubMessageParticipants', () => {
     expect(sent).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).recipient_user_id).toBe('active');
+  });
+
+  it('bounds concurrent authorization checks for large hubs', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'svc-key';
+    global.fetch = jest.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+
+    let activeChecks = 0;
+    let maximumActiveChecks = 0;
+    mockAssertHubReadable.mockImplementation(async () => {
+      activeChecks += 1;
+      maximumActiveChecks = Math.max(maximumActiveChecks, activeChecks);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      activeChecks -= 1;
+      return null;
+    });
+    const from = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        eq: jest.fn().mockResolvedValue({
+          data: Array.from({ length: HUB_NOTIFICATION_AUTH_CONCURRENCY * 2 }, (_, index) => ({
+            user_id: `peer-${index}`,
+          })),
+          error: null,
+        }),
+      }),
+    });
+
+    const sent = await notifyHubMessageParticipants({
+      admin: { from } as never,
+      hubId: 'hub-1',
+      messageId: 'msg-1',
+      senderUserId: 'sender',
+    });
+
+    expect(sent).toBe(HUB_NOTIFICATION_AUTH_CONCURRENCY * 2);
+    expect(maximumActiveChecks).toBeLessThanOrEqual(HUB_NOTIFICATION_AUTH_CONCURRENCY);
   });
 });

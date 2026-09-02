@@ -106,6 +106,28 @@ Treat CodeRabbit as evidence, not authority:
 Only apply migrations from `click-web`. Do not run a mobile mirror migration
 against a Supabase project.
 
+The ordered chain begins with the tracked
+`supabase/migrations/20260330000000_legacy_schema_bootstrap.sql` compatibility
+foundation. It supplies the legacy relations that feature migrations consume on
+a clean reset; its guarded definitions are intentionally additive for projects
+that already contain those production objects. Do not run `supabase-setup.sql`
+as a prerequisite for a fresh reset. Fresh-reset coverage and upgrade-safe
+foundation checks live in `supabase/tests/migration_paths.sql` and
+`__tests__/supabase/migrationChain.test.ts`.
+
+The later `supabase/migrations/20260901400000_waitlist_signup_security.sql`
+owns the anon waitlist signup policy and grant after
+`20260612090000_security_hardening_rls.sql` removes authenticated reads. The
+schema bootstrap intentionally creates no waitlist policies, RLS state, or
+grants, so rerunning that older migration cannot undo the hardening.
+
+The database test creates sentinel data and a narrow policy on the
+already-existing `waitlist` relation, includes the exact tracked bootstrap with
+psql `\ir`, and asserts that both survive the rerun without duplication while
+the removed blanket authenticated-read policy stays absent. This is the
+bounded upgrade-path fixture; it runs inside the test transaction and rolls
+back.
+
 ### Preconditions
 
 Before any remote operation, confirm all of the following:
@@ -134,9 +156,9 @@ state, and execute the real dry run:
 
 ```bash
 cd <click-web-checkout>
-supabase link --project-ref <confirmed-project-ref>
-supabase migration list --linked
-supabase db diff --linked
+npx --no-install supabase link --project-ref <confirmed-project-ref>
+npx --no-install supabase migration list --linked
+npx --no-install supabase db diff --linked
 bash scripts/apply-supabase-migrations.sh --dry-run
 ```
 
@@ -159,7 +181,7 @@ SQL or an unpinned CLI command.
 
 Immediately after application:
 
-1. Re-run `supabase migration list --linked` and record applied versions.
+1. Re-run `npx --no-install supabase migration list --linked` and record applied versions.
 2. Run schema invariants, RLS/authorization tests, and migration upgrade tests.
 3. Run old-client and new-client staging smoke tests.
 4. Verify sensitive RPC grants, event-hub relationships, signed media access,

@@ -51,4 +51,14 @@ describe('event-hub production containment migration', () => {
     expect(migration).toContain("'hub_id', hub.id");
     expect(migration).not.toContain("'hub_id', beacon.hub_id");
   });
+
+  it('reconciles event hub foreign keys by relationship instead of generated names', () => {
+    expect(migration).toContain("conrelid = 'public.hub_venues'::regclass");
+    expect(migration).toContain("confrelid = 'public.map_beacons'::regclass");
+    expect(migration).toContain("conrelid = 'public.map_beacons'::regclass");
+    expect(migration).toContain("confrelid = 'public.hub_venues'::regclass");
+    expect(migration).toContain("DROP CONSTRAINT %I");
+    expect(migration).toContain('ADD CONSTRAINT hub_venues_event_beacon_id_fkey');
+    expect(migration).toContain('ADD CONSTRAINT map_beacons_hub_id_fkey');
+  });
 });
