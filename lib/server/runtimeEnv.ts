@@ -46,9 +46,24 @@ function readStaticProcessEnv(name: string): string | undefined {
       return process.env.LIVEKIT_WS_URL?.trim() || undefined;
     case 'LIVEKIT_URL':
       return process.env.LIVEKIT_URL?.trim() || undefined;
+    case 'CLICK_ENABLE_SIMULATOR_MOCK':
+      return process.env.CLICK_ENABLE_SIMULATOR_MOCK?.trim() || undefined;
+    case 'CLICK_APP_ENV':
+      return process.env.CLICK_APP_ENV?.trim() || undefined;
+    case 'HEALTH_DIAGNOSTICS_SECRET':
+      return process.env.HEALTH_DIAGNOSTICS_SECRET?.trim() || undefined;
     default:
       return undefined;
   }
+}
+
+/** Simulator handshake fixtures are an explicit non-production capability. */
+export function simulatorProximityMocksEnabled(): boolean {
+  return (
+    runtimeEnv('CLICK_ENABLE_SIMULATOR_MOCK') === 'true' &&
+    runtimeEnv('CLICK_APP_ENV') !== 'production' &&
+    process.env.NODE_ENV !== 'production'
+  );
 }
 
 /**

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("fetch_map_beacons_within:", error.message);
-      return NextResponse.json({ error: "Failed to load beacons", detail: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to load beacons" }, { status: 500 });
     }
 
     const admin = createAdminSupabaseClient();
@@ -54,8 +54,9 @@ export async function GET(request: NextRequest) {
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
 
     try {
-      const { data: ownData, error: ownErr } = await admin.rpc("fetch_creator_active_map_beacons", {
-        p_creator_id: user.id,
+      // Caller-scoped RPC: never pass a user id through a service-role location
+      // query, or another caller can substitute it to enumerate active pins.
+      const { data: ownData, error: ownErr } = await supabase.rpc("fetch_my_active_map_beacons", {
         p_limit: 50,
       });
       if (ownErr) {

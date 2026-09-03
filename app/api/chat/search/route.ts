@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { createChatGatekeeperAdmin } from '@/lib/server/chatGatekeeper';
+import { filterReadableHubIds } from '@/lib/server/hubGatekeeper';
 import { escapeIlikePattern, type ChatSearchHit } from '@/lib/chat/searchSnippet';
 import { selectInChunks } from '@/lib/chat/postgrestInChunks';
 import { toDirectChatSearchHit, toHubChatSearchHit, isSearchablePlaintextBody, type ChatRow } from '@/lib/chat/serverMessageSearch';
@@ -166,9 +167,12 @@ export async function GET(req: NextRequest) {
       if (partErr) {
         console.error('[chat/search] hub_participants:', partErr.message);
       } else {
-        const hubIds = (parts ?? [])
+        const membershipHubIds = (parts ?? [])
           .map((row) => (typeof row.hub_id === 'string' ? row.hub_id : ''))
           .filter(Boolean);
+        // Event-hub participant rows are derived data. Re-check active check-in
+        // and expiry before the service-role client searches their messages.
+        const hubIds = await filterReadableHubIds(admin, membershipHubIds, user.id);
         if (hubIds.length > 0) {
           const hubMsgs = await selectInChunks(hubIds, async (chunk) => {
             const { data, error } = await admin
@@ -226,7 +230,7 @@ export async function GET(req: NextRequest) {
     hits.sort((a, b) => b.timestamp - a.timestamp);
     return NextResponse.json({ hits: hits.slice(0, MAX_CHAT_HITS + MAX_HUB_HITS) });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Search failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[chat/search] unexpected error:', err);
+    return NextResponse.json({ error: 'Search failed' }, { status: 500 });
   }
 }

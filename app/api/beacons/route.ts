@@ -139,8 +139,8 @@ async function relocateSoundtrackBeacon(
 }
 
 /**
- * Proximity map beacons (PostGIS ST_DWithin via SECURITY DEFINER RPC) using the service role
- * on the server after JWT verification — clients never query `map_beacons` directly.
+ * Proximity map beacons (PostGIS ST_DWithin via caller-scoped SECURITY DEFINER RPC)
+ * after JWT verification. The route never accepts a creator id for own-pin hydration.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error("fetch_map_beacons_within:", error.message);
-      return NextResponse.json({ error: "Failed to load beacons", detail: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to load beacons" }, { status: 500 });
     }
 
     const admin = createAdminSupabaseClient();
@@ -184,8 +184,10 @@ export async function GET(request: NextRequest) {
     // Use RPC (lat/lng in JSON) — selecting geography `location` via PostgREST often yields
     // opaque EWKB that parseInsertedBeacon cannot decode → own pins silently dropped.
     try {
-      const { data: ownData, error: ownErr } = await admin.rpc("fetch_creator_active_map_beacons", {
-        p_creator_id: user.id,
+      // This function deliberately has no user-id parameter. Calling it with the
+      // authenticated client keeps auth.uid() scoped to the caller; using the
+      // service role here would turn an arbitrary UUID into a location oracle.
+      const { data: ownData, error: ownErr } = await supabase.rpc("fetch_my_active_map_beacons", {
         p_limit: 50,
       });
       if (ownErr) {

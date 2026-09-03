@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { assertHubReadable } from '@/lib/server/hubGatekeeper';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubPatchBodySchema } from '@/lib/api/schemas/beacons';
 
@@ -18,12 +19,13 @@ async function resolveHubAndVerifyOwner(
 ) {
   const { data: hub, error } = await admin
     .from('hub_venues')
-    .select('id, creator_id')
+    .select('id, creator_id, event_beacon_id')
     .eq('id', hubId)
     .maybeSingle();
 
   if (error) {
-    return { hub: null, errorResponse: NextResponse.json({ error: error.message }, { status: 500 }) };
+    console.error('[hub] owner lookup:', error.message);
+    return { hub: null, errorResponse: NextResponse.json({ error: 'Failed to load hub' }, { status: 500 }) };
   }
   if (!hub) {
     return { hub: null, errorResponse: NextResponse.json({ error: 'Hub not found' }, { status: 404 }) };
@@ -45,6 +47,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const admin = createChatGatekeeperAdmin();
+  const denied = await assertHubReadable(admin, trimmedId, auth.user.id);
+  if (denied) return denied;
   const { data: hub, error } = await admin
     .from('hub_venues')
     .select('id, name, category, creator_id, event_beacon_id, expires_at')
@@ -78,6 +82,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const admin = createChatGatekeeperAdmin();
   const { hub, errorResponse } = await resolveHubAndVerifyOwner(admin, hubId.trim(), auth.user.id);
   if (errorResponse) return errorResponse;
+  if (hub?.event_beacon_id) {
+    return NextResponse.json(
+      {
+        error: 'EVENT_OWNED_HUB',
+        message: 'Edit this event from its event details instead of changing the hub directly.',
+      },
+      { status: 409 },
+    );
+  }
 
   const updates: Record<string, unknown> = {};
   if (typeof body.name === 'string' && body.name.trim()) {
@@ -118,6 +131,15 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   const admin = createChatGatekeeperAdmin();
   const { hub, errorResponse } = await resolveHubAndVerifyOwner(admin, hubId.trim(), auth.user.id);
   if (errorResponse) return errorResponse;
+  if (hub?.event_beacon_id) {
+    return NextResponse.json(
+      {
+        error: 'EVENT_OWNED_HUB',
+        message: 'Delete this event from its event details instead of deleting the hub directly.',
+      },
+      { status: 409 },
+    );
+  }
 
   const trimmedId = hub!.id;
 

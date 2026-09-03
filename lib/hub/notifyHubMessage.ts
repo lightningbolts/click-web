@@ -1,5 +1,29 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
+import { assertHubReadable } from '@/lib/server/hubGatekeeper';
+
+export const HUB_NOTIFICATION_AUTH_CONCURRENCY = 8;
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), values.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= values.length) return;
+        results[index] = await mapper(values[index]);
+      }
+    }),
+  );
+  return results;
+}
 
 function hubPushFunctionUrl(): string | null {
   const base = runtimeEnv('NEXT_PUBLIC_SUPABASE_URL');
@@ -15,7 +39,6 @@ export async function notifyHubMessageParticipants(args: {
   hubId: string;
   messageId: string;
   senderUserId: string;
-  preview: string;
 }): Promise<number> {
   const pushUrl = hubPushFunctionUrl();
   const serviceKey = runtimeEnv('SUPABASE_SERVICE_ROLE_KEY');
@@ -30,12 +53,23 @@ export async function notifyHubMessageParticipants(args: {
     return 0;
   }
 
-  const recipients = (data ?? [])
+  const participantRecipients = (data ?? [])
     .map((row) => (typeof row.user_id === 'string' ? row.user_id.trim() : ''))
     .filter((id) => id.length > 0 && id !== args.senderUserId);
 
+  // A stale event-hub participant row is not notification authorization. Use
+  // the same access gate as reads/search before emitting a deep link.
+  const recipientChecks = await mapWithConcurrency(
+    participantRecipients,
+    HUB_NOTIFICATION_AUTH_CONCURRENCY,
+    async (recipient) => ({
+      recipient,
+      denied: await assertHubReadable(args.admin, args.hubId, recipient),
+    }),
+  );
+  const recipients = recipientChecks.filter(({ denied }) => denied == null).map(({ recipient }) => recipient);
+
   let sent = 0;
-  const preview = args.preview.trim().slice(0, 120) || 'New hub message';
   await Promise.all(
     recipients.map(async (recipient) => {
       try {
@@ -48,7 +82,9 @@ export async function notifyHubMessageParticipants(args: {
           body: JSON.stringify({
             recipient_user_id: recipient,
             title: 'Hub message',
-            body: preview,
+            // Hub messages can be protected content. Never mirror message text
+            // into a third-party notification provider or lock-screen preview.
+            body: 'Open Click to view it.',
             data: {
               type: 'hub_message',
               hub_id: args.hubId,
@@ -59,8 +95,7 @@ export async function notifyHubMessageParticipants(args: {
         });
         if (response.ok) sent += 1;
         else {
-          const text = await response.text().catch(() => '');
-          console.warn('[hub/messages] push failed', response.status, text);
+          console.warn('[hub/messages] push failed', { status: response.status });
         }
       } catch (e) {
         console.warn('[hub/messages] push error', e);

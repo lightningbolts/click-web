@@ -1,15 +1,24 @@
-import { NextResponse } from 'next/server';
-import { runtimeEnvPresent } from '@/lib/server/runtimeEnv';
+import { NextRequest, NextResponse } from 'next/server';
+import { runtimeEnv, runtimeEnvPresent } from '@/lib/server/runtimeEnv';
 
 /**
  * Deploy sanity check: reports whether required runtime keys are visible to Workers
  * without leaking values. Used to verify dashboard vars + process.env population.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const ok =
+    runtimeEnvPresent('NEXT_PUBLIC_SUPABASE_URL') &&
+    runtimeEnvPresent('SUPABASE_SERVICE_ROLE_KEY');
+  const diagnosticsSecret = runtimeEnv('HEALTH_DIAGNOSTICS_SECRET');
+  const suppliedSecret = request.headers.get('x-click-health-secret') ?? '';
+
+  // Public liveness must not reveal which production integrations are configured.
+  if (!diagnosticsSecret || suppliedSecret !== diagnosticsSecret) {
+    return NextResponse.json({ ok });
+  }
+
   return NextResponse.json({
-    ok:
-      runtimeEnvPresent('NEXT_PUBLIC_SUPABASE_URL') &&
-      runtimeEnvPresent('SUPABASE_SERVICE_ROLE_KEY'),
+    ok,
     keys: {
       NEXT_PUBLIC_SUPABASE_URL: runtimeEnvPresent('NEXT_PUBLIC_SUPABASE_URL'),
       NEXT_PUBLIC_SUPABASE_ANON_KEY: runtimeEnvPresent('NEXT_PUBLIC_SUPABASE_ANON_KEY'),

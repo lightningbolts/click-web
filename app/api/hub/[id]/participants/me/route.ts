@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { assertHubCanLeave } from '@/lib/server/hubGatekeeper';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const admin = createChatGatekeeperAdmin();
+  const denied = await assertHubCanLeave(admin, hubId);
+  if (denied) return denied;
   const { error } = await admin
     .from('hub_participants')
     .delete()

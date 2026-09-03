@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { assertHubCanLeave } from '@/lib/server/hubGatekeeper';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubLeaveBodySchema } from '@/lib/api/schemas/beacons';
 
@@ -18,6 +19,8 @@ export async function POST(request: NextRequest) {
   const hubId = parsed.data.hub_id.trim();
 
   const admin = createChatGatekeeperAdmin();
+  const denied = await assertHubCanLeave(admin, hubId);
+  if (denied) return denied;
   const { error } = await admin
     .from('hub_participants')
     .delete()

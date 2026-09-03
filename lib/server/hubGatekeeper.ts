@@ -14,7 +14,7 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
   return R * c;
 }
 
-type HubVenueGateRow = {
+export type HubVenueGateRow = {
   id: string;
   geofence_lat: number;
   geofence_long: number;
@@ -57,12 +57,88 @@ async function loadHubVenue(
 
   if (error) {
     console.error('[hubGatekeeper] hub_venues:', error.message);
-    return { response: NextResponse.json({ error: error.message }, { status: 400 }) };
+    return {
+      response: NextResponse.json({ error: 'Failed to verify hub access' }, { status: 500 }),
+    };
   }
   if (!venue) {
     return { response: NextResponse.json({ error: 'Unknown hub' }, { status: 404 }) };
   }
   return { venue: venue as HubVenueGateRow };
+}
+
+/**
+ * Read access is intentionally stricter than a stale hub_participants row.
+ * Event hubs re-check live event access on every privileged read; standalone
+ * hubs require current participant membership after the regular join fence.
+ */
+export async function assertHubReadable(
+  admin: SupabaseClient,
+  hubId: string,
+  userId: string,
+): Promise<NextResponse | null> {
+  const loaded = await loadHubVenue(admin, hubId);
+  if ('response' in loaded) return loaded.response;
+  const { venue } = loaded;
+
+  if (venue.event_beacon_id) {
+    return assertEventLinkedHubAccess(admin, venue, userId);
+  }
+  if (isHubExpired(venue.expires_at)) return expiredResponse();
+
+  const { data: participant, error } = await admin
+    .from('hub_participants')
+    .select('user_id')
+    .eq('hub_id', venue.id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('[hubGatekeeper] standalone participant:', error.message);
+    return NextResponse.json({ error: 'Failed to verify hub access' }, { status: 500 });
+  }
+  if (!participant) {
+    return NextResponse.json(
+      { error: 'NOT_A_PARTICIPANT', message: 'Join this hub before viewing its messages.' },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+/**
+ * Filter a list already sourced from hub_participants (for example global
+ * search). Event hubs need their active check-in/expiry policy re-evaluated;
+ * a participant row alone is not authorization.
+ */
+export async function filterReadableHubIds(
+  admin: SupabaseClient,
+  hubIds: readonly string[],
+  userId: string,
+): Promise<string[]> {
+  const uniqueIds = [...new Set(hubIds.map((id) => id.trim()).filter(Boolean))];
+  const checks = await Promise.all(
+    uniqueIds.map(async (hubId) => ({ hubId, denied: await assertHubReadable(admin, hubId, userId) })),
+  );
+  return checks.filter(({ denied }) => denied == null).map(({ hubId }) => hubId);
+}
+
+/** Event membership is derived from check-in state; leaving it directly creates stale state. */
+export async function assertHubCanLeave(
+  admin: SupabaseClient,
+  hubId: string,
+): Promise<NextResponse | null> {
+  const loaded = await loadHubVenue(admin, hubId);
+  if ('response' in loaded) return loaded.response;
+  if (loaded.venue.event_beacon_id) {
+    return NextResponse.json(
+      {
+        error: 'CHECK_OUT_REQUIRED',
+        message: 'Check out of the event to leave its hub.',
+      },
+      { status: 409 },
+    );
+  }
+  return null;
 }
 
 async function assertEventLinkedHubAccess(
