@@ -1,7 +1,8 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-SELECT plan(8);
+SET LOCAL search_path = public, extensions, pg_temp;
+SELECT plan(11);
 
 INSERT INTO auth.users (id, aud, role, email, encrypted_password, created_at, updated_at)
 VALUES
@@ -87,6 +88,36 @@ SELECT throws_ok(
     '42501',
     NULL,
     'check-out revokes direct writes'
+);
+
+RESET ROLE;
+SELECT ok(
+    NOT has_function_privilege('anon', 'public.auth_uid_in_hub(text)', 'EXECUTE')
+    AND NOT has_function_privilege('anon', 'public.fetch_map_beacons_within(double precision, double precision, double precision, integer)', 'EXECUTE')
+    AND NOT has_function_privilege('anon', 'public.fetch_my_active_map_beacons(integer)', 'EXECUTE')
+    AND NOT has_function_privilege('anon', 'public.fetch_creator_active_map_beacons(uuid, integer)', 'EXECUTE')
+    AND NOT has_function_privilege('anon', 'public.get_hubs_nearby(double precision, double precision, double precision, integer)', 'EXECUTE'),
+    'anonymous role cannot execute event-hub RPCs'
+);
+
+SELECT ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM pg_policy
+        WHERE polrelid = 'public.waitlist'::regclass
+          AND polname = 'Allow public waitlist inserts'
+    ),
+    'legacy broad waitlist insert policy is absent'
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM pg_proc
+        WHERE oid = 'public.sync_user_contact_hashes()'::regprocedure
+          AND proconfig @> ARRAY['search_path=public, extensions, pg_temp']::text[]
+    ),
+    'contact-hash trigger has an explicit pgcrypto search path'
 );
 
 SELECT * FROM finish();
