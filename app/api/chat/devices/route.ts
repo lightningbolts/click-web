@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
+import { parseBody } from '@/lib/api/parseBody';
 import {
   assertChatWritable,
   createChatGatekeeperAdmin,
@@ -34,10 +36,6 @@ function errorResponse(status = 500) {
   return NextResponse.json({ error: 'Internal server error' }, { status });
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function parseDeviceId(value: unknown): string | null {
   if (typeof value !== 'string' || value.trim() !== value || !DEVICE_ID_PATTERN.test(value)) {
     return null;
@@ -67,6 +65,19 @@ function isX25519SpkiBase64(value: unknown): value is string {
   }
 }
 
+const deviceRegistrationSchema = z.unknown().transform((value, context) => {
+  const body = typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+  const deviceId = parseDeviceId(body?.device_id);
+  const publicKey = body?.identity_public_key;
+  if (!deviceId || !isX25519SpkiBase64(publicKey)) {
+    context.addIssue({ code: 'custom', message: 'Invalid device registration' });
+    return z.NEVER;
+  }
+  return { device_id: deviceId, identity_public_key: publicKey };
+});
+
 function postProjection(row: DeviceRow) {
   return {
     id: row.id,
@@ -90,15 +101,6 @@ function getProjection(row: DeviceRow) {
     created_at: row.created_at,
     last_seen_at: row.last_seen_at,
   };
-}
-
-async function parseJson(request: NextRequest): Promise<Record<string, unknown> | null> {
-  try {
-    const body: unknown = await request.json();
-    return isRecord(body) ? body : null;
-  } catch {
-    return null;
-  }
 }
 
 async function resolveParticipantIds(
@@ -162,12 +164,9 @@ export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
   if (!auth.ok) return auth.response;
 
-  const body = await parseJson(request);
-  const deviceId = parseDeviceId(body?.device_id);
-  const publicKey = body?.identity_public_key;
-  if (!deviceId || !isX25519SpkiBase64(publicKey)) {
-    return NextResponse.json({ error: 'Invalid device registration' }, { status: 400 });
-  }
+  const parsedBody = await parseBody(request, deviceRegistrationSchema);
+  if (!parsedBody.ok) return parsedBody.response;
+  const { device_id: deviceId, identity_public_key: publicKey } = parsedBody.data;
 
   try {
     const admin = createChatGatekeeperAdmin();

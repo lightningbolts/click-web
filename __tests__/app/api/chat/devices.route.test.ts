@@ -70,7 +70,10 @@ describe('/api/chat/devices', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: 'Invalid device registration' });
+    expect(await response.json()).toEqual({
+      error: 'Invalid device registration',
+      code: 'validation_error',
+    });
     expect(from).not.toHaveBeenCalled();
   });
 
