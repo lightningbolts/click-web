@@ -10,15 +10,22 @@ VALUES
     ('20000000-0000-0000-0000-000000000202', 'authenticated', 'authenticated', 'e2ee-b@example.test', '', now(), now()),
     ('30000000-0000-0000-0000-000000000303', 'authenticated', 'authenticated', 'e2ee-outsider@example.test', '', now(), now());
 
-INSERT INTO public.connections (id, user_ids, status)
+INSERT INTO public.connections (id, created, expiry, user_ids, status)
 VALUES (
     '40000000-0000-0000-0000-000000000404',
+    (extract(epoch FROM now()) * 1000)::bigint,
+    (extract(epoch FROM now() + interval '1 day') * 1000)::bigint,
     ARRAY['10000000-0000-0000-0000-000000000101', '20000000-0000-0000-0000-000000000202'],
     'active'
 );
 
-INSERT INTO public.chats (id, connection_id)
-VALUES ('50000000-0000-0000-0000-000000000505', '40000000-0000-0000-0000-000000000404');
+INSERT INTO public.chats (id, connection_id, created_at, updated_at)
+VALUES (
+    '50000000-0000-0000-0000-000000000505',
+    '40000000-0000-0000-0000-000000000404',
+    (extract(epoch FROM now()) * 1000)::bigint,
+    (extract(epoch FROM now()) * 1000)::bigint
+);
 
 SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.chat_devices'::regclass), 'chat_devices has RLS enabled');
 SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.chat_key_epochs'::regclass), 'chat_key_epochs has RLS enabled');
