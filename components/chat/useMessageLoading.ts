@@ -22,6 +22,7 @@ import {
   decryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
+import { decryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 const PAGE_SIZE = 40;
 
@@ -38,6 +39,7 @@ export function useMessageLoading({
   e2eKeys,
   groupMasterKey,
   groupKeyError,
+  getE2eeV2Session,
   chatId,
   setChatId,
   messages,
@@ -67,6 +69,7 @@ export function useMessageLoading({
   e2eKeys: DerivedKeys | null;
   groupMasterKey: ArrayBuffer | null;
   groupKeyError: string | null;
+  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   chatId: string | null;
   setChatId: Dispatch<SetStateAction<string | null>>;
   messages: Message[];
@@ -245,10 +248,21 @@ export function useMessageLoading({
       .reverse()
       .map(normalizeDbMessage);
 
+    const v2Session = await getE2eeV2Session(false).catch(() => null);
+    const v2Resolved = await Promise.all(raw.map(async (m) => {
+      if (!m.content.startsWith('e2e2:')) return m;
+      if (!v2Session) return { ...m, content: 'Encrypted message' };
+      try {
+        return { ...m, content: await decryptWebE2eeV2Message(v2Session, m.content) };
+      } catch {
+        return { ...m, content: 'Encrypted message' };
+      }
+    }));
+
     if (isGroupClique) {
-      if (!groupMasterKey) return raw;
+      if (!groupMasterKey) return v2Resolved;
       return Promise.all(
-        raw.map(async (m) => {
+        v2Resolved.map(async (m) => {
           if (shouldSkipChatDecrypt(m.message_type) || isBeaconChatMessage(m) || !isGroupMessageEncrypted(m.content)) return m;
           const plaintext = await decryptGroupMessageContent(m.content, groupMasterKey);
           return { ...m, content: plaintext };
@@ -256,9 +270,9 @@ export function useMessageLoading({
       );
     }
 
-    if (!e2eKeys) return raw;
+    if (!e2eKeys) return v2Resolved;
     const decrypted = await Promise.all(
-      raw.map(async (m) => {
+      v2Resolved.map(async (m) => {
         if (shouldSkipChatDecrypt(m.message_type) || isBeaconChatMessage(m) || !isEncrypted(m.content)) return m;
         const plaintext = await decryptContent(m.content, e2eKeys);
         return { ...m, content: plaintext };
@@ -266,7 +280,7 @@ export function useMessageLoading({
     );
     return decrypted;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [e2eKeys, groupMasterKey, isGroupClique]);
+  }, [e2eKeys, groupMasterKey, isGroupClique, getE2eeV2Session]);
 
   useEffect(() => {
     if (!chatId) return;

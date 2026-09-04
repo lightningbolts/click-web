@@ -15,6 +15,7 @@ import {
   encryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
+import { encryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
 
@@ -29,6 +30,7 @@ export function useMessageActions({
   chatId,
   e2eKeys,
   groupMasterKey,
+  getE2eeV2Session,
   messages,
   setMessages,
   inputText,
@@ -55,6 +57,7 @@ export function useMessageActions({
   chatId: string | null;
   e2eKeys: DerivedKeys | null;
   groupMasterKey: ArrayBuffer | null;
+  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   inputText: string;
@@ -118,17 +121,25 @@ export function useMessageActions({
     });
 
     try {
-      const wireContent =
-        isGroupClique && groupMasterKey
+      const v2Session = await getE2eeV2Session(true, true);
+      const encryptedV2 = v2Session
+        ? await encryptWebE2eeV2Message(v2Session, chatId, content)
+        : null;
+      const wireContent = encryptedV2
+        ? encryptedV2.wireContent
+        : isGroupClique && groupMasterKey
           ? await encryptGroupMessageContent(content, groupMasterKey)
           : e2eKeys
             ? await encryptContent(content, e2eKeys)
             : content;
       const headers = await getAuthHeaders();
-      const metadata =
+      const replyMetadata =
         replyingTo && replyingTo.message_type !== 'call_log'
           ? await appendReplyToMetadata({})
           : undefined;
+      const metadata = encryptedV2
+        ? { ...(replyMetadata ?? {}), ...encryptedV2.metadata }
+        : replyMetadata;
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
@@ -178,6 +189,7 @@ export function useMessageActions({
     getAuthHeaders,
     appendReplyToMetadata,
     snapThreadViewportToBottom,
+    getE2eeV2Session,
   ]);
 
   // Broadcast typing indicator
@@ -213,8 +225,19 @@ export function useMessageActions({
     setEditingId(null);
     setEditText('');
 
-    const wireContent =
-      isGroupClique && groupMasterKey
+    const v2Session = await getE2eeV2Session(false);
+    const previousMeta =
+      previous.metadata && typeof previous.metadata === 'object' && !Array.isArray(previous.metadata)
+        ? (previous.metadata as Record<string, unknown>)
+        : {};
+    const previousClientMessageId =
+      typeof previousMeta.client_message_id === 'string' ? previousMeta.client_message_id : undefined;
+    const encryptedV2 = v2Session
+      ? await encryptWebE2eeV2Message(v2Session, previous.chat_id, newContent, previousClientMessageId)
+      : null;
+    const wireContent = encryptedV2
+      ? encryptedV2.wireContent
+      : isGroupClique && groupMasterKey
         ? await encryptGroupMessageContent(newContent, groupMasterKey)
         : e2eKeys
           ? await encryptContent(newContent, e2eKeys)
@@ -223,7 +246,11 @@ export function useMessageActions({
     const res = await fetch('/api/chat/messages', {
       method: 'PATCH',
       headers,
-      body: JSON.stringify({ messageId: editingId, content: wireContent }),
+      body: JSON.stringify({
+        messageId: editingId,
+        content: wireContent,
+        ...(encryptedV2 ? { metadata: { ...previousMeta, ...encryptedV2.metadata } } : {}),
+      }),
     });
 
     if (!res.ok) {
@@ -232,7 +259,7 @@ export function useMessageActions({
       )));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingId, editText, getAuthHeaders, messages, e2eKeys, groupMasterKey, isGroupClique]);
+  }, [editingId, editText, getAuthHeaders, messages, e2eKeys, groupMasterKey, isGroupClique, getE2eeV2Session]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
     const index = messages.findIndex((m) => m.id === messageId);

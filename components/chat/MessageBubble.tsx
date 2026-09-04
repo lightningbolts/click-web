@@ -21,11 +21,16 @@ import { LinkifiedText } from '@/lib/chat/linkify';
 import {
   durationSecondsFromMetadata,
   isEncryptedMediaFromMetadata,
+  mediaPathFromMetadata,
   mediaUrlFromMetadata,
   originalMimeTypeFromMetadata,
 } from '@/lib/chat/mediaMetadata';
 import { isAnyE2eeWireContent, type DerivedKeys } from '@/lib/chat/crypto';
-import { tryDecodeEnvelope } from '@/lib/chat/attachmentCrypto';
+import {
+  tryDecodeEnvelope,
+  tryDecodeV2AttachmentDescriptor,
+  type AttachmentV2Descriptor,
+} from '@/lib/chat/attachmentCrypto';
 import { isBeaconChatMessage } from '@/lib/chat/messages';
 import AttachmentBubble from './AttachmentBubble';
 import BeaconChatCard from './BeaconChatCard';
@@ -33,6 +38,7 @@ import { useSecureMedia } from '@/lib/chat/useSecureMedia';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
+import type { E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 const ACTION_MENU_OPEN_EVENT = 'chat:message-action-open';
 
@@ -60,6 +66,8 @@ interface MessageBubbleProps {
   mediaChatKey?: DerivedKeys | ArrayBuffer | null;
   /** Factory returning `Authorization: Bearer …` headers; used to sign attachment URLs. */
   getAuthHeaders?: () => Promise<HeadersInit>;
+  /** Loader for the current chat epoch key, used by v2 media and file attachments. */
+  getE2eeV2Session?: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   /** Transient search deep-link highlight. */
   highlighted?: boolean;
 }
@@ -165,6 +173,7 @@ export default function MessageBubble({
   portalsBoundsRef,
   mediaChatKey,
   getAuthHeaders,
+  getE2eeV2Session,
   highlighted = false,
 }: MessageBubbleProps) {
   const [showPicker, setShowPicker] = useState(false);
@@ -216,13 +225,41 @@ export default function MessageBubble({
   }, [showPicker, cancelHide]);
 
   const mediaUrl = mediaUrlFromMetadata(message.metadata);
+  const mediaPath = mediaPathFromMetadata(message.metadata);
   const isEncryptedMedia = isEncryptedMediaFromMetadata(message.metadata);
   const originalMimeType = originalMimeTypeFromMetadata(message.metadata);
+  const v2MediaMetadata = useMemo(() => {
+    const meta = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
+    const cryptoVersion = Number((meta as Record<string, unknown>).crypto_version);
+    const epoch = Number((meta as Record<string, unknown>).epoch);
+    const senderDeviceId = (meta as Record<string, unknown>).sender_device_id;
+    const clientMessageId = (meta as Record<string, unknown>).client_message_id;
+    const digest = (meta as Record<string, unknown>).media_ciphertext_sha256;
+    if (
+      cryptoVersion !== 2 ||
+      !Number.isSafeInteger(epoch) ||
+      typeof senderDeviceId !== 'string' ||
+      typeof clientMessageId !== 'string' ||
+      typeof digest !== 'string'
+    ) {
+      return null;
+    }
+    return {
+      chatId: message.chat_id,
+      epoch,
+      senderDeviceId,
+      clientMessageId,
+      mediaCiphertextSha256: digest,
+    };
+  }, [message.chat_id, message.metadata]);
   const secureMedia = useSecureMedia({
     storageUrl: mediaUrl,
+    storagePath: mediaPath,
     chatKey: mediaChatKey,
     mimeType: originalMimeType,
     isEncryptedMedia,
+    getE2eeV2Session,
+    v2Metadata: v2MediaMetadata,
   });
 
   useLayoutEffect(() => {
@@ -380,7 +417,9 @@ export default function MessageBubble({
     message.message_type === 'file' || captionText.startsWith('ccx:v1:')
       ? tryDecodeEnvelope(captionText)
       : null;
-  const isAttachment = attachmentEnvelope !== null;
+  const attachmentV2Descriptor =
+    message.message_type === 'file' ? tryDecodeV2AttachmentDescriptor(captionText) : null;
+  const isAttachment = attachmentEnvelope !== null || attachmentV2Descriptor !== null;
   const isBeacon = isBeaconChatMessage(message);
   const textBubbleClass = isMine
     ? 'bg-primary text-on-primary rounded-br-sm'
@@ -483,12 +522,15 @@ export default function MessageBubble({
               </div>
             )}
             <AttachmentBubble
-              envelope={attachmentEnvelope}
+              envelope={attachmentEnvelope ?? attachmentV2Descriptor}
               isMine={isMine}
               getAuthHeaders={
                 getAuthHeaders ??
                 (async () => ({ 'Content-Type': 'application/json' }))
               }
+              chatId={message.chat_id}
+              messageMetadata={v2MediaMetadata}
+              getE2eeV2Session={getE2eeV2Session}
             />
           </div>
         ) : isImage || isAudio ? (

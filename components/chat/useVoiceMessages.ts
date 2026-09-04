@@ -10,13 +10,18 @@ import {
 } from 'react';
 import type { Message } from '@/lib/chat/types';
 import { normalizeDbMessage } from '@/lib/chat/messages';
-import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
+import { uploadChatMediaBlob, uploadChatMediaV2Blob } from '@/lib/chat/chatMediaStorage';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import {
   encryptContent,
   encryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
+import {
+  encryptWebE2eeV2Media,
+  encryptWebE2eeV2Message,
+  type E2eeV2Session,
+} from '@/lib/chat/e2eeV2Client';
 
 /**
  * Voice-note recording and upload: MediaRecorder lifecycle plus the
@@ -41,6 +46,7 @@ export function useVoiceMessages({
   setInputText,
   inputTextRef,
   getAuthHeaders,
+  getE2eeV2Session,
   appendReplyToMetadata,
   decryptWireMessageContent,
   isNearBottom,
@@ -63,6 +69,7 @@ export function useVoiceMessages({
   setInputText: Dispatch<SetStateAction<string>>;
   inputTextRef: MutableRefObject<string>;
   getAuthHeaders: () => Promise<HeadersInit>;
+  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   appendReplyToMetadata: (meta: Record<string, unknown>) => Promise<Record<string, unknown>>;
   decryptWireMessageContent: (content: string, messageType: string) => Promise<string>;
   isNearBottom: () => boolean;
@@ -93,24 +100,51 @@ export function useVoiceMessages({
       try {
         const caption = inputTextRef.current.trim();
         setInputText('');
-        const wireContent =
-          isGroupClique && groupMasterKey && caption
-            ? await encryptGroupMessageContent(caption, groupMasterKey)
-            : e2eKeys && caption
-              ? await encryptContent(caption, e2eKeys)
-              : caption;
-        const { publicUrl } = await uploadChatMediaBlob(
-          currentUserId,
-          blob,
-          blob.type || recordingMimeRef.current || 'audio/webm',
-        );
+        const mimeType = blob.type || recordingMimeRef.current || 'audio/webm';
+        const v2Session = await getE2eeV2Session(true, true);
+        let wireContent: string;
+        let metadata: Record<string, unknown>;
+        if (v2Session) {
+          const clientMessageId = crypto.randomUUID();
+          const media = await encryptWebE2eeV2Media(
+            v2Session,
+            { chatId, clientMessageId },
+            new Uint8Array(await blob.arrayBuffer()),
+          );
+          const upload = await uploadChatMediaV2Blob(
+            chatId,
+            media.payload,
+            mimeType,
+            media.authorizationEnvelope,
+            media.metadata.media_ciphertext_sha256 as string,
+            getAuthHeaders,
+          );
+          const message = await encryptWebE2eeV2Message(v2Session, chatId, caption, clientMessageId);
+          wireContent = message.wireContent;
+          metadata = await appendReplyToMetadata({
+            ...message.metadata,
+            ...media.metadata,
+            media_path: upload.path,
+            duration_seconds: durationSeconds,
+            original_mime_type: mimeType,
+            is_encrypted_media: true,
+          });
+        } else {
+          wireContent =
+            isGroupClique && groupMasterKey && caption
+              ? await encryptGroupMessageContent(caption, groupMasterKey)
+              : e2eKeys && caption
+                ? await encryptContent(caption, e2eKeys)
+                : caption;
+          const { publicUrl } = await uploadChatMediaBlob(currentUserId, blob, mimeType);
+          metadata = await appendReplyToMetadata({
+            media_url: publicUrl,
+            duration_seconds: durationSeconds,
+            original_mime_type: mimeType,
+            is_encrypted_media: false,
+          });
+        }
         const headers = await getAuthHeaders();
-        const metadata = await appendReplyToMetadata({
-          media_url: publicUrl,
-          duration_seconds: durationSeconds,
-          original_mime_type: blob.type || recordingMimeRef.current || 'audio/webm',
-          is_encrypted_media: false,
-        });
         const res = await fetch('/api/chat/messages', {
           method: 'POST',
           headers,
@@ -157,6 +191,7 @@ export function useVoiceMessages({
       groupMasterKey,
       isGroupClique,
       getAuthHeaders,
+      getE2eeV2Session,
       appendReplyToMetadata,
       decryptWireMessageContent,
       scrollToBottom,

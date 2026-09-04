@@ -1,6 +1,7 @@
 /** @jest-environment node */
 
 import { NextRequest } from 'next/server';
+import { createHash } from 'node:crypto';
 import {
   GET,
   MAX_MULTIPART_REQUEST_BYTES,
@@ -10,15 +11,24 @@ import {
 
 const mockRequireBearerUser = jest.fn();
 const mockIsRateLimited = jest.fn();
+const mockCreateAdmin = jest.fn();
+const mockAssertHubGeofence = jest.fn();
+const mockAssertHubReadable = jest.fn();
+const mockAssertHubE2eeMedia = jest.fn();
 
 jest.mock('@/lib/server/chatGatekeeper', () => ({
   requireBearerUser: (...args: unknown[]) => mockRequireBearerUser(...args),
-  createChatGatekeeperAdmin: jest.fn(),
+  createChatGatekeeperAdmin: (...args: unknown[]) => mockCreateAdmin(...args),
 }));
 
 jest.mock('@/lib/server/hubGatekeeper', () => ({
-  assertHubGeofenceFromCoords: jest.fn(),
-  assertHubReadable: jest.fn(),
+  assertHubGeofenceFromCoords: (...args: unknown[]) => mockAssertHubGeofence(...args),
+  assertHubReadable: (...args: unknown[]) => mockAssertHubReadable(...args),
+}));
+
+jest.mock('@/lib/server/hubE2eeV2Gate', () => ({
+  assertHubE2eeV2MediaUpload: (...args: unknown[]) => mockAssertHubE2eeMedia(...args),
+  HUB_E2EE_V2_INVALID: 'HUB_E2EE_V2_INVALID',
 }));
 
 jest.mock('@/lib/server/rateLimit', () => ({
@@ -32,8 +42,15 @@ describe('/api/hub/media', () => {
   beforeEach(() => {
     mockRequireBearerUser.mockReset();
     mockIsRateLimited.mockReset();
+    mockCreateAdmin.mockReset();
+    mockAssertHubGeofence.mockReset();
+    mockAssertHubReadable.mockReset();
+    mockAssertHubE2eeMedia.mockReset();
     mockRequireBearerUser.mockResolvedValue({ ok: true, user: { id: 'user-1' }, bearer: 'jwt' });
     mockIsRateLimited.mockResolvedValue(false);
+    mockAssertHubGeofence.mockResolvedValue(null);
+    mockAssertHubReadable.mockResolvedValue(null);
+    mockAssertHubE2eeMedia.mockResolvedValue({ ok: true, currentEpoch: null });
   });
 
   it('rejects an oversized multipart request before parsing it into memory', async () => {
@@ -100,5 +117,73 @@ describe('/api/hub/media', () => {
     expect(mockIsRateLimited).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'hub-upload:user-1:hub-1', limit: 6 }),
     );
+  });
+
+  it('passes multipart v2 media metadata to the gate and hashes the uploaded ciphertext', async () => {
+    const fileBytes = 'ciphertext';
+    const digest = createHash('sha256').update(fileBytes).digest('base64');
+    const participantQuery: any = { upsert: jest.fn().mockResolvedValue({ error: null }) };
+    const storageBucket: any = {
+      upload: jest.fn().mockResolvedValue({ error: null }),
+      createSignedUrl: jest.fn().mockResolvedValue({ data: { signedUrl: 'https://signed.test/media' }, error: null }),
+    };
+    mockCreateAdmin.mockReturnValue({
+      from: jest.fn(() => participantQuery),
+      storage: { from: jest.fn(() => storageBucket) },
+    });
+    mockAssertHubE2eeMedia.mockResolvedValue({
+      ok: true,
+      currentEpoch: 3,
+      envelope: { mediaCiphertextSha256: digest },
+    });
+    const form = new FormData();
+    form.set('hub_id', 'hub-1');
+    form.set('object_path', 'user-1/hub/hub-1/media.enc');
+    form.set('epoch', '3');
+    form.set('sender_device_id', 'device-1');
+    form.set('client_message_id', 'message-1');
+    form.set('media_ciphertext_sha256', digest);
+    form.set('e2ee_v2_envelope', 'e2e2:media-envelope');
+    form.set('file', new Blob([fileBytes], { type: 'application/octet-stream' }));
+
+    const response = await POST(new NextRequest('https://click.example/api/hub/media', { method: 'POST', body: form }));
+
+    expect(response.status).toBe(201);
+    expect(mockAssertHubE2eeMedia).toHaveBeenCalledWith(expect.anything(), {
+      hubId: 'hub-1',
+      userId: 'user-1',
+      content: 'e2e2:media-envelope',
+      mediaCiphertextSha256: digest,
+      epoch: 3,
+      senderDeviceId: 'device-1',
+      clientMessageId: 'message-1',
+    });
+    expect(storageBucket.upload).toHaveBeenCalled();
+  });
+
+  it('rejects a v2 upload when the exact ciphertext digest does not match', async () => {
+    const participantQuery: any = { upsert: jest.fn().mockResolvedValue({ error: null }) };
+    const upload = jest.fn();
+    const storageBucket: any = { upload, createSignedUrl: jest.fn() };
+    mockCreateAdmin.mockReturnValue({
+      from: jest.fn(() => participantQuery),
+      storage: { from: jest.fn(() => storageBucket) },
+    });
+    mockAssertHubE2eeMedia.mockResolvedValue({
+      ok: true,
+      currentEpoch: 3,
+      envelope: { mediaCiphertextSha256: createHash('sha256').update('different').digest('base64') },
+    });
+    const form = new FormData();
+    form.set('hub_id', 'hub-1');
+    form.set('object_path', 'user-1/hub/hub-1/media.enc');
+    form.set('media_ciphertext_sha256', createHash('sha256').update('different').digest('base64'));
+    form.set('e2ee_v2_envelope', 'e2e2:media-envelope');
+    form.set('file', new Blob(['ciphertext'], { type: 'application/octet-stream' }));
+
+    const response = await POST(new NextRequest('https://click.example/api/hub/media', { method: 'POST', body: form }));
+
+    expect(response.status).toBe(400);
+    expect(upload).not.toHaveBeenCalled();
   });
 });

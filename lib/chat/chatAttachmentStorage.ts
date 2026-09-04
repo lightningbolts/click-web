@@ -11,6 +11,17 @@
 /** Matches KMP `ChatMediaConstants.CHAT_ATTACHMENTS_BUCKET`. */
 export const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments';
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  // Chunked to avoid RangeError on very large strings in some JS engines.
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const slice = bytes.subarray(i, Math.min(i + chunk, bytes.length));
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
 export interface ChatAttachmentUploadResult {
   /** Canonical object path inside the bucket (stored in the envelope). */
   path: string;
@@ -83,6 +94,46 @@ export async function uploadChatAttachmentBlob(
   };
 }
 
+/** Upload opaque AES-GCM media for an upgraded chat with a server-verifiable v2 authorization. */
+export async function uploadChatAttachmentV2Blob(
+  chatId: string,
+  ciphertext: Uint8Array,
+  mimeType: string,
+  fileName: string,
+  authorizationEnvelope: string,
+  mediaCiphertextSha256: string,
+  getAuthHeaders: () => Promise<HeadersInit>,
+): Promise<ChatAttachmentUploadResult> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...Object.fromEntries(new Headers(await getAuthHeaders()).entries()),
+  };
+  const res = await fetch('/api/chat/attachments', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      chat_id: chatId,
+      mime_type: mimeType || 'application/octet-stream',
+      file_name: fileName,
+      file_b64: bytesToBase64(ciphertext),
+      e2ee_v2_envelope: authorizationEnvelope,
+      media_ciphertext_sha256: mediaCiphertextSha256,
+    }),
+  });
+  if (!res.ok) throw new Error(`E2EE v2 attachment upload failed (${res.status})`);
+  const payload = (await res.json().catch(() => ({}))) as {
+    path?: unknown;
+    url?: unknown;
+    ttl_seconds?: unknown;
+  };
+  if (typeof payload.path !== 'string' || !payload.path) throw new Error('E2EE v2 attachment upload response missing path');
+  return {
+    path: payload.path,
+    url: typeof payload.url === 'string' ? payload.url : null,
+    ttlSeconds: typeof payload.ttl_seconds === 'number' ? payload.ttl_seconds : 0,
+  };
+}
+
 /** Mint a fresh signed URL for an existing attachment path (used when opening old messages). */
 export async function signChatAttachmentUrl(
   path: string,
@@ -117,17 +168,6 @@ export async function downloadAttachmentCiphertext(signedUrl: string): Promise<U
   }
   const buf = await res.arrayBuffer();
   return new Uint8Array(buf);
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  // Chunked to avoid RangeError on very large strings in some JS engines.
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    const slice = bytes.subarray(i, Math.min(i + chunk, bytes.length));
-    binary += String.fromCharCode(...slice);
-  }
-  return btoa(binary);
 }
 
 async function safeReadErr(res: Response): Promise<string> {

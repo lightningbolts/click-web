@@ -23,17 +23,28 @@ import {
   decryptFileBytes,
   sha256Base64,
   type AttachmentEnvelope,
+  type AttachmentV2Descriptor,
 } from '@/lib/chat/attachmentCrypto';
 import {
   downloadAttachmentCiphertext,
   signChatAttachmentUrl,
 } from '@/lib/chat/chatAttachmentStorage';
+import { decryptWebE2eeV2Media, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 interface AttachmentBubbleProps {
-  envelope: AttachmentEnvelope;
+  envelope: AttachmentEnvelope | AttachmentV2Descriptor;
   isMine: boolean;
   /** Called with fresh `Headers` instance for Authorization; supplied by parent. */
   getAuthHeaders: () => Promise<HeadersInit>;
+  chatId?: string;
+  messageMetadata?: {
+    chatId: string;
+    epoch: number;
+    senderDeviceId: string;
+    clientMessageId: string;
+    mediaCiphertextSha256: string;
+  } | null;
+  getE2eeV2Session?: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
 }
 
 type DownloadState =
@@ -77,7 +88,14 @@ function triggerBrowserDownload(bytes: Uint8Array, fileName: string, mime: strin
   }
 }
 
-export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: AttachmentBubbleProps) {
+export default function AttachmentBubble({
+  envelope,
+  isMine,
+  getAuthHeaders,
+  chatId,
+  messageMetadata,
+  getE2eeV2Session,
+}: AttachmentBubbleProps) {
   const [state, setState] = useState<DownloadState>({ kind: 'idle' });
   const Icon = iconForMime(envelope.mime);
 
@@ -89,11 +107,27 @@ export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: A
       const cipher = await downloadAttachmentCiphertext(signed);
 
       setState({ kind: 'verifying' });
-      const key = decodeFileMasterKeyBase64(envelope.key);
-      const plain = await decryptFileBytes(cipher, key);
-      const digest = await sha256Base64(plain);
-      if (digest !== envelope.sha256) {
-        throw new Error('Attachment integrity check failed (SHA-256 mismatch)');
+      let plain: Uint8Array;
+      if (envelope.v === 2) {
+        if (!chatId || !messageMetadata || !getE2eeV2Session) {
+          throw new Error('Missing E2EE v2 metadata for attachment');
+        }
+        if (messageMetadata.chatId !== chatId || messageMetadata.mediaCiphertextSha256 !== envelope.mediaCiphertextSha256) {
+          throw new Error('Attachment metadata integrity check failed');
+        }
+        const session = await getE2eeV2Session(false);
+        if (!session) throw new Error('This device cannot unlock the attachment epoch');
+        plain = await decryptWebE2eeV2Media(session, {
+          ...messageMetadata,
+          mediaCiphertextSha256: envelope.mediaCiphertextSha256,
+        }, cipher);
+      } else {
+        const key = decodeFileMasterKeyBase64(envelope.key);
+        plain = await decryptFileBytes(cipher, key);
+        const digest = await sha256Base64(plain);
+        if (digest !== envelope.sha256) {
+          throw new Error('Attachment integrity check failed (SHA-256 mismatch)');
+        }
       }
 
       triggerBrowserDownload(plain, envelope.name, envelope.mime);
@@ -105,7 +139,7 @@ export default function AttachmentBubble({ envelope, isMine, getAuthHeaders }: A
         message: err instanceof Error ? err.message : 'Download failed',
       });
     }
-  }, [envelope, getAuthHeaders, state.kind]);
+  }, [chatId, envelope, getAuthHeaders, getE2eeV2Session, messageMetadata, state.kind]);
 
   const bubbleClass = isMine
     ? 'border border-border-hard bg-primary text-on-primary'

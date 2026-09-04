@@ -30,6 +30,8 @@ export type MessageType = 'text' | 'image' | 'audio' | 'file' | 'call_log' | 'be
 /** Structured fields stored in `messages.metadata` for media (matches mobile `MessageMediaMetadata`). */
 export interface MessageMediaMetadata {
   media_url?: string;
+  /** Private `chat-attachments` object path for E2EE v2 media. */
+  media_path?: string;
   /** True when [media_url] points at ciphertext bytes (KMP gatekeeper upload). */
   is_encrypted_media?: boolean;
   /** Original MIME before encryption (e.g. image/jpeg) — not sent to storage. */

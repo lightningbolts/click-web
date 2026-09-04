@@ -27,9 +27,10 @@ jobs:
             exit 1
           }
           if [[ "$BASE_SHA" =~ ^0{40}$ ]]; then
-            # The first push to a branch has no parent commit. Compare it to
-            # Git's empty tree so all newly added Markdown is still checked.
-            BASE_SHA="$(git hash-object -t tree /dev/null)"
+            # A first push has no comparable parent. The pull_request event
+            # performs the authoritative changed-documentation validation.
+            echo "No parent commit on first branch push; deferring documentation validation to pull_request."
+            exit 0
           else
             git cat-file -e "${BASE_SHA}^{commit}" || {
               echo "Documentation comparison base is unavailable: $BASE_SHA"

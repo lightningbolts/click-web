@@ -3,6 +3,12 @@ import { getSupabaseClient } from '@/lib/supabase';
 /** Matches KMP `ChatMediaConstants.CHAT_MEDIA_BUCKET`. */
 export const CHAT_MEDIA_BUCKET = 'chat-media';
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 function randomSuffix(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID().slice(0, 8);
@@ -50,4 +56,37 @@ export async function uploadChatMediaBlob(
 
   const { data: pub } = supabase.storage.from(CHAT_MEDIA_BUCKET).getPublicUrl(data.path);
   return { publicUrl: pub.publicUrl, path: data.path };
+}
+
+/** Upload opaque E2EE v2 media through the private server gatekeeper. */
+export async function uploadChatMediaV2Blob(
+  chatId: string,
+  ciphertext: Uint8Array,
+  mimeType: string,
+  authorizationEnvelope: string,
+  mediaCiphertextSha256: string,
+  getAuthHeaders: () => Promise<HeadersInit>,
+): Promise<{ url: string; path: string }> {
+  if (!chatId.trim()) throw new Error('chatId is required for E2EE v2 media upload');
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...Object.fromEntries(new Headers(await getAuthHeaders()).entries()),
+  };
+  const response = await fetch('/api/chat/media', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      chat_id: chatId,
+      mime_type: mimeType || 'application/octet-stream',
+      file_b64: bytesToBase64(ciphertext),
+      e2ee_v2_envelope: authorizationEnvelope,
+      media_ciphertext_sha256: mediaCiphertextSha256,
+    }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { url?: unknown; path?: unknown; error?: unknown };
+  if (!response.ok) throw new Error(`E2EE v2 media upload failed (${response.status})`);
+  if (typeof payload.url !== 'string' || typeof payload.path !== 'string') {
+    throw new Error('E2EE v2 media upload response is incomplete');
+  }
+  return { url: payload.url, path: payload.path };
 }

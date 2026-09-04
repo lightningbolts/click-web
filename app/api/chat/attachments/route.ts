@@ -20,6 +20,11 @@ import {
 } from '@/lib/server/chatGatekeeper';
 import { parseBody } from '@/lib/api/parseBody';
 import { chatAttachmentBodySchema } from '@/lib/api/schemas/chat';
+import {
+  assertE2eeV2MediaUpload,
+  messageBodyV2Field,
+} from '@/lib/server/e2eeV2Gate';
+import { createHash } from 'node:crypto';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -29,6 +34,7 @@ const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments';
 const MAX_PLAINTEXT_BYTES = 2 * 1024 * 1024;
 /** Modest ciphertext overhead budget: IV(16) + HMAC(32) + AES-CBC padding. 256 bytes is generous. */
 const MAX_CIPHERTEXT_BYTES = MAX_PLAINTEXT_BYTES + 256;
+const MAX_BASE64_CHARS = Math.ceil(MAX_CIPHERTEXT_BYTES / 3) * 4 + 4;
 /** Signed URLs expire after 1 hour — enough for receivers to download + decrypt without long-lived exposure. */
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -46,12 +52,54 @@ const ALLOWED_MIME_TYPES: ReadonlySet<string> = new Set([
   'application/csv',
 ]);
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readString(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === 'string') as string | undefined;
+}
+
+function v2EnvelopeAndMetadata(body: Record<string, unknown>): {
+  envelope: string;
+  metadata: Record<string, unknown>;
+} {
+  const bodyMetadata = isRecord(body.metadata) ? body.metadata : {};
+  const nestedV2 = isRecord(body.e2ee_v2)
+    ? body.e2ee_v2
+    : isRecord(body.e2eeV2)
+      ? body.e2eeV2
+      : {};
+  const metadata = { ...nestedV2, ...bodyMetadata };
+  return {
+    envelope:
+      readString(
+        body.e2ee_v2_envelope,
+        body.e2eeV2Envelope,
+        body.envelope,
+        body.content,
+        nestedV2.envelope,
+        nestedV2.content,
+        bodyMetadata.e2ee_v2_envelope,
+        bodyMetadata.e2eeV2Envelope,
+        bodyMetadata.envelope,
+        bodyMetadata.content,
+      ) ?? '',
+    metadata,
+  };
+}
+
 function stripDataUriPrefix(raw: string): string {
   const trimmed = raw.trim();
   const marker = 'base64,';
   const idx = trimmed.toLowerCase().indexOf(marker);
   if (idx >= 0) return trimmed.slice(idx + marker.length).trim();
   return trimmed;
+}
+
+function isStrictBase64(value: string): boolean {
+  return value.length > 0 && value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value) &&
+    !value.slice(0, -2).includes('=');
 }
 
 /**
@@ -86,12 +134,16 @@ export async function POST(request: NextRequest) {
     const rawName = typeof parsed.file_name === 'string' ? parsed.file_name : '';
     const fileB64Raw = parsed.file_b64;
     const fileB64 = stripDataUriPrefix(fileB64Raw);
+    const bodyRecord = parsed as unknown as Record<string, unknown>;
 
     if (!fileB64) {
       return NextResponse.json({ error: 'file_b64 is required' }, { status: 400 });
     }
     if (!rawName.trim()) {
       return NextResponse.json({ error: 'file_name is required' }, { status: 400 });
+    }
+    if (fileB64.length > MAX_BASE64_CHARS || !isStrictBase64(fileB64)) {
+      return NextResponse.json({ error: 'Invalid or oversized file_b64 payload' }, { status: 400 });
     }
     if (!ALLOWED_MIME_TYPES.has(mimeType)) {
       return NextResponse.json(
@@ -103,6 +155,16 @@ export async function POST(request: NextRequest) {
     const admin = createChatGatekeeperAdmin();
     const denied = await assertChatWritable(admin, auth.user.id, chatId);
     if (denied) return denied;
+
+    const v2 = v2EnvelopeAndMetadata(bodyRecord);
+    const mediaDigest = messageBodyV2Field(bodyRecord, 'media_ciphertext_sha256', 'mediaCiphertextSha256', v2.metadata);
+    const v2Gate = await assertE2eeV2MediaUpload(admin, {
+      chatId,
+      userId: auth.user.id,
+      content: v2.envelope,
+      mediaCiphertextSha256: mediaDigest,
+    });
+    if (!v2Gate.ok) return v2Gate.response;
 
     let buffer: Buffer;
     try {
@@ -120,6 +182,15 @@ export async function POST(request: NextRequest) {
         { error: 'Attachment ciphertext exceeds 2 MiB + envelope overhead' },
         { status: 413 },
       );
+    }
+    if (v2Gate.currentEpoch !== null) {
+      const computedDigest = createHash('sha256').update(buffer).digest('base64');
+      if (computedDigest !== v2Gate.envelope.mediaCiphertextSha256) {
+        return NextResponse.json(
+          { error: 'Uploaded bytes do not match the E2EE v2 authorization envelope' },
+          { status: 400 },
+        );
+      }
     }
 
     const safeName = sanitizeFilename(rawName);
