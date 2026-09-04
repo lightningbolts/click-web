@@ -23,6 +23,31 @@ describe('event-hub production containment migration', () => {
     );
   });
 
+  it('removes explicit anonymous RPC grants left by legacy definitions', () => {
+    for (const statement of [
+      'REVOKE EXECUTE ON FUNCTION public.auth_uid_in_hub(text) FROM anon;',
+      'REVOKE EXECUTE ON FUNCTION public.fetch_map_beacons_within(double precision, double precision, double precision, integer) FROM anon;',
+      'REVOKE EXECUTE ON FUNCTION public.fetch_my_active_map_beacons(integer) FROM anon;',
+      'REVOKE EXECUTE ON FUNCTION public.get_hubs_nearby(double precision, double precision, double precision, integer) FROM anon;',
+    ]) {
+      expect(read('supabase/migrations/20260903000000_event_rpc_anon_grants_reconciliation.sql')).toContain(statement);
+    }
+  });
+
+  it('keeps the auth contact-hash trigger able to resolve pgcrypto safely', () => {
+    const migration = read(
+      'supabase/migrations/20260903100000_contact_hash_trigger_search_path.sql',
+    );
+    expect(migration).toContain('ALTER FUNCTION public.sync_user_contact_hashes()');
+    expect(migration).toContain('SET search_path = public, extensions, pg_temp;');
+  });
+
+  it('removes the legacy broad waitlist insert policy', () => {
+    expect(
+      read('supabase/migrations/20260903200000_waitlist_legacy_policy_cleanup.sql'),
+    ).toContain('DROP POLICY IF EXISTS "Allow public waitlist inserts" ON public.waitlist;');
+  });
+
   it('keeps new hub media private and provides a canonical event-hub relationship', () => {
     expect(migration).toContain("VALUES ('hub-media', 'hub-media', false)");
     expect(migration).toContain('CREATE TRIGGER sync_event_hub_beacon_link_after_write');
