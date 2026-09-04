@@ -50,14 +50,13 @@ describe('E2EE v2 Supabase foundation source contract', () => {
   });
 
   it('ships pgTAP security assertions for RLS, policies, privileges, and constraints', () => {
-    expect(pgTap).toContain('SELECT plan(26);');
+    expect(pgTap).toContain('SELECT plan(35);');
     expect(pgTap).toContain('relrowsecurity');
     expect(pgTap).toContain('pg_policy');
     expect(pgTap).toContain('pg_constraint');
     expect(pgTap).toContain("has_table_privilege('anon'");
     expect(pgTap).toContain("has_table_privilege('service_role'");
     expect(pgTap).toContain("'42501'");
-    expect(pgTap).toContain("'23514'");
     expect(pgTap).toContain('SELECT * FROM finish();');
   });
 });

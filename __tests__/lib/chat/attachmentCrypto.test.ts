@@ -10,6 +10,10 @@ import {
   encodeEnvelope,
   tryDecodeEnvelope,
   isAttachmentEnvelope,
+  E2EE_V2_ATTACHMENT_PREFIX,
+  encodeV2AttachmentDescriptor,
+  tryDecodeV2AttachmentDescriptor,
+  type AttachmentV2Descriptor,
   type AttachmentEnvelope,
 } from '@/lib/chat/attachmentCrypto';
 
@@ -108,5 +112,34 @@ describe('AttachmentCrypto', () => {
     expect(isAttachmentEnvelope('ccx:v1:{}')).toBe(true);
     expect(isAttachmentEnvelope('hi')).toBe(false);
     expect(isAttachmentEnvelope('e2e:xxx')).toBe(false);
+  });
+
+  it('round-trips a strict E2EE v2 attachment descriptor', () => {
+    const descriptor: AttachmentV2Descriptor = {
+      v: 2,
+      type: 'file',
+      name: 'spec.pdf',
+      mime: 'application/pdf',
+      size: 12345,
+      path: 'chat-id/user-id/123-spec.pdf',
+      mediaCiphertextSha256: 'ypeBEsobvcr6wjGzmiPcTaeG7/gUfE5yuYB3ha/uSLs=',
+    };
+    const wire = encodeV2AttachmentDescriptor(descriptor);
+    expect(wire.startsWith(E2EE_V2_ATTACHMENT_PREFIX)).toBe(true);
+    expect(tryDecodeV2AttachmentDescriptor(wire)).toEqual(descriptor);
+  });
+
+  it('rejects v2 attachment descriptors with extra or unsafe fields', () => {
+    const valid = {
+      v: 2,
+      type: 'file',
+      name: 'x.txt',
+      mime: 'text/plain',
+      size: 1,
+      path: 'chat/user/x',
+      mediaCiphertextSha256: 'ypeBEsobvcr6wjGzmiPcTaeG7/gUfE5yuYB3ha/uSLs=',
+    };
+    expect(tryDecodeV2AttachmentDescriptor(`${E2EE_V2_ATTACHMENT_PREFIX}${JSON.stringify({ ...valid, extra: true })}`)).toBeNull();
+    expect(tryDecodeV2AttachmentDescriptor(`${E2EE_V2_ATTACHMENT_PREFIX}${JSON.stringify({ ...valid, path: '../escape' })}`)).toBeNull();
   });
 });

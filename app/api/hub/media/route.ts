@@ -7,11 +7,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import {
   assertHubGeofenceFromCoords,
   assertHubReadable,
 } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import {
+  assertHubE2eeV2MediaUpload,
+  HUB_E2EE_V2_INVALID,
+} from '@/lib/server/hubE2eeV2Gate';
+import { apiError } from '@/lib/api/errors';
 import {
   HUB_MUTATION_RATE_WINDOW_MS,
   HUB_UPLOAD_RATE_LIMIT,
@@ -166,6 +172,13 @@ export async function POST(request: NextRequest) {
   const file = form.get('file');
   const latRaw = form.get('user_lat') ?? form.get('userLat');
   const lonRaw = form.get('user_long') ?? form.get('userLong');
+  const e2eeV2Envelope = String(form.get('e2ee_v2_envelope') ?? form.get('e2eeV2Envelope') ?? '').trim();
+  const mediaCiphertextSha256 = String(
+    form.get('media_ciphertext_sha256') ?? form.get('mediaCiphertextSha256') ?? '',
+  ).trim();
+  const epochRaw = String(form.get('epoch') ?? '').trim();
+  const senderDeviceId = String(form.get('sender_device_id') ?? form.get('senderDeviceId') ?? '').trim();
+  const clientMessageId = String(form.get('client_message_id') ?? form.get('clientMessageId') ?? '').trim();
   const userLat = typeof latRaw === 'string' && latRaw.trim() !== '' ? Number.parseFloat(latRaw) : NaN;
   const userLong = typeof lonRaw === 'string' && lonRaw.trim() !== '' ? Number.parseFloat(lonRaw) : NaN;
 
@@ -212,6 +225,24 @@ export async function POST(request: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer());
   if (buffer.length > HUB_MEDIA_MAX_BYTES) {
     return NextResponse.json({ error: 'Hub media must be 25 MiB or smaller' }, { status: 413 });
+  }
+
+  const e2eeGate = await assertHubE2eeV2MediaUpload(admin, {
+    hubId,
+    userId: auth.user.id,
+    content: e2eeV2Envelope,
+    mediaCiphertextSha256: mediaCiphertextSha256 || undefined,
+    epoch: epochRaw ? Number(epochRaw) : undefined,
+    senderDeviceId: senderDeviceId || undefined,
+    clientMessageId: clientMessageId || undefined,
+  });
+  if (!e2eeGate.ok) return e2eeGate.response;
+
+  if (e2eeGate.envelope) {
+    const actualDigest = createHash('sha256').update(buffer).digest('base64');
+    if (actualDigest !== e2eeGate.envelope.mediaCiphertextSha256) {
+      return apiError('Hub E2EE v2 media ciphertext digest does not match the upload', 400, HUB_E2EE_V2_INVALID);
+    }
   }
 
   const declaredType = typeof form.get('mime_type') === 'string' ? String(form.get('mime_type')).trim() : '';

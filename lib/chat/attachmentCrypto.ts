@@ -12,6 +12,8 @@
 
 /** Envelope prefix used inside the decrypted E2EE message body. */
 export const ENVELOPE_PREFIX = 'ccx:v1:';
+/** Prefix for file descriptors whose bytes use the chat epoch AES-GCM media protocol. */
+export const E2EE_V2_ATTACHMENT_PREFIX = 'ccx:v2:';
 
 /** Length of the per-file master key, in bytes. */
 export const FILE_MASTER_KEY_BYTES = 32;
@@ -30,6 +32,17 @@ export interface AttachmentEnvelope {
   key: string;
   /** Base64 of the SHA-256 of the *plaintext* bytes. */
   sha256: string;
+}
+
+export interface AttachmentV2Descriptor {
+  v: 2;
+  type: 'file';
+  name: string;
+  mime: string;
+  size: number;
+  path: string;
+  /** Base64(SHA-256 of the exact uploaded AES-GCM payload). */
+  mediaCiphertextSha256: string;
 }
 
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -152,6 +165,11 @@ export function encodeEnvelope(env: AttachmentEnvelope): string {
   return ENVELOPE_PREFIX + JSON.stringify(env);
 }
 
+/** Serialize a file descriptor whose payload was encrypted with an E2EE v2 chat epoch key. */
+export function encodeV2AttachmentDescriptor(env: AttachmentV2Descriptor): string {
+  return E2EE_V2_ATTACHMENT_PREFIX + JSON.stringify(env);
+}
+
 /**
  * Try to parse an envelope. Returns `null` if [content] is not an attachment payload — the
  * caller should then treat it as a plain text message (backwards-compatible fallback).
@@ -179,6 +197,48 @@ export function tryDecodeEnvelope(content: string): AttachmentEnvelope | null {
   }
 }
 
+function isSha256Base64(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(value)) return false;
+  try {
+    return atob(value).length === 32;
+  } catch {
+    return false;
+  }
+}
+
+/** Strictly parse a v2 file descriptor after the surrounding message is decrypted. */
+export function tryDecodeV2AttachmentDescriptor(content: string): AttachmentV2Descriptor | null {
+  if (!content.startsWith(E2EE_V2_ATTACHMENT_PREFIX)) return null;
+  try {
+    const parsed = JSON.parse(content.slice(E2EE_V2_ATTACHMENT_PREFIX.length)) as Record<string, unknown>;
+    const keys = Object.keys(parsed).sort();
+    if (keys.join('|') !== 'mediaCiphertextSha256|mime|name|path|size|type|v') return null;
+    if (
+      parsed.v !== 2 ||
+      parsed.type !== 'file' ||
+      typeof parsed.name !== 'string' ||
+      parsed.name.length === 0 ||
+      parsed.name.length > 256 ||
+      typeof parsed.mime !== 'string' ||
+      parsed.mime.length === 0 ||
+      parsed.mime.length > 256 ||
+      typeof parsed.path !== 'string' ||
+      parsed.path.length === 0 ||
+      parsed.path.startsWith('/') ||
+      parsed.path.includes('..') ||
+      typeof parsed.size !== 'number' ||
+      !Number.isSafeInteger(parsed.size) ||
+      parsed.size < 0 ||
+      !isSha256Base64(parsed.mediaCiphertextSha256)
+    ) {
+      return null;
+    }
+    return parsed as unknown as AttachmentV2Descriptor;
+  } catch {
+    return null;
+  }
+}
+
 export function isAttachmentEnvelope(content: string): boolean {
-  return content.startsWith(ENVELOPE_PREFIX);
+  return content.startsWith(ENVELOPE_PREFIX) || content.startsWith(E2EE_V2_ATTACHMENT_PREFIX);
 }

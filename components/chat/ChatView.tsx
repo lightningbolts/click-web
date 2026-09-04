@@ -178,7 +178,8 @@ export default function ChatView({
     replyBannerText,
     decryptWireMessageContent,
     appendReplyToMetadata,
-  } = useChatEncryption({ connection, currentUserId, isGroupClique, replyingTo });
+    getE2eeV2Session,
+  } = useChatEncryption({ connection, currentUserId, isGroupClique, chatId, getAuthHeaders, replyingTo });
 
   const {
     groupHeaderSubtitle,
@@ -202,6 +203,7 @@ export default function ChatView({
     e2eKeys,
     groupMasterKey,
     groupKeyError,
+    getE2eeV2Session,
     chatId,
     setChatId,
     messages,
@@ -231,6 +233,7 @@ export default function ChatView({
     isGroupClique,
     e2eKeys,
     groupMasterKey,
+    getE2eeV2Session,
     setMessages,
     setTypingIndicator,
     typingTimeoutRef,
@@ -254,6 +257,7 @@ export default function ChatView({
     chatId,
     e2eKeys,
     groupMasterKey,
+    getE2eeV2Session,
     messages,
     setMessages,
     inputText,
@@ -293,6 +297,7 @@ export default function ChatView({
     setInputText,
     inputTextRef,
     getAuthHeaders,
+    getE2eeV2Session,
     appendReplyToMetadata,
     decryptWireMessageContent,
     isNearBottom,
@@ -323,6 +328,7 @@ export default function ChatView({
     inputRef,
     photoInputRef,
     getAuthHeaders,
+    getE2eeV2Session,
     appendReplyToMetadata,
   });
 
@@ -507,6 +513,7 @@ export default function ChatView({
                   currentUserId={currentUserId}
                   mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
                   getAuthHeaders={getAuthHeaders}
+                  getE2eeV2Session={getE2eeV2Session}
                   highlighted={highlightedMessageId === entry.message.id}
                   senderInitial={otherInitial}
                   senderLabel={

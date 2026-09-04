@@ -24,6 +24,7 @@ import {
   type DerivedKeys,
 } from '@/lib/chat/crypto';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
+import { decryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 /**
  * Supabase Realtime subscription for one chat: message INSERT/UPDATE/DELETE,
@@ -36,6 +37,7 @@ export function useChatRealtime({
   isGroupClique,
   e2eKeys,
   groupMasterKey,
+  getE2eeV2Session,
   setMessages,
   setTypingIndicator,
   typingTimeoutRef,
@@ -49,6 +51,7 @@ export function useChatRealtime({
   isGroupClique: boolean;
   e2eKeys: DerivedKeys | null;
   groupMasterKey: ArrayBuffer | null;
+  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setTypingIndicator: Dispatch<SetStateAction<boolean>>;
   typingTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
@@ -70,6 +73,15 @@ export function useChatRealtime({
     };
 
     const decryptIfNeeded = async (content: string): Promise<string> => {
+      if (content.startsWith('e2e2:')) {
+        const session = await getE2eeV2Session(false).catch(() => null);
+        if (!session) return 'Encrypted message';
+        try {
+          return await decryptWebE2eeV2Message(session, content);
+        } catch {
+          return 'Encrypted message';
+        }
+      }
       if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(content)) {
         return decryptGroupMessageContent(content, groupMasterKey);
       }
@@ -242,5 +254,5 @@ export function useChatRealtime({
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId, currentUserId, scrollToBottom, e2eKeys, groupMasterKey, isGroupClique, firePeerDeliveredAck]);
+  }, [chatId, currentUserId, scrollToBottom, e2eKeys, groupMasterKey, isGroupClique, firePeerDeliveredAck, getE2eeV2Session]);
 }

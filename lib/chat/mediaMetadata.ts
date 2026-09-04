@@ -1,4 +1,4 @@
-import { ENVELOPE_PREFIX } from '@/lib/chat/attachmentCrypto';
+import { ENVELOPE_PREFIX, E2EE_V2_ATTACHMENT_PREFIX } from '@/lib/chat/attachmentCrypto';
 import type { Message, MessageMediaMetadata, MessageType } from '@/lib/chat/types';
 
 /** Public URL for image/audio from `metadata.media_url` (camelCase fallback for older rows). */
@@ -6,6 +6,13 @@ export function mediaUrlFromMetadata(metadata: MessageMediaMetadata | undefined 
   if (!metadata || typeof metadata !== 'object') return null;
   const u = metadata.media_url ?? (metadata as { mediaUrl?: string }).mediaUrl;
   return typeof u === 'string' && u.trim() ? u.trim() : null;
+}
+
+/** Private storage path for v2 media; callers must mint a fresh signed URL before downloading. */
+export function mediaPathFromMetadata(metadata: MessageMediaMetadata | undefined | null): string | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  const raw = metadata.media_path ?? (metadata as { mediaPath?: unknown }).mediaPath;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
 }
 
 export function durationSecondsFromMetadata(metadata: MessageMediaMetadata | undefined | null): number | undefined {
@@ -65,6 +72,6 @@ export function previewLabelForMessage(
   // C6 regression fix: attachment envelopes (`ccx:v1:{...}`) must never bleed into
   // the chat list / reply banner as raw JSON. Render a neutral "📎 Attachment"
   // placeholder — the full preview is only materialised after client-side decryption.
-  if (cap.startsWith(ENVELOPE_PREFIX)) return '📎 Attachment';
+  if (cap.startsWith(ENVELOPE_PREFIX) || cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX)) return '📎 Attachment';
   return message.content;
 }

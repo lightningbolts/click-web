@@ -8,8 +8,8 @@ import {
   type SetStateAction,
 } from 'react';
 import type { Message } from '@/lib/chat/types';
-import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
-import { uploadChatAttachmentBlob } from '@/lib/chat/chatAttachmentStorage';
+import { uploadChatMediaBlob, uploadChatMediaV2Blob } from '@/lib/chat/chatMediaStorage';
+import { uploadChatAttachmentBlob, uploadChatAttachmentV2Blob } from '@/lib/chat/chatAttachmentStorage';
 import { validateAttachment } from '@/lib/chat/attachmentValidator';
 import {
   encodeEnvelope,
@@ -17,6 +17,7 @@ import {
   encryptFileBytes,
   generateFileMasterKey,
   sha256Base64,
+  encodeV2AttachmentDescriptor,
   type AttachmentEnvelope,
 } from '@/lib/chat/attachmentCrypto';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
@@ -25,6 +26,13 @@ import {
   encryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
+import {
+  encryptWebE2eeV2Media,
+  encryptWebE2eeV2Message,
+  type E2eeV2Session,
+} from '@/lib/chat/e2eeV2Client';
+
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 /**
  * Photo and encrypted file-attachment sending, including drag-and-drop.
@@ -48,6 +56,7 @@ export function useChatAttachments({
   inputRef,
   photoInputRef,
   getAuthHeaders,
+  getE2eeV2Session,
   appendReplyToMetadata,
 }: {
   connection: ConnectionRecord;
@@ -67,6 +76,7 @@ export function useChatAttachments({
   inputRef: RefObject<HTMLTextAreaElement | null>;
   photoInputRef: RefObject<HTMLInputElement | null>;
   getAuthHeaders: () => Promise<HeadersInit>;
+  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   appendReplyToMetadata: (meta: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }) {
   const onPhotoSelected = useCallback(
@@ -78,20 +88,53 @@ export function useChatAttachments({
         setActionToast({ type: 'error', message: 'Please choose an image file' });
         return;
       }
+      if (file.size > MAX_MEDIA_BYTES) {
+        setActionToast({ type: 'error', message: 'Photo exceeds the 25 MiB limit' });
+        return;
+      }
       setMediaBusy(true);
       inputRef.current?.focus();
       try {
-        const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
         const caption = inputTextRef.current.trim();
         setInputText('');
-        const wireContent =
-          isGroupClique && groupMasterKey && caption
-            ? await encryptGroupMessageContent(caption, groupMasterKey)
-            : e2eKeys && caption
-              ? await encryptContent(caption, e2eKeys)
-              : caption;
+        const v2Session = await getE2eeV2Session(true, true);
+        let wireContent: string;
+        let metadata: Record<string, unknown>;
+        if (v2Session) {
+          const clientMessageId = crypto.randomUUID();
+          const media = await encryptWebE2eeV2Media(
+            v2Session,
+            { chatId, clientMessageId },
+            new Uint8Array(await file.arrayBuffer()),
+          );
+          const upload = await uploadChatMediaV2Blob(
+            chatId,
+            media.payload,
+            file.type,
+            media.authorizationEnvelope,
+            media.metadata.media_ciphertext_sha256 as string,
+            getAuthHeaders,
+          );
+          const message = await encryptWebE2eeV2Message(v2Session, chatId, caption, clientMessageId);
+          wireContent = message.wireContent;
+          metadata = await appendReplyToMetadata({
+            ...message.metadata,
+            ...media.metadata,
+            media_path: upload.path,
+            original_mime_type: file.type,
+            is_encrypted_media: true,
+          });
+        } else {
+          const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
+          wireContent =
+            isGroupClique && groupMasterKey && caption
+              ? await encryptGroupMessageContent(caption, groupMasterKey)
+              : e2eKeys && caption
+                ? await encryptContent(caption, e2eKeys)
+                : caption;
+          metadata = await appendReplyToMetadata({ media_url: publicUrl });
+        }
         const headers = await getAuthHeaders();
-        const metadata = await appendReplyToMetadata({ media_url: publicUrl });
         const res = await fetch('/api/chat/messages', {
           method: 'POST',
           headers,
@@ -123,6 +166,7 @@ export function useChatAttachments({
       isGroupClique,
       connection.id,
       getAuthHeaders,
+      getE2eeV2Session,
       appendReplyToMetadata,
     ],
   );
@@ -144,45 +188,79 @@ export function useChatAttachments({
       setMediaBusy(true);
       try {
         const plainBytes = new Uint8Array(await file.arrayBuffer());
-        const masterKey = generateFileMasterKey();
-        const ciphertext = await encryptFileBytes(plainBytes, masterKey);
-        const sha = await sha256Base64(plainBytes);
         const mimeType = (file.type || 'application/octet-stream').toLowerCase();
-
-        const { path } = await uploadChatAttachmentBlob(
-          chatId,
-          ciphertext,
-          mimeType,
-          file.name,
-          getAuthHeaders,
-        );
-
-        const envelope: AttachmentEnvelope = {
-          v: 1,
-          type: 'file',
-          name: file.name,
-          mime: mimeType,
-          size: plainBytes.byteLength,
-          path,
-          key: encodeFileMasterKeyBase64(masterKey),
-          sha256: sha,
-        };
-        const envelopeBody = encodeEnvelope(envelope);
-
-        const wireContent =
-          isGroupClique && groupMasterKey
-            ? await encryptGroupMessageContent(envelopeBody, groupMasterKey)
-            : e2eKeys
-              ? await encryptContent(envelopeBody, e2eKeys)
-              : envelopeBody;
+        const v2Session = await getE2eeV2Session(true, true);
+        let wireContent: string;
+        let metadata: Record<string, unknown>;
+        if (v2Session) {
+          const clientMessageId = crypto.randomUUID();
+          const media = await encryptWebE2eeV2Media(v2Session, { chatId, clientMessageId }, plainBytes);
+          const { path } = await uploadChatAttachmentV2Blob(
+            chatId,
+            media.payload,
+            mimeType,
+            file.name,
+            media.authorizationEnvelope,
+            media.metadata.media_ciphertext_sha256 as string,
+            getAuthHeaders,
+          );
+          const descriptor = encodeV2AttachmentDescriptor({
+            v: 2,
+            type: 'file',
+            name: file.name,
+            mime: mimeType,
+            size: plainBytes.byteLength,
+            path,
+            mediaCiphertextSha256: media.metadata.media_ciphertext_sha256 as string,
+          });
+          const message = await encryptWebE2eeV2Message(v2Session, chatId, descriptor, clientMessageId);
+          wireContent = message.wireContent;
+          metadata = await appendReplyToMetadata({
+            ...message.metadata,
+            ...media.metadata,
+            attachment_path: path,
+            attachment_name: file.name,
+            attachment_mime: mimeType,
+            attachment_size: plainBytes.byteLength,
+            is_encrypted_media: true,
+          });
+        } else {
+          const masterKey = generateFileMasterKey();
+          const ciphertext = await encryptFileBytes(plainBytes, masterKey);
+          const sha = await sha256Base64(plainBytes);
+          const { path } = await uploadChatAttachmentBlob(
+            chatId,
+            ciphertext,
+            mimeType,
+            file.name,
+            getAuthHeaders,
+          );
+          const envelope: AttachmentEnvelope = {
+            v: 1,
+            type: 'file',
+            name: file.name,
+            mime: mimeType,
+            size: plainBytes.byteLength,
+            path,
+            key: encodeFileMasterKeyBase64(masterKey),
+            sha256: sha,
+          };
+          const envelopeBody = encodeEnvelope(envelope);
+          wireContent =
+            isGroupClique && groupMasterKey
+              ? await encryptGroupMessageContent(envelopeBody, groupMasterKey)
+              : e2eKeys
+                ? await encryptContent(envelopeBody, e2eKeys)
+                : envelopeBody;
+          metadata = await appendReplyToMetadata({
+            attachment_path: path,
+            attachment_name: file.name,
+            attachment_mime: mimeType,
+            attachment_size: plainBytes.byteLength,
+          });
+        }
 
         const headers = await getAuthHeaders();
-        const metadata = await appendReplyToMetadata({
-          attachment_path: path,
-          attachment_name: file.name,
-          attachment_mime: mimeType,
-          attachment_size: plainBytes.byteLength,
-        });
         const res = await fetch('/api/chat/messages', {
           method: 'POST',
           headers,
@@ -219,6 +297,7 @@ export function useChatAttachments({
       isGroupClique,
       connection.id,
       getAuthHeaders,
+      getE2eeV2Session,
       appendReplyToMetadata,
     ],
   );

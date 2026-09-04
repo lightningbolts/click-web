@@ -35,9 +35,22 @@ export interface MessageMetadata {
   readonly clientMessageId: string;
 }
 
+export interface MediaAuthorizationMetadata extends MessageMetadata {
+  /** Base64(SHA-256(uploaded ciphertext bytes)); authenticated by the authorization envelope. */
+  readonly mediaCiphertextSha256: string;
+}
+
 export interface MessageEnvelope extends MessageMetadata {
   readonly v: typeof E2EE_V2_CRYPTO_VERSION;
   readonly type: 'message';
+  readonly cryptoVersion: typeof E2EE_V2_CRYPTO_VERSION;
+  readonly nonce: string;
+  readonly ciphertext: string;
+}
+
+export interface MediaAuthorizationEnvelope extends MediaAuthorizationMetadata {
+  readonly v: typeof E2EE_V2_CRYPTO_VERSION;
+  readonly type: 'media';
   readonly cryptoVersion: typeof E2EE_V2_CRYPTO_VERSION;
   readonly nonce: string;
   readonly ciphertext: string;
@@ -47,6 +60,16 @@ export interface EncryptMessageRequest extends MessageMetadata {
   readonly epochKey: ArrayBuffer | Uint8Array;
   readonly plaintext: string;
   readonly replayGuard?: ReplayGuard;
+}
+
+export interface AuthorizeMediaRequest extends MediaAuthorizationMetadata {
+  readonly epochKey: ArrayBuffer | Uint8Array;
+  readonly replayGuard?: ReplayGuard;
+}
+
+export interface EncryptMediaPayloadRequest extends MessageMetadata {
+  readonly epochKey: ArrayBuffer | Uint8Array;
+  readonly plaintext: ArrayBuffer | Uint8Array;
 }
 
 export interface DecryptMessageRequest extends MessageMetadata {
@@ -158,12 +181,25 @@ function validateNonce(value: Bytes): Bytes {
   return value;
 }
 
+function validateDigest(value: string): string {
+  const digest = fromBase64(value, 'media ciphertext digest');
+  if (digest.byteLength !== 32) throw new Error('media ciphertext digest must be SHA-256');
+  return value;
+}
+
 function validateMetadata(metadata: MessageMetadata): MessageMetadata {
   return {
     chatId: validateIdentifier(metadata.chatId, 'chatId'),
     epoch: validateEpoch(metadata.epoch),
     senderDeviceId: validateIdentifier(metadata.senderDeviceId, 'senderDeviceId'),
     clientMessageId: validateIdentifier(metadata.clientMessageId, 'clientMessageId'),
+  };
+}
+
+function validateMediaMetadata(metadata: MediaAuthorizationMetadata): MediaAuthorizationMetadata {
+  return {
+    ...validateMetadata(metadata),
+    mediaCiphertextSha256: validateDigest(metadata.mediaCiphertextSha256),
   };
 }
 
@@ -197,15 +233,41 @@ function validateX25519Key(key: CryptoKey, type: 'private' | 'public'): void {
 
 function canonicalMessageMetadata(metadata: MessageMetadata): Bytes {
   const checked = validateMetadata(metadata);
-  return utf8(
-    JSON.stringify({
+  const value: Record<string, unknown> = {
       chatId: checked.chatId,
       epoch: checked.epoch,
       senderDeviceId: checked.senderDeviceId,
       cryptoVersion: E2EE_V2_CRYPTO_VERSION,
       clientMessageId: checked.clientMessageId,
-    }),
-  );
+  };
+  const mediaDigest = (metadata as Partial<MediaAuthorizationMetadata>).mediaCiphertextSha256;
+  if (mediaDigest !== undefined) value.mediaCiphertextSha256 = validateDigest(mediaDigest);
+  return utf8(JSON.stringify(value));
+}
+
+function canonicalMediaMetadata(metadata: MediaAuthorizationMetadata): Bytes {
+  const checked = validateMediaMetadata(metadata);
+  return utf8(JSON.stringify({
+    chatId: checked.chatId,
+    epoch: checked.epoch,
+    senderDeviceId: checked.senderDeviceId,
+    cryptoVersion: E2EE_V2_CRYPTO_VERSION,
+    clientMessageId: checked.clientMessageId,
+    mediaCiphertextSha256: checked.mediaCiphertextSha256,
+    purpose: 'media-authorization',
+  }));
+}
+
+function canonicalMediaPayloadMetadata(metadata: MessageMetadata): Bytes {
+  const checked = validateMetadata(metadata);
+  return utf8(JSON.stringify({
+    chatId: checked.chatId,
+    epoch: checked.epoch,
+    senderDeviceId: checked.senderDeviceId,
+    cryptoVersion: E2EE_V2_CRYPTO_VERSION,
+    clientMessageId: checked.clientMessageId,
+    purpose: 'media-payload',
+  }));
 }
 
 function canonicalWrapMetadata(metadata: EpochKeyWrapMetadata): Bytes {
@@ -261,8 +323,7 @@ function validateCommonEnvelope(value: Record<string, unknown>, type: string): v
 
 function parseMessageEnvelope(wire: string): MessageEnvelope {
   const value = parseJsonEnvelope(wire);
-  if (
-    !exactKeys(value, [
+  const baseKeys = [
       'v',
       'type',
       'chatId',
@@ -272,8 +333,11 @@ function parseMessageEnvelope(wire: string): MessageEnvelope {
       'clientMessageId',
       'nonce',
       'ciphertext',
-    ])
-  ) {
+  ];
+  const expectedKeys = value.mediaCiphertextSha256 === undefined
+    ? baseKeys
+    : [...baseKeys, 'mediaCiphertextSha256'];
+  if (!exactKeys(value, expectedKeys)) {
     throw new Error('Malformed message envelope fields');
   }
   validateCommonEnvelope(value, 'message');
@@ -283,10 +347,41 @@ function parseMessageEnvelope(wire: string): MessageEnvelope {
     senderDeviceId: value.senderDeviceId as string,
     clientMessageId: value.clientMessageId as string,
   });
-  return {
+  const result: MessageEnvelope = {
     ...metadata,
     v: E2EE_V2_CRYPTO_VERSION,
     type: 'message',
+    cryptoVersion: E2EE_V2_CRYPTO_VERSION,
+    nonce: value.nonce as string,
+    ciphertext: value.ciphertext as string,
+  };
+  if (value.mediaCiphertextSha256 !== undefined) {
+    (result as MessageEnvelope & { mediaCiphertextSha256: string }).mediaCiphertextSha256 =
+      validateDigest(value.mediaCiphertextSha256 as string);
+  }
+  return result;
+}
+
+function parseMediaAuthorizationEnvelope(wire: string): MediaAuthorizationEnvelope {
+  const value = parseJsonEnvelope(wire);
+  if (!exactKeys(value, [
+    'v', 'type', 'chatId', 'epoch', 'senderDeviceId', 'cryptoVersion', 'clientMessageId',
+    'mediaCiphertextSha256', 'nonce', 'ciphertext',
+  ])) {
+    throw new Error('Malformed media authorization envelope fields');
+  }
+  validateCommonEnvelope(value, 'media');
+  const metadata = validateMediaMetadata({
+    chatId: value.chatId as string,
+    epoch: value.epoch as number,
+    senderDeviceId: value.senderDeviceId as string,
+    clientMessageId: value.clientMessageId as string,
+    mediaCiphertextSha256: value.mediaCiphertextSha256 as string,
+  });
+  return {
+    ...metadata,
+    v: E2EE_V2_CRYPTO_VERSION,
+    type: 'media',
     cryptoVersion: E2EE_V2_CRYPTO_VERSION,
     nonce: value.nonce as string,
     ciphertext: value.ciphertext as string,
@@ -333,7 +428,7 @@ function parseWrapEnvelope(wire: string): EpochKeyWrapEnvelope {
   };
 }
 
-function encodeJsonEnvelope(value: MessageEnvelope | EpochKeyWrapEnvelope): string {
+function encodeJsonEnvelope(value: MessageEnvelope | EpochKeyWrapEnvelope | MediaAuthorizationEnvelope): string {
   return E2EE_V2_PREFIX + toBase64(utf8(JSON.stringify(value)));
 }
 
@@ -457,9 +552,13 @@ export class ReplayGuard {
 }
 
 /** Parse and strictly validate a message or epoch-key envelope without decrypting it. */
-export function parseE2eeV2Envelope(wire: string): MessageEnvelope | EpochKeyWrapEnvelope {
+export function parseE2eeV2Envelope(
+  wire: string,
+): MessageEnvelope | EpochKeyWrapEnvelope | MediaAuthorizationEnvelope {
   const value = parseJsonEnvelope(wire);
-  return value.type === 'message' ? parseMessageEnvelope(wire) : parseWrapEnvelope(wire);
+  if (value.type === 'message') return parseMessageEnvelope(wire);
+  if (value.type === 'media') return parseMediaAuthorizationEnvelope(wire);
+  return parseWrapEnvelope(wire);
 }
 
 /** Encrypt a message with AES-256-GCM and authenticated canonical metadata. */
@@ -484,6 +583,77 @@ export async function encryptMessage(request: EncryptMessageRequest): Promise<st
     ciphertext: toBase64(ciphertext),
   };
   return encodeJsonEnvelope(envelope);
+}
+
+/** Create an opaque authorization envelope for one encrypted media blob. */
+export async function authorizeMedia(request: AuthorizeMediaRequest): Promise<string> {
+  const metadata = validateMediaMetadata(request);
+  const epochKey = validateEpochKey(request.epochKey);
+  const nonce = validateNonce(getCrypto().getRandomValues(new Uint8Array(E2EE_V2_NONCE_BYTES)) as Bytes);
+  const nonceBase64 = toBase64(nonce);
+  request.replayGuard?.reserve(nonceBase64, JSON.stringify({ ...metadata, nonce: nonceBase64 }));
+  const ciphertext = await getCrypto().subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: nonce,
+      additionalData: canonicalMediaMetadata(metadata),
+      tagLength: AES_GCM_TAG_BITS,
+    },
+    await importAesKey(epochKey),
+    utf8('click-e2ee-v2-media-authorization'),
+  );
+  return encodeJsonEnvelope({
+    ...metadata,
+    v: E2EE_V2_CRYPTO_VERSION,
+    type: 'media',
+    cryptoVersion: E2EE_V2_CRYPTO_VERSION,
+    nonce: nonceBase64,
+    ciphertext: toBase64(ciphertext),
+  } as MediaAuthorizationEnvelope);
+}
+
+/** Encrypt media as nonce || AES-GCM(ciphertext+tag); the upload digest is separately authorized. */
+export async function encryptMediaPayload(
+  request: EncryptMediaPayloadRequest,
+): Promise<{ payload: Bytes; mediaCiphertextSha256: string }> {
+  const metadata = validateMetadata(request);
+  const epochKey = validateEpochKey(request.epochKey);
+  const nonce = validateNonce(getCrypto().getRandomValues(new Uint8Array(E2EE_V2_NONCE_BYTES)) as Bytes);
+  const ciphertext = await getCrypto().subtle.encrypt(
+    { name: 'AES-GCM', iv: nonce, additionalData: canonicalMediaPayloadMetadata(metadata), tagLength: AES_GCM_TAG_BITS },
+    await importAesKey(epochKey),
+    toBytes(request.plaintext),
+  );
+  const payload = new Uint8Array(nonce.byteLength + ciphertext.byteLength) as Bytes;
+  payload.set(nonce, 0);
+  payload.set(new Uint8Array(ciphertext), nonce.byteLength);
+  const digest = await getCrypto().subtle.digest('SHA-256', payload);
+  return { payload, mediaCiphertextSha256: toBase64(digest) };
+}
+
+export async function decryptMediaPayload(
+  metadata: MessageMetadata,
+  epochKey: ArrayBuffer | Uint8Array,
+  payload: ArrayBuffer | Uint8Array,
+  expectedMediaCiphertextSha256?: string,
+): Promise<Bytes> {
+  const bytes = toBytes(payload);
+  if (bytes.byteLength < E2EE_V2_NONCE_BYTES + AES_GCM_TAG_BITS / 8) throw new Error('Malformed E2EE v2 media payload');
+  if (expectedMediaCiphertextSha256 !== undefined) {
+    const digest = toBase64(await getCrypto().subtle.digest('SHA-256', bytes));
+    if (digest !== validateDigest(expectedMediaCiphertextSha256)) throw new Error('E2EE v2 media ciphertext digest mismatch');
+  }
+  const plaintext = await getCrypto().subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: bytes.slice(0, E2EE_V2_NONCE_BYTES),
+      additionalData: canonicalMediaPayloadMetadata(metadata),
+      tagLength: AES_GCM_TAG_BITS,
+    },
+    await importAesKey(validateEpochKey(epochKey)),
+    bytes.slice(E2EE_V2_NONCE_BYTES),
+  );
+  return new Uint8Array(plaintext) as Bytes;
 }
 
 /** Decrypt a message only when all caller-supplied metadata exactly matches the authenticated envelope. */

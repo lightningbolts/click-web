@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DerivedKeys } from '@/lib/chat/crypto';
 import { decryptGroupMediaBytes, decryptMediaBytes } from '@/lib/chat/crypto';
+import { signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
+import { decryptWebE2eeV2Media, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 const BASE64_BODY_MARKER = 'base64,';
 const BASE64_PAYLOAD_RE = /^[A-Za-z0-9+/=\s]+$/;
@@ -10,17 +12,31 @@ const BASE64_PAYLOAD_RE = /^[A-Za-z0-9+/=\s]+$/;
 export type SecureMediaChatKey = DerivedKeys | ArrayBuffer;
 
 export interface SecureMediaObjectUrlOptions {
-  storageUrl: string;
-  chatKey: SecureMediaChatKey;
+  storageUrl?: string | null;
+  storagePath?: string | null;
+  chatKey?: SecureMediaChatKey | null;
+  e2eeV2Session?: E2eeV2Session | null;
+  v2Metadata?: {
+    chatId: string;
+    epoch: number;
+    senderDeviceId: string;
+    clientMessageId: string;
+    mediaCiphertextSha256: string;
+  } | null;
+  getAuthHeaders?: () => Promise<HeadersInit>;
   mimeType?: string;
   signal?: AbortSignal;
 }
 
 export interface UseSecureMediaOptions {
   storageUrl?: string | null;
+  storagePath?: string | null;
   chatKey?: SecureMediaChatKey | null;
   mimeType?: string | null;
   isEncryptedMedia?: boolean;
+  getE2eeV2Session?: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
+  getAuthHeaders?: () => Promise<HeadersInit>;
+  v2Metadata?: SecureMediaObjectUrlOptions['v2Metadata'];
 }
 
 export interface UseSecureMediaResult {
@@ -82,21 +98,36 @@ async function decryptPayload(payload: Uint8Array, chatKey: SecureMediaChatKey):
 
 export async function createSecureMediaObjectUrl({
   storageUrl,
+  storagePath,
   chatKey,
+  e2eeV2Session,
+  v2Metadata,
+  getAuthHeaders,
   mimeType,
   signal,
 }: SecureMediaObjectUrlOptions): Promise<string> {
-  const encrypted = await fetchEncryptedPayload(storageUrl, signal);
+  const signedUrl =
+    storagePath && getAuthHeaders
+      ? await signChatAttachmentUrl(storagePath, getAuthHeaders)
+      : storageUrl;
+  if (!signedUrl) throw new Error('Missing secure media URL');
+  const encrypted = await fetchEncryptedPayload(signedUrl, signal);
 
   let decrypted: Uint8Array;
-  try {
-    decrypted = await decryptPayload(encrypted, chatKey);
-  } catch (primaryError) {
-    const fallbackBytes = decodeMaybeBase64Payload(encrypted);
-    if (!fallbackBytes) {
-      throw primaryError;
+  if (v2Metadata) {
+    if (!e2eeV2Session) throw new Error('Missing E2EE v2 session for encrypted media');
+    decrypted = await decryptWebE2eeV2Media(e2eeV2Session, v2Metadata, encrypted);
+  } else {
+    if (!chatKey) throw new Error('Missing chat key for encrypted media');
+    try {
+      decrypted = await decryptPayload(encrypted, chatKey);
+    } catch (primaryError) {
+      const fallbackBytes = decodeMaybeBase64Payload(encrypted);
+      if (!fallbackBytes) {
+        throw primaryError;
+      }
+      decrypted = await decryptPayload(fallbackBytes, chatKey);
     }
-    decrypted = await decryptPayload(fallbackBytes, chatKey);
   }
 
   const decryptedCopy = new Uint8Array(decrypted.byteLength);
@@ -110,9 +141,13 @@ export async function createSecureMediaObjectUrl({
 
 export function useSecureMedia({
   storageUrl,
+  storagePath,
   chatKey,
   mimeType,
   isEncryptedMedia = false,
+  getE2eeV2Session,
+  getAuthHeaders,
+  v2Metadata,
 }: UseSecureMediaOptions): UseSecureMediaResult {
   const [src, setSrc] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -129,19 +164,26 @@ export function useSecureMedia({
     revokeObjectUrl();
     setError(null);
 
-    if (!storageUrl || storageUrl.trim().length === 0) {
+    if ((!storageUrl || storageUrl.trim().length === 0) && (!storagePath || storagePath.trim().length === 0)) {
       setSrc(null);
       setIsLoading(false);
       return;
     }
 
     if (!isEncryptedMedia) {
-      setSrc(storageUrl);
+      setSrc(storageUrl ?? null);
       setIsLoading(false);
       return;
     }
 
-    if (!chatKey) {
+    const isV2Media = v2Metadata != null;
+    if (isV2Media && !getE2eeV2Session) {
+      setSrc(null);
+      setIsLoading(false);
+      setError(new Error('Missing E2EE v2 session loader for encrypted media'));
+      return;
+    }
+    if (!isV2Media && !chatKey) {
       setSrc(null);
       setIsLoading(false);
       setError(new Error('Missing chat key for encrypted media'));
@@ -154,12 +196,18 @@ export function useSecureMedia({
     setSrc(null);
     setIsLoading(true);
 
-    void createSecureMediaObjectUrl({
+    const sessionPromise = isV2Media ? getE2eeV2Session?.(false) : Promise.resolve(null);
+    void sessionPromise
+      ?.then((session) => createSecureMediaObjectUrl({
       storageUrl,
+      storagePath,
       chatKey,
+      e2eeV2Session: session,
+      v2Metadata,
+      getAuthHeaders,
       mimeType: mimeType ?? undefined,
       signal: controller.signal,
-    })
+      }))
       .then((objectUrl) => {
         if (cancelled) {
           URL.revokeObjectURL(objectUrl);
@@ -185,7 +233,7 @@ export function useSecureMedia({
       controller.abort();
       revokeObjectUrl();
     };
-  }, [chatKey, isEncryptedMedia, mimeType, revokeObjectUrl, storageUrl]);
+  }, [chatKey, getAuthHeaders, getE2eeV2Session, isEncryptedMedia, mimeType, revokeObjectUrl, storagePath, storageUrl, v2Metadata]);
 
   useEffect(() => revokeObjectUrl, [revokeObjectUrl]);
 

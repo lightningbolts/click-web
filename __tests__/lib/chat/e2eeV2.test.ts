@@ -128,4 +128,32 @@ describe('E2EE v2 foundation', () => {
     const v2 = await e2ee.encryptMessage({ ...metadata, epochKey, plaintext: 'v2' });
     await expect(e2ee.decryptContentCompatible(v2, { ...metadata, epochKey })).resolves.toBe('v2');
   });
+
+  it('creates a strict media authorization envelope with an authenticated ciphertext digest', async () => {
+    const epochKey = e2ee.generateEpochKey();
+    const mediaCiphertextSha256 = 'ypeBEsobvcr6wjGzmiPcTaeG7/gUfE5yuYB3ha/uSLs=';
+    const envelope = await e2ee.authorizeMedia({ ...metadata, epochKey, mediaCiphertextSha256 });
+    expect(e2ee.parseE2eeV2Envelope(envelope)).toMatchObject({
+      type: 'media',
+      chatId: metadata.chatId,
+      epoch: metadata.epoch,
+      mediaCiphertextSha256,
+    });
+  });
+
+  it('round-trips encrypted media payloads and rejects digest or metadata tampering', async () => {
+    const epochKey = e2ee.generateEpochKey();
+    const plaintext = new TextEncoder().encode('private media bytes');
+    const encrypted = await e2ee.encryptMediaPayload({ ...metadata, epochKey, plaintext });
+
+    await expect(
+      e2ee.decryptMediaPayload(metadata, epochKey, encrypted.payload, encrypted.mediaCiphertextSha256),
+    ).resolves.toEqual(plaintext);
+    await expect(
+      e2ee.decryptMediaPayload({ ...metadata, clientMessageId: '44444444-4444-4444-8444-444444444444' }, epochKey, encrypted.payload, encrypted.mediaCiphertextSha256),
+    ).rejects.toThrow(/operation|authentication|digest/i);
+    await expect(
+      e2ee.decryptMediaPayload(metadata, epochKey, encrypted.payload, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='),
+    ).rejects.toThrow(/digest mismatch/i);
+  });
 });

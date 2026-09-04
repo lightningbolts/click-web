@@ -31,6 +31,11 @@ import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboa
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 import { parseBody } from '@/lib/api/parseBody';
 import { chatMessagePatchBodySchema, chatMessagePostBodySchema } from '@/lib/api/schemas/chat';
+import {
+  assertE2eeV2MessageWrite,
+  assertE2eeV2MediaMessageWrite,
+  messageBodyV2Field,
+} from '@/lib/server/e2eeV2Gate';
 
 const CHAT_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -276,11 +281,12 @@ export async function POST(req: NextRequest) {
   }
 
   const mediaUrl = typeof meta.media_url === 'string' ? meta.media_url.trim() : '';
+  const isV2Content = typeof content === 'string' && content.startsWith('e2e2:');
 
   if (isCallLog || isBeacon) {
     // call_log / beacon rows may use empty or short plaintext content + metadata
   } else if (isMedia) {
-    if (!mediaUrl) {
+    if (!mediaUrl && !isV2Content) {
       return NextResponse.json(
         { error: 'metadata.media_url is required for image and audio messages' },
         { status: 400 },
@@ -341,6 +347,29 @@ export async function POST(req: NextRequest) {
 
     if (!resolvedChatId) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+    }
+
+    const bodyRecord = body as Record<string, unknown>;
+    const v2Gate = await assertE2eeV2MessageWrite(admin, {
+      chatId: resolvedChatId,
+      requestedChatId: trimmedChatId || undefined,
+      userId: user.id,
+      content,
+      epoch: messageBodyV2Field(bodyRecord, 'epoch', 'epoch', meta),
+      senderDeviceId: messageBodyV2Field(bodyRecord, 'sender_device_id', 'senderDeviceId', meta),
+      clientMessageId: messageBodyV2Field(bodyRecord, 'client_message_id', 'clientMessageId', meta),
+      allowLegacy: isCallLog || isBeacon,
+    });
+    if (!v2Gate.ok) return v2Gate.response;
+    if (isV2Content && (isMedia || messageType === 'file')) {
+      if (!v2Gate.envelope) return NextResponse.json({ error: 'Invalid E2EE v2 message envelope' }, { status: 400 });
+      const mediaMessageGate = assertE2eeV2MediaMessageWrite({
+        chatId: resolvedChatId,
+        userId: user.id,
+        messageEnvelope: v2Gate.envelope,
+        metadata: meta,
+      });
+      if (!mediaMessageGate.ok) return mediaMessageGate.response;
     }
 
     const now = Date.now();
@@ -412,6 +441,10 @@ export async function PATCH(req: NextRequest) {
   const messageId = typeof body.messageId === 'string' ? body.messageId : '';
   const chatIdBody = typeof body.chat_id === 'string' ? body.chat_id : '';
   const content = typeof body.content === 'string' ? body.content : '';
+  const metadata =
+    body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+      ? (body.metadata as Record<string, unknown>)
+      : undefined;
 
   if (!messageId || !content.trim()) {
     return NextResponse.json({ error: 'messageId and content are required' }, { status: 400 });
@@ -431,7 +464,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data: row, error: fetchErr } = await admin
     .from('messages')
-    .select('id, chat_id, user_id')
+    .select('id, chat_id, user_id, message_type, metadata')
     .eq('id', messageId.trim())
     .maybeSingle();
 
@@ -453,10 +486,53 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'chatId does not match message' }, { status: 400 });
   }
 
+  const effectiveMetadata =
+    metadata ?? (row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+      ? (row.metadata as Record<string, unknown>)
+      : {});
+
+  const v2Gate = await assertE2eeV2MessageWrite(admin, {
+    chatId: String(effectiveChatId),
+    requestedChatId: chatIdBody || undefined,
+    userId: user.id,
+    content,
+    epoch: messageBodyV2Field(body as Record<string, unknown>, 'epoch', 'epoch', effectiveMetadata),
+    senderDeviceId: messageBodyV2Field(
+      body as Record<string, unknown>,
+      'sender_device_id',
+      'senderDeviceId',
+      effectiveMetadata,
+    ),
+    clientMessageId: messageBodyV2Field(
+      body as Record<string, unknown>,
+      'client_message_id',
+      'clientMessageId',
+      effectiveMetadata,
+    ),
+    allowLegacy: row.message_type === 'call_log' || row.message_type === 'beacon',
+  });
+  if (!v2Gate.ok) return v2Gate.response;
+
+  if (
+    content.startsWith('e2e2:') &&
+    (row.message_type === 'image' || row.message_type === 'audio' || row.message_type === 'file')
+  ) {
+    if (!v2Gate.envelope) return NextResponse.json({ error: 'Invalid E2EE v2 message envelope' }, { status: 400 });
+    const mediaMessageGate = assertE2eeV2MediaMessageWrite({
+      chatId: String(effectiveChatId),
+      userId: user.id,
+      messageEnvelope: v2Gate.envelope,
+      metadata: effectiveMetadata,
+    });
+    if (!mediaMessageGate.ok) return mediaMessageGate.response;
+  }
+
   const wireContent = content.startsWith('e2e:') ? content : content.trim();
+  const update: Record<string, unknown> = { content: wireContent, time_edited: Date.now() };
+  if (metadata !== undefined) update.metadata = metadata;
   const { data: message, error } = await admin
     .from('messages')
-    .update({ content: wireContent, time_edited: Date.now() })
+    .update(update)
     .eq('id', messageId.trim())
     .eq('user_id', user.id)
     .select()

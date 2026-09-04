@@ -26,6 +26,10 @@ import {
 } from '@/lib/server/rateLimit';
 import { notifyHubMessageParticipants } from '@/lib/hub/notifyHubMessage';
 import {
+  assertHubE2eeV2MediaMessageWrite,
+  assertHubE2eeV2MessageWrite,
+} from '@/lib/server/hubE2eeV2Gate';
+import {
   HUB_AROUND_WINDOW,
   HUB_THREAD_LIMIT,
   hubRealtimeChannel,
@@ -41,6 +45,21 @@ type HubMessageInsert = {
   message_type?: string;
   metadata?: unknown;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readMessageMetadata(
+  body: Record<string, unknown>,
+  metadata: Record<string, unknown>,
+  snake: string,
+  camel: string,
+): unknown {
+  const direct = body[snake] ?? body[camel];
+  if (direct !== undefined) return direct;
+  return metadata[snake] ?? metadata[camel];
+}
 
 export async function GET(request: NextRequest) {
   const auth = await requireBearerUser(request);
@@ -233,6 +252,37 @@ export async function POST(request: NextRequest) {
 
   const metadata =
     payload.metadata !== undefined && payload.metadata !== null ? payload.metadata : {};
+
+  const metadataRecord = isRecord(metadata) ? metadata : {};
+  const e2eeGate = await assertHubE2eeV2MessageWrite(admin, {
+    hubId,
+    userId: auth.user.id,
+    content: bodyText,
+    epoch: readMessageMetadata(payload as Record<string, unknown>, metadataRecord, 'epoch', 'epoch'),
+    senderDeviceId: readMessageMetadata(
+      payload as Record<string, unknown>,
+      metadataRecord,
+      'sender_device_id',
+      'senderDeviceId',
+    ),
+    clientMessageId: readMessageMetadata(
+      payload as Record<string, unknown>,
+      metadataRecord,
+      'client_message_id',
+      'clientMessageId',
+    ),
+  });
+  if (!e2eeGate.ok) return e2eeGate.response;
+
+  if (e2eeGate.envelope && ['image', 'audio'].includes(messageType.toLowerCase())) {
+    const mediaBinding = assertHubE2eeV2MediaMessageWrite({
+      hubId,
+      userId: auth.user.id,
+      messageEnvelope: e2eeGate.envelope,
+      metadata: metadataRecord,
+    });
+    if (!mediaBinding.ok) return mediaBinding.response;
+  }
 
   const row: HubMessageInsert = {
     hub_id: hubId,
