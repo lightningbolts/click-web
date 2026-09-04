@@ -10,15 +10,22 @@ VALUES
     ('82000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'e2ee-rollout-b@example.test', '', now(), now()),
     ('83000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'e2ee-rollout-outsider@example.test', '', now(), now());
 
-INSERT INTO public.connections (id, user_ids, status)
+INSERT INTO public.connections (id, created, expiry, user_ids, status)
 VALUES (
     '84000000-0000-0000-0000-000000000004',
+    (extract(epoch FROM now()) * 1000)::bigint,
+    (extract(epoch FROM now() + interval '1 day') * 1000)::bigint,
     ARRAY['81000000-0000-0000-0000-000000000001', '82000000-0000-0000-0000-000000000002'],
     'active'
 );
 
-INSERT INTO public.chats (id, connection_id)
-VALUES ('85000000-0000-0000-0000-000000000005', '84000000-0000-0000-0000-000000000004');
+INSERT INTO public.chats (id, connection_id, created_at, updated_at)
+VALUES (
+    '85000000-0000-0000-0000-000000000005',
+    '84000000-0000-0000-0000-000000000004',
+    (extract(epoch FROM now()) * 1000)::bigint,
+    (extract(epoch FROM now()) * 1000)::bigint
+);
 
 SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.chat_key_transfer_approvals'::regclass), 'transfer approvals have RLS enabled');
 SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid = 'public.chat_devices'::regclass), 'devices have RLS enabled after rollout');
