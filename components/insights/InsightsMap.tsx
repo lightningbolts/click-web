@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, MapPin, Users } from "lucide-react";
 import type { VerifiedConnectionMapNode } from "@/lib/insights/connectionEncounterClustering";
