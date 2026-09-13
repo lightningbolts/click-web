@@ -107,7 +107,7 @@ export async function assertHubReadable(
 
 /**
  * Filter a list already sourced from hub_participants (for example global
- * search). Event hubs need their active check-in/expiry policy re-evaluated;
+ * search). Event hubs need their live RSVP/expiry policy re-evaluated;
  * a participant row alone is not authorization.
  */
 export async function filterReadableHubIds(
@@ -122,7 +122,7 @@ export async function filterReadableHubIds(
   return checks.filter(({ denied }) => denied == null).map(({ hubId }) => hubId);
 }
 
-/** Event membership is derived from check-in state; leaving it directly creates stale state. */
+/** Event membership is derived from RSVP state; leaving it directly creates stale state. */
 export async function assertHubCanLeave(
   admin: SupabaseClient,
   hubId: string,
@@ -132,8 +132,8 @@ export async function assertHubCanLeave(
   if (loaded.venue.event_beacon_id) {
     return NextResponse.json(
       {
-        error: 'CHECK_OUT_REQUIRED',
-        message: 'Check out of the event to leave its hub.',
+        error: 'EVENT_MEMBERSHIP_MANAGED',
+        message: 'Cancel your RSVP to leave this event chat.',
       },
       { status: 409 },
     );
@@ -186,7 +186,7 @@ async function assertEventLinkedHubAccess(
     return NextResponse.json(
       {
         error: 'EVENT_HUB_ACCESS_DENIED',
-        message: 'Check in to this event to join the hub.',
+        message: 'RSVP to this event to join its chat.',
       },
       { status: 403 },
     );
@@ -239,7 +239,7 @@ function assertStandaloneGeofence(
 }
 
 /**
- * Event hubs: check-in / host (no GPS). Standalone hubs: geofence + expiry.
+ * Event hubs: RSVP / host (no GPS). Standalone hubs: geofence + expiry.
  */
 export async function assertHubAccess(
   admin: SupabaseClient,
@@ -259,7 +259,7 @@ export async function assertHubAccess(
 
 /**
  * Ensures coordinates lie within [hubId]'s geofence (matches verify-hub-proximity Edge Function).
- * Event-linked hubs skip the fence and require check-in / host instead — pass [userId].
+ * Event-linked hubs skip the fence and require RSVP / host instead — pass [userId].
  */
 export async function assertHubGeofenceFromCoords(
   admin: SupabaseClient,
