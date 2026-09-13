@@ -1,12 +1,14 @@
 /**
  * Event-hub membership policy.
- * Flip [EVENT_HUB_ACCESS.requireRsvp] to also require an RSVP.
- * Host (event or hub creator) always bypasses both flags.
+ *
+ * Event chat is part of the RSVP experience, so accepted RSVP members can coordinate before they
+ * physically arrive. Hosts always bypass the policy. The flags remain configurable for stricter
+ * event modes and tests.
  */
 
 export const EVENT_HUB_ACCESS = {
-  requireCheckIn: true,
-  requireRsvp: false,
+  requireCheckIn: false,
+  requireRsvp: true,
 } as const;
 
 /** Hub stays open this long after the event's scheduled end. */
