@@ -57,65 +57,77 @@ jest.mock('maplibre-gl', () => {
     getCanvas: jest.fn(() => ({ style: {} })),
     project: jest.fn(() => ({ x: 140, y: 220 })),
   };
+
+  const Map = jest.fn(() => map);
+  const NavigationControl = jest.fn();
+  const Marker = jest.fn().mockImplementation(({ element }: { element?: HTMLElement } = {}) => {
+    const el = element ?? document.createElement('div');
+    const api: {
+      setLngLat: jest.Mock;
+      addTo: jest.Mock;
+      remove: jest.Mock;
+      getElement: jest.Mock;
+    } = {
+      setLngLat: jest.fn(),
+      addTo: jest.fn(),
+      remove: jest.fn(),
+      getElement: jest.fn(() => el),
+    };
+    api.setLngLat.mockReturnValue(api);
+    api.addTo.mockImplementation(() => {
+      document.body.appendChild(el);
+      return api;
+    });
+    api.remove.mockImplementation(() => {
+      el.remove();
+    });
+    return api;
+  });
+  const Popup = jest.fn().mockImplementation(() => {
+    const host = document.createElement('div');
+    const api: {
+      setLngLat: jest.Mock;
+      setHTML: jest.Mock;
+      addTo: jest.Mock;
+      remove: jest.Mock;
+    } = {
+      setLngLat: jest.fn(),
+      setHTML: jest.fn(),
+      addTo: jest.fn(),
+      remove: jest.fn(),
+    };
+    api.setLngLat.mockReturnValue(api);
+    api.setHTML.mockImplementation((html: string) => {
+      host.innerHTML = html;
+      return api;
+    });
+    api.addTo.mockImplementation(() => {
+      document.body.appendChild(host);
+      return api;
+    });
+    api.remove.mockImplementation(() => {
+      host.remove();
+    });
+    return api;
+  });
+  const LngLatBounds = jest.fn().mockImplementation(() => ({
+    extend: jest.fn().mockReturnThis(),
+  }));
+
+  const namespace = {
+    Map,
+    NavigationControl,
+    Marker,
+    Popup,
+    LngLatBounds,
+  };
+
+  // MapLibre v6 is consumed through namespace imports in production. Export the same members at
+  // module scope while retaining the default object for any legacy tests/components that still
+  // reference it directly.
   return {
     __esModule: true,
-    default: {
-      Map: jest.fn(() => map),
-      NavigationControl: jest.fn(),
-      Marker: jest.fn().mockImplementation(({ element }: { element?: HTMLElement } = {}) => {
-        const el = element ?? document.createElement('div');
-        const api: {
-          setLngLat: jest.Mock;
-          addTo: jest.Mock;
-          remove: jest.Mock;
-          getElement: jest.Mock;
-        } = {
-          setLngLat: jest.fn(),
-          addTo: jest.fn(),
-          remove: jest.fn(),
-          getElement: jest.fn(() => el),
-        };
-        api.setLngLat.mockReturnValue(api);
-        api.addTo.mockImplementation(() => {
-          document.body.appendChild(el);
-          return api;
-        });
-        api.remove.mockImplementation(() => {
-          el.remove();
-        });
-        return api;
-      }),
-      Popup: jest.fn().mockImplementation(() => {
-        const host = document.createElement('div');
-        const api: {
-          setLngLat: jest.Mock;
-          setHTML: jest.Mock;
-          addTo: jest.Mock;
-          remove: jest.Mock;
-        } = {
-          setLngLat: jest.fn(),
-          setHTML: jest.fn(),
-          addTo: jest.fn(),
-          remove: jest.fn(),
-        };
-        api.setLngLat.mockReturnValue(api);
-        api.setHTML.mockImplementation((html: string) => {
-          host.innerHTML = html;
-          return api;
-        });
-        api.addTo.mockImplementation(() => {
-          document.body.appendChild(host);
-          return api;
-        });
-        api.remove.mockImplementation(() => {
-          host.remove();
-        });
-        return api;
-      }),
-      LngLatBounds: jest.fn().mockImplementation(() => ({
-        extend: jest.fn().mockReturnThis(),
-      })),
-    },
+    ...namespace,
+    default: namespace,
   };
 });
-
