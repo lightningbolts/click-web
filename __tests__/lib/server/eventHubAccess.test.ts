@@ -14,7 +14,7 @@ describe('evaluateEventHubAccess', () => {
     hasRsvp: false,
   };
 
-  it('allows the hub creator without check-in', () => {
+  it('allows the hub creator without RSVP or check-in', () => {
     expect(
       evaluateEventHubAccess({
         ...guest,
@@ -33,30 +33,30 @@ describe('evaluateEventHubAccess', () => {
     ).toBe(true);
   });
 
-  it('allows a checked-in guest when requireRsvp is false', () => {
-    expect(
-      evaluateEventHubAccess({
-        ...guest,
-        hasActiveCheckIn: true,
-      }),
-    ).toBe(true);
-  });
-
-  it('denies RSVP-only guests while requireRsvp is false', () => {
+  it('allows an RSVP member before check-in', () => {
     expect(
       evaluateEventHubAccess({
         ...guest,
         hasRsvp: true,
       }),
+    ).toBe(true);
+  });
+
+  it('denies check-in-only guests under the shipped RSVP policy', () => {
+    expect(
+      evaluateEventHubAccess({
+        ...guest,
+        hasActiveCheckIn: true,
+      }),
     ).toBe(false);
   });
 
-  it('requires both check-in and RSVP when the flag is flipped', () => {
+  it('can still model a stricter check-in plus RSVP event', () => {
     const policy = { requireCheckIn: true, requireRsvp: true };
     expect(
       evaluateEventHubAccess({
         ...guest,
-        hasActiveCheckIn: true,
+        hasRsvp: true,
         policy,
       }),
     ).toBe(false);
@@ -70,9 +70,9 @@ describe('evaluateEventHubAccess', () => {
     ).toBe(true);
   });
 
-  it('keeps requireRsvp off in the shipped policy', () => {
-    expect(EVENT_HUB_ACCESS.requireCheckIn).toBe(true);
-    expect(EVENT_HUB_ACCESS.requireRsvp).toBe(false);
+  it('ships RSVP access without requiring physical check-in', () => {
+    expect(EVENT_HUB_ACCESS.requireCheckIn).toBe(false);
+    expect(EVENT_HUB_ACCESS.requireRsvp).toBe(true);
   });
 });
 
