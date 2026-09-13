@@ -30,16 +30,29 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-          old = "import maplibregl from 'maplibre-gl';"
-          new = "import * as maplibregl from 'maplibre-gl';"
+          import re
+
+          pattern = re.compile(
+              r"import maplibregl(?:,\s*\{(?P<named>[^}]*)\})? from (?P<quote>['\"])maplibre-gl(?P=quote);"
+          )
           changed = []
           for suffix in ('*.ts', '*.tsx'):
               for path in Path('.').rglob(suffix):
                   if 'node_modules' in path.parts or '.next' in path.parts:
                       continue
                   text = path.read_text()
-                  if old in text:
-                      path.write_text(text.replace(old, new))
+
+                  def replacement(match):
+                      quote = match.group('quote')
+                      named = match.group('named')
+                      namespace = f"import * as maplibregl from {quote}maplibre-gl{quote};"
+                      if named is None:
+                          return namespace
+                      return namespace + f"\nimport {{{named}}} from {quote}maplibre-gl{quote};"
+
+                  migrated, count = pattern.subn(replacement, text)
+                  if count:
+                      path.write_text(migrated)
                       changed.append(str(path))
           print('\n'.join(changed))
           if not changed:
