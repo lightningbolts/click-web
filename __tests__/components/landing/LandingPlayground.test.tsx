@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import LandingPlayground from '@/components/landing/playground';
 import ThemeToggle from '@/components/ThemeToggle';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
