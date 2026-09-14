@@ -1,0 +1,71 @@
+name: Temporary Unit Test Diagnostic
+
+on:
+  push:
+    branches:
+      - fix/event-chat-rsvp-access-20260913
+
+permissions:
+  contents: read
+
+jobs:
+  capture-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Materialize build env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_APP_LAUNCHED: ${{ secrets.NEXT_PUBLIC_APP_LAUNCHED }}
+          NEXT_PUBLIC_IOS_STORE_URL: ${{ secrets.NEXT_PUBLIC_IOS_STORE_URL }}
+          NEXT_PUBLIC_ANDROID_STORE_URL: ${{ secrets.NEXT_PUBLIC_ANDROID_STORE_URL }}
+          NEXT_PUBLIC_IOS_APP_ID: ${{ secrets.NEXT_PUBLIC_IOS_APP_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
+          LIVEKIT_WS_URL: ${{ secrets.LIVEKIT_WS_URL }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ID: ${{ secrets.STRIPE_PRICE_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          ENRICHMENT_WEBHOOK_SECRET: ${{ secrets.ENRICHMENT_WEBHOOK_SECRET }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          BUSINESS_INSIGHTS_DEV_EMAILS: ${{ secrets.BUSINESS_INSIGHTS_DEV_EMAILS }}
+        run: bash scripts/materialize-ci-env.sh
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capture unit-test output
+        shell: bash
+        run: |
+          set +e
+          npm test -- --ci --coverage --passWithNoTests > unit-test-output.txt 2>&1
+          status=$?
+          echo "$status" > unit-test-exit-code.txt
+          cat unit-test-output.txt
+          exit 0
+
+      - name: Upload diagnostic output
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-diagnostic
+          path: |
+            unit-test-output.txt
+            unit-test-exit-code.txt
+          if-no-files-found: error
+          retention-days: 1
