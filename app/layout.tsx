@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AppToaster from "@/components/AppToaster";
+import MapLibreWorkerInit from "@/components/MapLibreWorkerInit";
 import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/lib/theme/ThemeProvider";
 import { ProductChromeProvider } from "@/lib/shell/ProductChromeContext";
 import { getServerUser } from "@/lib/server/getServerUser";
@@ -75,6 +76,7 @@ export default async function RootLayout({
       <body
         className={`${manrope.variable} ${sourceSerif.variable} ${manrope.className} font-sans antialiased bg-background text-on-surface flex flex-col min-h-screen`}
       >
+        <MapLibreWorkerInit />
         <ThemeProvider>
           <AuthProvider>
             <ProductChromeProvider>
