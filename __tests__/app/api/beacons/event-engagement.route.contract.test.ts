@@ -266,6 +266,131 @@ describe("event engagement API contracts", () => {
                   beacon_type: "event",
                   expires_at: futureIso(),
                   venue_id: null,
+                  creator_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                  metadata: liveEventMeta(),
+                  location: { type: "Point", coordinates: [-122.3, 47.65] },
+                },
+                error: null,
+              }),
+            }),
+          }),
+        },
+        beacon_attendees: {
+          select: jest.fn().mockReturnValue(
+            chainSelect({ data: { user_id: USER_ID }, error: null }),
+          ),
+        },
+        event_bookmarks: {
+          select: jest.fn().mockReturnValue(chainSelect({ data: null, error: null })),
+        },
+        event_check_ins: {
+          select: jest.fn().mockReturnValue(chainSelect({ data: null, error: null, count: 1 })),
+          upsert,
+        },
+        event_engagement_events: {
+          insert: jest.fn().mockResolvedValue({ error: null }),
+        },
+        ...eventHubTables(),
+      }),
+    );
+
+    const res = await postCheckIn(
+      new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({ latitude: 47.6501, longitude: -122.3001, platform: "android" }),
+      }),
+      { params: Promise.resolve({ beaconId: BEACON_ID }) },
+    );
+    expect(res.status).toBe(200);
+    expect(upsert).toHaveBeenCalled();
+    expect((await res.json()).hub_id).toBe(EVENT_HUB_ID);
+  });
+
+  it("check-in rejects without RSVP when RSVP is enabled", async () => {
+    const engagementInserts: unknown[] = [];
+    mockGetSupabaseFromRouteRequest.mockResolvedValue({
+      supabase: {},
+      user: { id: USER_ID },
+      authError: null,
+    });
+
+    mockCreateAdminSupabaseClient.mockReturnValue(
+      makeAdmin({
+        map_beacons: {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                  id: BEACON_ID,
+                  beacon_type: "event",
+                  expires_at: futureIso(),
+                  venue_id: null,
+                  creator_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                  metadata: liveEventMeta(),
+                  location: { type: "Point", coordinates: [-122.3, 47.65] },
+                },
+                error: null,
+              }),
+            }),
+          }),
+        },
+        beacon_attendees: {
+          select: jest.fn().mockReturnValue(chainSelect({ data: null, error: null })),
+        },
+        event_bookmarks: {
+          select: jest.fn().mockReturnValue(chainSelect({ data: null, error: null })),
+        },
+        event_check_ins: {
+          select: jest.fn().mockReturnValue(chainSelect({ data: null, error: null })),
+        },
+        event_engagement_events: {
+          insert: jest.fn((row: unknown) => {
+            engagementInserts.push(row);
+            return Promise.resolve({ error: null });
+          }),
+        },
+      }),
+    );
+
+    const res = await postCheckIn(
+      new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/check-in`, {
+        method: "POST",
+        body: JSON.stringify({ latitude: 47.6501, longitude: -122.3001 }),
+      }),
+      { params: Promise.resolve({ beaconId: BEACON_ID }) },
+    );
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.reject_reason).toBe("rsvp_required");
+    expect(
+      engagementInserts.some(
+        (r) =>
+          (r as { event_type: string; reject_reason?: string }).event_type === "check_in_rejected" &&
+          (r as { reject_reason?: string }).reject_reason === "rsvp_required",
+      ),
+    ).toBe(true);
+  });
+
+  it("check-in allows host without RSVP", async () => {
+    const upsert = jest.fn().mockResolvedValue({ error: null });
+    mockGetSupabaseFromRouteRequest.mockResolvedValue({
+      supabase: {},
+      user: { id: USER_ID },
+      authError: null,
+    });
+
+    mockCreateAdminSupabaseClient.mockReturnValue(
+      makeAdmin({
+        map_beacons: {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                  id: BEACON_ID,
+                  beacon_type: "event",
+                  expires_at: futureIso(),
+                  venue_id: null,
+                  creator_id: USER_ID,
                   metadata: liveEventMeta(),
                   location: { type: "Point", coordinates: [-122.3, 47.65] },
                 },
@@ -294,13 +419,12 @@ describe("event engagement API contracts", () => {
     const res = await postCheckIn(
       new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/check-in`, {
         method: "POST",
-        body: JSON.stringify({ latitude: 47.6501, longitude: -122.3001, platform: "android" }),
+        body: JSON.stringify({ latitude: 47.6501, longitude: -122.3001 }),
       }),
       { params: Promise.resolve({ beaconId: BEACON_ID }) },
     );
     expect(res.status).toBe(200);
     expect(upsert).toHaveBeenCalled();
-    expect((await res.json()).hub_id).toBe(EVENT_HUB_ID);
   });
 
   it("engagement GET returns bookmark + check-in flags", async () => {

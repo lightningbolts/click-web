@@ -17,10 +17,12 @@ import {
 } from "@/lib/server/eventHubLifecycle";
 import { parseBody } from "@/lib/api/parseBody";
 import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
+import { rsvpEnabledFromMetadata } from "@/lib/events/eventMetadata";
+import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 
 /**
  * GET — current user check-in status + public check_in_count.
- * POST — check in (requires GPS + live window + geofence).
+ * POST — check in (requires GPS + geofence + RSVP when enabled + live window).
  * DELETE — check out / undo.
  */
 export async function GET(
@@ -130,34 +132,6 @@ export async function POST(
       return geo.response;
     }
 
-    if (!isEventLiveForCheckIn(beacon.metadata)) {
-      await insertEngagementEvent(admin, {
-        beacon_id: beaconId,
-        user_id: user.id,
-        venue_id: beacon.venue_id,
-        event_type: "check_in_rejected",
-        reject_reason: "not_live",
-        latitude: telemetry.latitude,
-        longitude: telemetry.longitude,
-        accuracy_meters: telemetry.accuracy_meters,
-        distance_meters: geo.distanceMeters,
-        client_occurred_at: telemetry.client_occurred_at,
-        source: telemetry.source,
-        platform: telemetry.platform,
-        app_version: telemetry.app_version,
-        radius_meters_applied: radiusMeters,
-        venue_scale: venueScale,
-      });
-      return NextResponse.json(
-        {
-          error: "Event not live",
-          message: "Check-in opens when the event starts",
-          reject_reason: "not_live",
-        },
-        { status: 409 },
-      );
-    }
-
     const [{ data: rsvpRow }, { data: bookmarkRow }, { data: existing }] = await Promise.all([
       admin
         .from("beacon_attendees")
@@ -181,6 +155,72 @@ export async function POST(
 
     const hadRsvp = rsvpRow != null;
     const hadBookmark = bookmarkRow != null;
+    const rsvpRequired = rsvpEnabledFromMetadata(beacon.metadata);
+    if (rsvpRequired && !hadRsvp) {
+      const isHost = await userMayManageBeacon(admin, user.id, {
+        creator_id: typeof beacon.creator_id === "string" ? beacon.creator_id : "",
+        venue_id: beacon.venue_id,
+      });
+      if (!isHost) {
+        await insertEngagementEvent(admin, {
+          beacon_id: beaconId,
+          user_id: user.id,
+          venue_id: beacon.venue_id,
+          event_type: "check_in_rejected",
+          reject_reason: "rsvp_required",
+          latitude: telemetry.latitude,
+          longitude: telemetry.longitude,
+          accuracy_meters: telemetry.accuracy_meters,
+          distance_meters: geo.distanceMeters,
+          client_occurred_at: telemetry.client_occurred_at,
+          source: telemetry.source,
+          platform: telemetry.platform,
+          app_version: telemetry.app_version,
+          radius_meters_applied: radiusMeters,
+          venue_scale: venueScale,
+          had_rsvp: false,
+          had_bookmark: hadBookmark,
+        });
+        return NextResponse.json(
+          {
+            error: "RSVP required to check in",
+            message: "RSVP to this event before checking in",
+            reject_reason: "rsvp_required",
+          },
+          { status: 403 },
+        );
+      }
+    }
+
+    if (!isEventLiveForCheckIn(beacon.metadata)) {
+      await insertEngagementEvent(admin, {
+        beacon_id: beaconId,
+        user_id: user.id,
+        venue_id: beacon.venue_id,
+        event_type: "check_in_rejected",
+        reject_reason: "not_live",
+        latitude: telemetry.latitude,
+        longitude: telemetry.longitude,
+        accuracy_meters: telemetry.accuracy_meters,
+        distance_meters: geo.distanceMeters,
+        client_occurred_at: telemetry.client_occurred_at,
+        source: telemetry.source,
+        platform: telemetry.platform,
+        app_version: telemetry.app_version,
+        radius_meters_applied: radiusMeters,
+        venue_scale: venueScale,
+        had_rsvp: hadRsvp,
+        had_bookmark: hadBookmark,
+      });
+      return NextResponse.json(
+        {
+          error: "Event not live",
+          message: "Check-in opens when the event starts",
+          reject_reason: "not_live",
+        },
+        { status: 409 },
+      );
+    }
     const prevCount =
       existing != null && typeof existing.check_in_count === "number"
         ? existing.check_in_count
