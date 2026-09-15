@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.mjs",
     "dev": "next dev",
     "prepare:env": "bash scripts/materialize-ci-env.sh",
     "postinstall": "bash scripts/maybe-materialize-ci-env.sh",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
+    "prebuild:worker": "node scripts/copy-maplibre-worker.mjs",
     "build:worker": "bash scripts/materialize-ci-env.sh && opennextjs-cloudflare build",
     "preview": "npm run build:worker && opennextjs-cloudflare preview",
     "deploy": "npm run build:worker && opennextjs-cloudflare deploy -- --keep-vars",
