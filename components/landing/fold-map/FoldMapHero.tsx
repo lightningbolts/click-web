@@ -7,7 +7,7 @@ import type { PresenceHeatmapCell } from '@/lib/landing/presenceHeatmap';
 const DIRECTION_CONTRACT = ` THESIS: The first viewport is the city: a quiet map of real handshake density, not a logo splash and not a feed. The handshake offer sits on one plate over that place.
  OWN-WORLD: Functional Clarity: opaque plate, 1px seam, Click Violet #7C3AED, Manrope, 8px buttons and 16px card, Carto map as content not chrome.
  STORY: A first-time visitor sees they are invited into a real city of verified presence, understands this is an in-person handshake (phone), and joins the mobile-app waitlist. The web companion is already live.
- FIRST VIEWPORT: Full-bleed map under the existing navbar; violet heatmap of real handshake GPS (block-offset); zoom 9–18 to building; lower-left plate with mark, handshake line, tagline, proof sentence, Join the Waitlist, Why Click exists.
+ FIRST VIEWPORT: Full-bleed map under the existing navbar; violet heatmap of real handshake GPS (block-offset); zoom 9–18 to building; lower-left plate with mark, handshake line, tagline, proof sentence, Join the Waitlist.
  FORM: The Fold Map; grounded structure 4 of 7; seed 5738aa14.
  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 `;
@@ -58,12 +58,6 @@ export default function FoldMapHero({
             >
               Join the Waitlist
             </button>
-            <a
-              href="#why"
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-on-surface-variant hover:text-primary"
-            >
-              Why Click exists
-            </a>
           </div>
         </div>
       </div>

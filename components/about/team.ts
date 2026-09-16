@@ -42,4 +42,11 @@ export const ABOUT_TEAM: TeamMember[] = [
     text: "Click resonated with me because I've always struggled to stay in touch with people I just met. Jaret has experience with full-stack development and game design.",
     email: "jaretz@uw.edu",
   },
+  {
+    name: "Carey Chiu",
+    initials: "CC",
+    subtitle: "Paul Allen School of Computer Engineering, UW 2029",
+    text: "I work across both the app and the website. Kairui told me about the app and as I started to understand, I agreed with his vision for Click because the people you meet once should be easy to find again. Carey has experience with full-stack and mobile development, teaching, and hardware project management.",
+    email: "careyc6@uw.edu",
+  },
 ];
