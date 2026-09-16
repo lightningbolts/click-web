@@ -54,7 +54,7 @@ function renderLanding() {
 }
 
 describe('LandingPage', () => {
-  it('renders the Fold Map hero, tagline, waitlist CTA, and Why Click exists', () => {
+  it('renders the Fold Map hero, tagline, and waitlist CTA', () => {
     renderLanding();
 
     expect(screen.getByTestId('landing-fold-map')).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('LandingPage', () => {
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
     expect(screen.getByText(/Your phones confirm you were in the same room/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'Why Click exists' })).toHaveAttribute('href', '#why');
+    expect(screen.queryByRole('link', { name: 'Why Click exists' })).not.toBeInTheDocument();
   });
 
   it('renders the playground and does not use product screenshot alts', () => {
