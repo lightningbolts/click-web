@@ -24,11 +24,6 @@ jest.mock('@/components/HomeAuthenticated', () => ({
   default: () => <div data-testid="home-authenticated">Loading your connections</div>,
 }));
 
-jest.mock('@/components/landing/fold-map/FoldMapLazy', () => ({
-  __esModule: true,
-  default: () => <div data-testid="landing-fold-map-canvas" />,
-}));
-
 jest.mock('@/components/landing/playground/LandingPlaygroundLazy', () => ({
   __esModule: true,
   default: () => <div data-testid="landing-playground" />,
