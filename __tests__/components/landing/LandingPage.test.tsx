@@ -49,14 +49,14 @@ function renderLanding() {
 }
 
 describe('LandingPage', () => {
-  it('renders the concise hero and waitlist CTA', () => {
+  it('renders the Fold Map hero, tagline, and waitlist CTA', () => {
     renderLanding();
 
     expect(screen.getByRole('img', { name: 'Click' })).toBeInTheDocument();
     expect(screen.getByText(/from handshake to friendship/)).toBeInTheDocument();
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'About Click' })).toHaveAttribute('href', '/about');
+    expect(screen.queryByRole('link', { name: 'Why Click exists' })).not.toBeInTheDocument();
   });
 
   it('renders the playground and does not use product screenshot alts', () => {
