@@ -16,11 +16,6 @@ jest.mock('@/components/HomeAuthenticated', () => ({
   default: () => <div data-testid="home-authenticated" />,
 }));
 
-jest.mock('@/components/landing/fold-map/FoldMapLazy', () => ({
-  __esModule: true,
-  default: () => <div data-testid="landing-fold-map-canvas" />,
-}));
-
 jest.mock('@/components/landing/playground/LandingPlaygroundLazy', () => ({
   __esModule: true,
   default: () => <div data-testid="landing-playground" />,
@@ -54,16 +49,14 @@ function renderLanding() {
 }
 
 describe('LandingPage', () => {
-  it('renders the Fold Map hero, tagline, waitlist CTA, and Why Click exists', () => {
+  it('renders the concise hero and waitlist CTA', () => {
     renderLanding();
 
-    expect(screen.getByTestId('landing-fold-map')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Click' })).toBeInTheDocument();
     expect(screen.getByText(/from handshake to friendship/)).toBeInTheDocument();
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
-    expect(screen.getByText(/Your phones confirm you were in the same room/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: 'Why Click exists' })).toHaveAttribute('href', '#why');
+    expect(screen.getByRole('link', { name: 'About Click' })).toHaveAttribute('href', '/about');
   });
 
   it('renders the playground and does not use product screenshot alts', () => {
@@ -78,15 +71,15 @@ describe('LandingPage', () => {
     expect(screen.queryByAltText(/Click mobile/i)).not.toBeInTheDocument();
   });
 
-  it('explains why the product exists', () => {
+  it('pairs concise feature copy with existing product images and working links', () => {
     renderLanding();
 
-    expect(screen.getByRole('heading', { name: 'Why Click exists' })).toBeInTheDocument();
-    expect(screen.getByText('The follow-back void')).toBeInTheDocument();
-    expect(screen.getByText('The handle handoff')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Built for the moment you put your phone down' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Connect.*without.*the noise/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Discover.*real events/i })).toBeInTheDocument();
+    expect(screen.getByAltText(/Add Click screen/)).toBeInTheDocument();
+    expect(screen.getByAltText(/Click event details/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Explore events/ })).toHaveAttribute('href', '/events');
+    expect(screen.getByRole('link', { name: /See how it works/ })).toHaveAttribute('href', '#how-it-works');
   });
 
   it('points enterprise traffic at /enterprise instead of an insights carousel', () => {

@@ -1,14 +1,14 @@
 'use client';
 
-import { CheckCircle, MapPin, Smartphone } from 'lucide-react';
+import { ArrowRight, MapPin, Radar } from 'lucide-react';
+import Image from 'next/image';
+import ClickLogo from '@/components/ClickLogo';
 import dynamic from 'next/dynamic';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import FoldMapHero from '@/components/landing/fold-map/FoldMapHero';
 import LandingPlaygroundLazy from '@/components/landing/playground/LandingPlaygroundLazy';
-import { EMPTY_PRESENCE_HEATMAP, type PresenceHeatmapPayload } from '@/lib/landing/presenceHeatmap';
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 import { cn } from '@/lib/cn';
 
@@ -55,11 +55,7 @@ function WaitlistLoadingShell({ onClose }: { onClose: () => void }) {
  * Marketing homepage. Never gates on auth `loading` so SSR/crawlers receive
  * indexable hero copy. After client login, swaps to the dashboard.
  */
-export default function LandingPage({
-  heatmap = EMPTY_PRESENCE_HEATMAP,
-}: {
-  heatmap?: PresenceHeatmapPayload;
-}) {
+export default function LandingPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [showWaitlist, setShowWaitlist] = useState(false);
@@ -85,12 +81,21 @@ export default function LandingPage({
 
   return (
     <>
-      <div className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate">
-        <FoldMapHero
-          onJoinWaitlist={openWaitlist}
-          onPrefetchWaitlist={prefetchWaitlist}
-          cells={heatmap.cells}
-        />
+      <div
+        className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate"
+        style={{ fontFamily: 'var(--font-manrope), ui-sans-serif, system-ui, sans-serif' }}
+      >
+        <section className="flex min-h-[560px] flex-col items-center justify-center px-6 py-24 text-center sm:min-h-[660px]" aria-labelledby="landing-hero-heading">
+          <ClickLogo variant="mark" size={80} className="h-20 w-20" priority />
+          <h1 id="landing-hero-heading" className="mt-8 max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-5xl">
+            Click: <span className="text-primary">from handshake to friendship.</span>
+          </h1>
+          <p className="mt-4 text-sm text-on-surface-variant sm:text-base">Stop scrolling. Start living.</p>
+          <button type="button" onClick={openWaitlist} onPointerEnter={prefetchWaitlist} onFocus={prefetchWaitlist} data-testid="waitlist-cta" className="fc-btn-primary mt-7 min-h-11 px-7">
+            Join the Waitlist
+          </button>
+          <Link href="/about" className="mt-3 inline-flex min-h-11 items-center text-sm text-on-surface-variant hover:text-primary">About Click</Link>
+        </section>
 
         {showWaitlist ? (
           <Suspense fallback={<WaitlistLoadingShell onClose={() => setShowWaitlist(false)} />}>
@@ -102,74 +107,72 @@ export default function LandingPage({
           </Suspense>
         ) : null}
 
-        <section id="why" className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-8 pt-16")} aria-labelledby="why-heading">
-          <div>
-            <h2 id="why-heading" className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
-              Why Click exists
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed text-on-surface-variant">
-              You&apos;ve had that conversation at a party, a class, a show, the kind where you think,{' '}
-              <span className="font-semibold text-primary">I should actually know this person</span>. Then you follow
-              each other and it evaporates. Pretty soon they&apos;re just another handle in the same endless scroll.
-            </p>
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-              <div className="fc-card p-5">
-                <h3 className="font-bold text-on-surface">The follow-back void</h3>
-                <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                  You follow. They follow back. Neither of you ever sends a message.
-                </p>
-              </div>
-              <div className="fc-card p-5">
-                <h3 className="font-bold text-on-surface">The handle handoff</h3>
-                <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                  You hunt for the right app, guess at spelling, and the person in front of you is already across the
-                  room.
-                </p>
-              </div>
-              <div className="fc-card p-5">
-                <h3 className="font-bold text-on-surface">A name without a where</h3>
-                <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                  Later they&apos;re a row in your messages with no tether to the night, the venue, or the vibe.
-                </p>
-              </div>
-              <div className="fc-card p-5">
-                <h3 className="font-bold text-on-surface">Apps built to scroll</h3>
-                <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                  Every other product is optimized to keep you in the feed. Click is the handshake, the memory, and the
-                  next event.
-                </p>
-              </div>
+        <div className={cn(PAGE_COLUMN_CLASS, "space-y-8 sm:space-y-12")}>
+          <section id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
+            <div className="flex justify-center">
+              <Image
+                src="/landing/consumer-add-click.png"
+                alt="Click’s Add Click screen with Tap to Connect and QR sharing"
+                width={472}
+                height={1024}
+                sizes="(max-width: 640px) 220px, 260px"
+                className="h-auto w-[220px] rounded-[28px] border-2 border-border-hard sm:w-[260px]"
+              />
             </div>
-          </div>
-        </section>
+            <div className="max-w-md">
+              <h2 id="why-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">Connect<br />without<br />the noise.</h2>
+              <p className="mt-6 max-w-sm text-base leading-relaxed text-on-surface-variant">Meet in person. Tap to connect. Keep the people you meet close, without another endless feed.</p>
+              <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">See how it works <ArrowRight className="h-4 w-4" aria-hidden /></a>
+            </div>
+          </section>
 
-        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-16")}>
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="fc-card p-6">
-              <Smartphone className="mb-4 h-6 w-6 text-primary" aria-hidden />
-              <h2 className="text-lg font-bold text-on-surface">In person</h2>
-              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                When you&apos;re standing together, phones confirm it. You swap profiles without
-                hunting for a handle.
-              </p>
+          <section className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
+            <div className="flex justify-center py-2">
+              <Image
+                src="/landing/consumer-event-detail.png"
+                alt="Click event details with a map, attendees, and Join Event Route"
+                width={472}
+                height={1024}
+                sizes="(max-width: 640px) 220px, 260px"
+                className="h-auto w-[220px] -rotate-3 rounded-[28px] border-2 border-white/30 sm:w-[260px]"
+              />
             </div>
-            <div className="fc-card p-6">
-              <MapPin className="mb-4 h-6 w-6 text-primary" aria-hidden />
-              <h2 className="text-lg font-bold text-on-surface">Events</h2>
-              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                Nearby gatherings, RSVP with people you&apos;ve already met, and show up together.
-              </p>
+            <div className="max-w-md">
+              <h2 id="events-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">Discover<br />real events.</h2>
+              <p className="mt-6 max-w-sm text-base leading-relaxed">Find your next gathering. See who’s going, bring your people, and show up together.</p>
+              <Link href="/events" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border-2 border-white bg-white px-6 text-sm font-bold text-primary hover:bg-white/90"><MapPin className="h-4 w-4" aria-hidden />Explore events <ArrowRight className="h-4 w-4" aria-hidden /></Link>
             </div>
-            <div className="fc-card p-6">
-              <CheckCircle className="mb-4 h-6 w-6 text-primary" aria-hidden />
-              <h2 className="text-lg font-bold text-on-surface">Context</h2>
-              <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
-                Place, time, and how you met stay on the connection so follow-up is not a blank
-                name.
-              </p>
+          </section>
+          <section
+            className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
+            aria-labelledby="irl-heading"
+          >
+            <div className="relative mx-auto w-full max-w-md p-2 sm:p-3">
+              <div className="absolute inset-0 -rotate-2 rounded-[28px] bg-primary/30" aria-hidden />
+              <div className="relative overflow-hidden rounded-[16px] border-2 border-primary/40 bg-[#17151c]">
+                <Image
+                  src="/landing/vibe-radar-enhanced.png"
+                  alt="Vibe Radar with nearby profiles arranged around concentric rings"
+                  width={1484}
+                  height={1060}
+                  sizes="(max-width: 640px) 85vw, 448px"
+                  className="h-auto w-full"
+                />
+              </div>
             </div>
-          </div>
-        </section>
+            <div className="max-w-md">
+              <h2 id="irl-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+                IRL<br /><span className="text-primary">over URL.</span>
+              </h2>
+              <p className="mt-6 max-w-sm text-base leading-relaxed text-on-surface-variant">
+                Your people are closer than you think. Find shared interests, make a connection, and take the conversation into the real world.
+              </p>
+              <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">
+                <Radar className="h-4 w-4" aria-hidden />Explore Click<ArrowRight className="h-4 w-4" aria-hidden />
+              </a>
+            </div>
+          </section>
+        </div>
 
         <section
           id="how-it-works"
@@ -186,8 +189,7 @@ export default function LandingPage({
                 Try it.
               </h2>
               <p className="mx-auto mt-3 max-w-xl text-base text-on-surface-variant">
-                A working tour of connections, map, chat, and QR. The handshake itself still happens
-                on your phone.
+                Take Click for a spin.
               </p>
             </div>
             <LandingPlaygroundLazy />
@@ -202,18 +204,6 @@ export default function LandingPage({
             </Link>
             .
           </p>
-        </section>
-
-        <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-8")} aria-labelledby="mission-heading">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 id="mission-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Built for the moment you put your phone down
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-on-surface-variant">
-              Every other app is optimized to keep you scrolling. Click is optimized for the{' '}
-              <span className="font-semibold text-primary">thirty seconds</span> when you meet someone worth knowing, and the months to come.
-            </p>
-          </div>
         </section>
 
         <section className={cn(PAGE_COLUMN_CLASS, "relative z-10 pb-24 pt-8")}>
