@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { unstable_cache } from 'next/cache';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { runtimeEnvPresent } from '@/lib/server/runtimeEnv';
 import {
@@ -12,8 +11,16 @@ import {
 
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 10_000;
+const CACHE_TTL_MS = 60 * 60 * 1000;
 
 type AdminClient = ReturnType<typeof createAdminSupabaseClient>;
+
+type CachedHeatmap = {
+  value: PresenceHeatmapPayload;
+  expiresAt: number;
+};
+
+let cachedHeatmap: CachedHeatmap | null = null;
 
 async function loadPointsFromEncounters(admin: AdminClient): Promise<{ lat: number; lng: number }[] | 'missing'> {
   const points: { lat: number; lng: number }[] = [];
@@ -68,8 +75,10 @@ async function loadPointsFromConnections(admin: AdminClient): Promise<{ lat: num
 }
 
 /**
- * One Postgres scan per revalidate window, then the landing SSR payload
- * carries the cells. No extra Worker round-trip from the browser.
+ * One Postgres scan per warm Worker isolate and TTL window, then the landing
+ * SSR payload carries the cells. Keep this cache process-local instead of
+ * using Next's composable cache: current OpenNext/Next 16.3 builds have a
+ * cache-runtime patch incompatibility on Cloudflare Workers.
  *
  * Live schema stores GPS on `connection_encounters` (`connections.geo_location`
  * was dropped). Older databases still have the JSON column — try that next.
@@ -89,8 +98,16 @@ async function loadPresenceHeatmapUncached(): Promise<PresenceHeatmapPayload> {
   };
 }
 
-export function loadPresenceHeatmap(): Promise<PresenceHeatmapPayload> {
-  return unstable_cache(loadPresenceHeatmapUncached, ['landing-presence-heatmap-v3'], {
-    revalidate: 3600,
-  })();
+export async function loadPresenceHeatmap(): Promise<PresenceHeatmapPayload> {
+  const now = Date.now();
+  if (cachedHeatmap && cachedHeatmap.expiresAt > now) {
+    return cachedHeatmap.value;
+  }
+
+  const value = await loadPresenceHeatmapUncached();
+  cachedHeatmap = {
+    value,
+    expiresAt: now + CACHE_TTL_MS,
+  };
+  return value;
 }
