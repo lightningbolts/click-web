@@ -16,6 +16,19 @@ jest.mock('@/components/HomeAuthenticated', () => ({
   default: () => <div data-testid="home-authenticated" />,
 }));
 
+jest.mock('@/components/landing/fold-map/FoldMapHero', () => ({
+  __esModule: true,
+  default: ({ onJoinWaitlist, cells }: { onJoinWaitlist: () => void; cells: readonly unknown[] }) => (
+    <section data-testid="landing-fold-map" data-heatmap-cells={cells.length}>
+      <img alt="Click" />
+      <h1>Click: from handshake to friendship.</h1>
+      <p>Stop scrolling. Start living.</p>
+      <p>Your phones confirm you were in the same room.</p>
+      <button type="button" onClick={onJoinWaitlist}>Join the Waitlist</button>
+    </section>
+  ),
+}));
+
 jest.mock('@/components/landing/playground/LandingPlaygroundLazy', () => ({
   __esModule: true,
   default: () => <div data-testid="landing-playground" />,
@@ -43,31 +56,32 @@ jest.mock('framer-motion', () => {
 function renderLanding() {
   return render(
     <ThemeProvider>
-      <LandingPage />
+      <LandingPage heatmap={{ cells: [{ lat: 47.61, lng: -122.33, weight: 2 }], generatedAt: 'test' }} />
     </ThemeProvider>,
   );
 }
 
 describe('LandingPage', () => {
-  it('renders the Fold Map hero, tagline, and waitlist CTA', () => {
+  it('renders the Fold Map heatmap hero, tagline, and waitlist CTA', () => {
     renderLanding();
 
+    expect(screen.getByTestId('landing-fold-map')).toHaveAttribute('data-heatmap-cells', '1');
     expect(screen.getByRole('img', { name: 'Click' })).toBeInTheDocument();
     expect(screen.getByText(/from handshake to friendship/)).toBeInTheDocument();
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
+    expect(screen.getByText(/Your phones confirm you were in the same room/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: 'Why Click exists' })).not.toBeInTheDocument();
   });
 
-  it('renders the playground and does not use product screenshot alts', () => {
+  it('renders the refined playground framing and demo', () => {
     renderLanding();
 
-    expect(screen.getByRole('heading', { name: /Try it/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Try Click before launch/i })).toBeInTheDocument();
+    expect(screen.getByText(/Demo state is local to this page/i)).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground-heading')).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground')).toBeInTheDocument();
-    expect(
-      screen.queryByAltText(/Click web — Personal dashboard/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByAltText(/Click web — Personal dashboard/i)).not.toBeInTheDocument();
     expect(screen.queryByAltText(/Click mobile/i)).not.toBeInTheDocument();
   });
 
