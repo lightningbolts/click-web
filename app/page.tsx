@@ -1,6 +1,17 @@
 import HomeAuthenticated from '@/components/HomeAuthenticated';
 import LandingPage from '@/components/landing/LandingPage';
+import { EMPTY_PRESENCE_HEATMAP } from '@/lib/landing/presenceHeatmap';
 import { getServerUser } from '@/lib/server/getServerUser';
+import { loadPresenceHeatmap } from '@/lib/server/presenceHeatmap';
+
+async function landingHeatmap() {
+  try {
+    return await loadPresenceHeatmap();
+  } catch (err) {
+    console.error('Presence heatmap load failed:', err);
+    return EMPTY_PRESENCE_HEATMAP;
+  }
+}
 
 function CartoPreconnect() {
   return (
@@ -25,7 +36,7 @@ export default async function Home() {
   return (
     <>
       <CartoPreconnect />
-      <LandingPage />
+      <LandingPage heatmap={await landingHeatmap()} />
     </>
   );
 }
