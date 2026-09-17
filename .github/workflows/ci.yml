@@ -174,3 +174,6 @@ jobs:
         run: |
           test -f .open-next/worker.js
           echo "OpenNext worker.js is present"
+
+      - name: Validate Cloudflare preview upload
+        run: npx --no-install wrangler versions upload --dry-run --keep-vars

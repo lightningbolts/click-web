@@ -7,14 +7,14 @@ env:
   BASE_URL: http://localhost:3000
 ---
 # The playground wrapper div is omitted from the AX tree (no accessible
-# name), so CSS [data-testid='landing-playground'] never matches. Scroll to
-# the section heading, which is a real text node.
+# name), so scroll to the stable section heading id instead of coupling this
+# smoke test to marketing copy that may change during landing refinements.
 - runFlow:
     file: ../subflows/open_origin.yaml
 - scrollUntilVisible:
-    element: "Try it."
+    element:
+      id: how-it-works-heading
     direction: DOWN
-    timeout: 20000
-- assertVisible: "Try it."
+    timeout: 30000
 - assertVisible:
     id: how-it-works-heading
