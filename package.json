@@ -10,7 +10,7 @@
     "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "prebuild:worker": "node scripts/copy-maplibre-worker.mjs",
-    "build:worker": "bash scripts/materialize-ci-env.sh && opennextjs-cloudflare build",
+    "build:worker": "bash scripts/materialize-ci-env.sh && rm -rf .next/cache/turbopack && opennextjs-cloudflare build",
     "preview": "npm run build:worker && opennextjs-cloudflare preview",
     "deploy": "npm run build:worker && opennextjs-cloudflare deploy -- --keep-vars",
     "typecheck": "tsc --noEmit",
