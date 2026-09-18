@@ -20,6 +20,18 @@ describe('normalizeHubMessageRow', () => {
     });
     expect(row?.message_type).toBe('text');
     expect(row?.body).toBe('hi');
+    expect(row?.edited_at).toBeNull();
+  });
+  it('normalizes edited_at when present', () => {
+    const row = normalizeHubMessageRow({
+      id: 'm2',
+      hub_id: 'hub_1',
+      user_id: 'u1',
+      body: 'edited',
+      created_at: '2026-08-18T00:00:00.000Z',
+      edited_at: '2026-08-18T00:01:00.000Z',
+    });
+    expect(row?.edited_at).toBe('2026-08-18T00:01:00.000Z');
   });
 });
 

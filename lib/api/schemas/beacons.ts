@@ -84,6 +84,40 @@ export const hubMessagesBodySchema = z.preprocess((raw) => {
   metadata: z.unknown().optional(),
 }).passthrough());
 
+export const hubInteractionBodySchema = z.preprocess((raw) => {
+  if (!isRecord(raw)) return raw;
+  return {
+    ...raw,
+    hubId: typeof raw.hubId === 'string' ? raw.hubId : typeof raw.hub_id === 'string' ? raw.hub_id : undefined,
+    userLat: pickDualNumber(raw, 'userLat', 'user_lat'),
+    userLong: pickDualNumber(raw, 'userLong', 'user_long'),
+  };
+}, z.object({
+  hubId: nonEmptyString,
+  userLat: z.number(),
+  userLong: z.number(),
+  body: z.string().trim().min(1).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+}).passthrough());
+
+export const hubReactionBodySchema = z.preprocess((raw) => {
+  if (!isRecord(raw)) return raw;
+  return {
+    ...raw,
+    hubId: typeof raw.hubId === 'string' ? raw.hubId : typeof raw.hub_id === 'string' ? raw.hub_id : undefined,
+    messageId: typeof raw.messageId === 'string' ? raw.messageId : typeof raw.message_id === 'string' ? raw.message_id : undefined,
+    reactionType: typeof raw.reactionType === 'string' ? raw.reactionType : typeof raw.reaction_type === 'string' ? raw.reaction_type : undefined,
+    userLat: pickDualNumber(raw, 'userLat', 'user_lat'),
+    userLong: pickDualNumber(raw, 'userLong', 'user_long'),
+  };
+}, z.object({
+  hubId: nonEmptyString,
+  messageId: nonEmptyString,
+  reactionType: z.string().trim().min(1).max(32),
+  userLat: z.number(),
+  userLong: z.number(),
+}).passthrough());
+
 export const hubJoinBodySchema = z.preprocess((raw) => {
   if (!isRecord(raw)) return raw;
   const hub_id =
