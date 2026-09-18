@@ -224,6 +224,37 @@ describe('Hub interaction routes', () => {
     });
   });
 
+  it('fails closed when a duplicate reaction cannot be resolved canonically', async () => {
+    mockParseBody.mockResolvedValue({
+      ok: true,
+      data: {
+        hubId: HUB_ID,
+        messageId: MESSAGE_ID,
+        reactionType: '❤️',
+        userLat: 47.6,
+        userLong: -122.3,
+      },
+    });
+    const target = queryWithMaybeSingle({ id: MESSAGE_ID, hub_id: HUB_ID });
+    const duplicateWrite: any = {};
+    duplicateWrite.insert = jest.fn(() => duplicateWrite);
+    duplicateWrite.select = jest.fn(() => duplicateWrite);
+    duplicateWrite.single = jest.fn().mockResolvedValue({
+      data: null,
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+    });
+    const canonicalLookup = queryWithMaybeSingle(null, { message: 'lookup failed' });
+    const from = jest.fn()
+      .mockReturnValueOnce(target)
+      .mockReturnValueOnce(duplicateWrite)
+      .mockReturnValueOnce(canonicalLookup);
+    mockCreateAdmin.mockReturnValue({ from });
+
+    const response = await addReaction(request('POST', '/api/hub/reactions'));
+
+    expect(response.status).toBe(500);
+  });
+
   it('revalidates access before reaction writes', async () => {
     mockParseBody.mockResolvedValue({
       ok: true,
