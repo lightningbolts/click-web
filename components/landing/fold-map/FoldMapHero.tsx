@@ -31,7 +31,7 @@ export default function FoldMapHero({
       <span className="sr-only" dangerouslySetInnerHTML={{ __html: `<!--${DIRECTION_CONTRACT}-->` }} />
       <FoldMapLazy cells={cells} />
       <div className="pointer-events-none absolute inset-0 z-[2] flex items-end p-4 sm:p-6 md:p-8">
-        <div className="pointer-events-auto w-full max-w-md rounded-[16px] border border-border-hard bg-surface p-6 shadow-lg sm:p-8">
+        <div className="landing-hero-reveal pointer-events-auto w-full max-w-md rounded-[16px] border border-border-hard bg-surface p-6 shadow-lg sm:p-8">
           <ClickLogo variant="mark" size={56} className="h-14 w-14" priority />
           <h1
             id="landing-hero-heading"
