@@ -326,8 +326,12 @@ export async function POST(request: NextRequest) {
         (typeof baseMeta.text === "string" && baseMeta.text.trim()) ||
         (typeof baseMeta.message === "string" && baseMeta.message.trim()) ||
         "";
-      if (desc.length > 500) {
-        return NextResponse.json({ error: "metadata.description is too long" }, { status: 400 });
+      const descriptionLimit = beacon_type === "event" ? 10_000 : 500;
+      if (desc.length > descriptionLimit) {
+        return NextResponse.json(
+          { error: `metadata.description must be ${descriptionLimit} characters or fewer` },
+          { status: 400 },
+        );
       }
       metadata = {
         ...metadata,
