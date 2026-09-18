@@ -9,11 +9,13 @@ import {
   PATCH as editMessage,
   DELETE as deleteMessage,
 } from '@/app/api/hub/messages/[messageId]/route';
+import { GET as getHubMessages } from '@/app/api/hub/messages/route';
 
 const mockRequireBearerUser = jest.fn();
 const mockCreateAdmin = jest.fn();
 const mockParseBody = jest.fn();
 const mockAssertHubGeofence = jest.fn();
+const mockAssertHubReadable = jest.fn();
 const mockAssertHubE2ee = jest.fn();
 
 jest.mock('@/lib/server/chatGatekeeper', () => ({
@@ -27,6 +29,7 @@ jest.mock('@/lib/api/parseBody', () => ({
 
 jest.mock('@/lib/server/hubGatekeeper', () => ({
   assertHubGeofenceFromCoords: (...args: unknown[]) => mockAssertHubGeofence(...args),
+  assertHubReadable: (...args: unknown[]) => mockAssertHubReadable(...args),
 }));
 
 jest.mock('@/lib/server/hubE2eeV2Gate', () => ({
@@ -79,6 +82,18 @@ function deleteQuery() {
   return q;
 }
 
+function resolvedQuery(data: unknown, error: unknown = null) {
+  const q: any = {};
+  q.select = jest.fn(() => q);
+  q.eq = jest.fn(() => q);
+  q.order = jest.fn(() => q);
+  q.limit = jest.fn(() => q);
+  q.then = (resolve: (value: unknown) => unknown) =>
+    Promise.resolve({ data, error }).then(resolve);
+  return q;
+}
+
+
 describe('Hub interaction routes', () => {
   beforeEach(() => {
     mockRequireBearerUser.mockReset().mockResolvedValue({
@@ -89,7 +104,65 @@ describe('Hub interaction routes', () => {
     mockCreateAdmin.mockReset();
     mockParseBody.mockReset();
     mockAssertHubGeofence.mockReset().mockResolvedValue(null);
+    mockAssertHubReadable.mockReset().mockResolvedValue(null);
     mockAssertHubE2ee.mockReset().mockResolvedValue({ ok: true, currentEpoch: 3 });
+  });
+
+  it('returns an explicit sender-profile visibility decision for hosts-only Event Hubs', async () => {
+    const participants = resolvedQuery([
+      { user_id: USER_ID },
+      { user_id: PEER_ID },
+    ]);
+    const venue = queryWithMaybeSingle({ event_beacon_id: 'event-1' });
+    const event = queryWithMaybeSingle({
+      creator_id: PEER_ID,
+      guest_list_visibility: 'hosts_only',
+    });
+    const messages = resolvedQuery([]);
+    const from = jest.fn()
+      .mockReturnValueOnce(participants)
+      .mockReturnValueOnce(venue)
+      .mockReturnValueOnce(event)
+      .mockReturnValueOnce(messages);
+    mockCreateAdmin.mockReturnValue({ from });
+
+    const response = await getHubMessages(
+      new NextRequest(`https://click.example/api/hub/messages?hubId=${HUB_ID}`),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.participant_ids).toEqual([]);
+    expect(body.sender_profiles_visible).toBe(false);
+    expect(body.occupant_count).toBe(2);
+  });
+
+  it('keeps sender profiles visible to the Event host', async () => {
+    const participants = resolvedQuery([
+      { user_id: USER_ID },
+      { user_id: PEER_ID },
+    ]);
+    const venue = queryWithMaybeSingle({ event_beacon_id: 'event-1' });
+    const event = queryWithMaybeSingle({
+      creator_id: USER_ID,
+      guest_list_visibility: 'hosts_only',
+    });
+    const messages = resolvedQuery([]);
+    const from = jest.fn()
+      .mockReturnValueOnce(participants)
+      .mockReturnValueOnce(venue)
+      .mockReturnValueOnce(event)
+      .mockReturnValueOnce(messages);
+    mockCreateAdmin.mockReturnValue({ from });
+
+    const response = await getHubMessages(
+      new NextRequest(`https://click.example/api/hub/messages?hubId=${HUB_ID}`),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.participant_ids).toEqual([USER_ID, PEER_ID]);
+    expect(body.sender_profiles_visible).toBe(true);
   });
 
   it('rejects reaction cross-Hub message spoofing before any write', async () => {

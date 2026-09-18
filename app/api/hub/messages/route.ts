@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
   // Event hosts may opt out of publishing a guest list. Participants can still
   // read the room, but only receive its occupant count, not a directory of ids.
   let participantIds = allParticipantIds;
+  let senderProfilesVisible = true;
   const { data: hubVenue, error: venueErr } = await admin
     .from('hub_venues')
     .select('event_beacon_id')
@@ -128,7 +129,10 @@ export async function GET(request: NextRequest) {
     const hostsOnly =
       eventBeacon != null &&
       (eventBeacon as { guest_list_visibility?: unknown }).guest_list_visibility === 'hosts_only';
-    if (hostsOnly && hostId !== auth.user.id) participantIds = [];
+    if (hostsOnly && hostId !== auth.user.id) {
+      participantIds = [];
+      senderProfilesVisible = false;
+    }
   }
 
   let messages: HubThreadMessage[] = [];
@@ -201,6 +205,7 @@ export async function GET(request: NextRequest) {
     messages,
     reactions,
     participant_ids: participantIds,
+    sender_profiles_visible: senderProfilesVisible,
     occupant_count: Math.max(allParticipantIds.length, 1),
     channel: hubRealtimeChannel(hubId),
   });
