@@ -114,11 +114,14 @@ export default function EventMarkdownContent({
         if (ordered) {
           return (
             <ol key={key} className="list-decimal space-y-1 pl-5">
-              {lines.map((line, index) => (
-                <li key={`${key}-li-${index}`}>
-                  {renderInline(line.replace(/^\s*\d+\.\s+/, ""), `${key}-li-${index}`)}
-                </li>
-              ))}
+              {lines.map((line, index) => {
+                const marker = Number.parseInt(line.trimStart().split(".", 1)[0] ?? "", 10);
+                return (
+                  <li key={`${key}-li-${index}`} value={Number.isFinite(marker) ? marker : undefined}>
+                    {renderInline(line.replace(/^\s*\d+\.\s+/, ""), `${key}-li-${index}`)}
+                  </li>
+                );
+              })}
             </ol>
           );
         }
@@ -138,31 +141,27 @@ export default function EventMarkdownContent({
           );
         }
 
-        if (lines.length === 1) {
-          const heading = lines[0].match(/^(#{1,3})\s+(.+)$/);
-          if (heading) {
-            const level = heading[1].length;
-            const body = renderInline(heading[2], `${key}-heading`);
-            if (level === 1) {
-              return (
-                <h2 key={key} className="font-display text-2xl font-semibold leading-tight text-on-surface">
-                  {body}
-                </h2>
-              );
-            }
-            if (level === 2) {
-              return (
-                <h3 key={key} className="text-lg font-bold leading-snug text-on-surface">
-                  {body}
-                </h3>
-              );
-            }
-            return (
-              <h4 key={key} className="text-base font-bold leading-snug text-on-surface">
+        const heading = lines[0]?.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+          const level = heading[1].length;
+          const body = renderInline(heading[2], `${key}-heading`);
+          const headingNode =
+            level === 1 ? (
+              <h2 className="font-display text-2xl font-semibold leading-tight text-on-surface">
                 {body}
-              </h4>
+              </h2>
+            ) : level === 2 ? (
+              <h3 className="text-lg font-bold leading-snug text-on-surface">{body}</h3>
+            ) : (
+              <h4 className="text-base font-bold leading-snug text-on-surface">{body}</h4>
             );
-          }
+          const remainder = lines.slice(1);
+          return (
+            <div key={key} className="space-y-2">
+              {headingNode}
+              {remainder.length > 0 ? <p>{renderLines(remainder, `${key}-body`)}</p> : null}
+            </div>
+          );
         }
 
         return <p key={key}>{renderLines(lines, key)}</p>;
