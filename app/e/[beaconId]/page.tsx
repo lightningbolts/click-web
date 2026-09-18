@@ -7,6 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadPublicEventPayload } from "@/lib/events/publicEvent";
 import {
   EVENT_BEACON_UUID_RE,
+  eventDescriptionPlainText,
   eventDisplayTitle,
   eventIsPast,
   eventSubtitle,
@@ -59,7 +60,7 @@ export async function generateMetadata({
     : "Click event";
   const url = eventShareUrl(beaconId);
   const description =
-    eventSubtitle(title, event?.description) ||
+    eventSubtitle(title, eventDescriptionPlainText(event?.description)) ||
     formatEventWhen(event?.event_start_at ?? null, event?.event_end_at ?? null, event?.timezone) ||
     "Open this event in Click.";
   const images = event?.image_url
