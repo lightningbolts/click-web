@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import { FcButton, FcTextarea } from "@/components/fc";
+import { FcButton } from "@/components/fc";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import {
   BEACON_IMAGE_ENDPOINT,
@@ -17,6 +17,7 @@ import EventLocationPicker from "@/components/events/EventLocationPicker";
 import EventDateTimeFields from "@/components/events/EventDateTimeFields";
 import EventOptionsFields from "@/components/events/EventOptionsFields";
 import EventThemePicker from "@/components/events/EventThemePicker";
+import EventMarkdownEditor from "@/components/events/EventMarkdownEditor";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import {
   DEFAULT_EVENT_LISTING_OPTIONS,
@@ -288,13 +289,10 @@ export default function EventCreateForm({
             placeholder="Event name"
             className="w-full border-0 border-b border-border-hard bg-transparent pb-2 font-display text-[32px] font-semibold leading-tight text-on-surface outline-none placeholder:text-on-surface-variant"
           />
-          <FcTextarea
-            name="description"
+          <EventMarkdownEditor
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
             maxLength={500}
-            rows={4}
-            placeholder="What should people know?"
           />
           <EventDateTimeFields
             start={start}
