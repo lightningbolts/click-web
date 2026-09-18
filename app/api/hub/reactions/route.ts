@@ -87,7 +87,14 @@ export async function POST(request: NextRequest) {
         error.message?.toLowerCase().includes('duplicate') ||
         error.message?.toLowerCase().includes('unique');
       if (duplicate) {
-        return NextResponse.json({ action: 'exists', reaction: null }, { status: 200 });
+        const { data: existing } = await admin
+          .from('hub_message_reactions')
+          .select('*')
+          .eq('hub_message_id', gate.target.id)
+          .eq('user_id', auth.user.id)
+          .eq('reaction_type', reactionType.trim())
+          .maybeSingle();
+        return NextResponse.json({ action: 'exists', reaction: existing ?? null }, { status: 200 });
       }
       console.error('[hub/reactions POST]', error.message);
       return NextResponse.json({ error: 'Failed to add reaction' }, { status: 500 });
