@@ -18,6 +18,7 @@ type MutableHubMessage = {
   hub_id: string;
   user_id: string;
   message_type: string | null;
+  metadata: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -40,7 +41,7 @@ async function loadOwnedTarget(
 ): Promise<{ target: MutableHubMessage } | { response: NextResponse }> {
   const { data, error } = await admin
     .from('hub_messages')
-    .select('id, hub_id, user_id, message_type')
+    .select('id, hub_id, user_id, message_type, metadata')
     .eq('id', messageId)
     .maybeSingle();
 
@@ -91,7 +92,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   );
   if (denied) return denied;
 
-  const metadata = isRecord(parsed.data.metadata) ? parsed.data.metadata : {};
+  const metadata =
+    parsed.data.metadata === undefined
+      ? isRecord(owned.target.metadata)
+        ? owned.target.metadata
+        : {}
+      : isRecord(parsed.data.metadata)
+        ? parsed.data.metadata
+        : {};
   const e2eeGate = await assertHubE2eeV2MessageWrite(admin, {
     hubId: owned.target.hub_id,
     userId: auth.user.id,
