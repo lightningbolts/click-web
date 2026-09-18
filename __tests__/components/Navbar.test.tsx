@@ -70,6 +70,19 @@ describe("Navbar", () => {
     expect(screen.getByTestId("nav-menu-toggle")).toBeInTheDocument();
   });
 
+  it("switches dashboard tabs without remounting the root route", async () => {
+    const user = userEvent.setup();
+    const pushState = jest.spyOn(window.history, "pushState");
+    navState.pathname = "/";
+    navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
+    renderNav();
+
+    await user.click(screen.getByTestId("dashboard-tab-chat"));
+
+    expect(pushState).toHaveBeenCalledWith(null, "", "/?tab=chat");
+    pushState.mockRestore();
+  });
+
   it("shows product tabs on signed-in event routes with Events current", () => {
     navState.pathname = "/events";
     navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
