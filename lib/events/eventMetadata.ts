@@ -57,6 +57,24 @@ export function eventDescriptionFromMetadata(meta: Record<string, unknown>): str
   return metaString(meta, "description", "text", "body", "message");
 }
 
+/** Collapse the supported event Markdown subset for cards, metadata, and other plain-text surfaces. */
+export function eventDescriptionPlainText(description: string | null | undefined): string | null {
+  if (!description?.trim()) return null;
+  const plain = description
+    .replace(/\[([^\]]+)\]\([^\s)]+\)/g, "$1")
+    .replace(/^\s{0,3}#{1,3}\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/^\s*(?:[-+*]|\d+\.)\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return plain || null;
+}
+
 export function eventImageFromMetadata(meta: Record<string, unknown>): string | null {
   return (
     beaconHeroImageUrl(meta) ??

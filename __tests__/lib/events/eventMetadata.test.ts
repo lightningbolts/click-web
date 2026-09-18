@@ -1,4 +1,5 @@
 import {
+  eventDescriptionPlainText,
   eventDisplayTitle,
   eventInstantFromRowOrMeta,
   eventStartAtFromMetadata,
@@ -45,6 +46,14 @@ describe("eventMetadata helpers", () => {
     expect(eventSubtitle("Picnic", "Picnic")).toBeNull();
     expect(eventSubtitle("Picnic", "Bring a blanket.")).toBe("Bring a blanket.");
     expect(eventSubtitle("Picnic", "  ")).toBeNull();
+  });
+
+  it("collapses event markdown for plain-text surfaces", () => {
+    expect(
+      eventDescriptionPlainText("## Details\n\nBring **friends** and [RSVP here](https://example.com)."),
+    ).toBe("Details Bring friends and RSVP here.");
+    expect(eventDescriptionPlainText("- One\n- Two")).toBe("One Two");
+    expect(eventDescriptionPlainText("  ")).toBeNull();
   });
 
   it("omits empty locations instead of placeholder copy", () => {

@@ -7,6 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadPublicEventPayload } from "@/lib/events/publicEvent";
 import {
   EVENT_BEACON_UUID_RE,
+  eventDescriptionPlainText,
   eventDisplayTitle,
   eventIsPast,
   eventSubtitle,
@@ -26,6 +27,7 @@ import EventHostRow from "@/components/events/EventHostRow";
 import EventGuestPreview from "@/components/events/EventGuestPreview";
 import EventHostActions from "@/components/events/EventHostActions";
 import EventPageShell from "@/components/events/EventPageShell";
+import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import PinMapLazy from "@/components/maps/PinMapLazy";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
 import {
@@ -58,7 +60,7 @@ export async function generateMetadata({
     : "Click event";
   const url = eventShareUrl(beaconId);
   const description =
-    eventSubtitle(title, event?.description) ||
+    eventSubtitle(title, eventDescriptionPlainText(event?.description)) ||
     formatEventWhen(event?.event_start_at ?? null, event?.event_end_at ?? null, event?.timezone) ||
     "Open this event in Click.";
   const images = event?.image_url
@@ -187,12 +189,7 @@ export default async function EventShareLandingPage({
                 />
               ) : null}
               {description ? (
-                <p
-                  data-testid="event-description"
-                  className="max-w-prose whitespace-pre-wrap text-base leading-relaxed text-on-surface-variant"
-                >
-                  {description}
-                </p>
+                <EventMarkdownContent className="max-w-prose">{description}</EventMarkdownContent>
               ) : null}
               <p className="text-sm">
                 <a href={reportMailto} className="font-semibold text-on-surface-variant hover:text-on-surface hover:underline">
