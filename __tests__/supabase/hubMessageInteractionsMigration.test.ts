@@ -6,6 +6,10 @@ describe('hub message interactions migration', () => {
     path.join(process.cwd(), 'supabase/migrations/20260917235000_hub_message_interactions.sql'),
     'utf8',
   );
+  const securitySql = fs.readFileSync(
+    path.join(process.cwd(), 'supabase/tests/hub_message_interactions_security.sql'),
+    'utf8',
+  );
 
   it('adds server-persisted edit timestamps and dedicated Hub reactions', () => {
     expect(sql).toContain('ADD COLUMN IF NOT EXISTS edited_at timestamptz');
@@ -15,6 +19,7 @@ describe('hub message interactions migration', () => {
   });
 
   it('keeps client writes API-only while allowing participant-scoped reads', () => {
+    expect(sql).toContain('REVOKE INSERT, UPDATE, DELETE ON public.hub_messages FROM authenticated');
     expect(sql).toContain('REVOKE ALL ON public.hub_message_reactions FROM authenticated');
     expect(sql).toContain('GRANT SELECT ON public.hub_message_reactions TO authenticated');
     expect(sql).toContain('USING (public.auth_uid_in_hub(hub_id))');
@@ -23,5 +28,12 @@ describe('hub message interactions migration', () => {
   it('publishes deterministic delete payloads over realtime', () => {
     expect(sql).toContain('REPLICA IDENTITY FULL');
     expect(sql).toContain('ALTER PUBLICATION supabase_realtime ADD TABLE public.hub_message_reactions');
+  });
+
+  it('has database-level regression coverage for direct-write denial', () => {
+    expect(securitySql).toContain("NOT has_table_privilege('authenticated', 'public.hub_message_reactions', 'INSERT')");
+    expect(securitySql).toContain("NOT has_table_privilege('authenticated', 'public.hub_messages', 'UPDATE')");
+    expect(securitySql).toContain("NOT has_table_privilege('authenticated', 'public.hub_messages', 'DELETE')");
+    expect(securitySql).toContain('throws_ok(');
   });
 });

@@ -4,6 +4,10 @@
 ALTER TABLE public.hub_messages
     ADD COLUMN IF NOT EXISTS edited_at timestamptz;
 
+-- Hub message edits/deletes are API/service-role mutations. Keep authenticated
+-- clients read-only even if an older environment accumulated broader grants.
+REVOKE INSERT, UPDATE, DELETE ON public.hub_messages FROM authenticated;
+
 CREATE TABLE IF NOT EXISTS public.hub_message_reactions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     hub_message_id uuid NOT NULL REFERENCES public.hub_messages(id) ON DELETE CASCADE,
