@@ -292,7 +292,7 @@ export default function EventCreateForm({
           <EventMarkdownEditor
             value={description}
             onChange={setDescription}
-            maxLength={500}
+            maxLength={10000}
           />
           <EventDateTimeFields
             start={start}
