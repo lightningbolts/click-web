@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
+import type { User } from "@supabase/supabase-js";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ replace: jest.fn(), refresh: jest.fn() }),
@@ -25,7 +26,7 @@ describe("AuthProvider", () => {
       id: "user-1",
       email: "ada@example.com",
       user_metadata: { full_name: "Ada Lovelace" },
-    } as any;
+    } as unknown as User;
 
     render(
       <AuthProvider initialUser={initialUser}>
