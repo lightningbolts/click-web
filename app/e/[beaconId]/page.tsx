@@ -26,6 +26,7 @@ import EventHostRow from "@/components/events/EventHostRow";
 import EventGuestPreview from "@/components/events/EventGuestPreview";
 import EventHostActions from "@/components/events/EventHostActions";
 import EventPageShell from "@/components/events/EventPageShell";
+import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import PinMapLazy from "@/components/maps/PinMapLazy";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
 import {
@@ -186,14 +187,7 @@ export default async function EventShareLandingPage({
                   past={ended}
                 />
               ) : null}
-              {description ? (
-                <p
-                  data-testid="event-description"
-                  className="max-w-prose whitespace-pre-wrap text-base leading-relaxed text-on-surface-variant"
-                >
-                  {description}
-                </p>
-              ) : null}
+              {description ? <EventMarkdownContent>{description}</EventMarkdownContent> : null}
               <p className="text-sm">
                 <a href={reportMailto} className="font-semibold text-on-surface-variant hover:text-on-surface hover:underline">
                   Report event
