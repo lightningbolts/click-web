@@ -3,7 +3,7 @@
 import { ArrowRight, MapPin, Radar } from 'lucide-react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
@@ -67,6 +67,7 @@ export default function LandingPage({
   const { user } = useAuth();
   const router = useRouter();
   const [showWaitlist, setShowWaitlist] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
 
   const prefetchWaitlist = () => {
     void loadWaitlistModal();
@@ -83,6 +84,54 @@ export default function LandingPage({
     }
   }, [user, router]);
 
+  useEffect(() => {
+    const root = pageRef.current;
+    if (!root) return;
+
+    const sections = Array.from(
+      root.querySelectorAll<HTMLElement>("[data-landing-reveal]"),
+    );
+    if (sections.length === 0) return;
+
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || typeof IntersectionObserver === "undefined") {
+      sections.forEach((section) => {
+        section.dataset.revealed = "true";
+      });
+      return;
+    }
+
+    const revealVisibleSections = () => {
+      const threshold = window.innerHeight + 56;
+      sections.forEach((section) => {
+        if (section.getBoundingClientRect().top <= threshold) {
+          section.dataset.revealed = "true";
+        }
+      });
+    };
+
+    revealVisibleSections();
+    root.dataset.landingRevealReady = "true";
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const target = entry.target as HTMLElement;
+          target.dataset.revealed = "true";
+          observer.unobserve(target);
+        });
+      },
+      { rootMargin: "0px 0px -56px 0px", threshold: 0.08 },
+    );
+
+    sections.forEach((section) => {
+      if (section.dataset.revealed !== "true") observer.observe(section);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   if (user) {
     return <HomeAuthenticated user={user} />;
   }
@@ -90,6 +139,7 @@ export default function LandingPage({
   return (
     <>
       <div
+        ref={pageRef}
         className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate"
         style={{ fontFamily: 'var(--font-manrope), ui-sans-serif, system-ui, sans-serif' }}
       >
@@ -110,7 +160,7 @@ export default function LandingPage({
         ) : null}
 
         <div className={cn(PAGE_COLUMN_CLASS, 'space-y-8 pt-10 sm:space-y-12 sm:pt-14')}>
-          <section id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
+          <section data-landing-reveal id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
             <div className="flex justify-center">
               <Image
                 src="/landing/consumer-add-click.png"
@@ -128,7 +178,7 @@ export default function LandingPage({
             </div>
           </section>
 
-          <section className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
+          <section data-landing-reveal className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
             <div className="flex justify-center py-2">
               <Image
                 src="/landing/consumer-event-detail.png"
@@ -147,6 +197,7 @@ export default function LandingPage({
           </section>
 
           <section
+            data-landing-reveal
             className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
             aria-labelledby="irl-heading"
           >
@@ -178,6 +229,7 @@ export default function LandingPage({
         </div>
 
         <section
+          data-landing-reveal
           id="how-it-works"
           className={cn(PAGE_COLUMN_CLASS, 'relative z-10 py-16 sm:py-20')}
           aria-labelledby="how-it-works-heading"
@@ -205,7 +257,7 @@ export default function LandingPage({
           </div>
         </section>
 
-        <section className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-8')}>
+        <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-8')}>
           <p className="mx-auto max-w-2xl text-center text-sm text-on-surface-variant">
             Running a venue, campus, or event program?{' '}
             <Link href="/enterprise" className="font-semibold text-primary hover:text-primary/80">
@@ -215,7 +267,7 @@ export default function LandingPage({
           </p>
         </section>
 
-        <section className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
+        <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
           <div className="fc-card px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
               Click app launches Fall 2026.
