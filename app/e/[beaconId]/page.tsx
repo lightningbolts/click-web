@@ -188,7 +188,9 @@ export default async function EventShareLandingPage({
                   past={ended}
                 />
               ) : null}
-              {description ? <EventMarkdownContent>{description}</EventMarkdownContent> : null}
+              {description ? (
+                <EventMarkdownContent className="max-w-prose">{description}</EventMarkdownContent>
+              ) : null}
               <p className="text-sm">
                 <a href={reportMailto} className="font-semibold text-on-surface-variant hover:text-on-surface hover:underline">
                   Report event
