@@ -26,7 +26,7 @@ type EditMode = "write" | "preview";
 export default function EventMarkdownEditor({
   value,
   onChange,
-  maxLength = 500,
+  maxLength = 10000,
   name = "description",
 }: EventMarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
