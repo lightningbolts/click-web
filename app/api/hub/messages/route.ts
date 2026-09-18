@@ -183,8 +183,23 @@ export async function GET(request: NextRequest) {
       .reverse();
   }
 
+  const messageIds = messages.map((message) => message.id);
+  let reactions: Record<string, unknown>[] = [];
+  if (messageIds.length > 0) {
+    const { data: reactionRows, error: reactionErr } = await admin
+      .from('hub_message_reactions')
+      .select('*')
+      .in('hub_message_id', messageIds);
+    if (reactionErr) {
+      console.error('[hub/messages GET] reactions:', reactionErr.message);
+      return NextResponse.json({ error: 'Failed to load hub reactions' }, { status: 500 });
+    }
+    reactions = (reactionRows ?? []) as Record<string, unknown>[];
+  }
+
   return NextResponse.json({
     messages,
+    reactions,
     participant_ids: participantIds,
     occupant_count: Math.max(allParticipantIds.length, 1),
     channel: hubRealtimeChannel(hubId),
