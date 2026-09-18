@@ -197,7 +197,7 @@ export default function LandingPage({
           </section>
 
           <section
-           
+            data-landing-reveal
             className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
             aria-labelledby="irl-heading"
           >
@@ -229,7 +229,7 @@ export default function LandingPage({
         </div>
 
         <section
-         
+          data-landing-reveal
           id="how-it-works"
           className={cn(PAGE_COLUMN_CLASS, 'relative z-10 py-16 sm:py-20')}
           aria-labelledby="how-it-works-heading"
