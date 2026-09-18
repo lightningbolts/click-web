@@ -71,7 +71,7 @@ export function AuthProvider({
     } catch (err) {
       console.error('Error refreshing user:', err);
     }
-  }, [initialUser?.id, loadProfileImageFromUsersTable]);
+  }, [loadProfileImageFromUsersTable]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -132,7 +132,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [loadProfileImageFromUsersTable]);
+  }, [initialUser?.id, loadProfileImageFromUsersTable]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
