@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, Suspense } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ClickLogo from "@/components/ClickLogo";
 import MobileNavDrawer from "@/components/shell/MobileNavDrawer";
@@ -156,6 +157,31 @@ export default function Navbar({
     }
   };
 
+  const handleProductTabNavigation = (
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    item: ReturnType<typeof personalProductNavItems>[number],
+  ) => {
+    const isDashboardTab = pathname === "/" && item.id !== "events";
+    if (
+      !isDashboardTab ||
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    if (!productNavItemIsActive(item, pathname, tab)) {
+      window.history.pushState(null, "", item.href);
+    }
+    setMobileOpen(false);
+    setUserMenuOpen(false);
+  };
+
   const userLabel = displayNameFromUserMetadata(user?.user_metadata) || user?.email || "Account";
 
   const marketingLinks = (
@@ -200,6 +226,7 @@ export default function Navbar({
                   <Link
                     key={item.id}
                     href={item.href}
+                    onClick={(event) => handleProductTabNavigation(event, item)}
                     data-testid={`dashboard-tab-${item.id}`}
                     aria-current={productNavItemIsActive(item, pathname, tab) ? "page" : undefined}
                     className={navLinkClass(productNavItemIsActive(item, pathname, tab))}
@@ -302,7 +329,7 @@ export default function Navbar({
                   <Link
                     key={item.id}
                     href={item.href}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={(event) => handleProductTabNavigation(event, item)}
                     data-testid={`dashboard-tab-${item.id}-mobile`}
                     aria-current={productNavItemIsActive(item, pathname, tab) ? "page" : undefined}
                     className={drawerLinkClass}
