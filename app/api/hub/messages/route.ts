@@ -98,7 +98,10 @@ export async function GET(request: NextRequest) {
   // Event hosts may opt out of publishing a guest list. Participants can still
   // read the room, but only receive its occupant count, not a directory of ids.
   let participantIds = allParticipantIds;
-  let senderProfilesVisible = true;
+  // Guest-list visibility controls the room directory. Message senders remain
+  // visible to authorized room participants, so profile actions are valid from
+  // a message even when the full attendee directory is hosts-only.
+  const senderProfilesVisible = true;
   const { data: hubVenue, error: venueErr } = await admin
     .from('hub_venues')
     .select('event_beacon_id')
@@ -131,7 +134,6 @@ export async function GET(request: NextRequest) {
       (eventBeacon as { guest_list_visibility?: unknown }).guest_list_visibility === 'hosts_only';
     if (hostsOnly && hostId !== auth.user.id) {
       participantIds = [];
-      senderProfilesVisible = false;
     }
   }
 

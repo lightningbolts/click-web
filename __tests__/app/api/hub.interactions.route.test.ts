@@ -133,7 +133,7 @@ describe('Hub interaction routes', () => {
 
     expect(response.status).toBe(200);
     expect(body.participant_ids).toEqual([]);
-    expect(body.sender_profiles_visible).toBe(false);
+    expect(body.sender_profiles_visible).toBe(true);
     expect(body.occupant_count).toBe(2);
   });
 
@@ -393,13 +393,14 @@ describe('Hub interaction routes', () => {
         content: 'edited',
       }),
     );
-    expect(write.update).toHaveBeenCalledWith(
+    const updatePayload = write.update.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(updatePayload).toEqual(
       expect.objectContaining({
         body: 'edited',
-        metadata: storedMetadata,
         edited_at: expect.any(String),
       }),
     );
+    expect(updatePayload).not.toHaveProperty('metadata');
   });
 
   it('does not update when the E2EE edit envelope is rejected', async () => {

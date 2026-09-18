@@ -111,13 +111,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!e2eeGate.ok) return e2eeGate.response;
 
   const editedAt = new Date().toISOString();
+  const updates: {
+    body: string;
+    edited_at: string;
+    metadata?: Record<string, unknown>;
+  } = {
+    body,
+    edited_at: editedAt,
+  };
+  if (parsed.data.metadata !== undefined) {
+    updates.metadata = metadata;
+  }
+
   const { data: updated, error } = await admin
     .from('hub_messages')
-    .update({
-      body,
-      metadata,
-      edited_at: editedAt,
-    })
+    .update(updates)
     .eq('id', owned.target.id)
     .eq('hub_id', owned.target.hub_id)
     .eq('user_id', auth.user.id)
