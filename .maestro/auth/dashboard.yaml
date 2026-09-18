@@ -18,9 +18,13 @@ env:
     css: "[data-testid='dashboard-chrome']"
 - tapOn:
     css: "[data-testid='dashboard-tab-map']"
+- assertNotVisible: "Loading your connections"
 - tapOn:
     css: "[data-testid='dashboard-tab-chat']"
+- assertNotVisible: "Loading your connections"
 - tapOn:
     css: "[data-testid='dashboard-tab-settings']"
+- assertNotVisible: "Loading your connections"
 - tapOn:
     css: "[data-testid='dashboard-tab-memory']"
+- assertNotVisible: "Loading your connections"

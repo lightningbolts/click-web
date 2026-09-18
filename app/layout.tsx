@@ -65,7 +65,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialHasSession = Boolean(await getServerUser());
+  const initialUser = await getServerUser();
+  const initialHasSession = Boolean(initialUser);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -78,7 +79,7 @@ export default async function RootLayout({
       >
         <MapLibreWorkerInit />
         <ThemeProvider>
-          <AuthProvider>
+          <AuthProvider initialUser={initialUser}>
             <ProductChromeProvider>
               <Suspense fallback={null}>
                 <Navbar initialHasSession={initialHasSession} />
