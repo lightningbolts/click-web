@@ -4,6 +4,7 @@ import { FcCard } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { formatEventWhen } from "@/lib/events/formatEventWhen";
 import {
+  eventDescriptionPlainText,
   eventDisplayTitle,
   eventIsPast,
   eventSubtitle,
@@ -44,7 +45,7 @@ export function EventListCard({
   hostActions?: boolean;
 }) {
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
-  const subtitle = eventSubtitle(title, event.description);
+  const subtitle = eventSubtitle(title, eventDescriptionPlainText(event.description));
   const when = formatEventWhen(event.event_start_at, event.event_end_at, event.timezone);
   const where = eventWhereLabel(event.location_name);
   const seed = event.visual_seed || event.cover_theme_id || event.beacon_id;
