@@ -211,8 +211,12 @@ export async function PATCH(
           (typeof metaPatch.text === "string" && metaPatch.text.trim()) ||
           (typeof metaPatch.message === "string" && metaPatch.message.trim()) ||
           "";
-        if (desc.length > 500) {
-          return NextResponse.json({ error: "metadata.description is too long" }, { status: 400 });
+        const descriptionLimit = beaconType === "event" ? 10_000 : 500;
+        if (desc.length > descriptionLimit) {
+          return NextResponse.json(
+            { error: `metadata.description must be ${descriptionLimit} characters or fewer` },
+            { status: 400 },
+          );
         }
         if (descPresent) {
           nextMeta.description = desc;
