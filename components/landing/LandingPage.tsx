@@ -4,6 +4,7 @@ import { ArrowRight, MapPin, Radar } from 'lucide-react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { Suspense, useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
@@ -67,6 +68,15 @@ export default function LandingPage({
   const { user } = useAuth();
   const router = useRouter();
   const [showWaitlist, setShowWaitlist] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const reveal = reduceMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 18 },
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, margin: '-56px' },
+        transition: { duration: 0.48, ease: [0.16, 1, 0.3, 1] as const },
+      };
 
   const prefetchWaitlist = () => {
     void loadWaitlistModal();
@@ -110,7 +120,7 @@ export default function LandingPage({
         ) : null}
 
         <div className={cn(PAGE_COLUMN_CLASS, 'space-y-8 pt-10 sm:space-y-12 sm:pt-14')}>
-          <section id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
+          <motion.section {...reveal} id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
             <div className="flex justify-center">
               <Image
                 src="/landing/consumer-add-click.png"
@@ -126,9 +136,9 @@ export default function LandingPage({
               <p className="mt-6 max-w-sm text-base leading-relaxed text-on-surface-variant">Meet in person. Tap to connect. Keep the people you meet close, without another endless feed.</p>
               <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">See how it works <ArrowRight className="h-4 w-4" aria-hidden /></a>
             </div>
-          </section>
+          </motion.section>
 
-          <section className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
+          <motion.section {...reveal} className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
             <div className="flex justify-center py-2">
               <Image
                 src="/landing/consumer-event-detail.png"
@@ -144,9 +154,10 @@ export default function LandingPage({
               <p className="mt-6 max-w-sm text-base leading-relaxed">Find your next gathering. See who’s going, bring your people, and show up together.</p>
               <Link href="/events" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border-2 border-white bg-white px-6 text-sm font-bold text-primary hover:bg-white/90"><MapPin className="h-4 w-4" aria-hidden />Explore events <ArrowRight className="h-4 w-4" aria-hidden /></Link>
             </div>
-          </section>
+          </motion.section>
 
-          <section
+          <motion.section
+            {...reveal}
             className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
             aria-labelledby="irl-heading"
           >
@@ -174,10 +185,11 @@ export default function LandingPage({
                 <Radar className="h-4 w-4" aria-hidden />Explore Click<ArrowRight className="h-4 w-4" aria-hidden />
               </a>
             </div>
-          </section>
+          </motion.section>
         </div>
 
-        <section
+        <motion.section
+          {...reveal}
           id="how-it-works"
           className={cn(PAGE_COLUMN_CLASS, 'relative z-10 py-16 sm:py-20')}
           aria-labelledby="how-it-works-heading"
@@ -203,9 +215,9 @@ export default function LandingPage({
             </div>
             <LandingPlaygroundLazy />
           </div>
-        </section>
+        </motion.section>
 
-        <section className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-8')}>
+        <motion.section {...reveal} className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-8')}>
           <p className="mx-auto max-w-2xl text-center text-sm text-on-surface-variant">
             Running a venue, campus, or event program?{' '}
             <Link href="/enterprise" className="font-semibold text-primary hover:text-primary/80">
@@ -213,9 +225,9 @@ export default function LandingPage({
             </Link>
             .
           </p>
-        </section>
+        </motion.section>
 
-        <section className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
+        <motion.section {...reveal} className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
           <div className="fc-card px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
               Click app launches Fall 2026.
@@ -233,7 +245,7 @@ export default function LandingPage({
               Join the Waitlist
             </button>
           </div>
-        </section>
+        </motion.section>
       </div>
     </>
   );
