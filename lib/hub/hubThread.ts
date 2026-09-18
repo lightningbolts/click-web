@@ -24,6 +24,7 @@ export type HubThreadMessage = {
   user_id: string;
   body: string;
   created_at: string;
+  edited_at: string | null;
   message_type: string;
   metadata: unknown;
 };
@@ -40,6 +41,7 @@ export function normalizeHubMessageRow(row: Record<string, unknown> | null | und
     user_id: userId,
     body: typeof row.body === 'string' ? row.body : '',
     created_at: typeof row.created_at === 'string' ? row.created_at : '',
+    edited_at: typeof row.edited_at === 'string' ? row.edited_at : null,
     message_type: typeof row.message_type === 'string' && row.message_type.trim() ? row.message_type : 'text',
     metadata: row.metadata ?? {},
   };
