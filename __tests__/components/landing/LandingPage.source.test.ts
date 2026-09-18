@@ -15,6 +15,7 @@ describe('anonymous landing JS budget', () => {
     expect(landing).not.toMatch(/import HomeAuthenticated from/);
     expect(landing).not.toMatch(/import LandingPlayground from/);
     expect(landing).not.toMatch(/import WaitlistModal from/);
+    expect(landing).not.toMatch(/from ['"]framer-motion['"]/);
     expect(landing).toContain('next/dynamic');
     expect(landing).toContain('LandingPlaygroundLazy');
 
