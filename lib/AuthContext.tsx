@@ -30,10 +30,16 @@ const AuthContext = createContext<AuthContextType>({
 const PRESENCE_CHANNEL = 'room:presence';
 const PRESENCE_TRACK_MS = 25_000;
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  initialUser = null,
+}: {
+  children: React.ReactNode;
+  initialUser?: User | null;
+}) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [loading, setLoading] = useState(!initialUser);
   const [onlineUserIds, setOnlineUserIds] = useState<ReadonlySet<string>>(() => new Set());
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
@@ -65,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error('Error refreshing user:', err);
     }
-  }, [loadProfileImageFromUsersTable]);
+  }, [initialUser?.id, loadProfileImageFromUsersTable]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -74,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const userIdRef = { current: null as string | null };
+    const userIdRef = { current: initialUser?.id ?? null };
 
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
