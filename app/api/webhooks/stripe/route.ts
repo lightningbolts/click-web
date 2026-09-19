@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server';
 import { getStripe } from '@/lib/server/stripe';
 import { createSupabaseServiceRoleClient } from '@/lib/server/supabaseServer';
 import { stripeSubscriptionStatusToVenue } from '@/lib/server/stripeVenueStatus';
+import { isTicketingEvent, handleTicketingEvent } from '@/lib/server/ticketing/webhookHandlers';
+import {
+  recordTicketingWebhookEvent,
+  markTicketingWebhookOutcome,
+} from '@/lib/server/ticketing/webhookLedger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -142,6 +147,27 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : 'Invalid signature';
     console.error('Stripe webhook signature error:', message);
     return NextResponse.json({ error: `Webhook Error: ${message}` }, { status: 400 });
+  }
+
+  // Ticketing events use ledger semantics (failed handlers stay retryable on
+  // Stripe redelivery); the venue-subscription flow keeps its original
+  // insert-once idempotency guard.
+  if (isTicketingEvent(event)) {
+    const admin = createSupabaseServiceRoleClient();
+    const decision = await recordTicketingWebhookEvent(admin, event);
+    if (!decision.process) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    try {
+      await handleTicketingEvent(admin, event);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('Stripe ticketing webhook handler error:', message);
+      await markTicketingWebhookOutcome(admin, event.id, 'failed', message);
+      return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
+    }
+    await markTicketingWebhookOutcome(admin, event.id, 'processed');
+    return NextResponse.json({ received: true });
   }
 
   if (await eventAlreadyProcessed(event.id)) {
