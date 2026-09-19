@@ -24,8 +24,26 @@ export const runtime = 'nodejs';
 
 const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments';
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
-const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+export const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 const MAX_MEDIA_BASE64_CHARS = Math.ceil(MAX_MEDIA_BYTES / 3) * 4 + 4;
+
+export const CHAT_MEDIA_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'audio/mp4',
+  'audio/m4a',
+  'audio/x-m4a',
+  'audio/aac',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/ogg',
+  'audio/webm',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -111,8 +129,11 @@ export async function POST(request: NextRequest) {
     const chatId = parsed.chat_id.trim();
     const mimeType =
       typeof parsed.mime_type === 'string' && parsed.mime_type.trim().length > 0
-        ? parsed.mime_type.trim()
+        ? parsed.mime_type.trim().toLowerCase()
         : 'application/octet-stream';
+    if (!CHAT_MEDIA_MIME_TYPES.has(mimeType)) {
+      return NextResponse.json({ error: 'Unsupported chat media type' }, { status: 415 });
+    }
     const fileB64Raw = parsed.file_b64;
     const fileB64 = stripDataUriPrefix(fileB64Raw);
     const bodyRecord = parsed as unknown as Record<string, unknown>;
