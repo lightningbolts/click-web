@@ -150,7 +150,10 @@ export async function loadActivityRecap(
       fetchJunctionIds(admin, 'connection_hidden', userId),
       admin
         .from('connections')
-        .select('id, created, created_utc, created_at, source, status, expiry_state')
+        // Production connections has `created` (epoch ms) + `created_utc`; there is no
+        // `created_at`. Selecting a nonexistent column makes PostgREST reject the whole
+        // query, which previously collapsed the entire recap to zeros.
+        .select('id, created, created_utc, source, status, expiry_state')
         .contains('user_ids', [userId]),
     ]);
 
