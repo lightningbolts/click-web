@@ -36,7 +36,10 @@ function mockAdmin(handlers: Record<string, Handler>) {
           reject?: (reason: unknown) => unknown,
         ) => Promise<unknown>;
       } = {
-        select: () => chain,
+        select: (...args) => {
+          filters.select = args[0];
+          return chain;
+        },
         contains: () => chain,
         eq: (col, val) => {
           filters[col] = val;
@@ -95,6 +98,38 @@ describe('emptyActivityRecap', () => {
 });
 
 describe('loadActivityRecap', () => {
+  it('queries only connection columns that exist in production', async () => {
+    const admin = mockAdmin({
+      connection_archives: () => ({ data: [], error: null }),
+      connection_hidden: () => ({ data: [], error: null }),
+      connections: (filters) => {
+        expect(filters.select).toBe('id, created, created_utc, source, status, expiry_state');
+        expect(String(filters.select)).not.toContain('created_at');
+        return {
+          data: [
+            {
+              id: 'c1',
+              created: NOW - 1_000,
+              created_utc: new Date(NOW - 1_000).toISOString(),
+              source: 'handshake',
+              status: 'active',
+            },
+          ],
+          error: null,
+        };
+      },
+      chats: () => ({ data: [{ id: 'chat-1' }], error: null }),
+      messages: () => ({ count: 0, error: null }),
+      map_beacons: () => ({ count: 0, error: null }),
+      beacon_attendees: () => ({ count: 0, error: null }),
+      event_check_ins: () => ({ count: 0, error: null }),
+      event_bookmarks: () => ({ count: 0, error: null }),
+    });
+
+    const recap = await loadActivityRecap(admin as never, USER, 'week', NOW);
+    expect(recap.connections_formed).toBe(1);
+  });
+
   it('returns zeros when the user has no connections', async () => {
     const admin = mockAdmin({
       connection_archives: () => ({ data: [], error: null }),
