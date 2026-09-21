@@ -241,3 +241,9 @@ Production is the Cloudflare Worker `click-web`. Set runtime variables on the **
 This package is part of the broader Click Platforms workspace. For the KMP client and shared product context, see **`click/README.md`** and any workspace root docs.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lightningbolts/click-web)
+
+## Waitlist confirmation
+
+Waitlist signup requires an emailed confirmation link. See
+[waitlist email verification](docs/waitlist-email-verification.md) for Resend
+configuration, the required database migration, and local testing.

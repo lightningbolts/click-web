@@ -5,10 +5,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle, X } from 'lucide-react';
 import { fadePresence, fadeTransition, platePresence } from '@/lib/motion';
 import { FcButton, FcField, FcInput } from '@/components/fc';
+import { WAITLIST_EMAIL_ERROR, waitlistEmailSchema } from '@/lib/validation/waitlistEmail';
 
 export type WaitlistSource = 'homepage_hero' | 'enterprise_landing';
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function focusableIn(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>(
@@ -68,9 +67,12 @@ export default function WaitlistModal({
   }, [open, onClose, status]);
 
   const submit = async () => {
-    if (!EMAIL_PATTERN.test(email.trim())) {
+    if (status === 'loading') return;
+    const parsedEmail = waitlistEmailSchema.safeParse(email);
+    if (!parsedEmail.success) {
       setStatus('error');
-      setMessage('Enter a valid email address.');
+      setMessage(WAITLIST_EMAIL_ERROR);
+      emailRef.current?.focus();
       return;
     }
     setStatus('loading');
@@ -78,12 +80,12 @@ export default function WaitlistModal({
       const response = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), source }),
+        body: JSON.stringify({ email: parsedEmail.data, source }),
       });
       const data = await response.json();
       if (data.success) {
         setStatus('success');
-        setMessage(data.message || "You're on the list. We'll email you when the app opens.");
+        setMessage(data.message || 'Check your inbox and confirm your email to join the waitlist.');
         return;
       }
       setStatus('error');
@@ -139,15 +141,21 @@ export default function WaitlistModal({
             {status === 'success' ? (
               <div className="rounded-[16px] border border-border-hard bg-primary-container p-5 text-center">
                 <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" aria-hidden />
-                <p className="font-medium text-on-primary-container">
-                  You&apos;re on the list. We&apos;ll email you when the handshake app opens.
+                <p className="font-bold text-on-primary-container">Check your inbox</p>
+                <p role="status" className="mt-2 text-on-primary-container">
+                  {message}
                 </p>
+                <p className="mt-3 text-sm text-on-primary-container">Check spam too. Need another link or used the wrong address?</p>
+                <FcButton className="mt-3 w-full" onClick={() => { setStatus('idle'); setMessage(''); }}>
+                  Try another email or resend
+                </FcButton>
                 <FcButton className="mt-5 w-full" onClick={onClose}>
                   Done
                 </FcButton>
               </div>
             ) : (
               <form
+                noValidate
                 className="space-y-4"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -161,6 +169,7 @@ export default function WaitlistModal({
                     type="email"
                     name="email"
                     autoComplete="email"
+                    required
                     value={email}
                     onChange={(event) => {
                       setEmail(event.target.value);

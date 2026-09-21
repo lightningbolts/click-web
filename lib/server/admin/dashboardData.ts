@@ -738,7 +738,7 @@ async function fetchBetaFunnel(
   warnings: string[],
 ): Promise<{ waitlistCount: number; activeAccountCount: number }> {
   const [waitlistResult, usersResult] = await Promise.all([
-    admin.from('waitlist').select('id', { head: true, count: 'exact' }),
+    admin.from('waitlist').select('id', { head: true, count: 'exact' }).not('verified_at', 'is', null),
     admin.from('users').select('id', { head: true, count: 'exact' }),
   ]);
 

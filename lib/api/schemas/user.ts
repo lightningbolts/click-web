@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { waitlistEmailSchema } from '@/lib/validation/waitlistEmail';
 import {
   isRecord,
   nonEmptyString,
@@ -86,7 +87,7 @@ export const displayNamesBodySchema = z.preprocess((raw) => {
 }).passthrough());
 
 export const waitlistBodySchema = z.object({
-  email: z.string().trim().email('Invalid email address'),
+  email: waitlistEmailSchema,
   source: z.string().trim().min(1).max(200).optional(),
   referrer_user_id: z.string().uuid().optional(),
 });
