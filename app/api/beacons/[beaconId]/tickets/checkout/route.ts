@@ -55,6 +55,7 @@ export async function POST(
       user.id,
       beaconId,
       parsed.data.items.map((i) => ({ tierId: i.ticket_tier_id, quantity: i.quantity })),
+      parsed.data.attempt_id,
     );
     if (!result.ok) {
       return NextResponse.json(

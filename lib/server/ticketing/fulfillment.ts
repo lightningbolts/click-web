@@ -48,13 +48,7 @@ export async function fulfillFromCheckoutSession(
 
   const order = await loadOrder(admin, orderId);
   if (!order) return { ok: false, code: 'order_not_found' };
-  if (order.order_state === 'paid' && order.fulfillment_state === 'fulfilled') {
-    return { ok: true, code: 'idempotent' };
-  }
-  if (
-    order.stripe_checkout_session_id &&
-    order.stripe_checkout_session_id !== session.id
-  ) {
+  if (order.stripe_checkout_session_id && order.stripe_checkout_session_id !== session.id) {
     return { ok: false, code: 'session_mismatch' };
   }
   if (session.payment_status !== 'paid') {
@@ -67,7 +61,7 @@ export async function fulfillFromCheckoutSession(
   const paymentIntentId =
     typeof session.payment_intent === 'string'
       ? session.payment_intent
-      : session.payment_intent?.id ?? null;
+      : (session.payment_intent?.id ?? null);
   if (!paymentIntentId) return { ok: false, code: 'missing_payment_intent' };
 
   const intent = await stripe.paymentIntents.retrieve(paymentIntentId, {
@@ -80,7 +74,7 @@ export async function fulfillFromCheckoutSession(
   const destination =
     typeof intent.transfer_data?.destination === 'string'
       ? intent.transfer_data.destination
-      : intent.transfer_data?.destination?.id ?? null;
+      : (intent.transfer_data?.destination?.id ?? null);
   if (!(await destinationMatchesOrder(admin, order, destination))) {
     return { ok: false, code: 'destination_mismatch' };
   }
@@ -88,12 +82,13 @@ export async function fulfillFromCheckoutSession(
   const chargeId =
     typeof intent.latest_charge === 'string'
       ? intent.latest_charge
-      : intent.latest_charge?.id ?? null;
+      : (intent.latest_charge?.id ?? null);
 
   const tickets = await buildTicketMints(admin, order.id);
 
   const { data, error } = await admin.rpc('ticketing_fulfill_order', {
     p_order: order.id,
+    p_session: session.id,
     p_payment_intent: paymentIntentId,
     p_charge: chargeId,
     p_amount: intent.amount,
@@ -108,11 +103,14 @@ export async function fulfillFromCheckoutSession(
 }
 
 export function verifyIntentAgainstOrder(
-  intent: Pick<Stripe.PaymentIntent, 'status' | 'amount' | 'currency' | 'transfer_data' | 'application_fee_amount' | 'metadata'>,
+  intent: Pick<
+    Stripe.PaymentIntent,
+    'status' | 'amount' | 'currency' | 'transfer_data' | 'application_fee_amount' | 'metadata'
+  >,
   order: Pick<OrderRow, 'id' | 'total_amount' | 'currency' | 'platform_fee_amount'>,
 ): string | null {
   if (intent.status !== 'succeeded') return 'intent_not_succeeded';
-  if (intent.metadata?.click_order_id && intent.metadata.click_order_id !== order.id) {
+  if (intent.metadata?.click_order_id !== order.id) {
     return 'order_reference_mismatch';
   }
   if (intent.amount !== order.total_amount) return 'amount_mismatch';

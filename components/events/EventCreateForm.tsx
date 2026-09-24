@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import TicketingGate from "@/components/events/ticketing/TicketingGate";
 import { useRouter } from "next/navigation";
 import { ImagePlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -47,6 +48,7 @@ export default function EventCreateForm({
   initial,
 }: EventCreateFormProps) {
   const router = useRouter();
+  const [ticketed, setTicketed] = useState(false);
   const reduceMotion = useReducedMotion();
   const isEdit = Boolean(beaconId);
   const initialWindow = useMemo(() => defaultEventWindow(), []);
@@ -59,7 +61,9 @@ export default function EventCreateForm({
     initial?.endIso ? new Date(initial.endIso) : initialWindow.end,
   );
   const [timeZone] = useState(() => initial?.timeZone || resolvedTimeZone());
-  const [locationName, setLocationName] = useState(initial?.locationName ?? defaultLocationName ?? "");
+  const [locationName, setLocationName] = useState(
+    initial?.locationName ?? defaultLocationName ?? "",
+  );
   const [lat, setLat] = useState(initial?.lat ?? (defaultLat != null ? String(defaultLat) : ""));
   const [lng, setLng] = useState(initial?.lng ?? (defaultLng != null ? String(defaultLng) : ""));
   const [coverThemeId, setCoverThemeId] = useState<string>(
@@ -192,7 +196,7 @@ export default function EventCreateForm({
       } catch {
         /* clipboard may be blocked */
       }
-      router.push(eventManagePath(id));
+      router.push(eventManagePath(id) + (ticketed ? "#ticketing" : ""));
     } catch {
       setError(isEdit ? "Could not save event" : "Could not create event");
     } finally {
@@ -201,7 +205,9 @@ export default function EventCreateForm({
   };
 
   const shareUrl =
-    createdId && typeof window !== "undefined" ? `${window.location.origin}${eventSharePath(createdId)}` : null;
+    createdId && typeof window !== "undefined"
+      ? `${window.location.origin}${eventSharePath(createdId)}`
+      : null;
 
   return (
     <form onSubmit={onSubmit} className="relative space-y-8" data-testid="event-create-form">
@@ -226,7 +232,9 @@ export default function EventCreateForm({
             <label
               className={cn(
                 "relative flex aspect-[4/5] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[16px] border border-dashed text-center transition-colors",
-                dragOver ? "border-primary bg-primary/10" : "border-border-hard bg-surface-container-low hover:border-primary",
+                dragOver
+                  ? "border-primary bg-primary/10"
+                  : "border-border-hard bg-surface-container-low hover:border-primary",
               )}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -242,7 +250,11 @@ export default function EventCreateForm({
             >
               {imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                <img
+                  src={imageUrl}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
               ) : (
                 <CardVisualHero
                   id="create-preview"
@@ -289,11 +301,7 @@ export default function EventCreateForm({
             placeholder="Event name"
             className="w-full border-0 border-b border-border-hard bg-transparent pb-2 font-display text-[32px] font-semibold leading-tight text-on-surface outline-none placeholder:text-on-surface-variant"
           />
-          <EventMarkdownEditor
-            value={description}
-            onChange={setDescription}
-            maxLength={10000}
-          />
+          <EventMarkdownEditor value={description} onChange={setDescription} maxLength={10000} />
           <EventDateTimeFields
             start={start}
             end={end}
@@ -311,6 +319,36 @@ export default function EventCreateForm({
               setLng(nextLng);
             }}
           />
+          <TicketingGate>
+            {isEdit ? (
+              <a href={"/e/" + beaconId + "/manage#ticketing"}>Manage ticketing and payouts</a>
+            ) : (
+              <fieldset className="space-y-2">
+                <legend>Admission</legend>
+                <label className="mr-4">
+                  <input
+                    type="radio"
+                    name="admission-intent"
+                    checked={!ticketed}
+                    onChange={() => setTicketed(false)}
+                  />{" "}
+                  Free
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="admission-intent"
+                    checked={ticketed}
+                    onChange={() => setTicketed(true)}
+                  />{" "}
+                  Ticketed
+                </label>
+                {ticketed ? (
+                  <p>After creating your event, set up payouts and tickets in event management.</p>
+                ) : null}
+              </fieldset>
+            )}
+          </TicketingGate>
           <EventOptionsFields
             visibility={visibility}
             capacity={capacity}
@@ -329,7 +367,13 @@ export default function EventCreateForm({
           />
           {error ? <p className="text-sm text-error">{error}</p> : null}
           <FcButton type="submit" className="w-full" disabled={submitting || uploading}>
-            {submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save changes" : "Create event"}
+            {submitting
+              ? isEdit
+                ? "Saving…"
+                : "Creating…"
+              : isEdit
+                ? "Save changes"
+                : "Create event"}
           </FcButton>
           {shareUrl ? (
             <p className="break-all text-xs text-on-surface-variant">

@@ -1,5 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
+import { money, salesLabel } from '@/lib/ticketing/format';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { parseLatLngFromLocationField } from '@/lib/map/mapBeaconApiShared';
 import {
   eventDescriptionFromMetadata,
   eventEndAtFromMetadata,
@@ -15,12 +16,12 @@ import {
   parseBeaconMetadata,
   parseIsoMs,
   rsvpEnabledFromMetadata,
-} from "@/lib/events/eventMetadata";
+} from '@/lib/events/eventMetadata';
 import {
   coverVisualSeed,
   parseEventListingOptions,
   type EventListingOptions,
-} from "@/lib/events/eventOptions";
+} from '@/lib/events/eventOptions';
 
 export type EventAttendeePreview = {
   user_id: string;
@@ -29,6 +30,12 @@ export type EventAttendeePreview = {
 };
 
 export type PublicEventPayload = {
+  ticketing?: {
+    admission_type: string;
+    ticketing_status: string;
+    ticket_sales_start_at: string | null;
+    ticket_sales_end_at: string | null;
+  };
   beacon_id: string;
   title: string | null;
   description: string | null;
@@ -53,6 +60,7 @@ export type PublicEventPayload = {
 };
 
 export type PublicEventListItem = {
+  ticketing_label?: string;
   beacon_id: string;
   title: string | null;
   description: string | null;
@@ -72,10 +80,7 @@ export type PublicEventListItem = {
   timezone: string | null;
 };
 
-export async function countEventRsvps(
-  admin: SupabaseClient,
-  beaconId: string,
-): Promise<number> {
+export async function countEventRsvps(admin: SupabaseClient, beaconId: string): Promise<number> {
   const counts = await countEventRsvpsByBeaconIds(admin, [beaconId]);
   return counts.get(beaconId) ?? 0;
 }
@@ -90,14 +95,14 @@ export async function countEventRsvpsByBeaconIds(
   if (unique.length === 0) return counts;
 
   const [{ data: clickRows }, { data: guestRows }] = await Promise.all([
-    admin.from("beacon_attendees").select("beacon_id").in("beacon_id", unique),
-    admin.from("event_guest_rsvps").select("beacon_id").in("beacon_id", unique),
+    admin.from('beacon_attendees').select('beacon_id').in('beacon_id', unique),
+    admin.from('event_guest_rsvps').select('beacon_id').in('beacon_id', unique),
   ]);
 
   const bump = (rows: unknown) => {
     if (!Array.isArray(rows)) return;
     for (const row of rows) {
-      if (!isRecord(row) || typeof row.beacon_id !== "string") continue;
+      if (!isRecord(row) || typeof row.beacon_id !== 'string') continue;
       counts.set(row.beacon_id, (counts.get(row.beacon_id) ?? 0) + 1);
     }
   };
@@ -107,10 +112,10 @@ export async function countEventRsvpsByBeaconIds(
 }
 
 function hostNameFromProfile(profile: Record<string, unknown>): string | null {
-  const first = typeof profile.first_name === "string" ? profile.first_name.trim() : "";
-  const last = typeof profile.last_name === "string" ? profile.last_name.trim() : "";
-  const combined = [first, last].filter(Boolean).join(" ").trim();
-  return combined || metaString(profile, "name");
+  const first = typeof profile.first_name === 'string' ? profile.first_name.trim() : '';
+  const last = typeof profile.last_name === 'string' ? profile.last_name.trim() : '';
+  const combined = [first, last].filter(Boolean).join(' ').trim();
+  return combined || metaString(profile, 'name');
 }
 
 type HostProfile = { name: string | null; image: string | null };
@@ -123,15 +128,15 @@ async function loadHostProfilesByCreatorIds(
   const names = new Map<string, HostProfile>();
   if (unique.length === 0) return names;
   const { data } = await admin
-    .from("users")
-    .select("id, name, first_name, last_name, image")
-    .in("id", unique);
+    .from('users')
+    .select('id, name, first_name, last_name, image')
+    .in('id', unique);
   if (!Array.isArray(data)) return names;
   for (const row of data) {
-    if (!isRecord(row) || typeof row.id !== "string") continue;
+    if (!isRecord(row) || typeof row.id !== 'string') continue;
     names.set(row.id, {
       name: hostNameFromProfile(row),
-      image: typeof row.image === "string" && row.image.trim() ? row.image.trim() : null,
+      image: typeof row.image === 'string' && row.image.trim() ? row.image.trim() : null,
     });
   }
   return names;
@@ -144,7 +149,9 @@ function isUpcomingFromRow(
 ): boolean {
   const end = parseIsoMs(eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)));
   if (end != null) return end >= nowMs;
-  const start = parseIsoMs(eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)));
+  const start = parseIsoMs(
+    eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)),
+  );
   if (start != null) return start >= nowMs - 6 * 60 * 60 * 1000;
   return isUpcomingEvent(meta, nowMs);
 }
@@ -168,16 +175,17 @@ async function loadAttendeePreviewsByBeaconIds(
   if (unique.length === 0) return out;
 
   const { data } = await admin
-    .from("beacon_attendees")
-    .select("beacon_id, user_id, created_at")
-    .in("beacon_id", unique)
-    .order("created_at", { ascending: true });
+    .from('beacon_attendees')
+    .select('beacon_id, user_id, created_at')
+    .in('beacon_id', unique)
+    .order('created_at', { ascending: true });
   if (!Array.isArray(data)) return out;
 
   const picked: Array<{ beacon_id: string; user_id: string }> = [];
   const per = new Map<string, number>();
   for (const row of data) {
-    if (!isRecord(row) || typeof row.beacon_id !== "string" || typeof row.user_id !== "string") continue;
+    if (!isRecord(row) || typeof row.beacon_id !== 'string' || typeof row.user_id !== 'string')
+      continue;
     const n = per.get(row.beacon_id) ?? 0;
     if (n >= perEvent) continue;
     per.set(row.beacon_id, n + 1);
@@ -186,24 +194,24 @@ async function loadAttendeePreviewsByBeaconIds(
   const userIds = [...new Set(picked.map((row) => row.user_id))];
   if (userIds.length === 0) return out;
   const { data: profiles } = await admin
-    .from("users")
-    .select("id, name, first_name, last_name, image")
-    .in("id", userIds);
+    .from('users')
+    .select('id, name, first_name, last_name, image')
+    .in('id', userIds);
   const byId = new Map<string, EventAttendeePreview>();
   if (Array.isArray(profiles)) {
     for (const row of profiles) {
-      if (!isRecord(row) || typeof row.id !== "string") continue;
+      if (!isRecord(row) || typeof row.id !== 'string') continue;
       byId.set(row.id, {
         user_id: row.id,
-        name: hostNameFromProfile(row) || "Attendee",
-        avatar_url: typeof row.image === "string" && row.image.trim() ? row.image.trim() : null,
+        name: hostNameFromProfile(row) || 'Attendee',
+        avatar_url: typeof row.image === 'string' && row.image.trim() ? row.image.trim() : null,
       });
     }
   }
   for (const row of picked) {
     const preview = byId.get(row.user_id) ?? {
       user_id: row.user_id,
-      name: "Attendee",
+      name: 'Attendee',
       avatar_url: null,
     };
     out.get(row.beacon_id)?.push(preview);
@@ -216,14 +224,14 @@ export async function loadPublicEventPayload(
   beaconId: string,
 ): Promise<PublicEventPayload | null> {
   const { data, error } = await admin
-    .from("map_beacons")
+    .from('map_beacons')
     .select(
-      "id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at, starts_at, ends_at, event_timezone, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id",
+      'id, beacon_type, admission_type, ticketing_status, ticket_sales_start_at, ticket_sales_end_at, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at, starts_at, ends_at, event_timezone, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id',
     )
-    .eq("id", beaconId)
+    .eq('id', beaconId)
     .maybeSingle();
 
-  if (error || !isRecord(data) || data.beacon_type !== "event") {
+  if (error || !isRecord(data) || data.beacon_type !== 'event') {
     return null;
   }
 
@@ -233,33 +241,43 @@ export async function loadPublicEventPayload(
 
   let hostName: string | null = null;
   let hostAvatar: string | null = null;
-  const creatorId = typeof data.creator_id === "string" ? data.creator_id : null;
+  const creatorId = typeof data.creator_id === 'string' ? data.creator_id : null;
   if (data.show_creator_name !== false && creatorId) {
     const { data: profile } = await admin
-      .from("users")
-      .select("name, first_name, last_name, image")
-      .eq("id", creatorId)
+      .from('users')
+      .select('name, first_name, last_name, image')
+      .eq('id', creatorId)
       .maybeSingle();
     if (isRecord(profile)) {
       hostName = hostNameFromProfile(profile);
-      hostAvatar = typeof profile.image === "string" && profile.image.trim() ? profile.image.trim() : null;
+      hostAvatar =
+        typeof profile.image === 'string' && profile.image.trim() ? profile.image.trim() : null;
     }
   }
 
   const rsvpCount = await countEventRsvps(admin, beaconId);
   const previews =
-    listing.guest_list_visibility === "public"
-      ? (await loadAttendeePreviewsByBeaconIds(admin, [beaconId])).get(beaconId) ?? []
+    listing.guest_list_visibility === 'public'
+      ? ((await loadAttendeePreviewsByBeaconIds(admin, [beaconId])).get(beaconId) ?? [])
       : [];
   const coverThemeId = listing.cover_theme_id;
   const startAt = eventInstantFromRowOrMeta(data.starts_at, eventStartAtFromMetadata(meta));
   const endAt = eventInstantFromRowOrMeta(data.ends_at, eventEndAtFromMetadata(meta));
   const timezone =
-    (typeof data.event_timezone === "string" && data.event_timezone.trim()) ||
+    (typeof data.event_timezone === 'string' && data.event_timezone.trim()) ||
     eventTimezoneFromMetadata(meta);
 
   return {
-    beacon_id: typeof data.id === "string" ? data.id : beaconId,
+    ticketing: {
+      admission_type: typeof data.admission_type === 'string' ? data.admission_type : 'free',
+      ticketing_status:
+        typeof data.ticketing_status === 'string' ? data.ticketing_status : 'disabled',
+      ticket_sales_start_at:
+        typeof data.ticket_sales_start_at === 'string' ? data.ticket_sales_start_at : null,
+      ticket_sales_end_at:
+        typeof data.ticket_sales_end_at === 'string' ? data.ticket_sales_end_at : null,
+    },
+    beacon_id: typeof data.id === 'string' ? data.id : beaconId,
     title: eventTitleFromMetadata(meta),
     description: eventDescriptionFromMetadata(meta),
     image_url: eventImageFromMetadata(meta),
@@ -273,17 +291,17 @@ export async function loadPublicEventPayload(
     location_name: eventLocationNameFromMetadata(meta),
     rsvp_count: rsvpCount,
     rsvp_enabled: rsvpEnabledFromMetadata(meta),
-    expires_at: typeof data.expires_at === "string" ? data.expires_at : null,
-    created_at: typeof data.created_at === "string" ? data.created_at : null,
+    expires_at: typeof data.expires_at === 'string' ? data.expires_at : null,
+    created_at: typeof data.created_at === 'string' ? data.created_at : null,
     timezone,
     cover_theme_id: coverThemeId,
-    visual_seed: coverVisualSeed(typeof data.id === "string" ? data.id : beaconId, coverThemeId),
+    visual_seed: coverVisualSeed(typeof data.id === 'string' ? data.id : beaconId, coverThemeId),
     attendees: previews,
     listing,
   };
 }
 
-type PublicEventTemporal = "upcoming" | "past";
+type PublicEventTemporal = 'upcoming' | 'past';
 
 async function loadPublicDiscoverableEvents(
   admin: SupabaseClient,
@@ -291,14 +309,14 @@ async function loadPublicDiscoverableEvents(
   limit = 40,
 ): Promise<PublicEventListItem[]> {
   const { data, error } = await admin
-    .from("map_beacons")
+    .from('map_beacons')
     .select(
-      "id, beacon_type, metadata, location, visibility_audience, expires_at, creator_id, show_creator_name, starts_at, ends_at, event_timezone, event_visibility, cover_theme_id, guest_list_visibility",
+      'id, beacon_type, admission_type, ticketing_status, ticket_sales_start_at, ticket_sales_end_at, metadata, location, visibility_audience, expires_at, creator_id, show_creator_name, starts_at, ends_at, event_timezone, event_visibility, cover_theme_id, guest_list_visibility',
     )
-    .eq("beacon_type", "event")
-    .eq("visibility_audience", "everyone")
-    .eq("event_visibility", "public")
-    .order("created_at", { ascending: false })
+    .eq('beacon_type', 'event')
+    .eq('visibility_audience', 'everyone')
+    .eq('event_visibility', 'public')
+    .order('created_at', { ascending: false })
     .limit(200);
 
   if (error || !Array.isArray(data)) return [];
@@ -326,12 +344,12 @@ async function loadPublicDiscoverableEvents(
     if (!isRecord(row)) continue;
     const meta = parseBeaconMetadata(row.metadata);
     const listing = parseEventListingOptions(row, meta);
-    if (listing.event_visibility !== "public") continue;
+    if (listing.event_visibility !== 'public') continue;
     const isUpcoming = isUpcomingFromRow(row, meta, now);
-    if (temporal === "upcoming" && !isUpcoming) continue;
-    if (temporal === "past" && isUpcoming) continue;
+    if (temporal === 'upcoming' && !isUpcoming) continue;
+    if (temporal === 'past' && isUpcoming) continue;
     const coords = parseLatLngFromLocationField(row.location, Number.NaN, Number.NaN);
-    const beaconId = typeof row.id === "string" ? row.id : "";
+    const beaconId = typeof row.id === 'string' ? row.id : '';
     pending.push({
       beacon_id: beaconId,
       title: eventTitleFromMetadata(meta),
@@ -343,17 +361,58 @@ async function loadPublicDiscoverableEvents(
       latitude: Number.isFinite(coords.lat) ? coords.lat : null,
       longitude: Number.isFinite(coords.lng) ? coords.lng : null,
       rsvp_enabled: rsvpEnabledFromMetadata(meta),
-      creator_id: typeof row.creator_id === "string" ? row.creator_id : null,
+      creator_id: typeof row.creator_id === 'string' ? row.creator_id : null,
       show_creator_name: row.show_creator_name !== false,
       cover_theme_id: listing.cover_theme_id,
       timezone:
-        (typeof row.event_timezone === "string" && row.event_timezone.trim()) ||
+        (typeof row.event_timezone === 'string' && row.event_timezone.trim()) ||
         eventTimezoneFromMetadata(meta),
-      guest_list_public: listing.guest_list_visibility === "public",
+      guest_list_public: listing.guest_list_visibility === 'public',
     });
     if (pending.length >= limit) break;
   }
 
+  const labels = new Map<string, string>();
+  if ((process.env.TICKETING_ENABLED ?? '').toLowerCase() === 'true') {
+    const paidIds = data
+      .filter((row) => row.admission_type === 'paid' && pending.some((p) => p.beacon_id === row.id))
+      .map((row) => row.id);
+    const { data: inventory, error: inventoryError } = paidIds.length
+      ? await admin.rpc('ticketing_tier_inventory', { p_beacons: paidIds })
+      : { data: [], error: null };
+    if (inventoryError) throw new Error('Could not load ticket availability');
+    for (const row of data) {
+      if (row.admission_type !== 'paid') {
+        labels.set(row.id, 'Free');
+        continue;
+      }
+      const state = salesLabel(
+        row.ticketing_status,
+        row.ticket_sales_start_at,
+        row.ticket_sales_end_at,
+      );
+      const tiers = (inventory ?? []).filter(
+        (t: { beacon_id: string; is_active: boolean }) => t.beacon_id === row.id && t.is_active,
+      );
+      const available = tiers.filter(
+        (t: { remaining: number; sales_start_at: string | null; sales_end_at: string | null }) =>
+          t.remaining > 0 &&
+          (!t.sales_start_at || Date.parse(t.sales_start_at) <= now) &&
+          (!t.sales_end_at || Date.parse(t.sales_end_at) > now),
+      );
+      labels.set(
+        row.id,
+        state !== 'Tickets available'
+          ? state
+          : available.length
+            ? 'From ' +
+              money(Math.min(...available.map((t: { unit_amount: number }) => t.unit_amount)))
+            : tiers.some((t: { remaining: number }) => t.remaining > 0)
+              ? 'Sales scheduled'
+              : 'Sold out',
+      );
+    }
+  }
   const rsvpCounts = await countEventRsvpsByBeaconIds(
     admin,
     pending.map((item) => item.beacon_id),
@@ -366,9 +425,11 @@ async function loadPublicDiscoverableEvents(
   const previews = await loadAttendeePreviewsByBeaconIds(admin, previewIds);
 
   const items: PublicEventListItem[] = pending.map((item) => {
-    const host = item.show_creator_name && item.creator_id ? hostProfiles.get(item.creator_id) : null;
+    const host =
+      item.show_creator_name && item.creator_id ? hostProfiles.get(item.creator_id) : null;
     return {
       beacon_id: item.beacon_id,
+      ticketing_label: labels.get(item.beacon_id),
       title: item.title,
       description: item.description,
       image_url: item.image_url,
@@ -383,7 +444,7 @@ async function loadPublicDiscoverableEvents(
       rsvp_enabled: item.rsvp_enabled,
       cover_theme_id: item.cover_theme_id,
       visual_seed: coverVisualSeed(item.beacon_id, item.cover_theme_id),
-      attendees: item.guest_list_public ? previews.get(item.beacon_id) ?? [] : [],
+      attendees: item.guest_list_public ? (previews.get(item.beacon_id) ?? []) : [],
       timezone: item.timezone,
     };
   });
@@ -391,7 +452,7 @@ async function loadPublicDiscoverableEvents(
   items.sort((a, b) => {
     const aMs = sortInstantMs(a.event_end_at, a.event_start_at);
     const bMs = sortInstantMs(b.event_end_at, b.event_start_at);
-    return temporal === "past" ? bMs - aMs : aMs - bMs;
+    return temporal === 'past' ? bMs - aMs : aMs - bMs;
   });
   return items;
 }
@@ -400,12 +461,12 @@ export async function loadPublicUpcomingEvents(
   admin: SupabaseClient,
   limit = 40,
 ): Promise<PublicEventListItem[]> {
-  return loadPublicDiscoverableEvents(admin, "upcoming", limit);
+  return loadPublicDiscoverableEvents(admin, 'upcoming', limit);
 }
 
 export async function loadPublicPastEvents(
   admin: SupabaseClient,
   limit = 40,
 ): Promise<PublicEventListItem[]> {
-  return loadPublicDiscoverableEvents(admin, "past", limit);
+  return loadPublicDiscoverableEvents(admin, 'past', limit);
 }
