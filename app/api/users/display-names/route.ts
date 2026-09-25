@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { parseBody } from '@/lib/api/parseBody';
 import { displayNamesBodySchema } from '@/lib/api/schemas/user';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
 type UserRow = {
   id: string;
@@ -87,7 +88,16 @@ async function getAuthUser(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { user, error: authError } = await getAuthUser(req);
+  // Preserve the route's legacy cookie parsing, but use the shared local-JWKS path for
+  // bearer clients (iOS/KMP/web BFF calls) instead of forcing Supabase Auth over the network.
+  const hasBearer = /^Bearer\s+/i.test(req.headers.get('Authorization') ?? '');
+  const auth = hasBearer
+    ? await getSupabaseFromRouteRequest(req).then(({ user, authError }) => ({
+        user,
+        error: authError?.message ?? null,
+      }))
+    : await getAuthUser(req);
+  const { user, error: authError } = auth;
   if (!user) {
     return NextResponse.json({ error: authError || 'Unauthorized' }, { status: 401 });
   }
