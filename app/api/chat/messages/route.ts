@@ -30,6 +30,7 @@ import {
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 import { parseBody } from '@/lib/api/parseBody';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 import { chatMessagePatchBodySchema, chatMessagePostBodySchema } from '@/lib/api/schemas/chat';
 import {
   assertE2eeV2MessageWrite,
@@ -460,16 +461,21 @@ export async function POST(req: NextRequest) {
       isMedia && (meta.is_encrypted_media === true || meta.is_encrypted_media === 'true');
 
     if (messageType !== 'call_log' && !skipPushForEncryptedMedia) {
-      try {
-        await notifyChatMessagePush(token, message.chat_id, message.id, user.id);
-      } catch (pushError) {
-        console.error('Chat push dispatch failed', {
-          chatId: message.chat_id,
-          messageId: message.id,
-          userId: user.id,
-          error: pushError instanceof Error ? pushError.message : String(pushError),
-        });
-      }
+      // Push delivery is not part of message durability. Keep it attached to the request
+      // lifecycle via Next.js `after`/Cloudflare `waitUntil`, but do not hold the sender's
+      // 201 response open while the Supabase Edge Function runs.
+      runAfterResponse('chat push dispatch', async () => {
+        try {
+          await notifyChatMessagePush(token, message.chat_id, message.id, user.id);
+        } catch (pushError) {
+          console.error('Chat push dispatch failed', {
+            chatId: message.chat_id,
+            messageId: message.id,
+            userId: user.id,
+            error: pushError instanceof Error ? pushError.message : String(pushError),
+          });
+        }
+      });
     }
 
     return NextResponse.json(
