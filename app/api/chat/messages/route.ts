@@ -99,6 +99,9 @@ export async function GET(req: NextRequest) {
   const chatId = req.nextUrl.searchParams.get('chatId');
   const cursor = req.nextUrl.searchParams.get('cursor'); // time_created of oldest loaded msg
   const aroundMessageId = req.nextUrl.searchParams.get('aroundMessageId')?.trim() || null;
+  // Delta sync: rows newer than the client's newest stored message (time_created, ms).
+  const sinceRaw = req.nextUrl.searchParams.get('since');
+  const since = sinceRaw != null && /^\d+$/.test(sinceRaw) ? parseInt(sinceRaw, 10) : null;
   const limit = parseInt(req.nextUrl.searchParams.get('limit') ?? String(DEFAULT_LIMIT), 10);
 
   if (!chatId) {
@@ -150,6 +153,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  if (!messages && since != null) {
+    // Oldest-first so a capped page never skips the gap right after `since`; returned
+    // newest-first like every other mode.
+    const { data, error: sinceErr } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .gt('time_created', since)
+      .order('time_created', { ascending: true })
+      .limit(Math.min(Math.max(limit, 1), 200));
+    if (sinceErr) return NextResponse.json({ error: sinceErr.message }, { status: 500 });
+    messages = ((data ?? []) as Record<string, unknown>[]).reverse();
+  }
+
   if (!messages) {
     let query = supabase
       .from('messages')
@@ -168,6 +185,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (!messages || messages.length === 0) {
+    if (since != null && req.nextUrl.searchParams.get('include_tombstones') === '1') {
+      // A delta with no new rows can still carry deletions of older messages.
+      const { data: tombstones } = await admin
+        .from('message_tombstones')
+        .select('message_id, user_id, time_created, deleted_at')
+        .eq('chat_id', chatId)
+        .gt('deleted_at', new Date(since).toISOString())
+        .limit(100);
+      return NextResponse.json({ messages: [], tombstones: tombstones ?? [] });
+    }
     return NextResponse.json({ messages: [] });
   }
 
@@ -247,7 +274,11 @@ export async function GET(req: NextRequest) {
       .eq('chat_id', chatId)
       .order('time_created', { ascending: false })
       .limit(100);
-    if (times.length > 0) query = query.gte('time_created', Math.min(...times));
+    if (since != null) {
+      query = query.gt('deleted_at', new Date(since).toISOString());
+    } else if (times.length > 0) {
+      query = query.gte('time_created', Math.min(...times));
+    }
     const { data: tombstones, error: tombErr } = await query;
     if (tombErr) console.warn('tombstones read failed in /api/chat/messages GET:', tombErr.message);
     return NextResponse.json({ messages: enriched, tombstones: tombstones ?? [] });
