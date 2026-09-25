@@ -67,6 +67,15 @@ export async function GET(request: NextRequest) {
 
   const hubId = (request.nextUrl.searchParams.get('hubId') ?? '').trim();
   const aroundMessageId = (request.nextUrl.searchParams.get('aroundMessageId') ?? '').trim();
+  // Older history (`cursor`, ms: rows created before it) and delta sync (`since`, ms: rows
+  // created after it). Both are additive; clients that send neither get the latest window.
+  const parseMillis = (raw: string | null): string | null => {
+    if (raw == null || !/^\d+$/.test(raw)) return null;
+    const date = new Date(parseInt(raw, 10));
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  };
+  const cursorIso = parseMillis(request.nextUrl.searchParams.get('cursor'));
+  const sinceIso = parseMillis(request.nextUrl.searchParams.get('since'));
   const limitRaw = parseInt(request.nextUrl.searchParams.get('limit') ?? String(HUB_THREAD_LIMIT), 10);
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), HUB_THREAD_LIMIT) : HUB_THREAD_LIMIT;
 
@@ -172,13 +181,30 @@ export async function GET(request: NextRequest) {
       newer: (newer ?? []).map((row) => normalizeHubMessageRow(row as Record<string, unknown>)).filter((row): row is HubThreadMessage => row != null),
       target,
     });
-  } else {
+  } else if (sinceIso) {
     const { data, error } = await admin
+      .from('hub_messages')
+      .select('*')
+      .eq('hub_id', hubId)
+      .gt('created_at', sinceIso)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+    if (error) {
+      console.error('[hub/messages GET] since:', error.message);
+      return NextResponse.json({ error: 'Failed to load hub messages' }, { status: 500 });
+    }
+    messages = (data ?? [])
+      .map((row) => normalizeHubMessageRow(row as Record<string, unknown>))
+      .filter((row): row is HubThreadMessage => row != null);
+  } else {
+    let query = admin
       .from('hub_messages')
       .select('*')
       .eq('hub_id', hubId)
       .order('created_at', { ascending: false })
       .limit(limit);
+    if (cursorIso) query = query.lt('created_at', cursorIso);
+    const { data, error } = await query;
     if (error) {
       console.error('[hub/messages GET] messages:', error.message);
       return NextResponse.json({ error: 'Failed to load hub messages' }, { status: 500 });
