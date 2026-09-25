@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
 import {
   enrichSoundtrackMetadata,
+  sanitizeClientSoundtrackFields,
   isAllowedMusicShareUrl,
   mergeSoundtrackMetadataOnRelocate,
 } from "@/lib/map/beaconSoundtrackEnrichment";
@@ -309,7 +310,7 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      metadata = await enrichSoundtrackMetadata(musicUrl, baseMeta);
+      metadata = await enrichSoundtrackMetadata(musicUrl, sanitizeClientSoundtrackFields(baseMeta));
     } else {
       const title =
         (typeof baseMeta.title === "string" && baseMeta.title.trim()) ||

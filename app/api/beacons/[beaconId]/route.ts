@@ -1,3 +1,8 @@
+import {
+  enrichSoundtrackMetadata,
+  isAllowedMusicShareUrl,
+  sanitizeClientSoundtrackFields,
+} from "@/lib/map/beaconSoundtrackEnrichment";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
@@ -192,8 +197,31 @@ export async function PATCH(
 
     const metaPatch = body.metadata;
     if (isRecord(metaPatch)) {
-      const nextMeta = { ...existingMeta, ...metaPatch };
-      if (beaconType !== "soundtrack") {
+      let nextMeta: Record<string, unknown> = { ...existingMeta, ...metaPatch };
+      if (beaconType === "soundtrack") {
+        const nextUrl =
+          (typeof metaPatch.music_url === "string" && metaPatch.music_url.trim()) || null;
+        const currentUrl =
+          (typeof existingMeta.original_url === "string" && existingMeta.original_url) ||
+          (typeof existingMeta.music_url === "string" && existingMeta.music_url) ||
+          null;
+        if (nextUrl != null && nextUrl !== currentUrl) {
+          // A new song: same allowlist and enrichment as creation; stale song fields go.
+          if (!isAllowedMusicShareUrl(nextUrl)) {
+            return NextResponse.json(
+              { error: "Soundtrack metadata must include an allowed https music_url" },
+              { status: 400 },
+            );
+          }
+          const base = { ...existingMeta, ...metaPatch };
+          for (const key of ["track_name", "artist_name", "preview_url", "album_art_url"]) {
+            if (!(key in metaPatch)) delete base[key];
+          }
+          nextMeta = await enrichSoundtrackMetadata(nextUrl, sanitizeClientSoundtrackFields(base));
+        } else {
+          nextMeta = sanitizeClientSoundtrackFields(nextMeta);
+        }
+      } else {
         const titlePatch =
           (typeof metaPatch.title === "string" && metaPatch.title.trim()) ||
           (typeof metaPatch.event_title === "string" && metaPatch.event_title.trim()) ||
