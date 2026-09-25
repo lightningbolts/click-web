@@ -76,11 +76,23 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const insights = isInsightsScope(searchParams);
+    const singleConnectionId = searchParams.get('connectionId')?.trim();
+    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
 
-    const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
-    if (!sweep.ok) {
-      console.error('[connections GET] sweep_stale_connections_for_user failed:', sweep.message);
-      return NextResponse.json({ error: sweep.message }, { status: 400 });
+    // Sweeping only affects active/archive membership. Skip the RPC for read shapes whose
+    // response is independent of the archive junction: insights history, a direct row refresh,
+    // and the memory map. The next active/archive/dashboard read still performs the sweep.
+    const needsLifecycleSweep =
+      !insights &&
+      !singleConnectionId &&
+      scope !== 'map';
+
+    if (needsLifecycleSweep) {
+      const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
+      if (!sweep.ok) {
+        console.error('[connections GET] sweep_stale_connections_for_user failed:', sweep.message);
+        return NextResponse.json({ error: sweep.message }, { status: 400 });
+      }
     }
 
     // Insights: full history — no junction filtering (avoids hiding rows from analytics views).
@@ -104,7 +116,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Single connection patch (Realtime row refresh without full dashboard bundle).
-    const singleConnectionId = searchParams.get('connectionId')?.trim();
     if (singleConnectionId) {
       const { data: connection, error } = await supabase
         .from('connections')
@@ -173,8 +184,6 @@ export async function GET(request: NextRequest) {
         core: coreForUser,
       });
     }
-
-    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
 
     const [archivedForUser, hiddenForUser] = await Promise.all([
       fetchJunctionConnectionIds(supabase, 'connection_archives', user.id),
