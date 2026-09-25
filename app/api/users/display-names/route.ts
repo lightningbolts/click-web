@@ -28,12 +28,78 @@ const isGenericName = (value: string | null | undefined): boolean => {
   return !normalized || GENERIC_NAMES.has(normalized);
 };
 
+/**
+ * Browser callers can send `Authorization: Bearer <access_token>`.
+ * Cookie-based / SSR sessions use
+ * `sb-<project-ref>-auth-token` with a JSON body containing access_token.
+ */
+function accessTokenFromRequest(req: NextRequest): string | null {
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const t = authHeader.slice(7).trim();
+    if (t) return t;
+  }
+
+  const legacy =
+    req.cookies.get('sb-access-token')?.value ||
+    req.cookies.get('sb-lrgcwnmcscimkmslihxp-auth-token')?.value;
+  if (legacy?.trim()) return legacy.trim();
+
+  for (const { name, value } of req.cookies.getAll()) {
+    if (!/^sb-[^-]+-auth-token$/.test(name) || !value) continue;
+    const tryParse = (raw: string) => {
+      try {
+        const parsed = JSON.parse(raw) as { access_token?: string };
+        const t = parsed?.access_token?.trim();
+        return t || null;
+      } catch {
+        return null;
+      }
+    };
+    const fromDecoded = tryParse(decodeURIComponent(value));
+    if (fromDecoded) return fromDecoded;
+    const direct = tryParse(value);
+    if (direct) return direct;
+  }
+
+  return null;
+}
+
+async function getAuthUser(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnon) {
+    return { user: null as any, error: 'Supabase env is not configured' };
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnon, {
+    auth: { persistSession: false },
+  });
+
+  const token = accessTokenFromRequest(req);
+
+  if (!token) return { user: null as any, error: 'Missing auth token' };
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return { user: null as any, error: 'Unauthorized' };
+
+  return { user, error: null as string | null };
+}
+
 export async function POST(req: NextRequest) {
-  // Use the shared bearer/cookie auth path so ES256 mobile/web bearer tokens are verified
-  // locally against cached Supabase JWKS instead of forcing an Auth network round-trip.
-  const { user, authError } = await getSupabaseFromRouteRequest(req);
-  if (!user || authError) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Preserve the route's legacy cookie parsing, but use the shared local-JWKS path for
+  // bearer clients (iOS/KMP/web BFF calls) instead of forcing Supabase Auth over the network.
+  const hasBearer = /^Bearer\s+/i.test(req.headers.get('Authorization') ?? '');
+  const auth = hasBearer
+    ? await getSupabaseFromRouteRequest(req).then(({ user, authError }) => ({
+        user,
+        error: authError?.message ?? null,
+      }))
+    : await getAuthUser(req);
+  const { user, error: authError } = auth;
+  if (!user) {
+    return NextResponse.json({ error: authError || 'Unauthorized' }, { status: 401 });
   }
 
   const parsed = await parseBody(req, displayNamesBodySchema);
