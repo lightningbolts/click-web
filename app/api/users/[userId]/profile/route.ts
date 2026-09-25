@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
@@ -97,11 +98,7 @@ export async function GET(
     const isSelf = user.id === userId;
 
     const [userRes, availRes] = await Promise.all([
-      supabase
-        .from('users')
-        .select('id, first_name, last_name, name, full_name, birthday, image, email, personality_tags')
-        .eq('id', userId)
-        .maybeSingle(),
+      readUserProfileRow(supabase, userId),
       supabase.from('user_availability').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
@@ -287,6 +284,23 @@ export async function GET(
   }
 }
 
+/** Profile columns; `bio` is additive (migration 20260924120000) so reads fall back without it. */
+const PROFILE_COLUMNS = 'id, first_name, last_name, name, full_name, birthday, image, email, personality_tags';
+const PROFILE_COLUMNS_WITH_BIO = `${PROFILE_COLUMNS}, bio`;
+const PROFILE_BIO_MAX_LENGTH = 160;
+
+/** Postgres "undefined column" — the bio migration hasn't reached this database yet. */
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined): boolean {
+  return error?.code === '42703' || /column .*bio.* does not exist/i.test(error?.message ?? '');
+}
+
+/** Reads the profile row including `bio`, retrying without it before the migration lands. */
+async function readUserProfileRow(supabase: SupabaseClient, userId: string) {
+  const withBio = await supabase.from('users').select(PROFILE_COLUMNS_WITH_BIO).eq('id', userId).maybeSingle();
+  if (!isMissingColumnError(withBio.error)) return withBio;
+  return supabase.from('users').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
+}
+
 function isJsonObject(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
@@ -349,6 +363,16 @@ export async function PATCH(
   if (typeof body.name === 'string') {
     const t = body.name.trim();
     if (t.length > 0) updates.name = t;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'bio')) {
+    if (body.bio !== null && typeof body.bio !== 'string') {
+      return NextResponse.json({ error: 'bio must be a string or null' }, { status: 400 });
+    }
+    const bio = typeof body.bio === 'string' ? body.bio.trim() : '';
+    if (bio.length > PROFILE_BIO_MAX_LENGTH) {
+      return NextResponse.json({ error: `bio must be at most ${PROFILE_BIO_MAX_LENGTH} characters` }, { status: 400 });
+    }
+    updates.bio = bio.length > 0 ? bio : null;
   }
   if (typeof body.image === 'string') {
     const t = body.image.trim();
@@ -418,7 +442,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error:
-          'No supported fields to update. Provide first_name, last_name, full_name, name, image, birthday, tags, and/or personality_tags.',
+          'No supported fields to update. Provide first_name, last_name, full_name, name, image, birthday, bio, tags, and/or personality_tags.',
       },
       { status: 400 },
     );
@@ -451,11 +475,7 @@ export async function PATCH(
       }
     }
 
-    const { data: userRow, error: readErr } = await supabase
-      .from('users')
-      .select('id, first_name, last_name, name, full_name, birthday, image, email, personality_tags')
-      .eq('id', userId)
-      .maybeSingle();
+    const { data: userRow, error: readErr } = await readUserProfileRow(supabase, userId);
 
     if (readErr) {
       return NextResponse.json({ error: readErr.message }, { status: 500 });

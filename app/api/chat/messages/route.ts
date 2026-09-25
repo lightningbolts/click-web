@@ -237,6 +237,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Opt-in "Message deleted" placeholders inside the returned window (older clients never ask,
+  // so their behavior is unchanged).
+  if (req.nextUrl.searchParams.get('include_tombstones') === '1') {
+    const times = messages.map((m: any) => Number(m.time_created)).filter((t: number) => Number.isFinite(t));
+    let query = admin
+      .from('message_tombstones')
+      .select('message_id, user_id, time_created, deleted_at')
+      .eq('chat_id', chatId)
+      .order('time_created', { ascending: false })
+      .limit(100);
+    if (times.length > 0) query = query.gte('time_created', Math.min(...times));
+    const { data: tombstones, error: tombErr } = await query;
+    if (tombErr) console.warn('tombstones read failed in /api/chat/messages GET:', tombErr.message);
+    return NextResponse.json({ messages: enriched, tombstones: tombstones ?? [] });
+  }
+
   return NextResponse.json({ messages: enriched });
 }
 
@@ -553,6 +569,14 @@ export async function DELETE(req: NextRequest) {
   const { user, supabase } = await getAuthenticatedSupabase(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Capture placement before the (unchanged) hard delete so a tombstone can be shown.
+  const { data: existing } = await supabase
+    .from('messages')
+    .select('id, chat_id, user_id, time_created')
+    .eq('id', messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from('messages')
     .delete()
@@ -560,5 +584,18 @@ export async function DELETE(req: NextRequest) {
     .eq('user_id', user.id); // ensure ownership
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (existing && typeof (existing as any).chat_id === 'string') {
+    const row = existing as { id: string; chat_id: string; user_id: string; time_created: number | string };
+    const { error: tombErr } = await createChatGatekeeperAdmin()
+      .from('message_tombstones')
+      .upsert({
+        message_id: row.id,
+        chat_id: row.chat_id,
+        user_id: row.user_id,
+        time_created: Number(row.time_created) || Date.now(),
+      }, { onConflict: 'message_id' });
+    if (tombErr) console.warn('tombstone write failed in /api/chat/messages DELETE:', tombErr.message);
+  }
   return NextResponse.json({ success: true });
 }

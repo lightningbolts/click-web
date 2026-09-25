@@ -1,26 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { parseBody } from '@/lib/api/parseBody';
 import { safetyBlockBodySchema } from '@/lib/api/schemas/connections';
 
-async function resolveAuthenticatedUser(
-    request: NextRequest,
-    supabase: ReturnType<typeof createServerClient>
-) {
-    const cookieAuth = await supabase.auth.getUser();
-    if (cookieAuth.data.user && !cookieAuth.error) {
-        return { user: cookieAuth.data.user, error: null };
-    }
+/**
+ * List the caller's blocked users, newest first.
+ * GET → { blocks: [{ blocked_id, blocked_at }] }
+ * Display names/avatars are resolved by clients via POST /api/users/display-names.
+ */
+export async function GET(request: NextRequest) {
+    try {
+        // Bearer-aware: mobile clients send `Authorization: Bearer`, and RLS on user_blocks
+        // (blocker_id = auth.uid()) needs the user's JWT on the query, not just a cookie check.
+        const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
-    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : null;
-    if (!token) {
-        return { user: null, error: cookieAuth.error };
-    }
+        const { data, error } = await supabase
+            .from('user_blocks')
+            .select('blocked_id, created_at')
+            .eq('blocker_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(500);
 
-    const tokenAuth = await supabase.auth.getUser(token);
-    return { user: tokenAuth.data.user, error: tokenAuth.error };
+        if (error) {
+            console.error('List blocks error:', error.message);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        const blocks = (data ?? []).map((row: { blocked_id: string; created_at: string | null }) => ({
+            blocked_id: row.blocked_id,
+            blocked_at: row.created_at,
+        }));
+        return NextResponse.json({ blocks });
+    } catch (error) {
+        console.error('List blocks API error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
 }
 
 /**
@@ -29,24 +46,7 @@ async function resolveAuthenticatedUser(
  */
 export async function POST(request: NextRequest) {
     try {
-        const cookieStore = await cookies();
-
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() { return cookieStore.getAll(); },
-                    setAll(cookiesToSet) {
-                        cookiesToSet.forEach(({ name, value, options }) => {
-                            cookieStore.set(name, value, options);
-                        });
-                    },
-                },
-            }
-        );
-
-        const { user, error: authError } = await resolveAuthenticatedUser(request, supabase);
+        const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -79,24 +79,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
     try {
-        const cookieStore = await cookies();
-
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    getAll() { return cookieStore.getAll(); },
-                    setAll(cookiesToSet) {
-                        cookiesToSet.forEach(({ name, value, options }) => {
-                            cookieStore.set(name, value, options);
-                        });
-                    },
-                },
-            }
-        );
-
-        const { user, error: authError } = await resolveAuthenticatedUser(request, supabase);
+        const { supabase, user, authError } = await getSupabaseFromRouteRequest(request);
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }

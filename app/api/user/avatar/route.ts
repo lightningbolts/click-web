@@ -149,3 +149,32 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ image: publicUrl, user: userRow }, { status: 200 });
 }
+
+/**
+ * DELETE /api/user/avatar
+ * Clears `public.users.image` and removes the caller's stored avatar objects (best effort:
+ * a storage failure never leaves the profile pointing at a photo the user asked to remove).
+ */
+export async function DELETE(request: NextRequest) {
+  const { user, supabase, authError } = await getSupabaseFromRouteRequest(request);
+  if (authError != null || user == null) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { error: dbError } = await supabase.from('users').update({ image: null }).eq('id', user.id);
+  if (dbError) {
+    console.error('[user/avatar] clear image:', dbError.message);
+    return NextResponse.json({ error: dbError.message }, { status: 500 });
+  }
+
+  const { data: objects, error: listError } = await supabase.storage.from(AVATARS_BUCKET).list(user.id, { limit: 100 });
+  if (listError) {
+    console.warn('[user/avatar] list for removal:', listError.message);
+  } else if (objects && objects.length > 0) {
+    const paths = objects.map((object) => `${user.id}/${object.name}`);
+    const { error: removeError } = await supabase.storage.from(AVATARS_BUCKET).remove(paths);
+    if (removeError) console.warn('[user/avatar] remove objects:', removeError.message);
+  }
+
+  return NextResponse.json({ image: null }, { status: 200 });
+}
