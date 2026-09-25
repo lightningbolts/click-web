@@ -37,14 +37,26 @@ function stripDataUriPrefix(value: string): string {
   return trimmed.slice(markerIndex + marker.length).trim();
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+type RouteSupabase = Awaited<ReturnType<typeof getSupabaseFromRouteRequest>>;
+type GroupProfileAuth =
+  | { response: NextResponse }
+  | {
+      groupId: string;
+      user: NonNullable<RouteSupabase['user']>;
+      supabase: RouteSupabase['supabase'];
+      admin: ReturnType<typeof createAdminClient>;
+      group: { avatar_url?: string | null };
+    };
+
+/** Member of the group, group exists, and the 60 s profile-change cooldown has passed. */
+async function authorizeGroupProfileChange(request: NextRequest, { params }: RouteParams): Promise<GroupProfileAuth> {
   const { groupId: rawGroupId } = await params;
   const groupId = rawGroupId?.trim() ?? '';
-  if (!groupId) return NextResponse.json({ error: 'groupId required' }, { status: 400 });
+  if (!groupId) return { response: NextResponse.json({ error: 'groupId required' }, { status: 400 }) };
 
   const { user, supabase, authError } = await getSupabaseFromRouteRequest(request);
   if (authError != null || user == null) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
   const admin = createAdminClient();
@@ -54,16 +66,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     .eq('group_id', groupId)
     .eq('user_id', user.id)
     .maybeSingle();
-  if (memberErr) return NextResponse.json({ error: memberErr.message }, { status: 500 });
-  if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (memberErr) return { response: NextResponse.json({ error: memberErr.message }, { status: 500 }) };
+  if (!member) return { response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
 
   const { data: group, error: groupErr } = await admin
     .from('groups')
-    .select('id, profile_updated_at')
+    .select('id, avatar_url, profile_updated_at')
     .eq('id', groupId)
     .maybeSingle();
-  if (groupErr) return NextResponse.json({ error: groupErr.message }, { status: 500 });
-  if (!group) return NextResponse.json({ error: 'Group not found' }, { status: 404 });
+  if (groupErr) return { response: NextResponse.json({ error: groupErr.message }, { status: 500 }) };
+  if (!group) return { response: NextResponse.json({ error: 'Group not found' }, { status: 404 }) };
 
   const lastChangedRaw =
     typeof group.profile_updated_at === 'string' && group.profile_updated_at.trim()
@@ -72,14 +84,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (Number.isFinite(lastChangedRaw)) {
     const waitMs = PROFILE_CHANGE_COOLDOWN_MS - (Date.now() - lastChangedRaw);
     if (waitMs > 0) {
-      return NextResponse.json(
-        {
-          error: `Please wait ${Math.ceil(waitMs / 1000)}s before changing this group profile again.`,
-        },
-        { status: 429 },
-      );
+      return {
+        response: NextResponse.json(
+          {
+            error: `Please wait ${Math.ceil(waitMs / 1000)}s before changing this group profile again.`,
+          },
+          { status: 429 },
+        ),
+      };
     }
   }
+  return { groupId, user, supabase, admin, group };
+}
+
+/** `avatars/{uploader}/groups/{groupId}/{file}` from a public URL, only for this group. */
+function groupAvatarObjectPath(avatarUrl: unknown, groupId: string): string | null {
+  if (typeof avatarUrl !== 'string') return null;
+  const marker = `/${AVATARS_BUCKET}/`;
+  const index = avatarUrl.indexOf(marker);
+  if (index < 0) return null;
+  const path = decodeURIComponent(avatarUrl.slice(index + marker.length).split('?')[0] ?? '');
+  const segments = path.split('/');
+  if (segments.length !== 4 || segments[1] !== 'groups' || segments[2] !== groupId || path.includes('..')) return null;
+  return path;
+}
+
+export async function POST(request: NextRequest, context: RouteParams) {
+  const auth = await authorizeGroupProfileChange(request, context);
+  if ('response' in auth) return auth.response;
+  const { groupId, user, supabase, admin } = auth;
 
   const parsedJson = await parseBody(request, groupAvatarBodySchema);
   if (!parsedJson.ok) return parsedJson.response;
@@ -127,4 +160,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
   return NextResponse.json({ image: publicUrl, group: groupRow }, { status: 200 });
+}
+
+/**
+ * DELETE /api/groups/{groupId}/avatar — any member removes the group photo (same cooldown as
+ * upload). Clears `groups.avatar_url` and best-effort deletes the stored object.
+ */
+export async function DELETE(request: NextRequest, context: RouteParams) {
+  const auth = await authorizeGroupProfileChange(request, context);
+  if ('response' in auth) return auth.response;
+  const { groupId, user, admin, group } = auth;
+
+  const { data: groupRow, error: updateErr } = await admin
+    .from('groups')
+    .update({
+      avatar_url: null,
+      profile_updated_at: new Date().toISOString(),
+      profile_updated_by: user.id,
+    })
+    .eq('id', groupId)
+    .select('id, name, avatar_url, profile_updated_at')
+    .maybeSingle();
+  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+
+  const objectPath = groupAvatarObjectPath(group.avatar_url, groupId);
+  if (objectPath) {
+    const { error: removeError } = await admin.storage.from(AVATARS_BUCKET).remove([objectPath]);
+    if (removeError) console.warn('[groups/avatar] remove object:', removeError.message);
+  }
+
+  return NextResponse.json({ image: null, group: groupRow }, { status: 200 });
 }
