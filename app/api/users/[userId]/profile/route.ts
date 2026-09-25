@@ -218,6 +218,32 @@ export async function GET(
       }
     }
 
+    let availabilityIntents = extractAvailabilityIntentsFromClaims(user, userId);
+    const availabilityIntentsPromise: Promise<AvailabilityIntentRow[]> =
+      availabilityIntents.length === 0 && (isSelf || isMutualConnection)
+        ? (async () => {
+            try {
+              const admin = getAdminClient();
+              const { data: intentRows, error: intentErr } = await admin
+                .from('availability_intents')
+                .select('id, timeframe, intent_tag, expires_at')
+                .eq('user_id', userId)
+                .gt('expires_at', new Date().toISOString())
+                .order('expires_at', { ascending: true });
+
+              if (!intentErr && intentRows) {
+                return normalizeAvailabilityIntentRows(intentRows);
+              }
+              if (intentErr) {
+                console.warn('profile availability_intents:', intentErr.message);
+              }
+            } catch (e) {
+              console.warn('profile availability_intents fetch failed:', e);
+            }
+            return [];
+          })()
+        : Promise.resolve(availabilityIntents);
+
     let profileTags: string[] = [];
     let viewerInterestTags: string[] = [];
     let sharedInterestTags: string[] = [];
@@ -250,26 +276,7 @@ export async function GET(
       }
     }
 
-    let availabilityIntents = extractAvailabilityIntentsFromClaims(user, userId);
-    if (availabilityIntents.length === 0 && (isSelf || isMutualConnection)) {
-      try {
-        const admin = getAdminClient();
-        const { data: intentRows, error: intentErr } = await admin
-          .from('availability_intents')
-          .select('id, timeframe, intent_tag, expires_at')
-          .eq('user_id', userId)
-          .gt('expires_at', new Date().toISOString())
-          .order('expires_at', { ascending: true });
-
-        if (!intentErr && intentRows) {
-          availabilityIntents = normalizeAvailabilityIntentRows(intentRows);
-        } else if (intentErr) {
-          console.warn('profile availability_intents:', intentErr.message);
-        }
-      } catch (e) {
-        console.warn('profile availability_intents fetch failed:', e);
-      }
-    }
+    availabilityIntents = await availabilityIntentsPromise;
 
     return NextResponse.json({
       user: userRes.data,
