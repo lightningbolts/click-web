@@ -106,12 +106,21 @@ export async function createSecureMediaObjectUrl({
   mimeType,
   signal,
 }: SecureMediaObjectUrlOptions): Promise<string> {
-  const signedUrl =
-    storagePath && getAuthHeaders
-      ? await signChatAttachmentUrl(storagePath, getAuthHeaders)
-      : storageUrl;
-  if (!signedUrl) throw new Error('Missing secure media URL');
-  const encrypted = await fetchEncryptedPayload(signedUrl, signal);
+  const canResign = !!(storagePath && getAuthHeaders);
+  let encrypted: Uint8Array;
+  if (storageUrl) {
+    // Stored signed URLs expire (1 h); re-sign from the storage path when the stored one fails.
+    try {
+      encrypted = await fetchEncryptedPayload(storageUrl, signal);
+    } catch (urlError) {
+      if (!canResign || (urlError instanceof DOMException && urlError.name === 'AbortError')) throw urlError;
+      encrypted = await fetchEncryptedPayload(await signChatAttachmentUrl(storagePath!, getAuthHeaders!), signal);
+    }
+  } else if (canResign) {
+    encrypted = await fetchEncryptedPayload(await signChatAttachmentUrl(storagePath!, getAuthHeaders!), signal);
+  } else {
+    throw new Error('Missing secure media URL');
+  }
 
   let decrypted: Uint8Array;
   if (v2Metadata) {

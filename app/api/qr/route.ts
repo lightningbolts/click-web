@@ -557,8 +557,12 @@ export async function POST(request: NextRequest) {
         const encounterInsert: Record<string, unknown> = {
           connection_id: existingConnection.id,
           encountered_at: new Date().toISOString(),
-          display_location: displayLocation,
+          // The scanner's device captured this context (same attribution as proximity rows).
+          reporting_user_id: user.id,
         };
+        if (displayLocation !== DISPLAY_LOCATION_FALLBACK) {
+          encounterInsert.display_location = displayLocation;
+        }
         const resolvedLocationName = manualLocationName ?? specificLocationName;
         if (resolvedLocationName) {
           encounterInsert.location_name = resolvedLocationName;

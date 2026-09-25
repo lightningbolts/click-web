@@ -15,6 +15,33 @@ export function mediaPathFromMetadata(metadata: MessageMediaMetadata | undefined
   return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
 }
 
+const CHAT_ATTACHMENTS_SIGN_MARKER = '/object/sign/chat-attachments/';
+
+/**
+ * Object path inside the private `chat-attachments` bucket from a stored signed URL
+ * (`…/storage/v1/object/sign/chat-attachments/<path>?token=…`). Those URLs expire after an
+ * hour, so rows that persisted only the signed URL (iOS v1 media) are re-signed from this path.
+ */
+export function chatAttachmentPathFromSignedUrl(url: string | null | undefined): string | null {
+  if (typeof url !== 'string' || !url.trim()) return null;
+  let pathname: string;
+  try {
+    pathname = new URL(url.trim()).pathname;
+  } catch {
+    return null;
+  }
+  const index = pathname.indexOf(CHAT_ATTACHMENTS_SIGN_MARKER);
+  if (index < 0) return null;
+  let path: string;
+  try {
+    path = decodeURIComponent(pathname.slice(index + CHAT_ATTACHMENTS_SIGN_MARKER.length));
+  } catch {
+    return null;
+  }
+  if (!path || path.startsWith('/') || path.split('/').includes('..')) return null;
+  return path;
+}
+
 export function durationSecondsFromMetadata(metadata: MessageMediaMetadata | undefined | null): number | undefined {
   if (!metadata || typeof metadata !== 'object') return undefined;
   const raw = metadata.duration_seconds ?? (metadata as { durationSeconds?: number }).durationSeconds;

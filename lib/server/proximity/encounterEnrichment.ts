@@ -1,9 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { deriveHeightCategoryFromRelativeAltitudeM } from '@/lib/server/terrainElevation';
 import {
+  DISPLAY_LOCATION_FALLBACK,
   fetchNominatimReverseGeocode,
   fetchOpenMeteoForecast,
 } from '@/lib/server/proximity/bindSupport';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 
 /**
  * Post-insert enrichment of the member's newest encounter row: reverse geocode,
@@ -38,7 +40,7 @@ export async function scheduleEncounterGeoEnrichment(
 
   const updates: Record<string, unknown> = {};
   const geocoded = await fetchNominatimReverseGeocode(memberLat, memberLon);
-  updates.display_location = geocoded.displayLocation;
+  if (geocoded.displayLocation !== DISPLAY_LOCATION_FALLBACK) updates.display_location = geocoded.displayLocation;
   if (geocoded.semanticLocation != null) updates.semantic_location = geocoded.semanticLocation;
   const locationName = manualLocationName ?? geocoded.specificLocationName;
   if (locationName) updates.location_name = locationName;
@@ -75,16 +77,16 @@ export function fireEncounterGeoEnrichment(
   manualLocationName: string | null,
   clientWeatherSnapshot: string | null,
 ): void {
-  void scheduleEncounterGeoEnrichment(
-    admin,
-    connectionId,
-    memberId,
-    memberLat,
-    memberLon,
-    memberExactBarometricElevationM,
-    manualLocationName,
-    clientWeatherSnapshot,
-  ).catch((error) => {
-    console.warn('[proximity] encounter enrichment failed:', error);
-  });
+  runAfterResponse('proximity encounter enrichment', () =>
+    scheduleEncounterGeoEnrichment(
+      admin,
+      connectionId,
+      memberId,
+      memberLat,
+      memberLon,
+      memberExactBarometricElevationM,
+      manualLocationName,
+      clientWeatherSnapshot,
+    ),
+  );
 }

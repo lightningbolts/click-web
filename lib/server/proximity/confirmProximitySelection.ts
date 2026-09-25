@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
 import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterContextTag';
 import {
@@ -380,14 +381,16 @@ export async function confirmProximityHandshakeSelection(
     );
     if (!atEventTelemetryEmitted) {
       atEventTelemetryEmitted = true;
-      void emitProximityAtEventOutcome(admin, {
-        attachment,
-        latitude: memberLat,
-        longitude: memberLon,
-        participantIds: [memberId],
-        peerCount: participantIds.length,
-        isGroup: participantIds.length > 2,
-      });
+      runAfterResponse('proximity at-event telemetry', () =>
+        emitProximityAtEventOutcome(admin, {
+          attachment,
+          latitude: memberLat,
+          longitude: memberLon,
+          participantIds: [memberId],
+          peerCount: participantIds.length,
+          isGroup: participantIds.length > 2,
+        }),
+      );
     }
     insertRow = applyLiveEventBeaconToEncounterRow(insertRow, attachment);
 

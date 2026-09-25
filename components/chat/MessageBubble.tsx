@@ -22,6 +22,7 @@ import {
   durationSecondsFromMetadata,
   isEncryptedMediaFromMetadata,
   mediaPathFromMetadata,
+  chatAttachmentPathFromSignedUrl,
   mediaUrlFromMetadata,
   originalMimeTypeFromMetadata,
 } from '@/lib/chat/mediaMetadata';
@@ -225,7 +226,8 @@ export default function MessageBubble({
   }, [showPicker, cancelHide]);
 
   const mediaUrl = mediaUrlFromMetadata(message.metadata);
-  const mediaPath = mediaPathFromMetadata(message.metadata);
+  const mediaPath =
+    mediaPathFromMetadata(message.metadata) ?? chatAttachmentPathFromSignedUrl(mediaUrl);
   const isEncryptedMedia = isEncryptedMediaFromMetadata(message.metadata);
   const originalMimeType = originalMimeTypeFromMetadata(message.metadata);
   const v2MediaMetadata = useMemo(() => {
@@ -259,6 +261,7 @@ export default function MessageBubble({
     mimeType: originalMimeType,
     isEncryptedMedia,
     getE2eeV2Session,
+    getAuthHeaders,
     v2Metadata: v2MediaMetadata,
   });
 
