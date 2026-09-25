@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import TicketingSetupCard from "@/components/events/ticketing/TicketingSetupCard";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 import { FcButton, FcCard, FcSectionHeader } from "@/components/fc";
@@ -62,7 +63,10 @@ export default function EventManagePage() {
 
   const publish = async () => {
     const headers = await getFreshAuthHeaders();
-    const res = await fetch(`/api/beacons/${beaconId}/summary/publish`, { method: "POST", headers });
+    const res = await fetch(`/api/beacons/${beaconId}/summary/publish`, {
+      method: "POST",
+      headers,
+    });
     const json = (await res.json()) as { summary_path?: string };
     if (json.summary_path) setSummaryPath(json.summary_path);
   };
@@ -71,13 +75,20 @@ export default function EventManagePage() {
     <EventPageShell className="py-10">
       <div className="space-y-6">
         <EventBackLink href={eventSharePath(beaconId)} className="mb-0" />
-        <FcSectionHeader title="Event manage" subtitle="Organizer metrics, guest list, and Seed a Room." />
+        <FcSectionHeader
+          title="Event manage"
+          subtitle="Organizer metrics, guest list, and Seed a Room."
+        />
         <div className="flex flex-wrap gap-2">
-          <a href={eventEditPath(beaconId)} className="fc-btn-primary inline-flex h-11 items-center px-4">
+          <a
+            href={eventEditPath(beaconId)}
+            className="fc-btn-primary inline-flex h-11 items-center px-4"
+          >
             Edit details
           </a>
         </div>
         {error ? <p className="text-error">{error}</p> : null}
+        <TicketingSetupCard beaconId={beaconId} />
         <GuestListUploadCard beaconId={beaconId} />
         <EventRsvpRequestsCard beaconId={beaconId} />
         <FcCard className="flex flex-wrap items-center gap-3 p-4">
@@ -112,7 +123,9 @@ export default function EventManagePage() {
               ["New pairs", health.new_pair_count],
             ].map(([label, value]) => (
               <FcCard key={String(label)} className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">{label}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+                  {label}
+                </p>
                 <p className="mt-1 text-2xl font-bold text-on-surface">{value}</p>
               </FcCard>
             ))}

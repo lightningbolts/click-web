@@ -1,7 +1,10 @@
+import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
+import { mayViewTicketing } from "@/lib/server/ticketing/access";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { unstable_cache } from "next/cache";
+import { ticketingEnabled } from "@/lib/server/ticketing/flags";
+import TicketPurchasePanel from "@/components/events/ticketing/TicketPurchasePanel";
 import { CalendarDays, MapPin } from "lucide-react";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadPublicEventPayload } from "@/lib/events/publicEvent";
@@ -30,10 +33,7 @@ import EventPageShell from "@/components/events/EventPageShell";
 import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import PinMapLazy from "@/components/maps/PinMapLazy";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
-import {
-  shouldShowEventFullCard,
-  shouldShowEventRsvpPanel,
-} from "@/lib/events/eventDetailState";
+import { shouldShowEventFullCard, shouldShowEventRsvpPanel } from "@/lib/events/eventDetailState";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +41,21 @@ function isUuidLike(v: string): boolean {
   return EVENT_BEACON_UUID_RE.test(v);
 }
 
-const loadEvent = (beaconId: string) =>
-  unstable_cache(
-    async () => loadPublicEventPayload(createAdminSupabaseClient(), beaconId),
-    ["public-event-v1", beaconId],
-    { revalidate: 60 },
-  )();
+const loadEvent = async (beaconId: string) => {
+  const admin = createAdminSupabaseClient();
+  const event = await loadPublicEventPayload(admin, beaconId);
+  if (
+    event?.ticketing?.admission_type === "paid" &&
+    event.listing?.event_visibility === "invite_only"
+  ) {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!(await mayViewTicketing(admin, beaconId, user?.id))) return null;
+  }
+  return event;
+};
 
 export async function generateMetadata({
   params,
@@ -63,9 +72,7 @@ export async function generateMetadata({
     eventSubtitle(title, eventDescriptionPlainText(event?.description)) ||
     formatEventWhen(event?.event_start_at ?? null, event?.event_end_at ?? null, event?.timezone) ||
     "Open this event in Click.";
-  const images = event?.image_url
-    ? [{ url: event.image_url }]
-    : [brandShareImage()];
+  const images = event?.image_url ? [{ url: event.image_url }] : [brandShareImage()];
   return {
     title: `${title} · Click`,
     description,
@@ -104,12 +111,11 @@ export default async function EventShareLandingPage({
   });
   const showRsvp = event.rsvp_enabled && !ended;
   const hasPin = event.latitude != null && event.longitude != null;
-  const mapsUrl = hasPin
-    ? `https://maps.google.com/?q=${event.latitude},${event.longitude}`
-    : null;
+  const mapsUrl = hasPin ? `https://maps.google.com/?q=${event.latitude},${event.longitude}` : null;
   const shareUrl = eventShareUrl(beaconId, publicOrigin());
   const reportMailto = `mailto:mepsht@uw.edu?subject=${encodeURIComponent(`Report event ${beaconId}`)}&body=${encodeURIComponent(`Event ID: ${beaconId}\nURL: ${shareUrl}\n\nDescribe the issue:\n`)}`;
-  const viewerRsvp = showRsvp || ended ? await loadViewerEventRsvp(beaconId) : { kind: "unknown" as const };
+  const viewerRsvp =
+    showRsvp || ended ? await loadViewerEventRsvp(beaconId) : { kind: "unknown" as const };
   const going = viewerRsvp.kind === "member" && viewerRsvp.going;
   const requestStatus = viewerRsvp.kind === "member" ? viewerRsvp.request_status : null;
   const atCapacity =
@@ -138,7 +144,9 @@ export default async function EventShareLandingPage({
             <h1 className="font-display max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-white md:text-5xl">
               {title}
             </h1>
-            {when ? <p className="mt-2 text-base font-medium text-white/90 md:text-lg">{when}</p> : null}
+            {when ? (
+              <p className="mt-2 text-base font-medium text-white/90 md:text-lg">{when}</p>
+            ) : null}
           </div>
         </CardVisualHero>
 
@@ -157,8 +165,16 @@ export default async function EventShareLandingPage({
                 <div className="flex gap-3">
                   <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" />
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">When</p>
-                    <p className={when ? "text-sm font-semibold text-on-surface" : "text-sm text-on-surface-variant"}>
+                    <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+                      When
+                    </p>
+                    <p
+                      className={
+                        when
+                          ? "text-sm font-semibold text-on-surface"
+                          : "text-sm text-on-surface-variant"
+                      }
+                    >
                       {when ?? "Time TBD"}
                     </p>
                   </div>
@@ -167,10 +183,15 @@ export default async function EventShareLandingPage({
                   <div className="flex gap-3">
                     <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-on-surface-variant" />
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Where</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+                        Where
+                      </p>
                       <p className="text-sm font-semibold text-on-surface">{where}</p>
                       {mapsUrl ? (
-                        <a href={mapsUrl} className="text-sm font-semibold text-primary hover:underline">
+                        <a
+                          href={mapsUrl}
+                          className="text-sm font-semibold text-primary hover:underline"
+                        >
                           Open in Google Maps
                         </a>
                       ) : null}
@@ -192,7 +213,10 @@ export default async function EventShareLandingPage({
                 <EventMarkdownContent className="max-w-prose">{description}</EventMarkdownContent>
               ) : null}
               <p className="text-sm">
-                <a href={reportMailto} className="font-semibold text-on-surface-variant hover:text-on-surface hover:underline">
+                <a
+                  href={reportMailto}
+                  className="font-semibold text-on-surface-variant hover:text-on-surface hover:underline"
+                >
                   Report event
                 </a>
               </p>
@@ -210,20 +234,12 @@ export default async function EventShareLandingPage({
               <EventCopyLinkButton url={shareUrl} icon />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <a
-                href={APP_CONFIG.ios_store_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={APP_CONFIG.ios_store_url} target="_blank" rel="noopener noreferrer">
                 <FcButton type="button" variant="secondary">
                   Get the app
                 </FcButton>
               </a>
-              <a
-                href={APP_CONFIG.android_store_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={APP_CONFIG.android_store_url} target="_blank" rel="noopener noreferrer">
                 <FcButton type="button" variant="secondary">
                   Android
                 </FcButton>
@@ -237,13 +253,23 @@ export default async function EventShareLandingPage({
           </div>
 
           <aside className="order-first space-y-4 lg:order-none lg:sticky lg:top-24">
-            {showFullCard ? (
+            {showFullCard && event.ticketing?.admission_type !== "paid" ? (
               <FcCard className="p-6" data-testid="event-state-full">
                 <h2 className="text-lg font-bold text-on-surface">This event is full</h2>
-                <p className="mt-2 text-sm text-on-surface-variant">Ask the host about the waitlist.</p>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Ask the host about the waitlist.
+                </p>
               </FcCard>
             ) : null}
-            {showRsvpPanel ? (
+            {event.ticketing?.admission_type === "paid" ? (
+              <FcCard className="p-6">
+                <TicketPurchasePanel
+                  beaconId={beaconId}
+                  initial={event.ticketing}
+                  enabled={ticketingEnabled()}
+                />
+              </FcCard>
+            ) : showRsvpPanel ? (
               <FcCard className="p-6">
                 <EventRsvpPanel
                   beaconId={beaconId}
@@ -255,7 +281,9 @@ export default async function EventShareLandingPage({
             ) : (
               <FcCard className="p-6">
                 <h2 className="text-lg font-bold text-on-surface">RSVP closed</h2>
-                <p className="mt-2 text-sm text-on-surface-variant">Open in Click for recap and connections.</p>
+                <p className="mt-2 text-sm text-on-surface-variant">
+                  Open in Click for recap and connections.
+                </p>
               </FcCard>
             )}
           </aside>

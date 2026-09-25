@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
-import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import {
   haversineMeters,
   insertEngagementEvent,
@@ -8,19 +8,19 @@ import {
   minutesBeforeStart,
   parseEngagementTelemetryBody,
   resolveBeaconCoordinates,
-} from "@/lib/server/eventEngagement";
-import { parseBody } from "@/lib/api/parseBody";
-import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
-import { maybeCreateSharedEventNudges } from "@/lib/events/sharedEventNudges";
+} from '@/lib/server/eventEngagement';
+import { parseBody } from '@/lib/api/parseBody';
+import { engagementTelemetryBodySchema } from '@/lib/api/schemas/beacons';
+import { maybeCreateSharedEventNudges } from '@/lib/events/sharedEventNudges';
 import {
   decideMemberRsvp,
   listingOptionsFromBeacon,
   loadRequestStatus,
   upsertRsvpRequest,
-} from "@/lib/events/eventRsvpPolicy";
-import { rsvpEnabledFromMetadata } from "@/lib/events/eventMetadata";
-import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
-import { countEventRsvps } from "@/lib/events/publicEvent";
+} from '@/lib/events/eventRsvpPolicy';
+import { rsvpEnabledFromMetadata } from '@/lib/events/eventMetadata';
+import { userMayManageBeacon } from '@/lib/events/beaconManageAuth';
+import { countEventRsvps } from '@/lib/events/publicEvent';
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -33,7 +33,7 @@ type UserProfileRow = {
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 /** PostgREST may return an embedded FK row as an object or a one-element array. */
@@ -43,26 +43,29 @@ function joinedUserProfile(raw: unknown): UserProfileRow | null {
     return joinedUserProfile(raw[0] ?? null);
   }
   if (!isRecord(raw)) return null;
-  const id = typeof raw.id === "string" ? raw.id : null;
+  const id = typeof raw.id === 'string' ? raw.id : null;
   if (id == null) return null;
   return {
     id,
-    name: typeof raw.name === "string" ? raw.name : null,
-    image: typeof raw.image === "string" ? raw.image : null,
-    first_name: typeof raw.first_name === "string" ? raw.first_name : null,
-    last_name: typeof raw.last_name === "string" ? raw.last_name : null,
+    name: typeof raw.name === 'string' ? raw.name : null,
+    image: typeof raw.image === 'string' ? raw.image : null,
+    first_name: typeof raw.first_name === 'string' ? raw.first_name : null,
+    last_name: typeof raw.last_name === 'string' ? raw.last_name : null,
   };
 }
 
 function displayNameFromUser(user: UserProfileRow | null): string {
-  if (user == null) return "Attendee";
-  const first = user.first_name?.trim() ?? "";
-  const last = user.last_name?.trim() ?? "";
-  const combined = [first, last].filter((s) => s.length > 0).join(" ").trim();
+  if (user == null) return 'Attendee';
+  const first = user.first_name?.trim() ?? '';
+  const last = user.last_name?.trim() ?? '';
+  const combined = [first, last]
+    .filter((s) => s.length > 0)
+    .join(' ')
+    .trim();
   if (combined.length > 0) return combined;
   const name = user.name?.trim();
   if (name != null && name.length > 0) return name;
-  return "Attendee";
+  return 'Attendee';
 }
 
 function parseAttendeeRows(data: unknown): Array<{ user_id: string; signed_up_at: string }> {
@@ -70,10 +73,10 @@ function parseAttendeeRows(data: unknown): Array<{ user_id: string; signed_up_at
   const rows: Array<{ user_id: string; signed_up_at: string }> = [];
   for (const item of data) {
     if (!isRecord(item)) continue;
-    const userId = typeof item.user_id === "string" ? item.user_id : null;
+    const userId = typeof item.user_id === 'string' ? item.user_id : null;
     const signedUpAt =
-      (typeof item.created_at === "string" ? item.created_at : null) ??
-      (typeof item.rsvpd_at === "string" ? item.rsvpd_at : null);
+      (typeof item.created_at === 'string' ? item.created_at : null) ??
+      (typeof item.rsvpd_at === 'string' ? item.rsvpd_at : null);
     if (userId == null || signedUpAt == null) continue;
     rows.push({ user_id: userId, signed_up_at: signedUpAt });
   }
@@ -88,12 +91,12 @@ async function loadAttendeeProfiles(
   if (unique.length === 0) return new Map();
 
   const { data, error } = await admin
-    .from("users")
-    .select("id, name, image, first_name, last_name")
-    .in("id", unique);
+    .from('users')
+    .select('id, name, image, first_name, last_name')
+    .in('id', unique);
 
   if (error != null || !Array.isArray(data)) {
-    console.error("loadAttendeeProfiles:", error?.message);
+    console.error('loadAttendeeProfiles:', error?.message);
     return new Map();
   }
 
@@ -116,28 +119,28 @@ export async function GET(
   try {
     const { beaconId } = await params;
     if (!UUID_RE.test(beaconId)) {
-      return NextResponse.json({ error: "Invalid beacon id" }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid beacon id' }, { status: 400 });
     }
 
     const { user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const admin = createAdminSupabaseClient();
     // Past / expired events still expose who RSVPed (read-only).
     const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
-    if ("response" in loaded) return loaded.response;
+    if ('response' in loaded) return loaded.response;
 
     const { data, error } = await admin
-      .from("beacon_attendees")
-      .select("user_id, created_at, rsvpd_at")
-      .eq("beacon_id", beaconId)
-      .order("created_at", { ascending: true });
+      .from('beacon_attendees')
+      .select('user_id, created_at, rsvpd_at')
+      .eq('beacon_id', beaconId)
+      .order('created_at', { ascending: true });
 
     if (error) {
-      console.error("GET /api/beacons/[beaconId]/rsvp:", error.message);
-      return NextResponse.json({ error: "Failed to load attendees" }, { status: 500 });
+      console.error('GET /api/beacons/[beaconId]/rsvp:', error.message);
+      return NextResponse.json({ error: 'Failed to load attendees' }, { status: 500 });
     }
 
     const attendeeRows = parseAttendeeRows(data);
@@ -148,11 +151,11 @@ export async function GET(
 
     const listing = listingOptionsFromBeacon(loaded.beacon);
     const isHost = await userMayManageBeacon(admin, user.id, {
-      creator_id: loaded.beacon.creator_id ?? "",
+      creator_id: loaded.beacon.creator_id ?? '',
       venue_id: loaded.beacon.venue_id,
     });
     const visibleRows =
-      listing.guest_list_visibility === "hosts_only" && !isHost
+      listing.guest_list_visibility === 'hosts_only' && !isHost
         ? attendeeRows.filter((row) => row.user_id === user.id)
         : attendeeRows;
     const attendees = visibleRows.map((row) => {
@@ -176,8 +179,8 @@ export async function GET(
       rsvp_count: rsvpCount,
     });
   } catch (e) {
-    console.error("GET /api/beacons/[beaconId]/rsvp:", e);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error('GET /api/beacons/[beaconId]/rsvp:', e);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -188,12 +191,12 @@ export async function POST(
   try {
     const { beaconId } = await params;
     if (!UUID_RE.test(beaconId)) {
-      return NextResponse.json({ error: "Invalid beacon id" }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid beacon id' }, { status: 400 });
     }
 
     const { user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const parsed = await parseBody(request, engagementTelemetryBodySchema);
@@ -203,18 +206,23 @@ export async function POST(
 
     const admin = createAdminSupabaseClient();
     const loaded = await loadEventBeaconOrResponse(admin, beaconId);
-    if ("response" in loaded) return loaded.response;
+    if ('response' in loaded) return loaded.response;
     const { beacon } = loaded;
+    if (beacon.admission_type === 'paid')
+      return NextResponse.json(
+        { error: 'Paid events require a ticket', code: 'ticket_required' },
+        { status: 409 },
+      );
     if (!rsvpEnabledFromMetadata(beacon.metadata)) {
-      return NextResponse.json({ error: "RSVP is closed for this event" }, { status: 403 });
+      return NextResponse.json({ error: 'RSVP is closed for this event' }, { status: 403 });
     }
     const options = listingOptionsFromBeacon(beacon);
 
     const { data: existingGoing } = await admin
-      .from("beacon_attendees")
-      .select("user_id")
-      .eq("beacon_id", beaconId)
-      .eq("user_id", user.id)
+      .from('beacon_attendees')
+      .select('user_id')
+      .eq('beacon_id', beaconId)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     const decision = await decideMemberRsvp({
@@ -224,23 +232,26 @@ export async function POST(
       options,
       alreadyGoing: existingGoing != null,
     });
-    if (decision.kind === "deny") {
-      return NextResponse.json({ error: decision.error, code: decision.kind }, { status: decision.status });
+    if (decision.kind === 'deny') {
+      return NextResponse.json(
+        { error: decision.error, code: decision.kind },
+        { status: decision.status },
+      );
     }
-    if (decision.kind === "pending" || decision.kind === "waitlisted") {
+    if (decision.kind === 'pending' || decision.kind === 'waitlisted') {
       try {
         await upsertRsvpRequest(admin, beaconId, user.id, decision.kind);
       } catch (err) {
-        console.error("POST rsvp request:", err);
-        return NextResponse.json({ error: "Could not save request" }, { status: 400 });
+        console.error('POST rsvp request:', err);
+        return NextResponse.json({ error: 'Could not save request' }, { status: 400 });
       }
       return NextResponse.json({
         ok: true,
         request_status: decision.kind,
         message:
-          decision.kind === "pending"
-            ? "Approval required — request to join"
-            : "Event full — join waitlist",
+          decision.kind === 'pending'
+            ? 'Approval required — request to join'
+            : 'Event full — join waitlist',
       });
     }
 
@@ -262,7 +273,7 @@ export async function POST(
 
     const mins = minutesBeforeStart(beacon.metadata);
 
-    const { error: insertError } = await admin.from("beacon_attendees").upsert(
+    const { error: insertError } = await admin.from('beacon_attendees').upsert(
       {
         beacon_id: beaconId,
         user_id: user.id,
@@ -277,11 +288,11 @@ export async function POST(
         distance_meters: distanceMeters,
         rsvpd_at: new Date().toISOString(),
       },
-      { onConflict: "beacon_id,user_id" },
+      { onConflict: 'beacon_id,user_id' },
     );
 
     if (insertError) {
-      console.error("POST /api/beacons/[beaconId]/rsvp:", insertError.message);
+      console.error('POST /api/beacons/[beaconId]/rsvp:', insertError.message);
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
@@ -289,7 +300,7 @@ export async function POST(
       beacon_id: beaconId,
       user_id: user.id,
       venue_id: beacon.venue_id,
-      event_type: "rsvp_set",
+      event_type: 'rsvp_set',
       latitude: telemetry.latitude,
       longitude: telemetry.longitude,
       accuracy_meters: telemetry.accuracy_meters,
@@ -319,8 +330,8 @@ export async function POST(
       },
     });
   } catch (e) {
-    console.error("POST /api/beacons/[beaconId]/rsvp:", e);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error('POST /api/beacons/[beaconId]/rsvp:', e);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -335,28 +346,34 @@ export async function DELETE(
   try {
     const { beaconId } = await params;
     if (!UUID_RE.test(beaconId)) {
-      return NextResponse.json({ error: "Invalid beacon id" }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid beacon id' }, { status: 400 });
     }
 
     const { user, authError } = await getSupabaseFromRouteRequest(request);
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const admin = createAdminSupabaseClient();
     // allowExpired: cancel must work after the event window so users can leave a stuck RSVP.
     const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
-    const venueId = "beacon" in loaded ? loaded.beacon.venue_id : null;
+    if ('response' in loaded) return loaded.response;
+    if (loaded.beacon.admission_type === 'paid')
+      return NextResponse.json(
+        { error: 'Paid events require a ticket', code: 'ticket_required' },
+        { status: 409 },
+      );
+    const venueId = 'beacon' in loaded ? loaded.beacon.venue_id : null;
 
     // Admin client: user-scoped DELETE was hitting RLS and surfacing as RSVP failures.
     const { error: deleteError } = await admin
-      .from("beacon_attendees")
+      .from('beacon_attendees')
       .delete()
-      .eq("beacon_id", beaconId)
-      .eq("user_id", user.id);
+      .eq('beacon_id', beaconId)
+      .eq('user_id', user.id);
 
     if (deleteError) {
-      console.error("DELETE /api/beacons/[beaconId]/rsvp:", deleteError.message);
+      console.error('DELETE /api/beacons/[beaconId]/rsvp:', deleteError.message);
       return NextResponse.json({ error: deleteError.message }, { status: 400 });
     }
 
@@ -364,12 +381,12 @@ export async function DELETE(
       beacon_id: beaconId,
       user_id: user.id,
       venue_id: venueId,
-      event_type: "rsvp_unset",
+      event_type: 'rsvp_unset',
     });
 
     return NextResponse.json({ ok: true, user_id: user.id });
   } catch (e) {
-    console.error("DELETE /api/beacons/[beaconId]/rsvp:", e);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error('DELETE /api/beacons/[beaconId]/rsvp:', e);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

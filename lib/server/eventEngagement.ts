@@ -1,10 +1,10 @@
-import { type SupabaseClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
-import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
+import { type SupabaseClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
+import { parseLatLngFromLocationField } from '@/lib/map/mapBeaconApiShared';
 
 export const EVENT_BEACON_UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
-export type VenueScale = "intimate" | "neighborhood" | "venue" | "campus";
+export type VenueScale = 'intimate' | 'neighborhood' | 'venue' | 'campus';
 
 export const VENUE_SCALE_RADIUS_METERS: Record<VenueScale, number> = {
   intimate: 75,
@@ -13,7 +13,7 @@ export const VENUE_SCALE_RADIUS_METERS: Record<VenueScale, number> = {
   campus: 2500,
 };
 
-export const DEFAULT_VENUE_SCALE: VenueScale = "neighborhood";
+export const DEFAULT_VENUE_SCALE: VenueScale = 'neighborhood';
 export const CHECK_IN_RADIUS_MIN_M = 25;
 export const CHECK_IN_RADIUS_MAX_M = 5000;
 /**
@@ -23,15 +23,15 @@ export const CHECK_IN_RADIUS_MAX_M = 5000;
 export const CHECK_IN_EARLY_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export type EventEngagementEventType =
-  | "event_view"
-  | "bookmark_set"
-  | "bookmark_unset"
-  | "rsvp_set"
-  | "rsvp_unset"
-  | "check_in"
-  | "check_out"
-  | "check_in_rejected"
-  | "share";
+  | 'event_view'
+  | 'bookmark_set'
+  | 'bookmark_unset'
+  | 'rsvp_set'
+  | 'rsvp_unset'
+  | 'check_in'
+  | 'check_out'
+  | 'check_in_rejected'
+  | 'share';
 
 export type EngagementTelemetryBody = {
   latitude: number | null;
@@ -48,6 +48,7 @@ export type EngagementTelemetryBody = {
 export type EventBeaconRow = {
   id: string;
   beacon_type: string;
+  admission_type?: string;
   expires_at: string | null;
   venue_id: string | null;
   metadata: Record<string, unknown>;
@@ -62,15 +63,10 @@ export type EventBeaconRow = {
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
-export function haversineMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number {
+export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -83,7 +79,7 @@ export function haversineMeters(
 }
 
 export function isVenueScale(v: unknown): v is VenueScale {
-  return v === "intimate" || v === "neighborhood" || v === "venue" || v === "campus";
+  return v === 'intimate' || v === 'neighborhood' || v === 'venue' || v === 'campus';
 }
 
 export function resolveCheckInRadiusMeters(metadata: Record<string, unknown>): {
@@ -92,16 +88,9 @@ export function resolveCheckInRadiusMeters(metadata: Record<string, unknown>): {
 } {
   const explicit = metadata.check_in_radius_meters ?? metadata.checkInRadiusMeters;
   const explicitNum =
-    typeof explicit === "number"
-      ? explicit
-      : typeof explicit === "string"
-        ? Number(explicit)
-        : NaN;
+    typeof explicit === 'number' ? explicit : typeof explicit === 'string' ? Number(explicit) : NaN;
   if (Number.isFinite(explicitNum)) {
-    const clamped = Math.min(
-      CHECK_IN_RADIUS_MAX_M,
-      Math.max(CHECK_IN_RADIUS_MIN_M, explicitNum),
-    );
+    const clamped = Math.min(CHECK_IN_RADIUS_MAX_M, Math.max(CHECK_IN_RADIUS_MIN_M, explicitNum));
     const scaleRaw = metadata.venue_scale ?? metadata.venueScale;
     const venueScale = isVenueScale(scaleRaw) ? scaleRaw : DEFAULT_VENUE_SCALE;
     return { radiusMeters: clamped, venueScale };
@@ -143,30 +132,28 @@ export function parseEngagementTelemetryBody(body: unknown): EngagementTelemetry
     };
   }
   const lat =
-    typeof body.latitude === "number"
+    typeof body.latitude === 'number'
       ? body.latitude
-      : typeof body.lat === "number"
+      : typeof body.lat === 'number'
         ? body.lat
         : Number(body.latitude ?? body.lat);
   const lon =
-    typeof body.longitude === "number"
+    typeof body.longitude === 'number'
       ? body.longitude
-      : typeof body.lng === "number"
+      : typeof body.lng === 'number'
         ? body.lng
-        : typeof body.lon === "number"
+        : typeof body.lon === 'number'
           ? body.lon
           : Number(body.longitude ?? body.lng ?? body.lon);
   const accuracyRaw =
-    typeof body.accuracy_meters === "number"
+    typeof body.accuracy_meters === 'number'
       ? body.accuracy_meters
       : Number(body.accuracy_meters ?? body.accuracyMeters);
   const clientRaw = body.client_occurred_at ?? body.clientOccurredAt;
   const client_occurred_at =
-    typeof clientRaw === "string" && Number.isFinite(Date.parse(clientRaw))
-      ? clientRaw
-      : null;
+    typeof clientRaw === 'string' && Number.isFinite(Date.parse(clientRaw)) ? clientRaw : null;
   const clip = (v: unknown, max = 64): string | null => {
-    if (typeof v !== "string") return null;
+    if (typeof v !== 'string') return null;
     const t = v.trim();
     if (!t) return null;
     return t.slice(0, max);
@@ -174,14 +161,13 @@ export function parseEngagementTelemetryBody(body: unknown): EngagementTelemetry
   return {
     latitude: Number.isFinite(lat) && lat >= -90 && lat <= 90 ? lat : null,
     longitude: Number.isFinite(lon) && lon >= -180 && lon <= 180 ? lon : null,
-    accuracy_meters:
-      Number.isFinite(accuracyRaw) && accuracyRaw >= 0 ? accuracyRaw : null,
+    accuracy_meters: Number.isFinite(accuracyRaw) && accuracyRaw >= 0 ? accuracyRaw : null,
     client_occurred_at,
     source: clip(body.source),
     platform: clip(body.platform),
     app_version: clip(body.app_version ?? body.appVersion, 32),
     surface: clip(body.surface, 32),
-    bookmarked: typeof body.bookmarked === "boolean" ? body.bookmarked : null,
+    bookmarked: typeof body.bookmarked === 'boolean' ? body.bookmarked : null,
   };
 }
 
@@ -195,13 +181,10 @@ export function isValidCheckInCoordinate(
   return latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 }
 
-function parseMetadataInstant(
-  metadata: Record<string, unknown>,
-  keys: string[],
-): number | null {
+function parseMetadataInstant(metadata: Record<string, unknown>, keys: string[]): number | null {
   for (const key of keys) {
     const raw = metadata[key];
-    if (typeof raw !== "string") continue;
+    if (typeof raw !== 'string') continue;
     const ms = Date.parse(raw);
     if (Number.isFinite(ms)) return ms;
   }
@@ -212,8 +195,8 @@ export function eventScheduleBounds(metadata: Record<string, unknown>): {
   startMs: number | null;
   endMs: number | null;
 } {
-  const startMs = parseMetadataInstant(metadata, ["event_start_at", "eventStartAt"]);
-  const endMs = parseMetadataInstant(metadata, ["event_end_at", "eventEndAt"]);
+  const startMs = parseMetadataInstant(metadata, ['event_start_at', 'eventStartAt']);
+  const endMs = parseMetadataInstant(metadata, ['event_end_at', 'eventEndAt']);
   return { startMs, endMs };
 }
 
@@ -247,17 +230,16 @@ export function isEventLiveForCheckIn(
   return true;
 }
 
-function parseBeaconLatLng(row: Record<string, unknown>): { lat: number | null; lng: number | null } {
+function parseBeaconLatLng(row: Record<string, unknown>): {
+  lat: number | null;
+  lng: number | null;
+} {
   const latDirect =
-    typeof row.lat === "number"
-      ? row.lat
-      : typeof row.latitude === "number"
-        ? row.latitude
-        : null;
+    typeof row.lat === 'number' ? row.lat : typeof row.latitude === 'number' ? row.latitude : null;
   const lngDirect =
-    typeof row.lng === "number"
+    typeof row.lng === 'number'
       ? row.lng
-      : typeof row.longitude === "number"
+      : typeof row.longitude === 'number'
         ? row.longitude
         : null;
   if (
@@ -281,41 +263,38 @@ export async function loadEventBeaconOrResponse(
   options: { allowExpired?: boolean } = {},
 ): Promise<{ beacon: EventBeaconRow } | { response: NextResponse }> {
   if (!EVENT_BEACON_UUID_RE.test(beaconId)) {
-    return { response: NextResponse.json({ error: "Invalid beacon id" }, { status: 400 }) };
+    return { response: NextResponse.json({ error: 'Invalid beacon id' }, { status: 400 }) };
   }
 
   const { data, error } = await admin
-    .from("map_beacons")
+    .from('map_beacons')
     .select(
-      "id, beacon_type, expires_at, venue_id, metadata, location, creator_id, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id",
+      'id, beacon_type, admission_type, expires_at, venue_id, metadata, location, creator_id, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id',
     )
-    .eq("id", beaconId)
+    .eq('id', beaconId)
     .maybeSingle();
 
   if (error) {
-    console.error("loadEventBeacon:", error.message);
+    console.error('loadEventBeacon:', error.message);
     return {
-      response: NextResponse.json({ error: "Failed to load beacon" }, { status: 500 }),
+      response: NextResponse.json({ error: 'Failed to load beacon' }, { status: 500 }),
     };
   }
   if (data == null) {
-    return { response: NextResponse.json({ error: "Not found" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
   }
-  if (data.beacon_type !== "event") {
+  if (data.beacon_type !== 'event') {
     return {
-      response: NextResponse.json(
-        { error: "Only available for event beacons" },
-        { status: 400 },
-      ),
+      response: NextResponse.json({ error: 'Only available for event beacons' }, { status: 400 }),
     };
   }
 
   const expRaw = data.expires_at;
-  const exp = typeof expRaw === "string" ? Date.parse(expRaw) : Number.NaN;
+  const exp = typeof expRaw === 'string' ? Date.parse(expRaw) : Number.NaN;
   const expired = !Number.isFinite(exp) || exp <= Date.now();
   // Read paths (RSVP list / people directory) must work for past events; mutations still reject.
   if (expired && !options.allowExpired) {
-    return { response: NextResponse.json({ error: "Expired" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: 'Expired' }, { status: 404 }) };
   }
 
   const metadata = isRecord(data.metadata) ? data.metadata : {};
@@ -324,19 +303,20 @@ export async function loadEventBeaconOrResponse(
   return {
     beacon: {
       id: data.id as string,
+      admission_type: data.admission_type,
       beacon_type: data.beacon_type as string,
-      expires_at: typeof data.expires_at === "string" ? data.expires_at : null,
-      venue_id: typeof data.venue_id === "string" ? data.venue_id : null,
+      expires_at: typeof data.expires_at === 'string' ? data.expires_at : null,
+      venue_id: typeof data.venue_id === 'string' ? data.venue_id : null,
       metadata,
       lat,
       lng,
-      creator_id: typeof data.creator_id === "string" ? data.creator_id : null,
-      event_visibility: typeof data.event_visibility === "string" ? data.event_visibility : null,
-      event_capacity: typeof data.event_capacity === "number" ? data.event_capacity : null,
+      creator_id: typeof data.creator_id === 'string' ? data.creator_id : null,
+      event_visibility: typeof data.event_visibility === 'string' ? data.event_visibility : null,
+      event_capacity: typeof data.event_capacity === 'number' ? data.event_capacity : null,
       approval_required: data.approval_required === true,
       guest_list_visibility:
-        typeof data.guest_list_visibility === "string" ? data.guest_list_visibility : null,
-      cover_theme_id: typeof data.cover_theme_id === "string" ? data.cover_theme_id : null,
+        typeof data.guest_list_visibility === 'string' ? data.guest_list_visibility : null,
+      cover_theme_id: typeof data.cover_theme_id === 'string' ? data.cover_theme_id : null,
     },
   };
 }
@@ -350,9 +330,9 @@ export async function resolveBeaconCoordinates(
   if (fallback.lat != null && fallback.lng != null) return fallback;
   try {
     const { data, error } = await admin
-      .from("map_beacons")
-      .select("location")
-      .eq("id", beaconId)
+      .from('map_beacons')
+      .select('location')
+      .eq('id', beaconId)
       .maybeSingle();
     if (error || data == null) return fallback;
     return parseBeaconLatLng(data as Record<string, unknown>);
@@ -415,8 +395,8 @@ export async function insertEngagementEvent(
       ...(row.beacon_id ? { beacon_id: row.beacon_id } : {}),
     },
   };
-  const { error } = await admin.from("event_engagement_events").insert(payload);
+  const { error } = await admin.from('event_engagement_events').insert(payload);
   if (error) {
-    console.error("insertEngagementEvent:", error.message, row.event_type);
+    console.error('insertEngagementEvent:', error.message, row.event_type);
   }
 }

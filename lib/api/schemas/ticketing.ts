@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
+export const connectOnboardingBodySchema = z.object({ return_to: z.string().max(200).optional() });
+
 export const checkoutBodySchema = z.object({
+  attempt_id: z.string().uuid(),
   items: z
     .array(
       z.object({
@@ -15,7 +18,7 @@ export const checkoutBodySchema = z.object({
 export const createTierBodySchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2000).nullish(),
-  unit_amount: z.number().int().min(0).max(1_000_000),
+  unit_amount: z.number().int().min(50).max(1_000_000),
   capacity: z.number().int().min(0).max(100_000),
   max_per_order: z.number().int().min(1).max(20).default(8),
   max_per_user: z.number().int().min(1).max(100).nullish(),
@@ -36,6 +39,14 @@ export const checkInBodySchema = z.object({
 });
 
 export const refundBodySchema = z.object({
-  ticket_ids: z.array(z.string().uuid()).max(50).nullish(),
+  request_id: z.string().uuid(),
+  ticket_ids: z.array(z.string().uuid()).min(1).max(50).nullish(),
   reason: z.string().trim().max(500).nullish(),
+});
+
+export const patchTierBodySchema = createTierBodySchema.partial().extend({
+  // PATCH must not apply the create schema's defaults to omitted fields.
+  max_per_order: z.number().int().min(1).max(20).optional(),
+  sort_order: z.number().int().min(0).max(1000).optional(),
+  is_active: z.boolean().optional(),
 });

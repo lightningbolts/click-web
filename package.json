@@ -23,7 +23,8 @@
     "db:migrate": "bash scripts/apply-supabase-migrations.sh",
     "db:migrate:dry-run": "bash scripts/apply-supabase-migrations.sh --dry-run",
     "verify:well-known": "node scripts/verify-well-known-json.mjs",
-    "icons": "node scripts/generate-brand-icons.mjs"
+    "icons": "node scripts/generate-brand-icons.mjs",
+    "test:ticketing:postgres": "node scripts/test-ticketing-postgres.cjs"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
@@ -72,6 +73,7 @@
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
+    "pg": "^8.23.0",
     "supabase": "2.106.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

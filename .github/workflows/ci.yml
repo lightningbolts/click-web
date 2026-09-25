@@ -112,6 +112,11 @@ jobs:
       - name: Run database authorization and invariant tests
         run: bash scripts/run-supabase-db-tests.sh
 
+      - name: Exercise ticketing concurrency with independent PostgreSQL connections
+        env:
+          TICKETING_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: npm run test:ticketing:postgres
+
       - name: Verify source migration contract
         run: bash scripts/test_map_beacons_hub_id.sh --live --local
 

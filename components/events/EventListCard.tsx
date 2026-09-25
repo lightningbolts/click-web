@@ -23,6 +23,7 @@ export type EventListItem = {
   event_start_at: string | null;
   event_end_at: string | null;
   location_name: string | null;
+  ticketing_label?: string;
   rsvp_count?: number;
   rsvp_enabled?: boolean;
   cover_theme_id?: string | null;
@@ -130,6 +131,9 @@ export function EventListCard({
                 <User className="h-4 w-4 shrink-0" />
                 <span className="line-clamp-1">{event.host_name.trim()}</span>
               </span>
+            ) : null}
+            {event.ticketing_label ? (
+              <p className="text-sm font-bold">{event.ticketing_label}</p>
             ) : null}
             {typeof event.rsvp_count === "number" && event.rsvp_enabled !== false ? (
               <EventGoingAvatars

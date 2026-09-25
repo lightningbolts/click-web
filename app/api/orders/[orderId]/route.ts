@@ -34,7 +34,9 @@ export async function GET(
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from('ticket_orders')
-    .select('id, beacon_id, buyer_user_id, currency, subtotal_amount, platform_fee_amount, total_amount, order_state, fulfillment_state, checkout_expires_at, paid_at, created_at')
+    .select(
+      'id, beacon_id, buyer_user_id, currency, subtotal_amount, platform_fee_amount, total_amount, order_state, fulfillment_state, checkout_expires_at, paid_at, created_at',
+    )
     .eq('id', orderId)
     .maybeSingle();
   if (error) {
@@ -47,5 +49,8 @@ export async function GET(
   }
 
   const { buyer_user_id: _omit, ...projection } = order as Record<string, unknown>;
-  return NextResponse.json({ order: projection });
+  return NextResponse.json(
+    { order: projection },
+    { headers: { 'Cache-Control': 'private, no-store' } },
+  );
 }

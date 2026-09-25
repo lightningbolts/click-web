@@ -40,6 +40,16 @@ export async function POST(
   // Refunds are an organizer/staff action on the order's event.
   const manager = await requireEventManager(request, order.beacon_id);
   if (!manager.ok) return manager.response;
+  const { data: principal } = await admin
+    .from('map_beacons')
+    .select('financial_principal_id')
+    .eq('id', order.beacon_id)
+    .single();
+  if (principal?.financial_principal_id !== manager.userId)
+    return NextResponse.json(
+      { error: 'Only the financial organizer can refund', code: 'forbidden' },
+      { status: 403 },
+    );
 
   const parsed = await parseBody(request, refundBodySchema);
   if (!parsed.ok) return parsed.response;
@@ -51,6 +61,7 @@ export async function POST(
       manager.userId,
       parsed.data.ticket_ids ?? null,
       parsed.data.reason ?? null,
+      parsed.data.request_id,
     );
     if (!result.ok) {
       return NextResponse.json(

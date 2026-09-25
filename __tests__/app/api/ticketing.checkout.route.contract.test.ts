@@ -30,7 +30,7 @@ const USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 function checkoutRequest(body: unknown): NextRequest {
   return new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/tickets/checkout`, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ attempt_id: ORDER_ID, ...(body as object) }),
     headers: { 'content-type': 'application/json' },
   });
 }
@@ -117,9 +117,13 @@ describe('POST /api/beacons/[beaconId]/tickets/checkout', () => {
     expect(body.checkout_url).toContain('checkout.stripe.com');
     // Only the buyer id, beacon, and tier/quantity reach the checkout layer —
     // never client-supplied prices.
-    expect(mockCreateTicketCheckout).toHaveBeenCalledWith({}, USER_ID, BEACON_ID, [
-      { tierId: TIER_ID, quantity: 2 },
-    ]);
+    expect(mockCreateTicketCheckout).toHaveBeenCalledWith(
+      {},
+      USER_ID,
+      BEACON_ID,
+      [{ tierId: TIER_ID, quantity: 2 }],
+      ORDER_ID,
+    );
   });
 
   it('maps reservation failures onto their HTTP statuses', async () => {
