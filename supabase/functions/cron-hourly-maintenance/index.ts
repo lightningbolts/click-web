@@ -6,10 +6,13 @@
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
  *   4. Delete expired pending_handshakes (expires_at < now())
  *
- * Deploy:
- *   supabase functions deploy cron-hourly-maintenance --no-verify-jwt
+ * Deploy (the gateway requires at least the project's anon key):
+ *   supabase functions deploy cron-hourly-maintenance
  *
- * Schedule via pg_cron — see migration 20260607120000_pg_cron_hourly_maintenance.sql
+ * Triggered hourly by pg_cron with the public anon key (see 20260926090000_relationship_moments
+ * .sql). Any caller that passes the gateway is fine: `claim_cron_run` lets at most one run start
+ * per 50 minutes, and every job below is idempotent. click-web is called with the service role
+ * key Supabase injects here.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -58,18 +61,23 @@ type ExpiredIntentRow = {
   anonymized_cell_id: string | null;
 };
 
-function authorize(req: Request): boolean {
-  const auth = req.headers.get('authorization') ?? '';
-  if (CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) return true;
-  if (SERVICE_ROLE_KEY && auth === `Bearer ${SERVICE_ROLE_KEY}`) return true;
-  return false;
-}
-
 async function runDisposableReveal(
   admin: ReturnType<typeof createClient>,
 ): Promise<{ sessions: number; pushAttempts: number }> {
   const nowIso = new Date().toISOString();
   const pushUrl = `${SUPABASE_URL}/functions/v1/send-push-notification`;
+
+  // Sessions that revealed more than a day ago are closed out silently: a "revealed!" push for
+  // an old Drop is noise (this matters when the sweep first runs or resumes after downtime).
+  const staleIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { error: staleError } = await admin
+    .from('collaboration_sessions')
+    .update({ notification_sent: true })
+    .lt('collaboration_ttl', staleIso)
+    .eq('notification_sent', false);
+  if (staleError) {
+    throw new Error(`disposable-reveal stale: ${staleError.message}`);
+  }
 
   const { data: sessions, error: fetchError } = await admin
     .from('collaboration_sessions')
@@ -241,9 +249,9 @@ async function runClickWebCron(path: string, label: string): Promise<Record<stri
     Deno.env.get('CLICK_WEB_BASE_URL') ??
     'https://joinclick.co'
   ).replace(/\/$/, '');
-  const secret = CRON_SECRET;
+  const secret = SERVICE_ROLE_KEY || CRON_SECRET;
   if (!secret) {
-    throw new Error(`${label}: missing CRON_SECRET`);
+    throw new Error(`${label}: missing SUPABASE_SERVICE_ROLE_KEY`);
   }
   const response = await fetch(`${base}${path}`, {
     headers: { Authorization: `Bearer ${secret}` },
@@ -298,13 +306,6 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  if (!authorize(req)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: 'Missing Supabase env' }), {
       status: 500,
@@ -315,6 +316,23 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  const { data: claimed, error: claimError } = await admin.rpc('claim_cron_run', {
+    p_name: 'hourly-maintenance',
+    p_min_interval: '50 minutes',
+  });
+  if (claimError) {
+    return new Response(JSON.stringify({ ok: false, error: claimError.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (claimed !== true) {
+    return new Response(JSON.stringify({ ok: true, skipped: 'ran within the last 50 minutes' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   try {
     const disposable = await runDisposableReveal(admin);

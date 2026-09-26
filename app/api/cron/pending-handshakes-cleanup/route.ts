@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/server/cronAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 
-const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * Hourly sweep: delete expired pending_handshakes rows (expires_at < now()).
  * Complements on-write cleanup in bindProximityHandshake.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

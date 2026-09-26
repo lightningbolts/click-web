@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assertChatWritable, createChatGatekeeperAdmin } from '@/lib/server/chatGatekeeper';
 import { insertChatMessage } from '@/lib/server/chatMessageWrite';
 import type { MessageType } from '@/lib/chat/types';
-import { runtimeEnv } from '@/lib/server/runtimeEnv';
+import { authorizeCronRequest, cronPushBearer } from '@/lib/server/cronAuth';
 
 type ScheduledRow = {
   id: string;
@@ -19,12 +19,7 @@ type ScheduledRow = {
  * runs never deliver twice; a sender who lost access to the chat is skipped.
  */
 export async function GET(request: NextRequest) {
-  // The trigger (cron-scheduled-messages edge function) holds only the project's service role
-  // key; CRON_SECRET is accepted too for manual runs.
-  const serviceKey = runtimeEnv('SUPABASE_SERVICE_ROLE_KEY');
-  const cronSecret = runtimeEnv('CRON_SECRET');
-  const auth = request.headers.get('authorization');
-  if (!((serviceKey && auth === `Bearer ${serviceKey}`) || (cronSecret && auth === `Bearer ${cronSecret}`))) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -63,8 +58,7 @@ export async function GET(request: NextRequest) {
         localSentAtMs: null,
       },
       Date.now(),
-      // send-push-notification trusts the service role key (its CRON_SECRET is unset).
-      serviceKey ?? null,
+      cronPushBearer(),
     );
     if ('error' in result) skipped += 1;
     else delivered += 1;

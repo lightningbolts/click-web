@@ -52,6 +52,9 @@ function thirtyMinAlreadySent(meta: Record<string, unknown>): boolean {
 }
 
 /** Due kinds for a single event at [nowMs]. Independent of sweep alignment. */
+/** Recaps go out within two days of an event ending, never later. */
+export const RECAP_WINDOW_MS = 48 * 60 * 60 * 1000;
+
 export function dueReminderKinds(args: {
   nowMs: number;
   startMs: number;
@@ -60,6 +63,9 @@ export function dueReminderKinds(args: {
 }): ReminderKind[] {
   const { nowMs, startMs, endMs, metadata } = args;
   if (endMs <= nowMs) {
+    // Only recently ended events: a recap for something long over is noise (and would flood
+    // creators whenever the sweep first runs or resumes after downtime).
+    if (nowMs - endMs > RECAP_WINDOW_MS) return [];
     if (!metadataFlag(metadata, 'recap_notification_sent')) return ['recap_ready'];
     return [];
   }

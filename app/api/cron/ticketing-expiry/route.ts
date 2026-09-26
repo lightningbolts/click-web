@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/server/cronAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 
-const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * Ticketing reservation sweep: expires orders whose Checkout Session lapsed
@@ -10,8 +10,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * deliveries and orders that never reached Stripe.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

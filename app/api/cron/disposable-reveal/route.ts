@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest, cronPushBearer } from '@/lib/server/cronAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 
-const CRON_SECRET = process.env.CRON_SECRET;
 
 const pushFunctionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
@@ -41,8 +41,7 @@ async function hasRevealedDisposableMessage(
  * Optional HTTP route — production uses Supabase pg_cron → cron-hourly-maintenance edge function.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -78,7 +77,7 @@ export async function GET(request: NextRequest) {
         const response = await fetch(pushFunctionUrl, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${CRON_SECRET}`,
+            Authorization: `Bearer ${cronPushBearer() ?? ''}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({

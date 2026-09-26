@@ -28,6 +28,7 @@ const AUTH_MARKERS = [
   'auth.getUser',
   'exchangeCodeForSession',
   'CRON_SECRET',
+  'authorizeCronRequest',
   'STRIPE_WEBHOOK_SECRET',
   'constructEvent',
   'publicRoute',

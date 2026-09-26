@@ -254,6 +254,9 @@ export async function runReconnectNudges(
 
   let created = 0;
   let pushAttempts = 0;
+  // One reconnect push per person per sweep; the rest still land in-app (Home). Matters most
+  // when the sweep first runs or resumes after downtime with many lulls due at once.
+  const pushedUsers = new Set<string>();
 
   for (const summary of summaryRows) {
     if (!isRecord(summary) || typeof summary.connection_id !== 'string') continue;
@@ -314,6 +317,8 @@ export async function runReconnectNudges(
         continue;
       }
       created += 1;
+      if (pushedUsers.has(userId)) continue;
+      pushedUsers.add(userId);
       const sent = await sendPush(pushUrl, authBearer, userId, copy.title, copy.body, {
         type: 'reconnect_nudge',
         connection_id: conn.id,
