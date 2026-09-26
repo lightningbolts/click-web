@@ -1,4 +1,4 @@
--- Pinned messages in direct and group chats. Any member can pin or unpin; every member sees
+-- Pinned messages in direct and group chats (applied 2026-09-26). Any member can pin or unpin; every member sees
 -- the chat's pins. Unpinning sets unpinned_at (an UPDATE, which realtime can filter by chat,
 -- unlike a DELETE); re-pinning clears it. Rows go with their message or chat.
 CREATE TABLE IF NOT EXISTS public.message_pins (
