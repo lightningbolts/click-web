@@ -10,6 +10,7 @@ import {
 import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 import { parseBody } from '@/lib/api/parseBody';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 import { chatMessagePostBodySchema } from '@/lib/api/schemas/chat';
 import {
   assertE2eeV2MessageWrite,
@@ -258,7 +259,7 @@ function skipsPush(messageType: MessageType, metadata: unknown): boolean {
   return isMedia && (meta.is_encrypted_media === true || meta.is_encrypted_media === 'true');
 }
 
-/** Inserts the message at `now`, bumps the chat, and pushes (push failures are logged only). */
+/** Inserts the message at `now`, bumps the chat, and pushes after the response (failures are logged only). */
 export async function insertChatMessage(
   admin: SupabaseClient,
   m: Omit<PreparedChatMessage, 'bearer' | 'body'>,
@@ -285,16 +286,21 @@ export async function insertChatMessage(
   await admin.from('chats').update({ updated_at: now }).eq('id', message.chat_id);
 
   if (!skipsPush(m.messageType, m.metadata)) {
-    try {
-      await notifyChatMessagePush(pushBearer, message.chat_id, message.id, m.userId);
-    } catch (pushError) {
-      console.error('Chat push dispatch failed', {
-        chatId: message.chat_id,
-        messageId: message.id,
-        userId: m.userId,
-        error: pushError instanceof Error ? pushError.message : String(pushError),
-      });
-    }
+    // Push delivery is not part of message durability. Keep it attached to the request
+    // lifecycle via Next.js `after`/Cloudflare `waitUntil`, but do not hold the sender's
+    // 201 response open while the Supabase Edge Function runs.
+    runAfterResponse('chat push dispatch', async () => {
+      try {
+        await notifyChatMessagePush(pushBearer, message.chat_id, message.id, m.userId);
+      } catch (pushError) {
+        console.error('Chat push dispatch failed', {
+          chatId: message.chat_id,
+          messageId: message.id,
+          userId: m.userId,
+          error: pushError instanceof Error ? pushError.message : String(pushError),
+        });
+      }
+    });
   }
   return { message: message as Record<string, unknown> };
 }

@@ -139,15 +139,59 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ messages: [] });
   }
 
-  // Bulk-fetch reactions for all returned messages
+  // Reactions and receipt acknowledgements are independent once the message page is known.
+  // Issue them together so a normal chat read does not serialize three Supabase round-trips.
   const messageIds = messages.map((m: any) => m.id);
-  const { data: reactions, error: reactionErr } = await supabase
+  const reactionsPromise = supabase
     .from('message_reactions')
     .select('*')
     .in('message_id', messageIds);
 
+  const unreadIds = messages
+    .filter((m: any) => m.user_id !== user.id && !m.is_read)
+    .map((m: any) => m.id);
+  const readPromise =
+    unreadIds.length > 0
+      ? admin
+          .from('messages')
+          .update({ is_read: true, read_at: Date.now() })
+          .in('id', unreadIds)
+      : Promise.resolve({ error: null });
+
+  // Recipient has loaded these rows on this device — mirror PATCH /messages/delivered (covers
+  // pagination and any missed client-side acks).
+  const deliveredIds = messages
+    .filter(
+      (m: any) =>
+        m.user_id !== user.id &&
+        (m.delivered_at == null || m.delivered_at === undefined),
+    )
+    .map((m: any) => String(m.id));
+  const deliveredPromise =
+    deliveredIds.length > 0
+      ? admin
+          .from('messages')
+          .update({ delivered_at: Date.now() })
+          .eq('chat_id', chatId)
+          .in('id', deliveredIds)
+          .neq('user_id', user.id)
+          .is('delivered_at', null)
+      : Promise.resolve({ error: null });
+
+  const [
+    { data: reactions, error: reactionErr },
+    { error: markErr },
+    { error: deliveredErr },
+  ] = await Promise.all([reactionsPromise, readPromise, deliveredPromise]);
+
   if (reactionErr) {
     console.error('Reaction fetch error:', reactionErr.message);
+  }
+  if (markErr) {
+    console.error('mark read failed in /api/chat/messages GET:', markErr.message);
+  }
+  if (deliveredErr) {
+    console.error('mark delivered failed in /api/chat/messages GET:', deliveredErr.message);
   }
 
   // Group reactions onto messages
@@ -164,46 +208,6 @@ export async function GET(req: NextRequest) {
       reactions: reactionMap[String(m.id)] ?? {},
     })
   );
-
-  // Mark messages from the other user as read
-  const unreadIds = messages
-    .filter((m: any) => m.user_id !== user.id && !m.is_read)
-    .map((m: any) => m.id);
-
-  if (unreadIds.length > 0) {
-    const readStamp = Date.now();
-    const { error: markErr } = await admin
-      .from('messages')
-      .update({ is_read: true, read_at: readStamp })
-      .in('id', unreadIds);
-    if (markErr) {
-      console.error('mark read failed in /api/chat/messages GET:', markErr.message);
-    }
-  }
-
-  // Recipient has loaded these rows on this device — mirror PATCH /messages/delivered (covers
-  // pagination and any missed client-side acks).
-  const deliveredIds = messages
-    .filter(
-      (m: any) =>
-        m.user_id !== user.id &&
-        (m.delivered_at == null || m.delivered_at === undefined),
-    )
-    .map((m: any) => String(m.id));
-
-  if (deliveredIds.length > 0) {
-    const deliveredStamp = Date.now();
-    const { error: deliveredErr } = await admin
-      .from('messages')
-      .update({ delivered_at: deliveredStamp })
-      .eq('chat_id', chatId)
-      .in('id', deliveredIds)
-      .neq('user_id', user.id)
-      .is('delivered_at', null);
-    if (deliveredErr) {
-      console.error('mark delivered failed in /api/chat/messages GET:', deliveredErr.message);
-    }
-  }
 
   // Opt-in "Message deleted" placeholders inside the returned window (older clients never ask,
   // so their behavior is unchanged).

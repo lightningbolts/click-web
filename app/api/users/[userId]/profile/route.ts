@@ -96,6 +96,11 @@ export async function GET(
 
   try {
     const isSelf = user.id === userId;
+    let adminClient: ReturnType<typeof createAdminClient> | null = null;
+    const getAdminClient = () => {
+      adminClient ??= createAdminClient();
+      return adminClient;
+    };
 
     const [userRes, availRes] = await Promise.all([
       readUserProfileRow(supabase, userId),
@@ -133,7 +138,7 @@ export async function GET(
         }
         // JWT read empty/failed — try service role so place/timeline still hydrate for mutuals.
         try {
-          const admin = createAdminClient();
+          const admin = getAdminClient();
           const { data: adminEncounters, error: adminEncErr } = await admin
             .from('connection_encounters')
             .select('*')
@@ -213,6 +218,32 @@ export async function GET(
       }
     }
 
+    let availabilityIntents = extractAvailabilityIntentsFromClaims(user, userId);
+    const availabilityIntentsPromise: Promise<AvailabilityIntentRow[]> =
+      availabilityIntents.length === 0 && (isSelf || isMutualConnection)
+        ? (async () => {
+            try {
+              const admin = getAdminClient();
+              const { data: intentRows, error: intentErr } = await admin
+                .from('availability_intents')
+                .select('id, timeframe, intent_tag, expires_at')
+                .eq('user_id', userId)
+                .gt('expires_at', new Date().toISOString())
+                .order('expires_at', { ascending: true });
+
+              if (!intentErr && intentRows) {
+                return normalizeAvailabilityIntentRows(intentRows);
+              }
+              if (intentErr) {
+                console.warn('profile availability_intents:', intentErr.message);
+              }
+            } catch (e) {
+              console.warn('profile availability_intents fetch failed:', e);
+            }
+            return [];
+          })()
+        : Promise.resolve(availabilityIntents);
+
     let profileTags: string[] = [];
     let viewerInterestTags: string[] = [];
     let sharedInterestTags: string[] = [];
@@ -226,7 +257,7 @@ export async function GET(
       profileTags = (myInterests as { tags?: string[] } | null)?.tags ?? [];
     } else if (isMutualConnection) {
       try {
-        const admin = createAdminClient();
+        const admin = getAdminClient();
         const [peerRes, viewerRes] = await Promise.all([
           admin.from('user_interests').select('tags').eq('user_id', userId).maybeSingle(),
           admin.from('user_interests').select('tags').eq('user_id', user.id).maybeSingle(),
@@ -245,26 +276,7 @@ export async function GET(
       }
     }
 
-    let availabilityIntents = extractAvailabilityIntentsFromClaims(user, userId);
-    if (availabilityIntents.length === 0 && (isSelf || isMutualConnection)) {
-      try {
-        const admin = createAdminClient();
-        const { data: intentRows, error: intentErr } = await admin
-          .from('availability_intents')
-          .select('id, timeframe, intent_tag, expires_at')
-          .eq('user_id', userId)
-          .gt('expires_at', new Date().toISOString())
-          .order('expires_at', { ascending: true });
-
-        if (!intentErr && intentRows) {
-          availabilityIntents = normalizeAvailabilityIntentRows(intentRows);
-        } else if (intentErr) {
-          console.warn('profile availability_intents:', intentErr.message);
-        }
-      } catch (e) {
-        console.warn('profile availability_intents fetch failed:', e);
-      }
-    }
+    availabilityIntents = await availabilityIntentsPromise;
 
     return NextResponse.json({
       user: userRes.data,
