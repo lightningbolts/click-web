@@ -212,6 +212,10 @@ export const livekitTokenBodySchema = z.object({
 }).passthrough();
 
 /** PUT /api/chat/notifications — mute a conversation until a time (null: until unmuted), or unmute. */
+export const chatPinBodySchema = z.object({
+  messageId: nonEmptyString,
+});
+
 export const chatMuteBodySchema = z.object({
   chat_id: z.string().trim().min(1).max(128),
   muted: z.boolean(),
