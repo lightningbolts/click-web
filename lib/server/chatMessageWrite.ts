@@ -11,6 +11,7 @@ import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboa
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 import { parseBody } from '@/lib/api/parseBody';
 import { runAfterResponse } from '@/lib/server/afterResponse';
+import { cronPushBearer, pushFunctionUrl } from '@/lib/server/cronAuth';
 import { chatMessagePostBodySchema } from '@/lib/api/schemas/chat';
 import {
   assertE2eeV2MessageWrite,
@@ -259,6 +260,56 @@ function skipsPush(messageType: MessageType, metadata: unknown): boolean {
   return isMedia && (meta.is_encrypted_media === true || meta.is_encrypted_media === 'true');
 }
 
+/**
+ * Group messages: one push per other member (the push function's user path only knows
+ * one-to-one chats). The service path attaches the ciphertext, which the iOS extension
+ * decrypts for the preview; the group's name rides along as the subtitle.
+ */
+async function notifyGroupMessagePush(
+  admin: SupabaseClient,
+  groupId: string,
+  chatId: string,
+  messageId: string,
+  senderUserId: string,
+  messageType: MessageType,
+) {
+  const url = pushFunctionUrl();
+  const bearer = cronPushBearer();
+  if (!url || !bearer) return;
+  const [{ data: members }, { data: group }, { data: sender }] = await Promise.all([
+    admin.from('group_members').select('user_id').eq('group_id', groupId),
+    admin.from('groups').select('name').eq('id', groupId).maybeSingle(),
+    admin.from('users').select('first_name, name').eq('id', senderUserId).maybeSingle(),
+  ]);
+  const groupName = (group as { name?: string | null } | null)?.name?.trim() || 'Group';
+  const senderRow = sender as { first_name?: string | null; name?: string | null } | null;
+  const senderName = senderRow?.first_name?.trim() || senderRow?.name?.trim() || 'Someone';
+  const recipients = ((members ?? []) as Array<{ user_id: string }>).map((row) => row.user_id).filter((id) => id !== senderUserId);
+  await Promise.all(
+    recipients.map(async (recipientUserId) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient_user_id: recipientUserId,
+          title: `${senderName} in ${groupName}`,
+          body: 'New message',
+          data: {
+            type: 'chat_message',
+            chat_id: chatId,
+            message_id: messageId,
+            sender_user_id: senderUserId,
+            group_id: groupId,
+            group_name: groupName,
+            message_type: messageType,
+          },
+        }),
+      });
+      if (!response.ok) console.warn('Group push failed', { chatId, recipientUserId, status: response.status });
+    }),
+  );
+}
+
 /** Inserts the message at `now`, bumps the chat, and pushes after the response (failures are logged only). */
 export async function insertChatMessage(
   admin: SupabaseClient,
@@ -291,7 +342,13 @@ export async function insertChatMessage(
     // 201 response open while the Supabase Edge Function runs.
     runAfterResponse('chat push dispatch', async () => {
       try {
-        await notifyChatMessagePush(pushBearer, message.chat_id, message.id, m.userId);
+        const { data: chat } = await admin.from('chats').select('group_id').eq('id', message.chat_id).maybeSingle();
+        const groupId = (chat as { group_id?: string | null } | null)?.group_id;
+        if (groupId) {
+          await notifyGroupMessagePush(admin, groupId, message.chat_id, message.id, m.userId, m.messageType);
+        } else {
+          await notifyChatMessagePush(pushBearer, message.chat_id, message.id, m.userId);
+        }
       } catch (pushError) {
         console.error('Chat push dispatch failed', {
           chatId: message.chat_id,
