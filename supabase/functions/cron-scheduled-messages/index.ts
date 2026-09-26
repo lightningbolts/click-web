@@ -3,27 +3,25 @@
  * messages by calling click-web `/api/cron/scheduled-messages`, which validates, inserts and
  * pushes each one. Kept separate from cron-hourly-maintenance so it runs on its own schedule.
  *
- * Deploy:
- *   supabase functions deploy cron-scheduled-messages --no-verify-jwt
+ * Deploy (the gateway requires the project's anon key or better):
+ *   supabase functions deploy cron-scheduled-messages
+ *
+ * Triggering needs no secret: it only delivers messages that are already due, each claimed
+ * exactly once. The privileged step (calling click-web with the service role key, which
+ * Supabase injects into every function) stays inside this function.
  *
  * Schedule: see migration 20260925120000_scheduled_messages_read_cursors.sql
  */
 
-const SERVICE_ROLE_KEY =
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_KEY') ?? '';
-const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
 Deno.serve(async (req: Request) => {
-  const auth = req.headers.get('authorization') ?? '';
-  const authorized =
-    (CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) ||
-    (SERVICE_ROLE_KEY && auth === `Bearer ${SERVICE_ROLE_KEY}`);
-  if (!authorized) return json({ error: 'Unauthorized' }, 401);
-  if (!CRON_SECRET) return json({ error: 'Missing CRON_SECRET' }, 500);
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  if (!SERVICE_ROLE_KEY) return json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY' }, 500);
 
   const base = (
     Deno.env.get('CLICK_WEB_URL') ??
@@ -32,7 +30,7 @@ Deno.serve(async (req: Request) => {
   ).replace(/\/$/, '');
   try {
     const response = await fetch(`${base}/api/cron/scheduled-messages`, {
-      headers: { Authorization: `Bearer ${CRON_SECRET}` },
+      headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
     });
     const body = await response.json().catch(() => ({ error: 'invalid json' }));
     if (!response.ok) console.error('[cron-scheduled-messages]', response.status, JSON.stringify(body));
