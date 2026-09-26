@@ -15,8 +15,8 @@ type ScheduledRow = {
 };
 
 /**
- * Per-minute delivery of due scheduled messages (pg_cron → cron-hourly-maintenance
- * `?job=scheduled-messages` → here). Each row is claimed by deleting it first, so overlapping
+ * Per-minute delivery of due scheduled messages (pg_cron → cron-scheduled-messages edge
+ * function → here). Each row is claimed by deleting it first, so overlapping
  * runs never deliver twice; a sender who lost access to the chat is skipped.
  */
 export async function GET(request: NextRequest) {

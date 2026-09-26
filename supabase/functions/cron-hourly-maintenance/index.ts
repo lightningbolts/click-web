@@ -317,14 +317,6 @@ Deno.serve(async (req: Request) => {
   });
 
   try {
-    // Per-minute schedule (click-scheduled-messages): deliver due scheduled messages only.
-    if (new URL(req.url).searchParams.get('job') === 'scheduled-messages') {
-      const scheduled = await runClickWebCron('/api/cron/scheduled-messages', 'scheduled-messages');
-      return new Response(JSON.stringify({ ok: true, scheduled }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
     const disposable = await runDisposableReveal(admin);
     const events = await runEventRemindersViaWeb();
     const availability = await runAvailabilityMatchesViaWeb();

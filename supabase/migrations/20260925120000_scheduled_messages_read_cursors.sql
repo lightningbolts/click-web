@@ -43,12 +43,12 @@ BEGIN
   END IF;
 END $$;
 
--- Delivery runs every minute (SQL Editor, after deploying click-web and cron-hourly-maintenance;
--- same Vault secrets as click-hourly-maintenance):
+-- Delivery runs every minute (SQL Editor, after deploying click-web and the
+-- cron-scheduled-messages edge function; same Vault secrets as click-hourly-maintenance):
 --   SELECT cron.schedule('click-scheduled-messages', '* * * * *', $$
 --     SELECT net.http_post(
 --       url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'project_url')
---              || '/functions/v1/cron-hourly-maintenance?job=scheduled-messages',
+--              || '/functions/v1/cron-scheduled-messages',
 --       headers := jsonb_build_object(
 --         'Content-Type', 'application/json',
 --         'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_service_role_key')
