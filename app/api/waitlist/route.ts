@@ -32,14 +32,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      // Duplicate email — still success from user perspective
       if (error.code === '23505') {
         return NextResponse.json({
           success: true,
           message: "You're already on the waitlist!",
         });
       }
-      // Column does not exist — attribution columns not yet migrated; retry with email only
+
       if (error.code === '42703') {
         const { error: retryError } = await admin.from('waitlist').insert({ email });
         if (retryError && retryError.code !== '23505') {
@@ -48,9 +47,12 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({
           success: true,
-          message: 'Successfully joined the waitlist!',
+          message: retryError?.code === '23505'
+            ? "You're already on the waitlist!"
+            : 'Successfully joined the waitlist!',
         });
       }
+
       console.error('Waitlist insert error:', error.message);
       return apiError(error.message, 400, 'waitlist_insert_failed');
     }
