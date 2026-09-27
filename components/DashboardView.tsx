@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
-import { motion, useReducedMotion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import useSWR from 'swr';
 import { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
@@ -582,7 +581,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
       ) : null}
 
           {activeTab === 'memory' ? (
-            <TabPaneEnter key="memory" className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="min-w-0 space-y-6">
                 <section aria-label="Your stats">
                   <StatsOverview
@@ -663,7 +662,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                   </div>
                 </section>
               </aside>
-            </TabPaneEnter>
+            </div>
           ) : null}
 
           {/* Map and chat stay mounted after their first visit: MapLibre and an open
@@ -741,8 +740,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
           ) : null}
 
           {activeTab === 'identity' ? (
-            <TabPaneEnter
-              key="identity"
+            <div
               className="flex min-h-[min(70vh,640px)] flex-col items-center justify-center py-4"
             >
                 <div className="w-full max-w-md">
@@ -752,16 +750,16 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                     userEmail={user?.email}
                   />
                 </div>
-            </TabPaneEnter>
+            </div>
           ) : null}
 
           {activeTab === 'settings' ? (
-            <TabPaneEnter key="settings">
+            <div>
               <SettingsView
                 notificationPreferences={notificationPreferences}
                 onSaveNotificationPreferences={persistNotificationPreferences}
               />
-            </TabPaneEnter>
+            </div>
           ) : null}
 
       <DashboardGroupModals
@@ -830,25 +828,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
 
     </div>
     </div>
-  );
-}
-
-/**
- * Short opacity-only arrival for lightweight tab panes. No exit phase: the old
- * pane is replaced in the same frame, so there is never an empty gap or a
- * layout that still belongs to the previous tab.
- */
-function TabPaneEnter({ className, children }: { className?: string; children: React.ReactNode }) {
-  const reduceMotion = useReducedMotion();
-  return (
-    <motion.div
-      initial={reduceMotion ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-      className={className}
-    >
-      {children}
-    </motion.div>
   );
 }
 

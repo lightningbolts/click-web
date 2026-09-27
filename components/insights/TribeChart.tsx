@@ -228,7 +228,7 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                   )}
                 </span>
                 {hoveredTribe.isMicroCommunity ? (
-                  <span className="rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/95">
+                  <span className="rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200/95">
                     Verified clique
                   </span>
                 ) : null}

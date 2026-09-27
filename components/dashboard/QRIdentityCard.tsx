@@ -241,7 +241,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             <button
               type="button"
               onClick={handleShare}
-              className="rounded-lg p-2 transition-colors hover:bg-white/5"
+              className="rounded-lg p-2 transition-colors hover:bg-surface-container-high"
               title="Share Click ID"
               aria-label="Share Click ID"
             >
@@ -250,7 +250,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
             <button
               type="button"
               onClick={handleDownload}
-              className="rounded-lg p-2 transition-colors hover:bg-white/5"
+              className="rounded-lg p-2 transition-colors hover:bg-surface-container-high"
               title="Download QR code"
               aria-label="Download QR code"
             >
@@ -260,7 +260,7 @@ export default function QRIdentityCard({ userId, userName, userEmail }: QRIdenti
               type="button"
               onClick={() => fetchToken(true)}
               disabled={refreshing}
-              className="rounded-lg p-2 transition-colors hover:bg-white/5 disabled:opacity-40"
+              className="rounded-lg p-2 transition-colors hover:bg-surface-container-high disabled:opacity-40"
               title="Refresh QR token"
               aria-label="Refresh QR token"
             >

@@ -26,7 +26,7 @@ export function NoiseVolumeBars({
         <span
           key={i}
           className={`${barW} rounded-sm ${
-            i < activeCount ? 'bg-violet-400' : 'bg-zinc-600/80'
+            i < activeCount ? 'bg-violet-400' : 'bg-outline-variant'
           }`}
           style={{ height: heightsPx[i] }}
         />
@@ -90,7 +90,7 @@ export function MomentBlock({
       {weatherSummary && (
         <div className="flex gap-2 items-center min-w-0">
           <CloudSun
-            className={`shrink-0 text-sky-300 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
+            className={`shrink-0 text-sky-700 dark:text-sky-300 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'}`}
           />
           <span className={`min-w-0 truncate ${textMain}`} title={weatherSummary}>{weatherSummary}</span>
         </div>

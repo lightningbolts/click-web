@@ -56,3 +56,6 @@ decode-ico-0.4.1.tgz
 .maestro/**/*.png
 .maestro/**/*.mp4
 .maestro/.screenshots/
+
+# Copied from node_modules by scripts/copy-maplibre-worker.mjs
+/public/maplibre/
