@@ -62,7 +62,7 @@ describe.each(['homepage_hero', 'enterprise_landing', 'deep_link'] as const)('%s
     expect(mockSignup).toHaveBeenCalledWith('/api/waitlist', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'Ada.Lovelace+click@students.example.co.uk', source,
+        email: 'ada.lovelace+click@students.example.co.uk', source,
         ...(source === 'deep_link' ? { referrer_user_id: referrerId } : {}),
       }),
     });
