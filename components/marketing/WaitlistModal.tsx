@@ -85,7 +85,7 @@ export default function WaitlistModal({
       const data = await response.json();
       if (data.success) {
         setStatus('success');
-        setMessage(data.message || 'Check your inbox and confirm your email to join the waitlist.');
+        setMessage(data.message || "You're on the list. We'll email you when the app opens.");
         return;
       }
       setStatus('error');
@@ -141,14 +141,10 @@ export default function WaitlistModal({
             {status === 'success' ? (
               <div className="rounded-[16px] border border-border-hard bg-primary-container p-5 text-center">
                 <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" aria-hidden />
-                <p className="font-bold text-on-primary-container">Check your inbox</p>
+                <p className="font-bold text-on-primary-container">You&apos;re on the list</p>
                 <p role="status" className="mt-2 text-on-primary-container">
                   {message}
                 </p>
-                <p className="mt-3 text-sm text-on-primary-container">Check spam too. Need another link or used the wrong address?</p>
-                <FcButton className="mt-3 w-full" onClick={() => { setStatus('idle'); setMessage(''); }}>
-                  Try another email or resend
-                </FcButton>
                 <FcButton className="mt-5 w-full" onClick={onClose}>
                   Done
                 </FcButton>
