@@ -114,7 +114,7 @@ export default function LandingPage({
     <>
       <div
         ref={pageRef}
-        className="min-h-screen bg-background text-on-surface overflow-x-hidden isolate"
+        className="min-h-screen bg-background text-on-surface overflow-x-clip isolate"
         style={{ fontFamily: 'var(--font-manrope), ui-sans-serif, system-ui, sans-serif' }}
       >
         <FoldMapHero
@@ -173,18 +173,15 @@ export default function LandingPage({
             className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
             aria-labelledby="irl-heading"
           >
-            <div className="relative mx-auto w-full max-w-md p-2 sm:p-3">
-              <div className="absolute inset-0 -rotate-2 rounded-[28px] bg-primary/30" aria-hidden />
-              <div className="relative overflow-hidden rounded-[16px] border-2 border-primary/40 bg-[#17151c]">
-                <Image
-                  src="/landing/vibe-radar-enhanced.png"
-                  alt="Vibe Radar with nearby profiles arranged around concentric rings"
-                  width={1484}
-                  height={1060}
-                  sizes="(max-width: 640px) 85vw, 448px"
-                  className="h-auto w-full"
-                />
-              </div>
+            <div className="flex justify-center py-2">
+              <Image
+                src="/landing/consumer-friend-profile.webp"
+                alt="A friend’s profile in Click showing shared interests, a Close friendship level, and a map of the spots you’ve hung out"
+                width={923}
+                height={2000}
+                sizes="(max-width: 640px) 220px, 260px"
+                className="h-auto w-[220px] rotate-2 rounded-[28px] border-2 border-primary/40 sm:w-[260px]"
+              />
             </div>
             <div className="max-w-md">
               <h2 id="irl-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">

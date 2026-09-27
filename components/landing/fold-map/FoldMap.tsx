@@ -155,9 +155,14 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
       const initialCells = cellsRef.current;
       const hasHeat = initialCells.length > 0;
       const bounds = foldMapCameraBounds(initialCells);
+      // The hero map is decorative and fills most of a phone's first screen. On touch,
+      // any map touch handler (notably tap-then-drag zoom, which cooperativeGestures does
+      // not block) can preventDefault a swipe and stall page scrolling, so go static.
+      const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
       const map = new maplibregl.Map({
         container,
         style: playgroundMapStyle(themeRef.current),
+        interactive: !coarsePointer,
         ...(bounds
           ? {
               bounds,
