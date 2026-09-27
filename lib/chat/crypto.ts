@@ -146,6 +146,27 @@ export async function deriveKeysForConnection(
   return keys;
 }
 
+/**
+ * Legacy (pre-v2) Community Hub broadcast keys, for reading older hub messages. Same
+ * derivation as iOS `ClickCryptoV1.deriveKeysForHub`: `SHA-256("<salt>:hub-broadcast:<hubId>")`.
+ */
+export async function deriveKeysForHub(hubId: string): Promise<DerivedKeys> {
+  const cacheKey = `hub:${hubId.trim()}`;
+  const cached = keyCache.get(cacheKey);
+  if (cached) return cached;
+  const master = new Uint8Array(await sha256(toUtf8(`${E2EE_SALT}:hub-broadcast:${hubId.trim()}`))) as Bytes;
+  const encKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x01]) as Bytes));
+  const macKeyRaw = await sha256(concatBuffers(master, new Uint8Array([0x02]) as Bytes));
+  const encKey = await crypto.subtle.importKey('raw', encKeyRaw, { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
+  const macKey = await crypto.subtle.importKey('raw', macKeyRaw, { name: 'HMAC', hash: 'SHA-256' }, false, [
+    'sign',
+    'verify',
+  ]);
+  const keys: DerivedKeys = { encKey, macKey, encKeyRaw, macKeyRaw };
+  keyCache.set(cacheKey, keys);
+  return keys;
+}
+
 export async function encryptContent(plaintext: string, keys: DerivedKeys): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH)) as Bytes;
   const ciphertext = new Uint8Array(
@@ -273,4 +294,11 @@ export function isGroupMessageEncrypted(content: string): boolean {
 
 export function isAnyE2eeWireContent(content: string): boolean {
   return isEncrypted(content) || isGroupMessageEncrypted(content);
+}
+
+/** Any ciphertext wire format this app can receive (v1 pairwise, v1 group, v2). Display surfaces must never render it. */
+export function isEncryptedWireContent(content: string | null | undefined): boolean {
+  if (typeof content !== 'string') return false;
+  const t = content.trimStart();
+  return isAnyE2eeWireContent(t) || t.startsWith('e2e2:');
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import * as Switch from '@radix-ui/react-switch';
-import { RefreshCw, Bell, MessageCircle, Phone, Calendar, Users, Radio, Sparkles, HeartHandshake } from 'lucide-react';
+import { RefreshCw, Bell, MessageCircle, Calendar, Users, Radio, Sparkles, HeartHandshake } from 'lucide-react';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
 
 export default function NotificationsSection({
@@ -97,7 +97,7 @@ export default function NotificationsSection({
         </div>
         <div>
           <h3 className="text-xl font-bold">Notifications</h3>
-          <p className="text-on-surface-variant text-sm">Control browser alerts for messages and incoming calls.</p>
+          <p className="text-on-surface-variant text-sm">Control alerts for messages, events, and activity.</p>
         </div>
       </div>
 
@@ -136,15 +136,6 @@ export default function NotificationsSection({
           checked={notificationPreferences.messagePushEnabled}
           disabled={notificationLoading}
           onChange={(checked) => { void handleNotificationToggle('messagePushEnabled', checked); }}
-        />
-
-        <NotificationToggleRow
-          icon={<Phone className="w-4 h-4 text-on-surface-variant" />}
-          title="Incoming call alerts"
-          description="Show browser alerts for incoming calls when the dashboard is not frontmost."
-          checked={notificationPreferences.callPushEnabled}
-          disabled={notificationLoading}
-          onChange={(checked) => { void handleNotificationToggle('callPushEnabled', checked); }}
         />
 
         <NotificationToggleRow

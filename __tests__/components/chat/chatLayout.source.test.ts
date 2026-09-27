@@ -7,7 +7,7 @@ describe("chat panel chrome", () => {
       path.join(__dirname, "../../../components/chat/ChatView.tsx"),
       "utf8",
     );
-    expect(view).toContain("CHAT_PANEL_CLASS");
+    expect(view).toContain("CHAT_THREAD_PANEL_CLASS");
     expect(view).toContain('data-testid="chat-panel"');
     expect(view).not.toContain("CHAT_TRANSCRIPT_MAX_CLASS");
     expect(view).not.toContain("max-w-none");
@@ -42,6 +42,7 @@ describe("chat panel chrome", () => {
       "utf8",
     );
     expect(token).toContain("CHAT_PANEL_CLASS");
+    expect(token).toContain("CHAT_THREAD_PANEL_CLASS");
     expect(token).toContain("rounded-[16px]");
     expect(token).toContain("border-border-hard");
     expect(token).not.toMatch(/max-w-none/);
