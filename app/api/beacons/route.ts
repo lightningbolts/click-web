@@ -139,9 +139,42 @@ async function relocateSoundtrackBeacon(
   return parseInsertedBeacon(updated, lon, lat);
 }
 
+const BEACON_PAGE_DEFAULT = 200;
+const BEACON_PAGE_MAX = 500;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type BeaconPageCursor = { createdAt: string; id: string };
+
+/** Opaque `cursor`: base64url of `{"c": created_at, "i": id}` of the last row of a page. */
+function encodeBeaconCursor(cursor: BeaconPageCursor): string {
+  return Buffer.from(JSON.stringify({ c: cursor.createdAt, i: cursor.id })).toString("base64url");
+}
+
+function decodeBeaconCursor(raw: string | null): BeaconPageCursor | null | "invalid" {
+  if (raw == null || raw.trim() === "") return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw.trim(), "base64url").toString("utf8")) as { c?: unknown; i?: unknown };
+    if (typeof parsed.c !== "string" || Number.isNaN(Date.parse(parsed.c))) return "invalid";
+    if (typeof parsed.i !== "string" || !UUID_RE.test(parsed.i)) return "invalid";
+    return { createdAt: parsed.c, id: parsed.i };
+  } catch {
+    return "invalid";
+  }
+}
+
+function parsePageLimit(searchParams: URLSearchParams): number {
+  const raw = Number(searchParams.get("limit"));
+  if (!Number.isFinite(raw) || raw <= 0) return BEACON_PAGE_DEFAULT;
+  return Math.min(Math.floor(raw), BEACON_PAGE_MAX);
+}
+
 /**
  * Proximity map beacons (PostGIS ST_DWithin via caller-scoped SECURITY DEFINER RPC)
  * after JWT verification. The route never accepts a creator id for own-pin hydration.
+ *
+ * Paginated newest first: `limit` (default 200, max 500) and an opaque `cursor` from the
+ * previous response's `next_cursor` (null once there are no more pages). Pages are cut before
+ * visibility filtering, so a page can hold fewer than `limit` beacons while more remain.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -161,51 +194,70 @@ export async function GET(request: NextRequest) {
     const { lat, lng } = latLon;
     const radius = parseRadiusMeters(searchParams);
     const typeFilter = parseBeaconTypeFilters(searchParams);
+    const limit = parsePageLimit(searchParams);
+    const cursor = decodeBeaconCursor(searchParams.get("cursor"));
+    if (cursor === "invalid") {
+      return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
+    }
 
     // Use the user-scoped client so RPC visibility (auth.uid()) works for connections /
     // core_connections — admin RPC leaves auth.uid() null and drops those rows.
-    const { data, error } = await supabase.rpc("fetch_map_beacons_within", {
+    // One extra row tells whether another page exists.
+    const { data, error } = await supabase.rpc("fetch_map_beacons_within_page", {
       lat,
       lng,
       radius_meters: radius,
-      p_limit: 200,
+      p_limit: limit + 1,
+      p_before_created_at: cursor?.createdAt ?? null,
+      p_before_id: cursor?.id ?? null,
     });
 
     if (error) {
-      console.error("fetch_map_beacons_within:", error.message);
+      console.error("fetch_map_beacons_within_page:", error.message);
       return NextResponse.json({ error: "Failed to load beacons" }, { status: 500 });
     }
 
     const admin = createAdminSupabaseClient();
-    const rawList = normalizeBeaconRpcRows(data);
+    const fetched = normalizeBeaconRpcRows(data);
+    const rawList = fetched.slice(0, limit);
+    let nextCursor: string | null = null;
+    if (fetched.length > limit) {
+      const last = rawList[rawList.length - 1] as { created_at?: unknown; id?: unknown } | undefined;
+      if (last && typeof last.created_at === "string" && typeof last.id === "string") {
+        nextCursor = encodeBeaconCursor({ createdAt: last.created_at, id: last.id });
+      }
+    }
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
 
     // Always merge the caller's own active beacons (any location) so creators still see
     // pins they dropped even when the map/GPS center is far from the drop site.
     // Use RPC (lat/lng in JSON) — selecting geography `location` via PostgREST often yields
     // opaque EWKB that parseInsertedBeacon cannot decode → own pins silently dropped.
-    try {
-      // This function deliberately has no user-id parameter. Calling it with the
-      // authenticated client keeps auth.uid() scoped to the caller; using the
-      // service role here would turn an arbitrary UUID into a location oracle.
-      const { data: ownData, error: ownErr } = await supabase.rpc("fetch_my_active_map_beacons", {
-        p_limit: 50,
-      });
-      if (ownErr) {
-        console.warn("GET /api/beacons own beacons:", ownErr.message);
-      } else {
-        const ownParsed = normalizeBeaconRpcRows(ownData)
-          .map(parseMapBeacon)
-          .filter((b): b is MapBeaconRecord => b != null);
-        if (ownParsed.length > 0) {
-          const byId = new Map<string, MapBeaconRecord>();
-          for (const b of beacons) byId.set(b.id, b);
-          for (const b of ownParsed) byId.set(b.id, b);
-          beacons = Array.from(byId.values());
+    // First page only: later pages would repeat them.
+    if (cursor == null) {
+      try {
+        // This function deliberately has no user-id parameter. Calling it with the
+        // authenticated client keeps auth.uid() scoped to the caller; using the
+        // service role here would turn an arbitrary UUID into a location oracle.
+        const { data: ownData, error: ownErr } = await supabase.rpc("fetch_my_active_map_beacons", {
+          p_limit: 50,
+        });
+        if (ownErr) {
+          console.warn("GET /api/beacons own beacons:", ownErr.message);
+        } else {
+          const ownParsed = normalizeBeaconRpcRows(ownData)
+            .map(parseMapBeacon)
+            .filter((b): b is MapBeaconRecord => b != null);
+          if (ownParsed.length > 0) {
+            const byId = new Map<string, MapBeaconRecord>();
+            for (const b of beacons) byId.set(b.id, b);
+            for (const b of ownParsed) byId.set(b.id, b);
+            beacons = Array.from(byId.values());
+          }
         }
+      } catch (e) {
+        console.warn("GET /api/beacons own beacons merge failed:", e);
       }
-    } catch (e) {
-      console.warn("GET /api/beacons own beacons merge failed:", e);
     }
 
     beacons = filterBeaconRecords(beacons, typeFilter);
@@ -213,7 +265,7 @@ export async function GET(request: NextRequest) {
     beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
-    return NextResponse.json({ beacons, radius_meters: radius });
+    return NextResponse.json({ beacons, radius_meters: radius, next_cursor: nextCursor });
   } catch (e) {
     console.error("GET /api/beacons:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
