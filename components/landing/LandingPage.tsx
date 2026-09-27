@@ -245,7 +245,7 @@ export default function LandingPage({
               The Click beta is live on iPhone.
             </h2>
             <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-on-surface-variant sm:text-base">
-              Install TestFlight, tap the invite, and start connecting. Full launch Fall 2026. No ads. No feed. Built at UW.
+              Install TestFlight, tap the invite, and start connecting. Android coming soon. Full launch Fall 2026. No ads. No feed. Built at UW.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <a

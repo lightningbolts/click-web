@@ -72,7 +72,7 @@ export default function FoldMapHero({
             </button>
           </div>
           <p className="mt-3 text-xs font-medium text-on-surface-variant">
-            iPhone beta via TestFlight. On Android? Join the waitlist.
+            iPhone beta via TestFlight. Android coming soon: join the waitlist to hear first.
           </p>
         </div>
       </div>
