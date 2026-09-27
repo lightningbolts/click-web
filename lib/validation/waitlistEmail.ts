@@ -6,6 +6,7 @@ export const WAITLIST_EMAIL_ERROR = 'Enter a valid email address.';
 // syntax only; it does not claim that the mailbox exists or belongs to the user.
 export const waitlistEmailSchema = z.string()
   .trim()
+  .toLowerCase()
   .max(254, WAITLIST_EMAIL_ERROR)
   .email(WAITLIST_EMAIL_ERROR)
   .refine((email) => {
