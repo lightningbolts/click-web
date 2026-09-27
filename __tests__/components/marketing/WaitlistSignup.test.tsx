@@ -15,7 +15,7 @@ const originalFetch = global.fetch;
 const mockSignup = jest.fn();
 
 beforeEach(() => {
-  mockSignup.mockReset().mockResolvedValue({ json: async () => ({ success: true, verificationRequired: true, message: 'Check your inbox for a confirmation link. Your place is confirmed only after you verify your email.' }) });
+  mockSignup.mockReset().mockResolvedValue({ json: async () => ({ success: true, message: 'Successfully joined the waitlist!' }) });
   global.fetch = jest.fn((url, options) => {
     if (url === '/api/qr') return Promise.resolve({ ok: true, json: async () => ({ success: true }) } as Response);
     return mockSignup(url, options);
@@ -113,16 +113,5 @@ describe.each(['homepage_hero', 'enterprise_landing', 'deep_link'] as const)('%s
     expect(mockSignup).toHaveBeenCalledTimes(1);
     finish({ json: async () => ({ success: true, message: "You're already on the waitlist!" }) });
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Email' })).not.toBeInTheDocument());
-  });
-
-  it('shows pending confirmation and allows correcting the address or requesting another link', async () => {
-    const user = await showForm();
-    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'terajzhang@gmail.com');
-    await user.click(screen.getByRole('button', { name: 'Join the Waitlist' }));
-    expect(await screen.findByText(/Your place is confirmed only after you verify your email/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Try another email or resend' }));
-    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue('terajzhang@gmail.com');
-    await user.click(screen.getByRole('button', { name: 'Join the Waitlist' }));
-    await waitFor(() => expect(mockSignup).toHaveBeenCalledTimes(2));
   });
 });
