@@ -3,17 +3,11 @@
 import { motion } from 'framer-motion';
 import {
   BookOpen,
-  Calendar,
-  Flame,
-  Heart,
   MapPin,
   MessageCircle,
   QrCode,
   Search,
-  Sparkles,
-  Target,
   Users,
-  Zap,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { PlaygroundAvatar, VolumeBars } from '../DeviceChrome';
@@ -55,8 +49,19 @@ export default function DashboardScene({
   }, [connected, query, state.memories]);
 
   const kept = connected.filter((p) => p.status === 'kept').length;
-  const milestoneTarget = 5;
-  const firstFiveUnlocked = connected.length >= 5;
+  const recent = [...connected].reverse().slice(0, 4);
+  const upcoming = [
+    ...connected.flatMap((person) =>
+      (state.messages[person.id] ?? [])
+        .filter((m) => m.plan?.going)
+        .map((m) => ({
+          key: m.id,
+          title: `${m.plan!.title} with ${person.name.split(' ')[0]}`,
+          detail: `${m.plan!.when} · ${m.plan!.place}`,
+        })),
+    ),
+    ...rsvps.map((event) => ({ key: event.id, title: event.title, detail: `${event.when} · ${event.venue}` })),
+  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-on-surface" data-testid="playground-scene-dashboard">
@@ -66,7 +71,6 @@ export default function DashboardScene({
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-2"
         >
-          <Sparkles className="h-4 w-4 text-primary" />
           <div>
             <h2 className="text-xl font-bold">
               Welcome back, <span className="text-primary">{DEMO_USER_NAME.split(' ')[0]}</span>
@@ -111,20 +115,52 @@ export default function DashboardScene({
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-5 md:px-6">
         {state.dashboardTab === 'memory' ? (
             <div className="h-full space-y-6 overflow-y-auto">
-            <motion.div
-              className="grid grid-cols-2 gap-3 md:grid-cols-4"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-              }}
-            >
-              <StatCard icon={Users} label="Total Connections" value={connected.length} trend="+2" />
-              <StatCard icon={Calendar} label="This Month" value={connected.length} />
-              <StatCard icon={Flame} label="Connection Streak" value="4 days" accent="text-primary" />
-              <StatCard icon={Heart} label="Retention Rate" value="100%" accent="text-primary" />
-            </motion.div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-[16px] border border-border-hard bg-surface p-4" data-testid="playground-coming-up">
+                <p className="text-sm font-semibold text-on-surface">Coming up</p>
+                <p className="text-xs text-on-surface-variant">Plans from your chats and events you RSVP’d to</p>
+                {upcoming.length === 0 ? (
+                  <p className="mt-3 text-xs text-on-surface-variant">Nothing planned yet. Send a plan from a chat.</p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {upcoming.map((item) => (
+                      <li key={item.key} className="rounded-[12px] border border-border-hard bg-primary-container px-3 py-2">
+                        <p className="text-sm font-semibold text-on-primary-container">{item.title}</p>
+                        <p className="text-xs text-on-primary-container">{item.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="rounded-[16px] border border-border-hard bg-surface p-4">
+                <p className="text-sm font-semibold text-on-surface">Recent connections</p>
+                <ul className="mt-3 space-y-2">
+                  {recent.map((person) => {
+                    const memory = state.memories[person.id] ?? person.memory;
+                    return (
+                      <li key={person.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            actions.setOpenChatId(person.id);
+                            actions.setDashboardTab('chat');
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1 text-left hover:bg-surface-container-low"
+                        >
+                          <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-on-surface">{person.name}</span>
+                            <span className="block truncate text-xs text-on-surface-variant">
+                              {memory ? `${memory.label} · ${memory.place}` : person.dateMet}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
 
             <div className="rounded-[16px] border border-border-hard bg-surface p-4">
               <p className="text-sm font-semibold text-on-surface">Availability</p>
@@ -134,67 +170,9 @@ export default function DashboardScene({
                 </span>
                 <span className="text-xs text-on-surface-variant">Fri afternoon</span>
               </div>
-              <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-100">
+              <p className="mt-2 text-xs font-medium text-on-surface">
                 Maya Chen overlaps Friday afternoon.
               </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <p className="mb-2 text-xs font-medium text-on-surface-variant">Recent Achievements</p>
-                <div className="rounded-[12px] border border-border-hard bg-surface p-3">
-                  <p className="text-sm font-semibold text-on-surface">First Click</p>
-                  <p className="text-xs text-on-surface-variant">You met someone in the same room.</p>
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-medium text-on-surface-variant">Next Milestone</p>
-                <div className="rounded-[12px] border border-border-hard bg-surface p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 text-sm font-medium">
-                      <Target className="h-4 w-4 text-primary" /> First Five
-                    </span>
-                    <span className="text-xs text-on-surface-variant">
-                      {connected.length}/{milestoneTarget}
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-surface-container">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((connected.length / milestoneTarget) * 100, 100)}%` }}
-                      transition={{ duration: 1, ease: 'easeOut' }}
-                      className="h-full bg-primary"
-                    />
-                  </div>
-                  <p className="mt-2 flex items-center gap-1 text-xs text-on-surface-variant">
-                    <Zap className="h-3 w-3 text-primary" />
-                    {firstFiveUnlocked ? 'Unlocked.' : 'Tap Jordan in the app to hit five.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[16px] border border-border-hard bg-surface p-4">
-              <p className="text-sm font-semibold text-on-surface">This week</p>
-              <p className="text-xs text-on-surface-variant">
-                {connected.length} Clicks · UW campus · {rsvps.length} upcoming event
-                {rsvps.length === 1 ? '' : 's'}
-              </p>
-              {rsvps.length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {rsvps.map((event) => (
-                    <li
-                      key={event.id}
-                      className="rounded-[12px] border border-border-hard bg-primary-container px-3 py-2"
-                    >
-                      <p className="text-sm font-semibold text-on-primary-container">{event.title}</p>
-                      <p className="text-xs text-on-primary-container">
-                        {event.when} · {event.venue}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
             </div>
 
             <div className="rounded-[16px] border border-border-hard bg-surface p-4">
@@ -302,35 +280,5 @@ export default function DashboardScene({
         </div>
       </div>
     </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  trend,
-  accent,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string | number;
-  trend?: string;
-  accent?: string;
-}) {
-  return (
-    <motion.div
-      variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-      className="rounded-[16px] border border-border-hard bg-surface p-3"
-    >
-      <div className="mb-2 flex items-start justify-between">
-        <span className="rounded-xl bg-primary/15 p-2">
-          <Icon className={`h-4 w-4 ${accent ?? 'text-primary'}`} />
-        </span>
-        {trend ? <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">{trend}</span> : null}
-      </div>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs text-on-surface-variant">{label}</p>
-    </motion.div>
   );
 }

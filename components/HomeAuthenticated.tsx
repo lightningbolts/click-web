@@ -7,6 +7,7 @@ import type { User } from '@supabase/supabase-js';
 import LoadingScreen from '@/components/LoadingScreen';
 import { ProductChromeOn } from '@/lib/shell/ProductChromeContext';
 import { fadeTransition } from '@/lib/motion';
+import { readSessionCache } from '@/lib/dashboard/sessionCache';
 
 /** Keep livekit/maplibre/emoji-mart out of the Cloudflare Worker SSR bundle. */
 const DashboardView = dynamic(() => import('@/components/DashboardView'), {
@@ -15,7 +16,8 @@ const DashboardView = dynamic(() => import('@/components/DashboardView'), {
 });
 
 export default function HomeAuthenticated({ user }: { user: User }) {
-  const [ready, setReady] = useState(false);
+  // Returning to `/` in the same tab session paints the cached dashboard, not the boot loader.
+  const [ready, setReady] = useState(() => readSessionCache<boolean>(user.id, 'booted') === true);
   const reduceMotion = useReducedMotion();
   const onReady = useCallback(() => setReady(true), []);
 

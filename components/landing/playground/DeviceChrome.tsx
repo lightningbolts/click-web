@@ -94,7 +94,7 @@ export function WebChrome({
   children,
   label,
   lockScroll = false,
-  address = 'click.app / dashboard',
+  address = 'joinclick.co',
 }: {
   children: ReactNode;
   label: string;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { useSessionCachedState } from '@/lib/dashboard/sessionCache';
 import { memberSetKeySorted } from '@/components/chat';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 
@@ -17,8 +18,14 @@ export function useVerifiedCliques({
   user: any;
   groupClicksReloadNonce: number;
 }) {
-  const [groupCliqueRecords, setGroupCliqueRecords] = useState<ConnectionRecord[]>([]);
-  const [verifiedClickMemberSetKeys, setVerifiedClickMemberSetKeys] = useState<Set<string>>(
+  const [groupCliqueRecords, setGroupCliqueRecords] = useSessionCachedState<ConnectionRecord[]>(
+    user?.id,
+    'groupCliques',
+    [],
+  );
+  const [verifiedClickMemberSetKeys, setVerifiedClickMemberSetKeys] = useSessionCachedState<Set<string>>(
+    user?.id,
+    'verifiedClickMemberSetKeys',
     () => new Set(),
   );
   const [groupMemberPickerRows, setGroupMemberPickerRows] = useState<{ userId: string; label: string }[]>([]);

@@ -5,6 +5,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useState,
   type Dispatch,
   type MutableRefObject,
   type RefObject,
@@ -59,6 +60,7 @@ export function useMessageLoading({
   programmaticListScrollRef,
   snapScrollToLatestOnOpenRef,
   searchFocusConsumedRef,
+  readReceiptsEnabled = true,
   getAuthHeaders,
   firePeerDeliveredAck,
 }: {
@@ -89,6 +91,8 @@ export function useMessageLoading({
   programmaticListScrollRef: MutableRefObject<boolean>;
   snapScrollToLatestOnOpenRef: MutableRefObject<boolean>;
   searchFocusConsumedRef: MutableRefObject<string | null>;
+  /** False while the thread is not on screen (hidden tab pane); nothing is marked read then. */
+  readReceiptsEnabled?: boolean;
   getAuthHeaders: () => Promise<HeadersInit>;
   firePeerDeliveredAck: (messageIds: string[]) => Promise<void>;
 }) {
@@ -408,8 +412,20 @@ export function useMessageLoading({
     [messages, currentUserId],
   );
 
+  // Only mark messages read while someone can actually see them: the thread is the visible
+  // pane and the browser tab is in the foreground.
+  const [documentVisible, setDocumentVisible] = useState(
+    () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  );
+  useEffect(() => {
+    const onChange = () => setDocumentVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+  }, []);
+
   useEffect(() => {
     if (!chatId || unreadIncomingMessageIds.length === 0) return;
+    if (!readReceiptsEnabled || !documentVisible) return;
     let cancelled = false;
 
     (async () => {
@@ -441,7 +457,7 @@ export function useMessageLoading({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId, getAuthHeaders, unreadIncomingMessageIds]);
+  }, [chatId, getAuthHeaders, unreadIncomingMessageIds, readReceiptsEnabled, documentVisible]);
 
   return {
     scrollToBottom,

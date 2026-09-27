@@ -130,29 +130,17 @@ export function useChatEncryption({
     [isGroupClique, groupMasterKey, e2eKeys, getE2eeV2Session],
   );
 
+  /**
+   * Reply threading sends only the target id. A plaintext excerpt in metadata would expose
+   * encrypted text to the server (iOS `textPost` rule); quotes are resolved on-device from
+   * the timeline instead.
+   */
   const appendReplyToMetadata = useCallback(
     async (meta: Record<string, unknown>): Promise<Record<string, unknown>> => {
       if (!replyingTo || shouldSkipChatDecrypt(replyingTo.message_type)) return meta;
-      let snippetSource = replyingTo.content;
-      if (replyingTo.content.startsWith('e2e2:')) {
-        const session = await getE2eeV2Session(false);
-        if (session) snippetSource = await decryptWebE2eeV2Message(session, replyingTo.content);
-      } else if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(replyingTo.content)) {
-        snippetSource = await decryptGroupMessageContent(replyingTo.content, groupMasterKey);
-      } else if (e2eKeys && isEncrypted(replyingTo.content)) {
-        snippetSource = await decryptContent(replyingTo.content, e2eKeys);
-      }
-      const replyLabel =
-        replyingTo.message_type === 'image' || replyingTo.message_type === 'audio'
-          ? previewLabelForMessage({ ...replyingTo, content: snippetSource })
-          : snippetSource;
-      return {
-        ...meta,
-        reply_to_id: replyingTo.id,
-        reply_to_content: replySnippetForSend(replyLabel, 140),
-      };
+      return { ...meta, reply_to_id: replyingTo.id };
     },
-    [replyingTo, e2eKeys, groupMasterKey, isGroupClique, getE2eeV2Session],
+    [replyingTo],
   );
 
   useEffect(() => {

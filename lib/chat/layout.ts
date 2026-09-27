@@ -8,3 +8,10 @@
  */
 export const CHAT_PANEL_CLASS =
   "flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border border-border-hard bg-surface";
+
+/**
+ * The open conversation: same plate as [CHAT_PANEL_CLASS] but laid out as a row, so the
+ * thread column and the conversation-details column share one border.
+ */
+export const CHAT_THREAD_PANEL_CLASS =
+  "relative flex h-full min-h-0 overflow-hidden rounded-[16px] border border-border-hard bg-surface";

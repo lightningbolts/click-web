@@ -1,10 +1,11 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { PlaygroundAvatar, VolumeBars } from '../DeviceChrome';
 import { PLAYGROUND_PEOPLE } from '../mockData';
+import DemoThread, { isNewClick } from './DemoThread';
 import type { PlaygroundActions, PlaygroundState } from '../types';
 
 export default function ChatPane({
@@ -20,14 +21,7 @@ export default function ChatPane({
   const open = connected.find((p) => p.id === state.openChatId) ?? null;
   const memory = open ? (state.memories[open.id] ?? open.memory) : undefined;
   const thread = open ? (state.messages[open.id] ?? []) : [];
-  const [draft, setDraft] = useState('');
   const [listTab, setListTab] = useState<'active' | 'archived'>('active');
-
-  const send = () => {
-    if (!open || !draft.trim()) return;
-    actions.sendMessage(open.id, draft.trim());
-    setDraft('');
-  };
 
   return (
     <div className={compact ? 'flex h-full min-h-0 flex-col' : undefined}>
@@ -62,41 +56,7 @@ export default function ChatPane({
               ) : null}
             </div>
           </div>
-          <ul className="flex flex-1 flex-col gap-2 overflow-auto px-3 py-3">
-            {thread.map((msg) => (
-              <li
-                key={msg.id}
-                className={`max-w-[80%] rounded-[16px] px-3 py-2 text-sm ${
-                  msg.from === 'you'
-                    ? 'ml-auto bg-primary text-on-primary'
-                    : 'border border-border-hard bg-surface-container text-on-surface'
-                }`}
-              >
-                <p>{msg.text}</p>
-                <p className={`mt-1 text-[10px] ${msg.from === 'you' ? 'text-on-primary/70' : 'text-on-surface-variant'}`}>
-                  {msg.time}
-                </p>
-              </li>
-            ))}
-          </ul>
-          <form
-            className="flex gap-2 border-t border-border-hard p-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              send();
-            }}
-          >
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={`Message ${open.name.split(' ')[0]}…`}
-              className="fc-input min-w-0 flex-1 px-3 py-2"
-              aria-label="Message"
-            />
-            <button type="submit" className="fc-btn-primary px-3 py-2" aria-label="Send message">
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
+          <DemoThread person={open} memory={memory} thread={thread} actions={actions} />
         </motion.div>
       ) : (
         <motion.div
@@ -154,7 +114,10 @@ export default function ChatPane({
               ) : (
                 <ul className="divide-y divide-border-hard overflow-hidden rounded-[16px] border border-border-hard bg-surface">
                   {connected.map((person) => {
-                    const preview = state.messages[person.id]?.at(-1)?.text ?? person.chatPreview;
+                    const thread = state.messages[person.id] ?? [];
+                    const fresh = thread.length > 0 && isNewClick(thread);
+                    const last = thread.at(-1);
+                    const preview = fresh ? 'New Click · say hi' : last?.plan ? `📅 ${last.plan.title}` : last?.text ?? person.chatPreview;
                     return (
                       <li key={person.id}>
                         <button
@@ -170,9 +133,13 @@ export default function ChatPane({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
                               <p className="truncate text-sm font-semibold text-on-surface">{person.name}</p>
-                              <span className="text-[11px] text-on-surface-variant">{person.chatTime}</span>
+                              {fresh ? (
+                          <span className="rounded-full bg-primary-container px-1.5 py-0.5 text-[10px] font-bold text-on-primary-container">48h left</span>
+                        ) : (
+                          <span className="text-[11px] text-on-surface-variant">{person.chatTime}</span>
+                        )}
                             </div>
-                            <p className="truncate text-xs text-on-surface-variant">{preview}</p>
+                            <p className={`truncate text-xs ${fresh ? 'font-semibold text-primary' : 'text-on-surface-variant'}`}>{preview}</p>
                           </div>
                         </button>
                       </li>

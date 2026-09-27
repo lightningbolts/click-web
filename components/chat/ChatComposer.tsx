@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
-import { Send, Loader2, ImagePlus, Paperclip, Mic, Square, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { Send, Loader2, ImagePlus, Paperclip, Mic, Square, X, Plus, CalendarPlus, Clock } from 'lucide-react';
 import type { Message } from '@/lib/chat/types';
 import { ATTACHMENT_ACCEPT_STRING } from '@/lib/chat/attachmentValidator';
 import type { KlipyGifItem } from '@/lib/chat/klipy';
@@ -37,6 +37,8 @@ export function ChatComposer({
   sendMessage,
   gifCustomerId,
   sendGif,
+  onPlan,
+  onSchedule,
 }: {
   chatId: string | null;
   isGroupClique: boolean;
@@ -62,9 +64,34 @@ export function ChatComposer({
   sendMessage: () => Promise<void>;
   gifCustomerId: string | null;
   sendGif: (item: KlipyGifItem, query: string) => Promise<void>;
+  /** Opens the plan dialog (direct chats and verified cliques). */
+  onPlan?: () => void;
+  /** Opens the schedule dialog for the current text. */
+  onSchedule?: () => void;
 }) {
   const [showGifPicker, setShowGifPicker] = useState(false);
   const closeGifPicker = useCallback(() => setShowGifPicker(false), []);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMoreOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [moreOpen]);
+  const toolButton =
+    'inline-flex h-10 w-10 items-center justify-center rounded-[8px] text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary disabled:cursor-not-allowed disabled:opacity-30';
+  const menuItem =
+    'flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2.5 text-left text-sm font-semibold text-on-surface hover:bg-surface-container-low disabled:opacity-40';
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -74,7 +101,7 @@ export function ChatComposer({
   };
 
   return (
-    <div className="relative z-40 shrink-0 overflow-visible border-t border-border-hard bg-surface px-4 py-3">
+    <div className="relative z-40 shrink-0 overflow-visible border-t border-border-hard bg-surface px-3 py-3 md:px-4">
       {showGifPicker && gifCustomerId && (
         <GifPicker
           customerId={gifCustomerId}
@@ -99,7 +126,7 @@ export function ChatComposer({
           </button>
         </div>
       )}
-      <div className="flex w-full min-w-0 items-end gap-2 sm:gap-3">
+      <div className="flex w-full min-w-0 items-end gap-1.5 sm:gap-2">
         <input
           ref={photoInputRef}
           type="file"
@@ -114,15 +141,79 @@ export function ChatComposer({
           className="hidden"
           onChange={onAttachmentSelected}
         />
-        <div className="flex shrink-0 flex-row items-center gap-1.5">
+        <div className="flex shrink-0 flex-row items-center gap-0.5">
+          <div className="relative" ref={moreRef}>
+            <button
+              type="button"
+              onClick={() => setMoreOpen((o) => !o)}
+              disabled={!chatId || isRecording}
+              className={toolButton}
+              aria-label="More actions"
+              aria-haspopup="menu"
+              aria-expanded={moreOpen}
+              title="More"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+            {moreOpen ? (
+              <div
+                role="menu"
+                className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 w-56 rounded-[12px] border border-border-hard bg-surface p-1.5 shadow-xl"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItem}
+                  disabled={mediaBusy}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    attachmentInputRef.current?.click();
+                  }}
+                >
+                  <Paperclip className="h-4 w-4 text-on-surface-variant" aria-hidden />
+                  File (2 MB max)
+                </button>
+                {onPlan ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={menuItem}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      onPlan();
+                    }}
+                  >
+                    <CalendarPlus className="h-4 w-4 text-on-surface-variant" aria-hidden />
+                    Plan a hangout
+                  </button>
+                ) : null}
+                {onSchedule ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={menuItem}
+                    disabled={!inputText.trim() || Boolean(editingId)}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      onSchedule();
+                    }}
+                  >
+                    <Clock className="h-4 w-4 text-on-surface-variant" aria-hidden />
+                    Schedule message
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => photoInputRef.current?.click()}
             disabled={!chatId || mediaBusy || isRecording}
-            className="rounded-[8px] border border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+            className={toolButton}
             title="Attach photo"
+            aria-label="Attach photo"
           >
-            {mediaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+            {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
           </button>
           {gifCustomerId && (
             <button
@@ -130,9 +221,7 @@ export function ChatComposer({
               data-gif-toggle
               onClick={() => setShowGifPicker((open) => !open)}
               disabled={!chatId || isRecording}
-              className={`rounded-[8px] border bg-surface-container px-2 py-2.5 text-[11px] font-bold leading-4 tracking-wide transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 ${
-                showGifPicker ? 'border-primary text-primary' : 'border-border-hard text-on-surface-variant'
-              }`}
+              className={`${toolButton} text-[11px] font-bold tracking-wide ${showGifPicker ? 'bg-primary-container text-on-primary-container' : ''}`}
               title="Send a GIF"
               aria-label="Send a GIF"
               aria-expanded={showGifPicker}
@@ -140,51 +229,44 @@ export function ChatComposer({
               GIF
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => attachmentInputRef.current?.click()}
-            disabled={!chatId || mediaBusy || isRecording}
-            className="rounded-[8px] border border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
-            title="Attach file (2 MB max)"
-            aria-label="Attach file"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
           {!isRecording ? (
             <button
               type="button"
               onClick={() => void beginVoiceRecording()}
               disabled={!chatId || mediaBusy}
-              className="rounded-[8px] border border-border-hard bg-surface-container p-2.5 text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              className={toolButton}
               title="Record voice message"
+              aria-label="Record voice message"
             >
-              <Mic className="w-4 h-4" />
+              <Mic className="h-5 w-5" />
             </button>
           ) : (
             <>
-              <span className="min-w-[2.5rem] text-center font-mono text-[10px] tabular-nums text-red-700 dark:text-red-400">
+              <span className="min-w-[2.5rem] text-center text-xs font-semibold tabular-nums text-error">
                 {`${Math.floor(recordingMs / 60000)}:${String(Math.floor((recordingMs % 60000) / 1000)).padStart(2, '0')}`}
               </span>
               <button
                 type="button"
                 onClick={stopVoiceRecording}
-                className="rounded-[8px] border-2 border-primary/40 bg-on-primary-container p-2.5 text-primary"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[8px] bg-primary-container text-on-primary-container"
                 title="Stop and send"
+                aria-label="Stop and send voice message"
               >
-                <Square className="w-4 h-4 fill-current" />
+                <Square className="h-4 w-4 fill-current" />
               </button>
               <button
                 type="button"
                 onClick={cancelVoiceRecording}
-                className="rounded-[8px] border border-border-hard p-2.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                className={toolButton}
                 title="Cancel"
+                aria-label="Cancel recording"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </>
           )}
         </div>
-        <div className="flex min-w-0 flex-1 items-center rounded-[8px] border border-border-hard bg-surface-container px-4 py-[7px] transition-colors focus-within:border-primary">
+        <div className="flex min-h-10 min-w-0 flex-1 items-center rounded-[16px] border border-border-hard bg-surface-container-low px-4 py-2 transition-colors focus-within:border-primary">
           <textarea
             ref={inputRef}
             value={inputText}
@@ -208,17 +290,29 @@ export function ChatComposer({
             style={{ minHeight: '24px', maxHeight: '120px' }}
           />
         </div>
+        {onSchedule && inputText.trim() && !editingId ? (
+          <button
+            type="button"
+            onClick={onSchedule}
+            className={`${toolButton} hidden sm:inline-flex`}
+            title="Schedule message"
+            aria-label="Schedule message"
+          >
+            <Clock className="h-5 w-5" />
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={sendMessage}
           disabled={!inputText.trim() || mediaBusy || isRecording}
-          className="shrink-0 rounded-xl bg-primary p-3 text-on-primary transition-colors disabled:cursor-not-allowed disabled:opacity-30"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-primary text-on-primary transition-[filter] hover:brightness-[0.92] disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="Send message"
         >
           <Send className="h-4 w-4" />
         </button>
       </div>
-      <p className="text-[10px] text-on-surface-variant mt-1 text-left hidden sm:block">
-        Press Enter to send · Shift+Enter for new line
+      <p className="mt-1.5 hidden text-xs text-on-surface-variant sm:block">
+        Enter to send · Shift+Enter for a new line · End-to-end encrypted
       </p>
     </div>
   );

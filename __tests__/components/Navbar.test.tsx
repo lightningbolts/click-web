@@ -140,7 +140,7 @@ describe("Navbar", () => {
     navState.pathname = "/";
     navState.user = { email: "ada@example.com", user_metadata: { full_name: "Ada Lovelace" } };
     renderNav();
-    const theme = screen.getByRole("button", { name: /Switch to (light|dark) mode/i });
+    const theme = screen.getByRole("button", { name: /Toggle light or dark theme/i });
     expect(theme.className).toMatch(/hidden/);
     expect(theme.className).toMatch(/md:inline-flex/);
     expect(screen.getByRole("button", { name: /Ada Lovelace/i }).closest("div")).toHaveClass("hidden");

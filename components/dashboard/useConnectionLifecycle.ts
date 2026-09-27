@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -30,7 +29,6 @@ export function useConnectionLifecycle({
   selectedConnection,
   setSelectedConnection,
   setMenuConnectionId,
-  setSuppressClickConnectionId,
   setChatListTab,
   loadConnections,
 }: {
@@ -47,12 +45,10 @@ export function useConnectionLifecycle({
   selectedConnection: ConnectionRecord | null;
   setSelectedConnection: Dispatch<SetStateAction<ConnectionRecord | null>>;
   setMenuConnectionId: Dispatch<SetStateAction<string | null>>;
-  setSuppressClickConnectionId: Dispatch<SetStateAction<string | null>>;
   setChatListTab: Dispatch<SetStateAction<'active' | 'archived'>>;
   loadConnections: () => Promise<void>;
 }) {
   const [archiveTableAvailable, setArchiveTableAvailable] = useState(true);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isMissingArchiveTableError = useCallback((error: any) => {
     const code = error?.code;
@@ -104,12 +100,6 @@ export function useConnectionLifecycle({
     document.addEventListener('click', handleGlobalClick);
     return () => document.removeEventListener('click', handleGlobalClick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    };
   }, []);
 
   const archiveConnection = useCallback(async (connectionId: string): Promise<boolean> => {
@@ -228,11 +218,6 @@ export function useConnectionLifecycle({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getAuthHeaders, loadConnections],
   );
-
-  const openActionMenu = useCallback((connectionId: string) => {
-    setMenuConnectionId((prev) => (prev === connectionId ? null : connectionId));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const removeConnection = useCallback(async (connectionId: string): Promise<boolean> => {
     const prevRecords = connectionRecords;
@@ -360,33 +345,14 @@ export function useConnectionLifecycle({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getAuthHeaders]);
 
-  const startLongPress = useCallback((connectionId: string) => {
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => {
-      setSuppressClickConnectionId(connectionId);
-      setMenuConnectionId(connectionId);
-    }, 450);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const endLongPress = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  }, []);
-
   return {
     archiveConnection,
     addConnectionToCore,
     removeConnectionFromCore,
     unarchiveConnection,
-    openActionMenu,
     removeConnection,
     reportConnection,
     blockUser,
     unblockUser,
-    startLongPress,
-    endLongPress,
   };
 }

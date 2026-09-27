@@ -19,6 +19,7 @@ import PlaygroundMap from './PlaygroundMapLazy';
 import type {
   ChatMessage,
   DashboardTab,
+  DemoPlan,
   MemoryCapsule,
   PlaygroundScene,
   PlaygroundState,
@@ -69,8 +70,8 @@ export default function LandingPlayground() {
       [id]: prev[id] ?? [
         {
           id: `click-${id}`,
-          from: 'them',
-          text: `Clicked at ${memory.place}.`,
+          from: 'system',
+          text: `You Clicked at ${memory.place}.`,
           time: 'now',
         },
       ],
@@ -108,6 +109,27 @@ export default function LandingPlayground() {
     }));
   }, []);
 
+  const sendPlan = useCallback((personId: string, plan: Omit<DemoPlan, 'going'>) => {
+    // Whoever proposes a plan is going (same rule as the app).
+    const msg: ChatMessage = {
+      id: `plan-${Date.now()}`,
+      from: 'you',
+      text: `📅 ${plan.title} · ${plan.when} · 📍 ${plan.place}`,
+      time: 'now',
+      plan: { ...plan, going: true },
+    };
+    setMessages((prev) => ({ ...prev, [personId]: [...(prev[personId] ?? []), msg] }));
+  }, []);
+
+  const togglePlanGoing = useCallback((personId: string, messageId: string) => {
+    setMessages((prev) => ({
+      ...prev,
+      [personId]: (prev[personId] ?? []).map((m) =>
+        m.id === messageId && m.plan ? { ...m, plan: { ...m.plan, going: !m.plan.going } } : m,
+      ),
+    }));
+  }, []);
+
   const goToScene = useCallback((next: PlaygroundScene) => {
     setScene(next);
   }, []);
@@ -118,11 +140,13 @@ export default function LandingPlayground() {
       toggleRsvp,
       toggleRoute,
       sendMessage,
+      sendPlan,
+      togglePlanGoing,
       setOpenChatId,
       setDashboardTab,
       setScene: goToScene,
     }),
-    [connectPerson, toggleRsvp, toggleRoute, sendMessage, goToScene],
+    [connectPerson, toggleRsvp, toggleRoute, sendMessage, sendPlan, togglePlanGoing, goToScene],
   );
 
   const isPhone = scene !== 'dashboard';

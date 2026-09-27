@@ -14,8 +14,8 @@ import {
   Flag,
   Shield,
   ShieldOff,
-  Phone,
-  Video,
+  BellOff,
+  PanelRight,
   Pencil,
   LogOut,
   Trash2,
@@ -26,9 +26,9 @@ import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvata
 import { deleteCliqueRpc, leaveCliqueRpc } from '@/lib/chat/createVerifiedClick';
 
 /**
- * Chat header: back button, avatar/profile entry, title, status badge, and
- * the call + actions menus (portaled, with their own positioning state).
- * Extracted verbatim from ChatView.
+ * Chat header: back button (narrow layouts), avatar/profile entry, title, status badge,
+ * the details-panel toggle, and the actions menu. Voice/video controls were removed from the
+ * web product; the LiveKit/API support stays in place (see `useDashboardCalls`, `CallOverlay`).
  */
 export function ChatHeader({
   connection,
@@ -48,7 +48,9 @@ export function ChatHeader({
   isBlocked,
   onClose,
   onOpenProfile,
-  onStartCall,
+  muted,
+  detailsOpen,
+  onToggleDetails,
   onGroupChatChanged,
   onAddToCore,
   onRemoveFromCore,
@@ -79,7 +81,9 @@ export function ChatHeader({
   isBlocked: boolean;
   onClose: () => void;
   onOpenProfile?: (userId: string) => void;
-  onStartCall: (videoEnabled: boolean) => void;
+  muted: boolean;
+  detailsOpen: boolean;
+  onToggleDetails: () => void;
   onGroupChatChanged?: () => void;
   onAddToCore?: () => Promise<boolean> | boolean;
   onRemoveFromCore?: () => Promise<boolean> | boolean;
@@ -94,36 +98,9 @@ export function ChatHeader({
   openRenameGroupModal: (currentTitle: string) => void;
 }) {
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
-  const [showCallMenu, setShowCallMenu] = useState(false);
   const [groupMenuBusy, setGroupMenuBusy] = useState(false);
-  const callMenuAnchorRef = useRef<HTMLDivElement>(null);
   const headerMenuAnchorRef = useRef<HTMLDivElement>(null);
-  const [callMenuPos, setCallMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [headerMenuPos, setHeaderMenuPos] = useState<{ top: number; left: number } | null>(null);
-
-  useLayoutEffect(() => {
-    if (!showCallMenu || typeof document === 'undefined') {
-      setCallMenuPos(null);
-      return;
-    }
-    const place = () => {
-      const el = callMenuAnchorRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const menuW = 200;
-      setCallMenuPos({
-        top: r.bottom + 8,
-        left: Math.min(r.right - menuW, window.innerWidth - menuW - 12),
-      });
-    };
-    place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
-    return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
-    };
-  }, [showCallMenu]);
 
   useLayoutEffect(() => {
     if (!showHeaderMenu || typeof document === 'undefined') {
@@ -156,10 +133,12 @@ export function ChatHeader({
           {groupKeyError}
         </div>
       ) : null}
-      <div className="flex items-center gap-4 px-5 py-4">
+      <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-5">
         <button
+          type="button"
           onClick={onClose}
-          className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+          className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface md:hidden"
+          aria-label="Back to conversations"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -228,81 +207,33 @@ export function ChatHeader({
           )}
         </div>
 
-        {/* Connection / clique status badge */}
-        <div
-          className={`hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium sm:flex ${
-            isGroupClique
-              ? 'border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
-              : 'border-primary/25 bg-on-primary-container text-primary'
+        {muted ? (
+          <span className="hidden items-center text-on-surface-variant sm:inline-flex" title="Notifications muted">
+            <BellOff className="h-4 w-4" aria-label="Notifications muted" />
+          </span>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={onToggleDetails}
+          aria-pressed={detailsOpen}
+          aria-controls="conversation-details"
+          className={`rounded-[8px] p-2 transition-colors ${
+            detailsOpen
+              ? 'bg-primary-container text-on-primary-container'
+              : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
           }`}
+          aria-label={detailsOpen ? 'Hide conversation details' : 'Show conversation details'}
+          title="Details"
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-              isGroupClique ? 'bg-emerald-400' : 'bg-primary'
-            }`}
-          />
-          {isGroupClique ? 'Verified clique' : 'Connected'}
-        </div>
-
-        <div className="relative" ref={callMenuAnchorRef}>
-            <button
-              onClick={() => {
-                setShowCallMenu((prev) => !prev);
-                setShowHeaderMenu(false);
-              }}
-              className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-              aria-label="Call options"
-            >
-              <Phone className="w-5 h-5" />
-            </button>
-
-            {showCallMenu &&
-              callMenuPos &&
-              typeof document !== 'undefined' &&
-              createPortal(
-                <>
-                  <button
-                    type="button"
-                    aria-label="Dismiss menu"
-                    className="fixed inset-0 z-[240] cursor-default bg-transparent"
-                    onClick={() => setShowCallMenu(false)}
-                  />
-                  <div
-                    className="fixed z-[250] min-w-[180px] rounded-[1.4rem] border border-border-hard bg-surface shadow-2xl overflow-hidden"
-                    style={{ top: callMenuPos.top, left: callMenuPos.left }}
-                  >
-                    <button
-                      onClick={() => {
-                        setShowCallMenu(false);
-                        onStartCall(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container"
-                    >
-                      <Phone className="h-4 w-4" />
-                      {isGroupClique ? 'Group voice call' : 'Voice call'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowCallMenu(false);
-                        onStartCall(true);
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-on-surface hover:bg-surface-container"
-                    >
-                      <Video className="h-4 w-4" />
-                      {isGroupClique ? 'Group video call' : 'Video call'}
-                    </button>
-                  </div>
-                </>,
-                document.body,
-              )}
-          </div>
+          <PanelRight className="h-5 w-5" />
+        </button>
 
         <div className="relative" ref={headerMenuAnchorRef}>
           <button
             type="button"
             onClick={() => {
               setShowHeaderMenu((prev) => !prev);
-              setShowCallMenu(false);
             }}
             className="rounded-[8px] p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
             aria-label="Chat actions"
@@ -384,7 +315,7 @@ export function ChatHeader({
                               setGroupMenuBusy(false);
                             }
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-surface-container flex items-center gap-2 disabled:opacity-40"
+                          className="w-full text-left px-3 py-2 text-sm text-error hover:bg-surface-container flex items-center gap-2 disabled:opacity-40"
                         >
                           <Trash2 className="w-4 h-4" /> Delete group
                         </button>
@@ -468,7 +399,7 @@ export function ChatHeader({
                       <button
                         type="button"
                         onClick={() => { setShowReportDialog(true); setShowHeaderMenu(false); }}
-                        className="w-full text-left px-3 py-2 text-sm text-amber-300 hover:bg-surface-container flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2"
                       >
                         <Flag className="w-4 h-4" /> Report
                       </button>
@@ -506,7 +437,7 @@ export function ChatHeader({
                             }
                             setShowHeaderMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-surface-container flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-error hover:bg-surface-container flex items-center gap-2"
                         >
                           <Shield className="w-4 h-4" /> Block
                         </button>
@@ -528,7 +459,7 @@ export function ChatHeader({
                             setTimeout(() => onClose(), 700);
                           }
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-surface-container flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 text-sm text-error hover:bg-surface-container flex items-center gap-2"
                       >
                         <UserMinus className="w-4 h-4" /> Remove connection
                       </button>

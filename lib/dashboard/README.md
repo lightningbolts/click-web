@@ -90,8 +90,10 @@ This module **is** the consumer web dashboard. Most post-connection mobile featu
 | Connection table / inbox | `ConnectionsScreen` | `ConnectionTable` | Full parity |
 | Connection map | `MapViewModel` | `ConnectionMap` | Full parity; beacons layer |
 | Timeline / Time Capsule | Home + profile | `TimeCapsule`, `/api/profile/timeline` | Display parity |
-| E2EE chat entry | `ChatView` | `ChatView` slide-over | Byte-compatible crypto |
-| Voice/video calls | LiveKit native | `CallOverlay` + LiveKit JS | Push payload must match mobile |
+| E2EE chat entry | `ChatView` | Two-pane inbox + `ChatView` with details column | Byte-compatible crypto |
+| Pins, mutes, plans, scheduled, hangouts | `ConversationModel`, `MuteMenu`, `PlanViews` | `ConversationDetailsPanel`, `useConversationExtras`, `PlanCard` | Same routes and wire format (`metadata.plan`, ✅/❌ RSVP) |
+| Event chat | `HubChatView` | `EventChatPanel` on `/e/{id}` | Hub E2EE v2 scope; reactions read-only on web (no fake coordinates) |
+| Voice/video calls | Removed on iOS | Frontend removed; `/api/livekit/token`, `CallOverlay`, `useDashboardCalls` kept dormant | Backend/API/schema intact for future work |
 | QR identity card | `QrCodeView` | `QRIdentityCard` | Web issues token via `/api/qr` |
 | Availability intents | Home + settings | `MyAvailabilityIntentsCard` | UI parity; match alerts push to mobile |
 | Post-connection vibe | Connection sheets | `PostConnectionVibePrompt` | Same `venue-vibe` API |
