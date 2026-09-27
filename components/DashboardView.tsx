@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import useSWR from 'swr';
 import { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
@@ -27,7 +27,6 @@ import {
 } from '@/components/dashboard';
 import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import CallOverlay from '@/components/chat/CallOverlay';
 import UserProfileModal, { type DecryptedProfileMessage } from '@/components/UserProfileModal';
 import type { Message } from '@/lib/chat/types';
 import PostConnectionVibePrompt from '@/components/dashboard/PostConnectionVibePrompt';
@@ -47,7 +46,6 @@ import {
   getAllAchievements,
 } from '@/lib/dashboard/userMetrics';
 import { isActiveChatListStatus } from '@/lib/dashboard/connectionStatus';
-import { useDashboardCalls } from '@/components/dashboard/useDashboardCalls';
 import { useVerifiedCliques } from '@/components/dashboard/useVerifiedCliques';
 import { useChatListMetadata } from '@/components/dashboard/useChatListMetadata';
 import { useOnboardingGates } from '@/components/dashboard/useOnboardingGates';
@@ -58,11 +56,13 @@ import { ChatTabSection } from '@/components/dashboard/ChatTabSection';
 import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModals';
 import { messagesForProfileConnection } from '@/lib/userProfile/profileChatContext';
 import {
+  dashboardTabHref,
   parseDashboardTab,
   type DashboardTab,
 } from '@/lib/shell/personalProductNav';
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 import { cn } from '@/lib/cn';
+import { useSessionCachedState, writeSessionCache } from '@/lib/dashboard/sessionCache';
 
 interface DashboardViewProps {
   user: any;
@@ -84,29 +84,34 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
     parseDashboardTab(searchParams.get('tab')),
   );
-  const [connectionRecords, setConnectionRecords] = useState<ConnectionRecord[]>([]);
+  const userId: string | undefined = user?.id;
+  const [connectionRecords, setConnectionRecords] = useSessionCachedState<ConnectionRecord[]>(userId, 'connections', []);
   /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
-  const [mapConnectionRecords, setMapConnectionRecords] = useState<ConnectionRecord[]>([]);
+  const [mapConnectionRecords, setMapConnectionRecords] = useSessionCachedState<ConnectionRecord[]>(userId, 'mapConnections', []);
   const chapters = useMemo(
     () => generateChaptersFromConnections(connectionRecords),
     [connectionRecords],
   );
   /** The connection whose chat is currently open, or null */
-  const [selectedConnection, setSelectedConnection] = useState<ConnectionRecord | null>(null);
-  const [chatListTab, setChatListTab] = useState<'active' | 'archived'>('active');
+  const [selectedConnection, setSelectedConnection] = useSessionCachedState<ConnectionRecord | null>(userId, 'selectedConnection', null);
+  const [chatListTab, setChatListTab] = useSessionCachedState<'active' | 'archived'>(userId, 'chatListTab', 'active');
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
-  const [archivedConnectionIds, setArchivedConnectionIds] = useState<Set<string>>(new Set());
-  const [coreConnectionIds, setCoreConnectionIds] = useState<Set<string>>(new Set());
+  const [archivedConnectionIds, setArchivedConnectionIds] = useSessionCachedState<Set<string>>(userId, 'archivedIds', () => new Set());
+  const [coreConnectionIds, setCoreConnectionIds] = useSessionCachedState<Set<string>>(userId, 'coreIds', () => new Set());
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const [menuConnectionId, setMenuConnectionId] = useState<string | null>(null);
-  const [suppressClickConnectionId, setSuppressClickConnectionId] = useState<string | null>(null);
   const [vibePromptConnection, setVibePromptConnection] = useState<ConnectionRecord | null>(null);
   const [groupClicksReloadNonce, setGroupClicksReloadNonce] = useState(0);
   const [createClickOpen, setCreateClickOpen] = useState(false);
-  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [notificationPreferences, setNotificationPreferences] = useSessionCachedState<NotificationPreferences>(userId, 'notificationPreferences', DEFAULT_NOTIFICATION_PREFERENCES);
   /** Re-render countdown labels periodically */
   const [archiveCountdownTick, setArchiveCountdownTick] = useState(0);
   const activeTabRef = useRef<DashboardTab>(activeTab);
+  /** Tabs whose panes have mounted at least once (map/chat are kept alive after that). */
+  const [visitedTabs, setVisitedTabs] = useState<ReadonlySet<DashboardTab>>(() => new Set([activeTab]));
+  useEffect(() => {
+    setVisitedTabs((prev) => (prev.has(activeTab) ? prev : new Set([...prev, activeTab])));
+  }, [activeTab]);
   const selectedConnectionRef = useRef<ConnectionRecord | null>(selectedConnection);
   const notificationPreferencesRef = useRef<NotificationPreferences>(notificationPreferences);
   const chatConnectionMapRef = useRef<Map<string, string>>(new Map());
@@ -134,7 +139,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   const [chatListGroupActionBusyId, setChatListGroupActionBusyId] = useState<string | null>(null);
 
   /** Avoid painting stats at 0 before the first `/api/connections` response (hydrates real counts). */
-  const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useState(false);
+  const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useSessionCachedState(userId, 'connectionsLoaded', false);
 
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => getFreshAuthHeaders(), []);
 
@@ -162,28 +167,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     notificationPreferencesRef.current = notificationPreferences;
   }, [notificationPreferences]);
 
-  const showBrowserNotification = useCallback((
-    title: string,
-    body: string,
-    onClick?: () => void,
-  ) => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    if (Notification.permission !== 'granted') return;
-
-    const notification = new Notification(title, {
-      body,
-      icon: '/icon.png',
-      badge: '/icon.png',
-      silent: false,
-    });
-
-    notification.onclick = () => {
-      notification.close();
-      window.focus();
-      onClick?.();
-    };
-  }, []);
-
   const persistNotificationPreferences = useCallback(async (preferences: NotificationPreferences) => {
     const previousPreferences = notificationPreferencesRef.current;
     setNotificationPreferences(preferences);
@@ -197,7 +180,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
       setNotificationPreferences(previousPreferences);
     }
     return result;
-  }, [user?.id]);
+  }, [user?.id, setNotificationPreferences]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -219,7 +202,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, setNotificationPreferences]);
 
   const archiveStorageKey = user?.id ? `click:archived-connections:${user.id}` : null;
 
@@ -234,7 +217,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
       writeArchivedToLocalStorage(next);
       return next;
     });
-  }, [writeArchivedToLocalStorage]);
+  }, [writeArchivedToLocalStorage, setArchivedConnectionIds]);
 
   const {
     groupCliqueRecords,
@@ -242,30 +225,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     groupMemberPickerRows,
     showGroupMemberPicker,
     setShowGroupMemberPicker,
-    groupMemberPickerBusy,
     openVerifiedCliqueMemberPicker,
   } = useVerifiedCliques({ user, groupClicksReloadNonce });
-
-  const {
-    callOverlayState,
-    activeCallState,
-    startOutgoingCall,
-    acceptIncomingCall,
-    declineIncomingCall,
-    cancelPendingCall,
-    dismissEndedCall,
-    endActiveCall,
-    toggleMicrophone,
-    toggleCamera,
-  } = useDashboardCalls({
-    user,
-    getAuthHeaders,
-    connectionRecords,
-    notificationPreferencesRef,
-    showBrowserNotification,
-    setSelectedConnection,
-    setActiveTab,
-  });
 
   const { chatMetadataByConnectionId } = useChatListMetadata({
     user,
@@ -292,8 +253,9 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     if (waitingForData) return;
     if (!authLoading && !sessionUser) return;
     readyNotifiedRef.current = true;
+    writeSessionCache(userId, 'booted', true);
     onReady?.();
-  }, [waitingForData, authLoading, sessionUser, onReady]);
+  }, [waitingForData, authLoading, sessionUser, onReady, userId]);
 
   const { loadConnections } = useConnectionsData({
     user,
@@ -321,13 +283,10 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     addConnectionToCore,
     removeConnectionFromCore,
     unarchiveConnection,
-    openActionMenu,
     removeConnection,
     reportConnection,
     blockUser,
     unblockUser,
-    startLongPress,
-    endLongPress,
   } = useConnectionLifecycle({
     user,
     getAuthHeaders,
@@ -342,7 +301,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     selectedConnection,
     setSelectedConnection,
     setMenuConnectionId,
-    setSuppressClickConnectionId,
     setChatListTab,
     loadConnections,
   });
@@ -357,7 +315,11 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     setSelectedConnection(conn);
     setTargetMessageId(messageId?.trim() ? messageId.trim() : null);
     setActiveTab('chat');
-  }, []);
+    // Keep the URL (and the Navbar's active tab) in step with the pane.
+    if (parseDashboardTab(new URLSearchParams(window.location.search).get('tab')) !== 'chat') {
+      window.history.pushState(null, '', dashboardTabHref('chat'));
+    }
+  }, [setSelectedConnection]);
 
   const connectionRecordsWithChatPreview = useMemo(
     () =>
@@ -402,7 +364,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     if (!known) {
       setSelectedConnection(null);
     }
-  }, [connectionRecords, groupCliqueRecords, selectedConnection]);
+  }, [connectionRecords, groupCliqueRecords, selectedConnection, setSelectedConnection]);
 
   const chatCandidates = useMemo(
     () =>
@@ -419,6 +381,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
             chatPreview: metadata?.preview ?? null,
             chatLastMessageAt: metadata?.lastMessageAt ?? null,
             chatUpdatedAt: metadata?.chatUpdatedAt ?? null,
+            chatUnreadCount: metadata?.unreadCount ?? 0,
+            chatId: metadata?.chatId ?? connection.groupChatId ?? null,
           };
         })
         .sort((left, right) => {
@@ -617,19 +581,10 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
         />
       ) : null}
 
-          <AnimatePresence mode="wait">
-            {/* Memory Box Tab */}
-            {activeTab === 'memory' && (
-              <motion.div
-                key="memory"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-8"
-              >
-                {/* Stats Overview Section */}
-                <section>
+          {activeTab === 'memory' ? (
+            <TabPaneEnter key="memory" className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+              <div className="min-w-0 space-y-6">
+                <section aria-label="Your stats">
                   <StatsOverview
                     totalConnections={dashboardMetrics.totalConnections}
                     thisMonth={dashboardMetrics.thisMonth}
@@ -640,61 +595,17 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                   />
                 </section>
 
-                <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
-
-                {homeAvailabilityOverlapLines.length > 0 ? (
-                  <div className="space-y-2">
-                    {homeAvailabilityOverlapLines.map((line, i) => (
-                      <p
-                        key={`${line}-${i}`}
-                        className="text-sm font-medium text-amber-900 dark:text-amber-100"
-                      >
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-
-                {/* Achievements & Milestones Row */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-on-surface-variant mb-2">Achievements</h3>
-                    <div className="space-y-2">
-                      {achievementStatuses.map((achievement) => (
-                        <AchievementBadge
-                          key={achievement.id}
-                          title={achievement.title}
-                          description={achievement.description}
-                          icon={achievement.icon}
-                          unlocked={achievement.unlocked}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-on-surface-variant mb-2">Next Milestone</h3>
-                    <MilestoneProgress
-                      current={dashboardMetrics.totalConnections}
-                      target={nextMilestone.target}
-                      label={nextMilestone.label}
-                      reward={nextMilestone.reward}
-                    />
-                  </div>
-                </section>
-
-                {/* Time Capsule Section */}
-                <section className="fc-card p-6 rounded-[16px] border border-border-hard">
+                <section className="fc-card rounded-[16px] border border-border-hard p-5 md:p-6">
                   <TimeCapsule chapters={chapters} onConnectionClick={handleOpenChat} />
                 </section>
 
-                {/* Connection Table Section */}
-                <section className="fc-card p-6 rounded-[16px] border border-border-hard">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-primary/20 rounded-xl">
-                      <Users className="w-5 h-5 text-primary" />
+                <section className="fc-card rounded-[16px] border border-border-hard p-5 md:p-6">
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="rounded-[10px] bg-primary-container p-2">
+                      <Users className="h-5 w-5 text-on-primary-container" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold">People I've Met</h2>
+                      <h2 className="text-xl font-bold">People I&apos;ve Met</h2>
                       <p className="text-sm text-on-surface-variant">Your connection history</p>
                     </div>
                   </div>
@@ -709,40 +620,79 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                   />
                 </section>
 
-                {/* Data sovereignty notice */}
-                <div className="text-center py-4">
-                  <p className="text-xs text-outline">
-                    🔒 Your data belongs to you. Export anytime, delete anytime.
-                  </p>
-                </div>
-              </motion.div>
-            )}
+                <p className="py-2 text-center text-xs text-outline">
+                  🔒 Your data belongs to you. Export anytime, delete anytime.
+                </p>
+              </div>
 
-            {/* Map Tab */}
-            {activeTab === 'map' && (
-              <motion.div
-                key="map"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="flex min-h-0 flex-1 overflow-hidden"
-              >
-                <ConnectionMap connections={mapConnectionRecords} onConnectionClick={handleOpenChat} />
-              </motion.div>
-            )}
+              <aside className="space-y-4 lg:sticky lg:top-6" aria-label="Right now">
+                <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
 
-            {/* Chat Tab */}
-            {activeTab === 'chat' && (
-              <motion.div
-                key="chat"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex h-full min-h-0 flex-col overflow-hidden"
-              >
+                {homeAvailabilityOverlapLines.length > 0 ? (
+                  <div className="space-y-1.5 rounded-[16px] border border-primary/30 bg-primary-container p-4">
+                    {homeAvailabilityOverlapLines.map((line, i) => (
+                      <p key={`${line}-${i}`} className="text-sm font-semibold text-on-primary-container">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-bold text-on-surface-variant">Next milestone</h3>
+                  <MilestoneProgress
+                    current={dashboardMetrics.totalConnections}
+                    target={nextMilestone.target}
+                    label={nextMilestone.label}
+                    reward={nextMilestone.reward}
+                  />
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-bold text-on-surface-variant">Achievements</h3>
+                  <div className="space-y-2">
+                    {achievementStatuses.map((achievement) => (
+                      <AchievementBadge
+                        key={achievement.id}
+                        title={achievement.title}
+                        description={achievement.description}
+                        icon={achievement.icon}
+                        unlocked={achievement.unlocked}
+                      />
+                    ))}
+                  </div>
+                </section>
+              </aside>
+            </TabPaneEnter>
+          ) : null}
+
+          {/* Map and chat stay mounted after their first visit: MapLibre and an open
+              thread are expensive to rebuild, and remounting them was the visible
+              flash when switching tabs. Hidden panes do not mark messages read. */}
+          {visitedTabs.has('map') ? (
+            <div
+              className={cn('min-h-0 flex-1 overflow-hidden', activeTab === 'map' ? 'flex' : 'hidden')}
+              aria-hidden={activeTab !== 'map'}
+            >
+              <ConnectionMap
+                connections={mapConnectionRecords}
+                onConnectionClick={handleOpenChat}
+                onOpenProfile={(otherUserId, connectionId) => {
+                  setProfileConnectionId(connectionId);
+                  setProfileUserId(otherUserId);
+                }}
+                active={activeTab === 'map'}
+              />
+            </div>
+          ) : null}
+
+          {visitedTabs.has('chat') ? (
+            <div
+              className={cn('h-full min-h-0 flex-col overflow-hidden', activeTab === 'chat' ? 'flex' : 'hidden')}
+              aria-hidden={activeTab !== 'chat'}
+            >
                 <ChatTabSection
+                  active={activeTab === 'chat'}
                   user={user}
                   onlineUserIds={onlineUserIds}
                   selectedConnection={selectedConnection}
@@ -767,11 +717,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                   formatChatActivity={formatChatActivity}
                   menuConnectionId={menuConnectionId}
                   setMenuConnectionId={setMenuConnectionId}
-                  openActionMenu={openActionMenu}
-                  suppressClickConnectionId={suppressClickConnectionId}
-                  setSuppressClickConnectionId={setSuppressClickConnectionId}
-                  startLongPress={startLongPress}
-                  endLongPress={endLongPress}
                   addConnectionToCore={addConnectionToCore}
                   removeConnectionFromCore={removeConnectionFromCore}
                   archiveConnection={archiveConnection}
@@ -780,13 +725,11 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                   reportConnection={reportConnection}
                   blockUser={blockUser}
                   unblockUser={unblockUser}
-                  startOutgoingCall={startOutgoingCall}
                   setCreateClickOpen={setCreateClickOpen}
                   setProfileUserId={setProfileUserId}
                   setProfileConnectionId={setProfileConnectionId}
                   setGroupClicksReloadNonce={setGroupClicksReloadNonce}
                   setChatMessagesSnapshot={setChatMessagesSnapshot}
-                  groupMemberPickerBusy={groupMemberPickerBusy}
                   openVerifiedCliqueMemberPicker={openVerifiedCliqueMemberPicker}
                   selectedConnectionRef={selectedConnectionRef}
                   setChatListGroupRenameGroupId={setChatListGroupRenameGroupId}
@@ -794,19 +737,14 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                   chatListGroupActionBusyId={chatListGroupActionBusyId}
                   setChatListGroupActionBusyId={setChatListGroupActionBusyId}
                 />
-              </motion.div>
-            )}
+            </div>
+          ) : null}
 
-            {/* QR Identity Tab */}
-            {activeTab === 'identity' && (
-              <motion.div
-                key="identity"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="flex min-h-[min(70vh,640px)] flex-col items-center justify-center py-4"
-              >
+          {activeTab === 'identity' ? (
+            <TabPaneEnter
+              key="identity"
+              className="flex min-h-[min(70vh,640px)] flex-col items-center justify-center py-4"
+            >
                 <div className="w-full max-w-md">
                   <QRIdentityCard
                     userId={user.id}
@@ -814,38 +752,17 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                     userEmail={user?.email}
                   />
                 </div>
-              </motion.div>
-            )}
+            </TabPaneEnter>
+          ) : null}
 
-            {/* Settings Tab */}
-            {activeTab === 'settings' && (
-              <motion.div
-                key="settings"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <SettingsView
-                  notificationPreferences={notificationPreferences}
-                  onSaveNotificationPreferences={persistNotificationPreferences}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-      <CallOverlay
-        currentUserId={user.id}
-        overlayState={callOverlayState}
-        activeCall={activeCallState}
-        onAccept={acceptIncomingCall}
-        onDecline={declineIncomingCall}
-        onCancel={cancelPendingCall}
-        onDismissEnded={dismissEndedCall}
-        onEndCall={endActiveCall}
-        onToggleMicrophone={toggleMicrophone}
-        onToggleCamera={toggleCamera}
-      />
+          {activeTab === 'settings' ? (
+            <TabPaneEnter key="settings">
+              <SettingsView
+                notificationPreferences={notificationPreferences}
+                onSaveNotificationPreferences={persistNotificationPreferences}
+              />
+            </TabPaneEnter>
+          ) : null}
 
       <DashboardGroupModals
         showGroupMemberPicker={showGroupMemberPicker}
@@ -915,3 +832,23 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     </div>
   );
 }
+
+/**
+ * Short opacity-only arrival for lightweight tab panes. No exit phase: the old
+ * pane is replaced in the same frame, so there is never an empty gap or a
+ * layout that still belongs to the previous tab.
+ */
+function TabPaneEnter({ className, children }: { className?: string; children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+

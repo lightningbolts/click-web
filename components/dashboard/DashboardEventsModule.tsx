@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import useSWR from "swr";
 import { FcCard } from "@/components/fc";
@@ -22,11 +23,14 @@ export async function fetchMineEvents(url: string) {
 function EventCardList({
   events,
   past,
+  animate,
 }: {
   events: Array<EventListItem & { role?: string }>;
   past?: boolean;
+  /** False when the list painted from cache: returning to Events should not re-stagger. */
+  animate: boolean;
 }) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotion() || !animate;
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       {events.map((event, index) => (
@@ -60,6 +64,7 @@ export default function DashboardEventsModule() {
     dedupingInterval: 60_000,
   });
   const events = data?.events ?? [];
+  const [animateCards] = useState(() => data == null);
 
   const upcomingHosted = events.filter((e) => e.role === "creator" && !eventIsPast(e));
   const upcomingAttending = events.filter((e) => e.role !== "creator" && !eventIsPast(e));
@@ -86,7 +91,7 @@ export default function DashboardEventsModule() {
                 </Link>
               </FcCard>
             ) : (
-              <EventCardList events={upcomingHosted} />
+              <EventCardList events={upcomingHosted} animate={animateCards} />
             )}
           </div>
           <div className="space-y-3">
@@ -94,7 +99,7 @@ export default function DashboardEventsModule() {
             {upcomingAttending.length === 0 && !isLoading ? (
               <FcCard className="p-4 text-sm text-on-surface-variant">No Click-account RSVPs yet.</FcCard>
             ) : (
-              <EventCardList events={upcomingAttending} />
+              <EventCardList events={upcomingAttending} animate={animateCards} />
             )}
           </div>
         </div>
@@ -107,13 +112,13 @@ export default function DashboardEventsModule() {
             {pastHosted.length > 0 ? (
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Hosted</h4>
-                <EventCardList events={pastHosted} past />
+                <EventCardList events={pastHosted} past animate={animateCards} />
               </div>
             ) : null}
             {pastAttended.length > 0 ? (
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Attended</h4>
-                <EventCardList events={pastAttended} past />
+                <EventCardList events={pastAttended} past animate={animateCards} />
               </div>
             ) : null}
           </div>

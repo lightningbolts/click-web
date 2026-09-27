@@ -7,8 +7,8 @@ const revealEase = [0.16, 1, 0.3, 1] as const;
 
 /**
  * Smooth handoff from the route skeleton into ready event content.
- * The animation starts immediately and only moves a few pixels so it feels
- * weighted without creating a second loading phase.
+ * Opacity only and short: the skeleton already holds the layout, so moving the
+ * content would read as a second loading phase.
  */
 export default function EventPageEnter({ children }: { children: ReactNode }) {
   const reduceMotion = useReducedMotion();
@@ -16,9 +16,9 @@ export default function EventPageEnter({ children }: { children: ReactNode }) {
   return (
     <motion.div
       data-testid="event-page-enter"
-      initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.38, ease: revealEase }}
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: revealEase }}
     >
       {children}
     </motion.div>

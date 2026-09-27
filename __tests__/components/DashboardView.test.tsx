@@ -56,6 +56,7 @@ jest.mock('framer-motion', () => {
       { get: (_target: any, prop: string) => Forward(prop) },
     ),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useReducedMotion: () => true,
   };
 });
 
@@ -195,7 +196,7 @@ async function renderDashboard(user: Record<string, unknown> = buildMockUser()) 
   });
   // Wait until loading gates clear (connections + birthday profile).
   await waitFor(() => {
-    expect(screen.getByTestId('call-overlay')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-root')).toBeInTheDocument();
   });
   return result!;
 }
@@ -295,9 +296,9 @@ describe('DashboardView', () => {
     expect(await screen.findByText(/Your data belongs to you/)).toBeInTheDocument();
   });
 
-  it('renders the CallOverlay component', async () => {
+  it('does not mount calling UI (voice/video are out of the web product; the API stays)', async () => {
     await renderDashboard();
-    expect(screen.getByTestId('call-overlay')).toBeInTheDocument();
+    expect(screen.queryByTestId('call-overlay')).not.toBeInTheDocument();
   });
 
   it('does not crash when user has no email or metadata', async () => {

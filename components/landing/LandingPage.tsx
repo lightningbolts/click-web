@@ -3,7 +3,7 @@
 import { ArrowRight, MapPin, Radar } from 'lucide-react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
@@ -22,39 +22,6 @@ const HomeAuthenticated = dynamic(loadHomeAuthenticated, { ssr: false });
 const loadWaitlistModal = () => import('@/components/marketing/WaitlistModal');
 const WaitlistModal = dynamic(loadWaitlistModal, { ssr: false });
 
-function WaitlistLoadingShell({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-[100000] flex items-center justify-center bg-on-surface/40 px-4"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div
-        className="fc-card w-full max-w-md p-6"
-        style={{ backgroundColor: 'var(--color-surface)' }}
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="waitlist-title"
-        aria-busy="true"
-      >
-        <h2 id="waitlist-title" className="text-2xl font-bold text-on-surface">
-          Join the Waitlist
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">Loading…</p>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Marketing homepage. Never gates on auth `loading` so SSR/crawlers receive
  * indexable hero copy. After client login, swaps to the dashboard.
@@ -67,15 +34,21 @@ export default function LandingPage({
   const { user } = useAuth();
   const router = useRouter();
   const [showWaitlist, setShowWaitlist] = useState(false);
+  /** Mounted once requested and kept mounted, so later opens and every close animate in place. */
+  const [waitlistMounted, setWaitlistMounted] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
 
   const prefetchWaitlist = () => {
     void loadWaitlistModal();
   };
 
+  // Open only after the chunk is ready: no interim loading shell that the real dialog
+  // replaces (that swap was the visible flash). Hover/focus prefetch makes this instant.
   const openWaitlist = () => {
-    prefetchWaitlist();
-    setShowWaitlist(true);
+    void loadWaitlistModal().then(() => {
+      setWaitlistMounted(true);
+      setShowWaitlist(true);
+    });
   };
 
   useEffect(() => {
@@ -149,14 +122,12 @@ export default function LandingPage({
           cells={heatmap.cells}
         />
 
-        {showWaitlist ? (
-          <Suspense fallback={<WaitlistLoadingShell onClose={() => setShowWaitlist(false)} />}>
-            <WaitlistModal
-              open
-              onClose={() => setShowWaitlist(false)}
-              source="homepage_hero"
-            />
-          </Suspense>
+        {waitlistMounted ? (
+          <WaitlistModal
+            open={showWaitlist}
+            onClose={() => setShowWaitlist(false)}
+            source="homepage_hero"
+          />
         ) : null}
 
         <div className={cn(PAGE_COLUMN_CLASS, 'space-y-8 pt-10 sm:space-y-12 sm:pt-14')}>

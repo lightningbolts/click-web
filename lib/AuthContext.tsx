@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { clearSessionCache } from '@/lib/dashboard/sessionCache';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +16,8 @@ interface AuthContextType {
   setProfileImageUrl: (url: string | null) => void;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** What the server rendered with (`initialUser`); see `useHydrated`. */
+  serverSnapshot: { user: User | null; loading: boolean };
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   setProfileImageUrl: () => { },
   signOut: async () => { },
   refreshUser: async () => { },
+  serverSnapshot: { user: null, loading: true },
 });
 
 const PRESENCE_CHANNEL = 'room:presence';
@@ -42,6 +46,7 @@ export function AuthProvider({
   const [loading, setLoading] = useState(!initialUser);
   const [onlineUserIds, setOnlineUserIds] = useState<ReadonlySet<string>>(() => new Set());
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [serverSnapshot] = useState(() => ({ user: initialUser, loading: !initialUser }));
 
   const loadProfileImageFromUsersTable = useCallback(async (userId: string) => {
     const supabase = getSupabaseClient();
@@ -107,6 +112,7 @@ export function AuthProvider({
         setLoading(false);
         return;
       }
+      if (userIdRef.current && userIdRef.current !== nextId) clearSessionCache();
       userIdRef.current = nextId;
       setUser(next);
       setLoading(false);
@@ -178,6 +184,7 @@ export function AuthProvider({
   }, [user?.id]);
 
   const signOut = async () => {
+    clearSessionCache();
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
@@ -217,6 +224,7 @@ export function AuthProvider({
         setProfileImageUrl,
         signOut,
         refreshUser,
+        serverSnapshot,
       }}
     >
       {children}

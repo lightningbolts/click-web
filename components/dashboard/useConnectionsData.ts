@@ -24,6 +24,7 @@ import {
 import type { DisplayNamesBatchResponse } from '@/types/database-connections';
 import { normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { readSessionCache } from '@/lib/dashboard/sessionCache';
 
 /**
  * Loading and live-patching of the dashboard's connection records: the
@@ -491,7 +492,11 @@ export function useConnectionsData({
   // Fetch user connections (initial load + refetch). Reset gate when the signed-in user changes.
   useEffect(() => {
     if (!user?.id) return;
-    if (connectionsLoadUserIdRef.current !== user.id) {
+    const resumedFromSession = readSessionCache<boolean>(user.id, 'connectionsLoaded') === true;
+    if (connectionsLoadUserIdRef.current !== user.id && resumedFromSession) {
+      // Remount within this tab session: keep the painted snapshot and revalidate quietly.
+      connectionsLoadUserIdRef.current = user.id;
+    } else if (connectionsLoadUserIdRef.current !== user.id) {
       connectionsLoadUserIdRef.current = user.id;
       setConnectionsInitialLoadComplete(false);
       setConnectionRecords([]);
