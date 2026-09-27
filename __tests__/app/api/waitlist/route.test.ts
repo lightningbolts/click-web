@@ -44,7 +44,7 @@ describe('POST /api/waitlist', () => {
       message: 'Successfully joined the waitlist!',
     });
     expect(mockFrom).toHaveBeenCalledWith('waitlist');
-    expect(mockInsert).toHaveBeenCalledWith({ email });
+    expect(mockInsert).toHaveBeenCalledWith({ email: email.toLowerCase() });
   });
 
   it('trims whitespace and preserves source/referral attribution', async () => {
@@ -56,7 +56,7 @@ describe('POST /api/waitlist', () => {
 
     expect(response.status).toBe(200);
     expect(mockInsert).toHaveBeenCalledWith({
-      email: 'Ada.Lovelace+click@students.example.co.uk',
+      email: 'ada.lovelace+click@students.example.co.uk',
       source: 'deep_link',
       referrer_user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     });
