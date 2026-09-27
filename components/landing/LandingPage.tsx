@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowRight, MapPin, Radar } from 'lucide-react';
+import { ArrowRight, MapPin, Radar, Smartphone } from 'lucide-react';
+import { IOS_TESTFLIGHT_URL } from '@/lib/config';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
@@ -214,7 +215,7 @@ export default function LandingPage({
                   data-testid="landing-playground-heading"
                   className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
                 >
-                  Try Click before launch.
+                  Try Click in your browser.
                 </h2>
                 <p className="mt-3 max-w-xl text-base text-on-surface-variant">
                   Connect with someone, RSVP to an event, then see how the same relationship carries into the companion dashboard.
@@ -241,20 +242,31 @@ export default function LandingPage({
         <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
           <div className="fc-card px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
-              Click app launches Fall 2026.
+              The Click beta is live on iPhone.
             </h2>
             <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-on-surface-variant sm:text-base">
-              No ads. No feed. Built at UW.
+              Install TestFlight, tap the invite, and start connecting. Full launch Fall 2026. No ads. No feed. Built at UW.
             </p>
-            <button
-              type="button"
-              onClick={openWaitlist}
-              onPointerEnter={prefetchWaitlist}
-              onFocus={prefetchWaitlist}
-              className="fc-btn-primary mt-8 h-11 px-8"
-            >
-              Join the Waitlist
-            </button>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href={IOS_TESTFLIGHT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="fc-btn-primary inline-flex h-11 items-center gap-2 px-8"
+              >
+                <Smartphone className="h-4 w-4" aria-hidden />
+                Get the iOS beta
+              </a>
+              <button
+                type="button"
+                onClick={openWaitlist}
+                onPointerEnter={prefetchWaitlist}
+                onFocus={prefetchWaitlist}
+                className="h-11 rounded-[8px] border border-border-hard bg-surface px-8 text-sm font-bold text-on-surface hover:border-primary hover:text-primary"
+              >
+                Join the Waitlist
+              </button>
+            </div>
           </div>
         </section>
       </div>

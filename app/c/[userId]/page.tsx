@@ -115,7 +115,9 @@ export default async function ConnectionProfilePage({
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3.5 bg-white text-black rounded-xl font-medium hover:bg-zinc-200 transition-colors"
             >
-              Download on the App Store
+              {APP_CONFIG.ios_store_url === APP_CONFIG.ios_testflight_url
+                ? 'Get the iOS beta (TestFlight)'
+                : 'Download on the App Store'}
             </a>
 
             <a
