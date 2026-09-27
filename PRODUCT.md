@@ -54,7 +54,7 @@ Hard limits:
 - No BLE / ultrasonic / progressive GPS orchestration, no Multi-Tap initiation, no CallKit/PushKit/FCM wake, no App Clip, no device calendar, no Memory Capsule capture.
 - Insights must not expose individual identities in vibe-radar / hexbin views.
 - Availability-intent match pushes remain mobile-first.
-- Community Hubs are API-only on web.
+- Community Hubs: event chat is on web (`/e/{id}`); standalone geofenced hubs remain mobile-only.
 - Contracts with mobile (push payloads, E2EE wire format, incoming-call shape) are shared; web must not “simplify” field names.
 
 Open: whether the **mobile** app is publicly launched (`NEXT_PUBLIC_APP_LAUNCHED`). The website companion is already in production. LiveKit and Stripe are optional dependencies, not product promises when unset.

@@ -66,7 +66,7 @@ export default function EnterprisePlayground() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 overflow-hidden rounded-[20px] border border-border-hard bg-surface shadow-sm">
-          <WebChrome label="Insights · HUB demo" address="click.app / insights" lockScroll>
+          <WebChrome label="Insights · HUB demo" address="joinclick.co / insights" lockScroll>
             <div className="flex h-full min-h-0 flex-col lg:flex-row lg:items-stretch">
               <nav
                 className="flex shrink-0 gap-1 overflow-x-auto border-b border-border-hard bg-surface p-2 lg:w-44 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r"

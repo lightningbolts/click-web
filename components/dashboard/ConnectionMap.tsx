@@ -3,33 +3,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { MapPin, Loader2, Layers } from 'lucide-react';
+import { MapPin, Loader2, Layers, List } from 'lucide-react';
 import type { ConnectionRecord } from './ConnectionTable';
-import { escapeHtml } from '@/lib/dashboard/connectionExtras';
 import { getSupabaseClient } from '@/lib/supabase';
 import {
   DEFAULT_MAP_LAYER_TOGGLES,
   type MapLayerToggles,
   type MapBeaconRecord,
   beaconGeoJsonFeatures,
+  beaconLayerGroup,
+  displayTitleForBeacon,
+  humanizeBeaconType,
   mapLayerForBeacon,
   parseMapBeacon,
   rawBeaconRowsFromApiPayload,
 } from '@/lib/map/mapBeacons';
-import { beaconPopupErrorHtml, formatBeaconPopupHtml } from '@/lib/map/beaconPopupHtml';
 import { useTheme } from '@/lib/theme/ThemeProvider';
-import { mapStyleForTheme } from '@/lib/theme/mapStyles';
+import { FC_PRIMARY, FC_SECONDARY, mapStyleForTheme } from '@/lib/theme/mapStyles';
 import { Toggle } from '@/components/ui/Toggle';
-
-function atmosphereHtml(conn: ConnectionRecord): string {
-  const bits = [conn.weatherSummary, conn.noiseSummary].filter((b): b is string => typeof b === 'string' && b.length > 0);
-  if (bits.length === 0) return '';
-  return `<span style="color:#a1a1aa;font-size:10px;display:block;margin-top:6px;line-height:1.35;">${bits.map((b) => escapeHtml(b)).join(' · ')}</span>`;
-}
+import { ConnectionPeerAvatar } from './ConnectionPeerAvatar';
+import { MapSelectionPanel, type MapSelection } from './map/MapSelectionPanel';
 
 interface ConnectionMapProps {
   connections: ConnectionRecord[];
   onConnectionClick?: (connection: ConnectionRecord) => void;
+  /** Open a person's profile from a selected pin. */
+  onOpenProfile?: (otherUserId: string, connectionId: string) => void;
+  /** False while the Map tab is hidden but kept mounted. */
+  active?: boolean;
 }
 
 type PositionedConnection = {
@@ -111,6 +112,18 @@ const SRC_CONNECTIONS = 'connections-geo';
 const SRC_OFFICIAL = 'beacons-official-geo';
 const SRC_COMMUNITY = 'beacons-community-geo';
 const SRC_HAZARDS = 'beacons-hazards-geo';
+const SRC_SELECTED = 'selected-point';
+
+const INTERACTIVE_LAYERS = [
+  'connection-clusters',
+  'connection-unclustered',
+  'official-beacon-clusters',
+  'official-beacon-unclustered',
+  'community-beacon-clusters',
+  'community-beacon-unclustered',
+  'hazard-beacon-clusters',
+  'hazard-beacon-unclustered',
+];
 
 const CLUSTER_MAX_ZOOM = 14;
 const CLUSTER_RADIUS = 52;
@@ -161,38 +174,50 @@ function buildConnectionFeatures(positioned: PositionedConnection[]): GeoJSON.Fe
  *
  * **Data contract:** pass rows from `GET /api/connections?statusScope=map` or the `map` array from `?bundle=dashboard`.
  */
-export default function ConnectionMap({ connections, onConnectionClick }: ConnectionMapProps) {
+export default function ConnectionMap({ connections, onConnectionClick, onOpenProfile, active = true }: ConnectionMapProps) {
   const { theme } = useTheme();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const popupRef = useRef<maplibregl.Popup | null>(null);
   const initialFitDoneRef = useRef(false);
+  const presentedRef = useRef(false);
   /** Map instance finished `load` (sources/layers exist) — drives GeoJSON updates. */
   const [mapInitialized, setMapInitialized] = useState(false);
   /** First fully idle paint (tiles + layout settled) — drives fade-in to avoid pre-tile flicker. */
   const [mapPresentationReady, setMapPresentationReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
+  const [layersOpen, setLayersOpen] = useState(false);
   const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
+  const [selection, setSelection] = useState<MapSelection | null>(null);
+  /** Hover label is positioned imperatively: a mousemove must not re-render the map component. */
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  /** Connections and events inside the current viewport (desktop "In view" list). */
+  const [viewBounds, setViewBounds] = useState<maplibregl.LngLatBounds | null>(null);
+  const [listOpenMobile, setListOpenMobile] = useState(false);
+
   const beaconsRef = useRef<MapBeaconRecord[]>([]);
   useEffect(() => {
     beaconsRef.current = beacons;
   }, [beacons]);
   const connectionsRef = useRef(connections);
-  const onConnectionClickRef = useRef(onConnectionClick);
-  useEffect(() => { connectionsRef.current = connections; }, [connections]);
-  useEffect(() => { onConnectionClickRef.current = onConnectionClick; }, [onConnectionClick]);
+  useEffect(() => {
+    connectionsRef.current = connections;
+  }, [connections]);
 
-  const geoConnections = connections.filter(c => {
-    if (!c.geo_location) return false;
-    const { latitude, longitude } = c.geo_location;
-    return (
-      typeof latitude === 'number' && typeof longitude === 'number' &&
-      isFinite(latitude) && isFinite(longitude) &&
-      !(latitude === 0 && longitude === 0)
-    );
-  });
-  const positionedConnections = spreadOverlappingConnections(geoConnections);
+  const geoConnections = useMemo(
+    () =>
+      connections.filter((c) => {
+        if (!c.geo_location) return false;
+        const { latitude, longitude } = c.geo_location;
+        return (
+          typeof latitude === 'number' && typeof longitude === 'number' &&
+          isFinite(latitude) && isFinite(longitude) &&
+          !(latitude === 0 && longitude === 0)
+        );
+      }),
+    [connections],
+  );
+  const positionedConnections = useMemo(() => spreadOverlappingConnections(geoConnections), [geoConnections]);
   const hasGeoConnections = geoConnections.length > 0;
 
   const mapCenter = useMemo((): [number, number] => {
@@ -226,10 +251,7 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (
-        session &&
-        (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')
-      ) {
+      if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
         setBeaconAuthEpoch((n) => n + 1);
       }
     });
@@ -241,11 +263,8 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     const m = map.current;
     const syncFromMap = () => {
       const c = m.getCenter();
-      setBeaconViewport({
-        lng: c.lng,
-        lat: c.lat,
-        radiusM: radiusMetersFromBounds(m.getBounds()),
-      });
+      setBeaconViewport({ lng: c.lng, lat: c.lat, radiusM: radiusMetersFromBounds(m.getBounds()) });
+      setViewBounds(m.getBounds());
     };
     syncFromMap();
     let debounceId: number | null = null;
@@ -268,10 +287,8 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
   const beaconQueryRadiusM = beaconViewport?.radiusM ?? 15_000;
 
   useEffect(() => {
-    if (!wantsBeaconFetch) {
-      setBeacons([]);
-      return;
-    }
+    // With every place layer off, the layer filter already hides pins; no fetch needed.
+    if (!wantsBeaconFetch || !active) return;
     let cancelled = false;
 
     const run = async () => {
@@ -284,19 +301,16 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
         lng: String(beaconQueryLng),
         radius_m: String(Math.round(beaconQueryRadiusM)),
       });
-      const url = `/api/beacons?${q.toString()}`;
       try {
-        const res = await fetch(url, { credentials: 'include', headers });
-        if (!res.ok) {
-          if (!cancelled) setBeacons([]);
-          return;
-        }
+        const res = await fetch(`/api/beacons?${q.toString()}`, { credentials: 'include', headers });
+        // Keep the pins already on the map when a refresh fails; do not blank the layer.
+        if (!res.ok || cancelled) return;
         const json: unknown = await res.json();
         if (cancelled) return;
         const list = rawBeaconRowsFromApiPayload(json);
         setBeacons(list.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null));
       } catch {
-        if (!cancelled) setBeacons([]);
+        /* keep current pins */
       }
     };
 
@@ -304,95 +318,10 @@ export default function ConnectionMap({ connections, onConnectionClick }: Connec
     return () => {
       cancelled = true;
     };
-  }, [
-    wantsBeaconFetch,
-    beaconQueryLng,
-    beaconQueryLat,
-    beaconQueryRadiusM,
-    beaconAuthEpoch,
-  ]);
-
-  const chatButtonBackground = 'var(--color-primary)';
-
-const POPUP_MAX_CONNECTIONS = 5;
-
-  const buildConnectionPopupHtml = useCallback((connIdsCsv: string) => {
-    const ids = connIdsCsv.split(',').filter(Boolean);
-    const groupedConnections = ids
-      .map((id) => connectionsRef.current.find((c) => c.id === id))
-      .filter((c): c is ConnectionRecord => c != null)
-      .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
-    if (groupedConnections.length === 0) return '';
-
-    const connection = groupedConnections[0];
-    const displayedConnections = groupedConnections.slice(0, POPUP_MAX_CONNECTIONS);
-    const overflowCount = groupedConnections.length - displayedConnections.length;
-
-    const groupedRows = displayedConnections
-      .map((conn) => {
-        const date = conn.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-        const ctx = conn.context
-          ? `<span style="color:var(--color-primary,#7c3aed); font-size:10px; display:inline-block; margin-top:6px; padding:2px 8px; background:rgba(124,58,237,0.2); border-radius:9999px;">${escapeHtml(conn.context)}</span>`
-          : '';
-        const atm = atmosphereHtml(conn);
-        return `<div style="padding:8px 0; border-bottom:1px solid rgba(63,63,70,0.35);">
-          <strong style="color:var(--color-primary,#7c3aed); font-size:13px; display:block; margin-bottom:2px;">${escapeHtml(conn.name)}</strong>
-          <span style="color:#a1a1aa; font-size:11px; display:block;">${escapeHtml(conn.location)}</span>
-          <span style="color:#71717a; font-size:10px; display:block; margin-top:4px;">${escapeHtml(date)}</span>
-          ${ctx}${atm}
-          <button data-conn-id="${conn.id}" style="display:block; width:100%; margin-top:8px; padding:5px 10px; background:${chatButtonBackground}; color:white; font-size:11px; font-weight:600; border:none; border-radius:8px; cursor:pointer; text-align:center;">
-            Chat →
-          </button>
-        </div>`;
-      })
-      .join('');
-
-    const single = groupedConnections.length === 1;
-    const singleDate = connection.dateMet.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-    const singleCtx = connection.context
-      ? `<span style="color: var(--color-primary,#7c3aed); font-size: 10px; display: inline-block; margin-top: 8px; padding: 2px 8px; background: rgba(124, 58, 237, 0.2); border-radius: 9999px;">${escapeHtml(connection.context)}</span>`
-      : '';
-    const singleAtm = atmosphereHtml(connection);
-    const overflowNote =
-      overflowCount > 0
-        ? `<p style="margin-top:8px; color:#a1a1aa; font-size:11px; font-weight:600;">+${overflowCount} more</p>`
-        : '';
-
-    return `<div style="color: white; background: #18181b; padding: 14px; border-radius: 14px; border: 1px solid #27272a; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-height: 260px; overflow-y: auto;">
-      ${single ? `<strong style="color: var(--color-primary,#7c3aed); font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(connection.name)}</strong>
-      <span style="color: #a1a1aa; font-size: 12px; display: block;">${escapeHtml(connection.location)}</span>
-      <span style="color: #71717a; font-size: 11px; display: block; margin-top: 6px;">${escapeHtml(singleDate)}</span>
-      ${singleCtx}${singleAtm}
-      <button data-conn-id="${connection.id}" style="display: block; width: 100%; margin-top: 10px; padding: 6px 12px; background: ${chatButtonBackground}; color: white; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; text-align: center;">Chat →</button>`
-      : `<strong style="color:var(--color-primary,#7c3aed); font-size:14px; display:block; margin-bottom:6px;">${groupedConnections.length} connection${groupedConnections.length === 1 ? '' : 's'} at this location</strong>${groupedRows}${overflowNote}`}
-    </div>`;
-  }, []);
+  }, [wantsBeaconFetch, active, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
 
   const attachMapInteractions = useCallback((mapInstance: maplibregl.Map) => {
-    const onConnClusterClick = (e: maplibregl.MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      if (!f || f.geometry.type !== 'Point') return;
-      const clusId = f.properties?.cluster_id;
-      const src = mapInstance.getSource(SRC_CONNECTIONS) as maplibregl.GeoJSONSource | undefined;
-      if (clusId == null || !src || typeof src.getClusterExpansionZoom !== 'function') return;
-      src.getClusterExpansionZoom(clusId as number).then((z) => {
-        const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-        mapInstance.easeTo({ center: coords, zoom: z + 0.35, duration: 420 });
-      }).catch(() => {});
-    };
-
-    const onConnPointClick = (e: maplibregl.MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      const csv = f?.properties?.connIds;
-      if (typeof csv !== 'string') return;
-      popupRef.current?.remove();
-      const html = buildConnectionPopupHtml(csv);
-      const popup = new maplibregl.Popup({ offset: 18, closeButton: false, maxWidth: '280px' }).setLngLat(e.lngLat).setHTML(html);
-      popup.addTo(mapInstance);
-      popupRef.current = popup;
-    };
-
-    const beaconClusterClick = (sourceId: string) => (e: maplibregl.MapLayerMouseEvent) => {
+    const zoomIntoCluster = (sourceId: string) => (e: maplibregl.MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f || f.geometry.type !== 'Point') return;
       const clusId = f.properties?.cluster_id;
@@ -404,71 +333,80 @@ const POPUP_MAX_CONNECTIONS = 5;
       }).catch(() => {});
     };
 
-    const onBeaconPointClick = (e: maplibregl.MapLayerMouseEvent) => {
+    const onConnPointClick = (e: maplibregl.MapLayerMouseEvent) => {
       const f = e.features?.[0];
-      if (!f) return;
-      const id = f.properties?.id;
-      if (typeof id !== 'string' || id.length === 0) return;
-
-      const beacon = beaconsRef.current.find((b) => b.id === id);
-      const html = beacon
-        ? formatBeaconPopupHtml(beacon)
-        : beaconPopupErrorHtml('This pin is not in the loaded set. Pan or zoom the map to refresh beacons.');
-
-      popupRef.current?.remove();
-      const popup = new maplibregl.Popup({ offset: 14, closeButton: false, maxWidth: '300px' })
-        .setLngLat(e.lngLat)
-        .setHTML(html);
-      popup.addTo(mapInstance);
-      popupRef.current = popup;
+      const csv = f?.properties?.connIds;
+      if (typeof csv !== 'string' || !f || f.geometry.type !== 'Point') return;
+      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+      setSelection({ kind: 'connections', ids: csv.split(',').filter(Boolean), lng, lat });
     };
 
-    mapInstance.on('click', 'connection-clusters', onConnClusterClick);
-    mapInstance.on('click', 'connection-unclustered', onConnPointClick);
-    const beaconClusterLayerIds = [
-      'official-beacon-clusters',
-      'official-beacon-cluster-mixed',
-      'community-beacon-clusters',
-      'community-beacon-cluster-mixed',
-      'hazard-beacon-clusters',
-      'hazard-beacon-cluster-mixed',
-    ] as const;
-    beaconClusterLayerIds.forEach((layerId) => {
-      const src =
-        layerId.startsWith('official') ? SRC_OFFICIAL
-        : layerId.startsWith('community') ? SRC_COMMUNITY
-        : SRC_HAZARDS;
-      mapInstance.on('click', layerId, beaconClusterClick(src));
-    });
-    mapInstance.on('click', 'official-beacon-unclustered', onBeaconPointClick);
-    mapInstance.on('click', 'official-beacon-unclustered-icon', onBeaconPointClick);
-    mapInstance.on('click', 'community-beacon-unclustered', onBeaconPointClick);
-    mapInstance.on('click', 'community-beacon-unclustered-icon', onBeaconPointClick);
-    mapInstance.on('click', 'hazard-beacon-unclustered', onBeaconPointClick);
-    mapInstance.on('click', 'hazard-beacon-unclustered-icon', onBeaconPointClick);
+    const onBeaconPointClick = (e: maplibregl.MapLayerMouseEvent) => {
+      const f = e.features?.[0];
+      const id = f?.properties?.id;
+      if (typeof id !== 'string' || !id || !f || f.geometry.type !== 'Point') return;
+      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+      setSelection({ kind: 'beacon', id, lng, lat });
+    };
 
-    mapInstance.on('mouseenter', 'connection-clusters', () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
-    mapInstance.on('mouseleave', 'connection-clusters', () => { mapInstance.getCanvas().style.cursor = ''; });
-    mapInstance.on('mouseenter', 'connection-unclustered', () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
-    mapInstance.on('mouseleave', 'connection-unclustered', () => { mapInstance.getCanvas().style.cursor = ''; });
-    [
-      'official-beacon-clusters',
-      'official-beacon-cluster-mixed',
-      'official-beacon-unclustered',
-      'official-beacon-unclustered-icon',
-      'community-beacon-clusters',
-      'community-beacon-cluster-mixed',
-      'community-beacon-unclustered',
-      'community-beacon-unclustered-icon',
-      'hazard-beacon-clusters',
-      'hazard-beacon-cluster-mixed',
-      'hazard-beacon-unclustered',
-      'hazard-beacon-unclustered-icon',
-    ].forEach((id) => {
-      mapInstance.on('mouseenter', id, () => { mapInstance.getCanvas().style.cursor = 'pointer'; });
-      mapInstance.on('mouseleave', id, () => { mapInstance.getCanvas().style.cursor = ''; });
+    const hoverLabel = (e: maplibregl.MapLayerMouseEvent): string | null => {
+      const props = e.features?.[0]?.properties;
+      if (!props) return null;
+      if (props.cluster_id != null) return `${props.point_count} here · click to zoom`;
+      if (typeof props.connIds === 'string') {
+        const ids = props.connIds.split(',').filter(Boolean);
+        const first = connectionsRef.current.find((c) => c.id === ids[0]);
+        if (!first) return null;
+        return ids.length > 1 ? `${first.name} + ${ids.length - 1} more` : first.name;
+      }
+      if (typeof props.title === 'string') return props.title;
+      return null;
+    };
+    const onHover = (e: maplibregl.MapLayerMouseEvent) => {
+      mapInstance.getCanvas().style.cursor = 'pointer';
+      const el = tooltipRef.current;
+      const label = hoverLabel(e);
+      if (!el) return;
+      if (!label) {
+        el.style.opacity = '0';
+        return;
+      }
+      if (el.textContent !== label) el.textContent = label;
+      el.style.transform = `translate(${e.point.x}px, ${e.point.y}px) translate(-50%, calc(-100% - 18px))`;
+      el.style.opacity = '1';
+    };
+    const onLeave = () => {
+      mapInstance.getCanvas().style.cursor = '';
+      if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
+    };
+
+    mapInstance.on('click', 'connection-clusters', zoomIntoCluster(SRC_CONNECTIONS));
+    mapInstance.on('click', 'connection-unclustered', onConnPointClick);
+    for (const [prefix, src] of [
+      ['official-beacon', SRC_OFFICIAL],
+      ['community-beacon', SRC_COMMUNITY],
+      ['hazard-beacon', SRC_HAZARDS],
+    ] as const) {
+      mapInstance.on('click', `${prefix}-clusters`, zoomIntoCluster(src));
+      mapInstance.on('click', `${prefix}-unclustered`, onBeaconPointClick);
+      mapInstance.on('click', `${prefix}-unclustered-icon`, onBeaconPointClick);
+      for (const layer of [`${prefix}-clusters`, `${prefix}-unclustered`]) {
+        mapInstance.on('mousemove', layer, onHover);
+        mapInstance.on('mouseleave', layer, onLeave);
+      }
+    }
+    for (const layer of ['connection-clusters', 'connection-unclustered']) {
+      mapInstance.on('mousemove', layer, onHover);
+      mapInstance.on('mouseleave', layer, onLeave);
+    }
+    // Clicking empty map clears the selection.
+    mapInstance.on('click', (e) => {
+      const hits = mapInstance.queryRenderedFeatures(e.point, {
+        layers: INTERACTIVE_LAYERS.filter((id) => mapInstance.getLayer(id)),
+      });
+      if (hits.length === 0) setSelection(null);
     });
-  }, [buildConnectionPopupHtml]);
+  }, []);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -486,7 +424,7 @@ const POPUP_MAX_CONNECTIONS = 5;
       });
 
       map.current = mapInstance;
-      mapInstance.addControl(new maplibregl.NavigationControl(), 'top-right');
+      mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
       mapInstance.on('load', () => {
         mapInstance.addSource(SRC_CONNECTIONS, {
@@ -495,18 +433,19 @@ const POPUP_MAX_CONNECTIONS = 5;
           cluster: true,
           clusterMaxZoom: CLUSTER_MAX_ZOOM,
           clusterRadius: CLUSTER_RADIUS,
+          clusterProperties: { people: ['+', ['get', 'count']] },
         });
 
+        // People: solid violet. Cluster size/label counts people, not grouped spots.
         mapInstance.addLayer({
           id: 'connection-clusters',
           type: 'circle',
           source: SRC_CONNECTIONS,
           filter: ['has', 'point_count'],
           paint: {
-            'circle-color': '#7c3aed',
-            'circle-radius': ['step', ['get', 'point_count'], 20, 10, 24, 28, 30],
-            'circle-opacity': 0.92,
-            'circle-stroke-width': 2,
+            'circle-color': FC_PRIMARY,
+            'circle-radius': ['step', ['get', 'people'], 18, 10, 23, 30, 29],
+            'circle-stroke-width': 3,
             'circle-stroke-color': '#ffffff',
           },
         });
@@ -516,8 +455,9 @@ const POPUP_MAX_CONNECTIONS = 5;
           source: SRC_CONNECTIONS,
           filter: ['has', 'point_count'],
           layout: {
-            'text-field': ['get', 'point_count_abbreviated'],
-            'text-size': 12,
+            'text-field': ['to-string', ['get', 'people']],
+            'text-size': 13,
+            'text-allow-overlap': true,
           },
           paint: { 'text-color': '#ffffff' },
         });
@@ -527,25 +467,33 @@ const POPUP_MAX_CONNECTIONS = 5;
           source: SRC_CONNECTIONS,
           filter: ['!', ['has', 'point_count']],
           paint: {
-            'circle-color': '#7c3aed',
-            'circle-radius': 14,
-            'circle-opacity': 0.95,
+            'circle-color': FC_PRIMARY,
+            'circle-radius': ['case', ['>', ['get', 'count'], 1], 15, 11],
             'circle-stroke-width': 3,
             'circle-stroke-color': '#ffffff',
           },
         });
+        mapInstance.addLayer({
+          id: 'connection-unclustered-count',
+          type: 'symbol',
+          source: SRC_CONNECTIONS,
+          filter: ['all', ['!', ['has', 'point_count']], ['>', ['get', 'count'], 1]],
+          layout: {
+            'text-field': ['to-string', ['get', 'count']],
+            'text-size': 12,
+            'text-allow-overlap': true,
+          },
+          paint: { 'text-color': '#ffffff' },
+        });
 
-        const addBeaconStack = (sourceId: string, prefix: string, defaultColor: string) => {
+        // Places (beacons): light plates with a tinted ring and glyph, so they never read as people.
+        const addBeaconStack = (sourceId: string, prefix: string, clusterColor: string) => {
           mapInstance.addSource(sourceId, {
             type: 'geojson',
             data: emptyFc(),
             cluster: true,
             clusterMaxZoom: BEACON_CLUSTER_MAX_ZOOM,
             clusterRadius: BEACON_CLUSTER_RADIUS,
-            clusterProperties: {
-              soundtrack_members: ['+', ['case', ['==', ['get', 'beacon_type'], 'soundtrack'], 1, 0]],
-              non_soundtrack_members: ['+', ['case', ['!=', ['get', 'beacon_type'], 'soundtrack'], 1, 0]],
-            },
           });
           mapInstance.addLayer({
             id: `${prefix}-clusters`,
@@ -553,11 +501,10 @@ const POPUP_MAX_CONNECTIONS = 5;
             source: sourceId,
             filter: ['has', 'point_count'],
             paint: {
-              'circle-color': defaultColor,
-              'circle-radius': ['step', ['get', 'point_count'], 18, 8, 22, 20, 26],
-              'circle-opacity': 0.9,
-              'circle-stroke-width': 2,
-              'circle-stroke-color': 'rgba(255,255,255,0.9)',
+              'circle-color': '#ffffff',
+              'circle-radius': ['step', ['get', 'point_count'], 16, 8, 20, 20, 24],
+              'circle-stroke-width': 3,
+              'circle-stroke-color': clusterColor,
             },
           });
           mapInstance.addLayer({
@@ -567,34 +514,10 @@ const POPUP_MAX_CONNECTIONS = 5;
             filter: ['has', 'point_count'],
             layout: {
               'text-field': ['get', 'point_count_abbreviated'],
-              'text-size': 11,
-              'text-allow-overlap': true,
+              'text-size': 12,
+                'text-allow-overlap': true,
             },
-            paint: { 'text-color': '#0a0a0a' },
-          });
-          mapInstance.addLayer({
-            id: `${prefix}-cluster-mixed`,
-            type: 'symbol',
-            source: sourceId,
-            filter: [
-              'all',
-              ['has', 'point_count'],
-              ['>', ['get', 'point_count'], 1],
-              ['>', ['get', 'soundtrack_members'], 0],
-              ['>', ['get', 'non_soundtrack_members'], 0],
-            ],
-            layout: {
-              'text-field': '★',
-              'text-size': 15,
-              'text-offset': [0, -1.15],
-              'text-allow-overlap': true,
-              'text-ignore-placement': true,
-            },
-            paint: {
-              'text-color': '#fde047',
-              'text-halo-color': '#18181b',
-              'text-halo-width': 1.35,
-            },
+            paint: { 'text-color': clusterColor },
           });
           mapInstance.addLayer({
             id: `${prefix}-unclustered`,
@@ -602,11 +525,10 @@ const POPUP_MAX_CONNECTIONS = 5;
             source: sourceId,
             filter: ['!', ['has', 'point_count']],
             paint: {
-              'circle-color': ['get', 'tint'],
-              'circle-radius': 13,
-              'circle-opacity': 0.92,
-              'circle-stroke-width': 2,
-              'circle-stroke-color': '#ffffff',
+              'circle-color': '#ffffff',
+              'circle-radius': 12,
+              'circle-stroke-width': 3,
+              'circle-stroke-color': ['get', 'tint'],
             },
           });
           mapInstance.addLayer({
@@ -616,43 +538,31 @@ const POPUP_MAX_CONNECTIONS = 5;
             filter: ['!', ['has', 'point_count']],
             layout: {
               'text-field': ['get', 'icon_char'],
-              'text-size': 13,
+              'text-size': 12,
               'text-allow-overlap': true,
               'text-ignore-placement': true,
             },
-            paint: {
-              'text-color': '#fafafa',
-              'text-halo-color': ['get', 'tint'],
-              'text-halo-width': 1.65,
-            },
+            paint: { 'text-color': ['get', 'tint'] },
           });
         };
 
-        addBeaconStack(SRC_OFFICIAL, 'official-beacon', '#22d3ee');
-        addBeaconStack(SRC_COMMUNITY, 'community-beacon', '#34d399');
-        addBeaconStack(SRC_HAZARDS, 'hazard-beacon', '#f97316');
+        addBeaconStack(SRC_OFFICIAL, 'official-beacon', FC_SECONDARY);
+        addBeaconStack(SRC_COMMUNITY, 'community-beacon', FC_SECONDARY);
+        addBeaconStack(SRC_HAZARDS, 'hazard-beacon', '#c2410c');
 
-        /** Append beacon GL layers so they always paint above connection clusters (basemap may register late). */
-        const beaconPaintOrder = [
-          'official-beacon-clusters',
-          'official-beacon-cluster-count',
-          'official-beacon-cluster-mixed',
-          'official-beacon-unclustered',
-          'official-beacon-unclustered-icon',
-          'community-beacon-clusters',
-          'community-beacon-cluster-count',
-          'community-beacon-cluster-mixed',
-          'community-beacon-unclustered',
-          'community-beacon-unclustered-icon',
-          'hazard-beacon-clusters',
-          'hazard-beacon-cluster-count',
-          'hazard-beacon-cluster-mixed',
-          'hazard-beacon-unclustered',
-          'hazard-beacon-unclustered-icon',
-        ] as const;
-        for (const layerId of beaconPaintOrder) {
-          if (mapInstance.getLayer(layerId)) mapInstance.moveLayer(layerId);
-        }
+        // Selection ring above everything.
+        mapInstance.addSource(SRC_SELECTED, { type: 'geojson', data: emptyFc() });
+        mapInstance.addLayer({
+          id: 'selected-ring',
+          type: 'circle',
+          source: SRC_SELECTED,
+          paint: {
+            'circle-radius': 22,
+            'circle-color': 'rgba(124,58,237,0.18)',
+            'circle-stroke-width': 2.5,
+            'circle-stroke-color': FC_PRIMARY,
+          },
+        });
 
         attachMapInteractions(mapInstance);
         setMapInitialized(true);
@@ -662,6 +572,7 @@ const POPUP_MAX_CONNECTIONS = 5;
         const reveal = () => {
           if (revealed) return;
           revealed = true;
+          presentedRef.current = true;
           if (fallbackRevealTimer != null) {
             window.clearTimeout(fallbackRevealTimer);
             fallbackRevealTimer = null;
@@ -674,33 +585,21 @@ const POPUP_MAX_CONNECTIONS = 5;
 
       mapInstance.on('error', (e) => {
         console.error('Map error:', e);
-        setMapError('Failed to load map tiles');
+        // Individual tile errors after the first paint are recoverable; only fail before it.
+        if (!presentedRef.current) setMapError('Failed to load map tiles');
       });
     } catch (err) {
       console.error('Failed to initialize map:', err);
       setMapError('Failed to initialize map');
     }
 
-    const handlePopupClick = (e: MouseEvent) => {
-      const btn = (e.target as HTMLElement).closest('[data-conn-id]') as HTMLElement | null;
-      const openChat = onConnectionClickRef.current;
-      if (btn && openChat) {
-        const id = btn.getAttribute('data-conn-id');
-        const conn = connectionsRef.current.find(c => c.id === id);
-        if (conn) openChat(conn);
-      }
-    };
-    mapContainer.current.addEventListener('click', handlePopupClick);
-
     return () => {
       if (fallbackRevealTimer != null) {
         window.clearTimeout(fallbackRevealTimer);
         fallbackRevealTimer = null;
       }
-      mapContainer.current?.removeEventListener('click', handlePopupClick);
-      popupRef.current?.remove();
-      popupRef.current = null;
       initialFitDoneRef.current = false;
+      presentedRef.current = false;
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -713,18 +612,17 @@ const POPUP_MAX_CONNECTIONS = 5;
   useEffect(() => {
     const m = map.current;
     if (!m || !mapInitialized) return;
-    const fc = { type: 'FeatureCollection' as const, features: buildConnectionFeatures(positionedConnections) };
     const src = m.getSource(SRC_CONNECTIONS) as maplibregl.GeoJSONSource | undefined;
-    src?.setData(fc);
+    src?.setData({ type: 'FeatureCollection', features: buildConnectionFeatures(positionedConnections) });
 
     const vis = layers.myNetwork ? 'visible' : 'none';
-    ['connection-clusters', 'connection-cluster-count', 'connection-unclustered'].forEach((id) => {
+    ['connection-clusters', 'connection-cluster-count', 'connection-unclustered', 'connection-unclustered-count'].forEach((id) => {
       if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', vis);
     });
 
     if (!initialFitDoneRef.current && geoConnections.length > 1) {
       const bounds = new maplibregl.LngLatBounds();
-      geoConnections.forEach(conn => {
+      geoConnections.forEach((conn) => {
         if (conn.geo_location) bounds.extend([conn.geo_location.longitude, conn.geo_location.latitude]);
       });
       m.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
@@ -736,51 +634,45 @@ const POPUP_MAX_CONNECTIONS = 5;
     const m = map.current;
     if (!m || !mapInitialized) return;
     const setSrc = (id: string, feats: GeoJSON.Feature[]) => {
-      const src = m.getSource(id) as maplibregl.GeoJSONSource | undefined;
-      src?.setData({ type: 'FeatureCollection', features: feats });
+      (m.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: feats });
     };
     const visibleBeacons = beacons.filter((beacon) => layers[mapLayerForBeacon(beacon.beacon_type)]);
     setSrc(SRC_OFFICIAL, beaconGeoJsonFeatures(visibleBeacons, 'official'));
     setSrc(SRC_COMMUNITY, beaconGeoJsonFeatures(visibleBeacons, 'community'));
     setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(visibleBeacons, 'hazard'));
-
-    const vis = (on: boolean) => (on ? 'visible' : 'none');
-    [
-      'official-beacon-clusters',
-      'official-beacon-cluster-count',
-      'official-beacon-cluster-mixed',
-      'official-beacon-unclustered',
-      'official-beacon-unclustered-icon',
-    ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
-    });
-    [
-      'community-beacon-clusters',
-      'community-beacon-cluster-count',
-      'community-beacon-cluster-mixed',
-      'community-beacon-unclustered',
-      'community-beacon-unclustered-icon',
-    ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
-    });
-    [
-      'hazard-beacon-clusters',
-      'hazard-beacon-cluster-count',
-      'hazard-beacon-cluster-mixed',
-      'hazard-beacon-unclustered',
-      'hazard-beacon-unclustered-icon',
-    ].forEach((lid) => {
-      if (m.getLayer(lid)) m.setLayoutProperty(lid, 'visibility', vis(true));
-    });
   }, [mapInitialized, beacons, layers]);
 
+  // Selection ring follows the selection.
   useEffect(() => {
-    const handleResize = () => { map.current?.resize(); };
+    const m = map.current;
+    if (!m || !mapInitialized) return;
+    const src = m.getSource(SRC_SELECTED) as maplibregl.GeoJSONSource | undefined;
+    src?.setData(
+      selection
+        ? {
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [selection.lng, selection.lat] }, properties: {} }],
+          }
+        : emptyFc(),
+    );
+  }, [mapInitialized, selection]);
+
+  useEffect(() => {
+    if (!selection) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelection(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selection]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      map.current?.resize();
+    };
     window.addEventListener('resize', handleResize);
     const resizeObserver =
-      typeof ResizeObserver !== 'undefined' && mapContainer.current
-        ? new ResizeObserver(handleResize)
-        : null;
+      typeof ResizeObserver !== 'undefined' && mapContainer.current ? new ResizeObserver(handleResize) : null;
     if (resizeObserver && mapContainer.current) resizeObserver.observe(mapContainer.current);
     const resizeTimer = setTimeout(handleResize, 100);
     return () => {
@@ -790,16 +682,41 @@ const POPUP_MAX_CONNECTIONS = 5;
     };
   }, [mapInitialized]);
 
+  // A hidden (kept-alive) map has zero size; re-measure when the tab comes back.
+  useEffect(() => {
+    if (active) map.current?.resize();
+  }, [active]);
+
+  const inView = useMemo(() => {
+    if (!viewBounds) return { spots: positionedConnections.slice(0, 40), places: [] as MapBeaconRecord[] };
+    const spots = layers.myNetwork
+      ? positionedConnections.filter((p) => viewBounds.contains([p.markerLongitude, p.markerLatitude]))
+      : [];
+    const places = beacons
+      .filter((b) => layers[mapLayerForBeacon(b.beacon_type)] && viewBounds.contains([b.lng, b.lat]))
+      .sort((a, b) => Number(b.beacon_type === 'event') - Number(a.beacon_type === 'event'));
+    return {
+      spots: spots.sort((a, b) => b.connection.dateMet.getTime() - a.connection.dateMet.getTime()).slice(0, 40),
+      places: places.slice(0, 40),
+    };
+  }, [beacons, layers, positionedConnections, viewBounds]);
+
+  const focusOn = (sel: MapSelection) => {
+    setSelection(sel);
+    setListOpenMobile(false);
+    map.current?.easeTo({ center: [sel.lng, sel.lat], zoom: Math.max(map.current.getZoom(), 15), duration: 480 });
+  };
+
   const toggle = (key: keyof MapLayerToggles) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   if (!hasGeoConnections) {
     return (
-      <div className="fc-card p-12 rounded-[16px] border border-border-hard text-center">
-        <MapPin className="w-16 h-16 text-outline mx-auto mb-4" />
-        <h3 className="text-xl font-semibold mb-2">No Locations Yet</h3>
-        <p className="text-on-surface-variant">
+      <div className="fc-card flex flex-1 flex-col items-center justify-center rounded-[16px] border border-border-hard p-12 text-center">
+        <MapPin className="mx-auto mb-4 h-12 w-12 text-outline" />
+        <h3 className="mb-2 text-xl font-semibold">No places yet</h3>
+        <p className="max-w-sm text-on-surface-variant">
           Your Click map will appear here once you start making clicks!
         </p>
       </div>
@@ -808,79 +725,209 @@ const POPUP_MAX_CONNECTIONS = 5;
 
   if (mapError) {
     return (
-      <div className="fc-card p-12 rounded-[16px] border border-border-hard text-center">
-        <MapPin className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold mb-2">Map Error</h3>
+      <div className="fc-card flex flex-1 flex-col items-center justify-center rounded-[16px] border border-border-hard p-12 text-center">
+        <MapPin className="mx-auto mb-4 h-12 w-12 text-error" />
+        <h3 className="mb-2 text-xl font-semibold">Map unavailable</h3>
         <p className="text-on-surface-variant">{mapError}</p>
       </div>
     );
   }
 
-  return (
-    <div className="relative min-h-[420px] w-full flex-1 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container">
-      <div
-        className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
-          mapPresentationReady ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        }`}
-        aria-hidden={mapPresentationReady}
-      >
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-2" />
-          <p className="text-sm text-on-surface-variant">Loading map...</p>
-        </div>
+  const selectedConnections =
+    selection?.kind === 'connections'
+      ? selection.ids
+          .map((id) => connections.find((c) => c.id === id))
+          .filter((c): c is ConnectionRecord => c != null)
+          .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime())
+      : [];
+  const selectedBeacon = selection?.kind === 'beacon' ? beacons.find((b) => b.id === selection.id) ?? null : null;
+
+  const layerRows: { key: keyof MapLayerToggles; label: string }[] = [
+    { key: 'myNetwork', label: 'People I met' },
+    { key: 'events', label: 'Events' },
+    { key: 'socialVibes', label: 'Social vibes' },
+    { key: 'soundtracks', label: 'Soundtracks' },
+    { key: 'alertsUtilities', label: 'Alerts & utilities' },
+    { key: 'other', label: 'Other' },
+  ];
+
+  const inViewList = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-border-hard px-4 py-3">
+        <p className="text-sm font-bold text-on-surface">In view</p>
+        <p className="text-xs text-on-surface-variant">
+          {inView.spots.reduce((n, s) => n + s.groupedConnections.length, 0)} people · {inView.places.length} places
+        </p>
       </div>
-
-      <div
-        ref={mapContainer}
-        className={`absolute inset-0 transition-opacity duration-500 ease-out ${
-          mapPresentationReady ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-
-      {mapPresentationReady && (
-        <div className="absolute top-4 left-4 z-[6] max-w-[240px] rounded-[16px] border border-border-hard bg-surface p-3 text-xs text-on-surface shadow-lg">
-          <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
-            <Layers className="w-3.5 h-3.5 text-primary" />
-            Map layers
-          </div>
-          <p className="mb-2 text-[10px] leading-snug text-on-surface-variant">
-            <span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-primary align-middle" aria-hidden />
-            Purple numbered circles = connection clusters (people count).
-          </p>
-          <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.myNetwork} onCheckedChange={() => toggle('myNetwork')} aria-label="My Network" className="scale-75" />
-            My Network
-          </div>
-          <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.events} onCheckedChange={() => toggle('events')} aria-label="Events" className="scale-75" />
-            Events
-          </div>
-          <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.socialVibes} onCheckedChange={() => toggle('socialVibes')} aria-label="Social vibes" className="scale-75" />
-            Social vibes
-          </div>
-          <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.soundtracks} onCheckedChange={() => toggle('soundtracks')} aria-label="Soundtracks" className="scale-75" />
-            Soundtracks
-          </div>
-          <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.alertsUtilities} onCheckedChange={() => toggle('alertsUtilities')} aria-label="Alerts and utilities" className="scale-75" />
-            Alerts &amp; utilities
-          </div>
-          <div className="flex items-center gap-2 py-1 select-none">
-            <Toggle checked={layers.other} onCheckedChange={() => toggle('other')} aria-label="Other beacons" className="scale-75" />
-            Other
-          </div>
-        </div>
-      )}
-
-      {mapPresentationReady && (
-        <div className="absolute bottom-4 left-4 bg-surface-container/90 px-4 py-2 rounded-xl border border-border-hard">
-          <span className="text-sm text-on-surface-variant">
-            <span className="text-primary font-bold">{geoConnections.length}</span> locations mapped
-          </span>
-        </div>
-      )}
+      <div className="chat-thread-scroll min-h-0 flex-1 p-1.5">
+        {inView.spots.length === 0 && inView.places.length === 0 ? (
+          <p className="px-3 py-6 text-sm text-on-surface-variant">Nothing here. Zoom out or pan to see more.</p>
+        ) : null}
+        {inView.spots.map((spot) => (
+          <button
+            key={spot.connection.id}
+            type="button"
+            onClick={() =>
+              focusOn({
+                kind: 'connections',
+                ids: spot.groupedConnections.map((c) => c.id),
+                lng: spot.markerLongitude,
+                lat: spot.markerLatitude,
+              })
+            }
+            className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-surface-container-low"
+          >
+            <ConnectionPeerAvatar label={spot.connection.name} imageUrl={spot.connection.avatarUrl} size="md" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-on-surface">
+                {spot.connection.name}
+                {spot.groupedConnections.length > 1 ? ` +${spot.groupedConnections.length - 1}` : ''}
+              </span>
+              <span className="block truncate text-xs text-on-surface-variant">{spot.connection.location}</span>
+            </span>
+          </button>
+        ))}
+        {inView.places.length > 0 ? (
+          <p className="px-2.5 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-on-surface-variant">Places</p>
+        ) : null}
+        {inView.places.map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            onClick={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}
+            className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-surface-container-low"
+          >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] bg-white text-sm"
+              style={{ borderColor: beaconRowTint(b), color: beaconRowTint(b) }}
+              aria-hidden
+            >
+              {b.beacon_type === 'event' ? '◆' : '•'}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-on-surface">{displayTitleForBeacon(b)}</span>
+              <span className="block truncate text-xs text-on-surface-variant">{humanizeBeaconType(b.beacon_type)}</span>
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
+
+  return (
+    <div className="relative flex min-h-[420px] w-full flex-1 gap-4 overflow-hidden" data-testid="connection-map">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container">
+        <div
+          className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
+            mapPresentationReady ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
+          aria-hidden={mapPresentationReady}
+        >
+          <div className="text-center">
+            <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-on-surface-variant">Loading map…</p>
+          </div>
+        </div>
+
+        <div
+          ref={mapContainer}
+          className={`absolute inset-0 transition-opacity duration-500 ease-out ${mapPresentationReady ? 'opacity-100' : 'opacity-0'}`}
+        />
+
+        <div
+          ref={tooltipRef}
+          className="pointer-events-none absolute left-0 top-0 z-[7] whitespace-nowrap rounded-[8px] border border-border-hard bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface opacity-0 shadow-lg transition-opacity duration-100"
+          role="tooltip"
+          aria-hidden
+        />
+
+        {mapPresentationReady ? (
+          <div className="absolute left-3 top-3 z-[6] flex flex-col items-start gap-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLayersOpen((o) => !o)}
+                aria-expanded={layersOpen}
+                className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold text-on-surface shadow-lg hover:bg-surface-container-low"
+              >
+                <Layers className="h-4 w-4 text-primary" aria-hidden />
+                Layers
+              </button>
+              <button
+                type="button"
+                onClick={() => setListOpenMobile((o) => !o)}
+                aria-expanded={listOpenMobile}
+                className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold text-on-surface shadow-lg hover:bg-surface-container-low lg:hidden"
+              >
+                <List className="h-4 w-4 text-primary" aria-hidden />
+                In view
+              </button>
+            </div>
+            {layersOpen ? (
+              <div className="w-60 rounded-[12px] border border-border-hard bg-surface p-3 text-sm text-on-surface shadow-xl">
+                <div className="mb-2 flex items-center gap-3 text-xs text-on-surface-variant">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full bg-primary ring-2 ring-white" aria-hidden />
+                    People
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-full border-[3px] border-secondary bg-white" aria-hidden />
+                    Places
+                  </span>
+                </div>
+                {layerRows.map((row) => (
+                  <label key={row.key} className="flex cursor-pointer items-center justify-between gap-2 py-1.5 font-medium">
+                    {row.label}
+                    <Toggle checked={layers[row.key]} onCheckedChange={() => toggle(row.key)} aria-label={row.label} className="scale-75" />
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Narrow: bottom sheet for the selection or the in-view list. */}
+        {selection || listOpenMobile ? (
+          <div className="absolute inset-x-2 bottom-2 z-[8] max-h-[60%] overflow-y-auto rounded-[16px] border border-border-hard bg-surface shadow-xl lg:hidden">
+            {selection ? (
+              <MapSelectionPanel
+                selection={selection}
+                connections={selectedConnections}
+                beacon={selectedBeacon}
+                onClose={() => setSelection(null)}
+                onMessage={onConnectionClick}
+                onProfile={
+                  onOpenProfile ? (c) => c.otherUserId && onOpenProfile(c.otherUserId, c.id) : undefined
+                }
+              />
+            ) : (
+              <div className="h-[min(22rem,55vh)]">{inViewList}</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Desktop: map and detail side by side. */}
+      <aside className="hidden w-[20rem] shrink-0 overflow-hidden rounded-[16px] border border-border-hard bg-surface lg:flex lg:flex-col">
+        {selection ? (
+          <div className="chat-thread-scroll min-h-0 flex-1">
+            <MapSelectionPanel
+              selection={selection}
+              connections={selectedConnections}
+              beacon={selectedBeacon}
+              onClose={() => setSelection(null)}
+              onMessage={onConnectionClick}
+              onProfile={onOpenProfile ? (c) => c.otherUserId && onOpenProfile(c.otherUserId, c.id) : undefined}
+            />
+          </div>
+        ) : (
+          inViewList
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function beaconRowTint(b: MapBeaconRecord): string {
+  return beaconGeoJsonFeatures([b], beaconLayerGroup(b))[0]?.properties?.tint ?? FC_SECONDARY;
 }

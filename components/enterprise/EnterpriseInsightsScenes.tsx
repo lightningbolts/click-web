@@ -47,7 +47,7 @@ export function OverviewScene() {
       </ClientOnly>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Total connections" hint="Last 30 days" value={String(weekTotal)} />
-        <Stat label="Retention rate" hint="Returning visitors" value="42%" />
+        <Stat label="Arrived together" hint="Verified groups of 3+" value="31" />
         <Stat label="Busiest day" hint="Highest activity" value="Saturday" />
         <Stat label="Peak hour" hint="Most active time" value={`${mockInsightsPeakHour}:00`} />
       </div>
@@ -111,25 +111,55 @@ export function HeatmapScene() {
   );
 }
 
+/**
+ * The event lifecycle an operator can actually read in Insights (RSVP → check-in, from event
+ * engagement) plus what only Click can add: who met there, and who arrived as a verified group.
+ */
 export function EventsScene() {
   return (
     <ul className="space-y-3">
-      {DEMO_EVENTS.map((event) => (
-        <li key={event.id} className="rounded-[16px] border border-border-hard bg-background p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <p className="font-bold text-on-surface">{event.title}</p>
-              <p className="mt-1 text-sm text-on-surface-variant">
-                {event.when} · {event.room} · Host {event.host}
-              </p>
+      {DEMO_EVENTS.map((event) => {
+        const steps = [
+          { label: 'RSVP’d', value: event.going },
+          { label: 'Checked in', value: event.checkedIn },
+          { label: 'Met someone', value: event.met },
+        ];
+        return (
+          <li key={event.id} className="rounded-[16px] border border-border-hard bg-background p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-bold text-on-surface">{event.title}</p>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {event.when} · {event.room} · Host {event.host}
+                </p>
+              </div>
+              <span className="rounded-full bg-primary-container px-2.5 py-1 text-xs font-semibold text-on-primary-container">
+                {'upcoming' in event && event.upcoming ? 'Upcoming' : `${event.groups} verified groups`}
+              </span>
             </div>
-            <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary">
-              {event.going} going
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-on-surface-variant">{event.met} people met at this event</p>
-        </li>
-      ))}
+            {'upcoming' in event && event.upcoming ? (
+              <p className="mt-3 text-sm text-on-surface-variant">
+                {event.going} going so far. Check-ins and connections appear once the doors open.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-1.5" aria-label={`${event.title} funnel`}>
+                {steps.map((step) => (
+                  <div key={step.label} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 text-xs">
+                    <span className="font-semibold text-on-surface-variant">{step.label}</span>
+                    <span className="h-2 overflow-hidden rounded-full bg-surface-container">
+                      <span
+                        className="block h-full rounded-full bg-primary"
+                        style={{ width: `${Math.max(4, Math.round((step.value / event.going) * 100))}%` }}
+                      />
+                    </span>
+                    <span className="text-right font-semibold tabular-nums text-on-surface">{step.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

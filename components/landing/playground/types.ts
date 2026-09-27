@@ -11,11 +11,20 @@ export type MemoryCapsule = {
   volume: 1 | 2 | 3;
 };
 
+/** A hangout plan sent in chat (same shape as the app's plan card: title, time, place, RSVP). */
+export type DemoPlan = {
+  title: string;
+  when: string;
+  place: string;
+  going: boolean;
+};
+
 export type ChatMessage = {
   id: string;
-  from: 'you' | 'them';
+  from: 'you' | 'them' | 'system';
   text: string;
   time: string;
+  plan?: DemoPlan;
 };
 
 export type PlaygroundPerson = {
@@ -58,6 +67,8 @@ export type PlaygroundActions = {
   toggleRsvp: (eventId: string) => void;
   toggleRoute: (eventId: string) => void;
   sendMessage: (personId: string, text: string) => void;
+  sendPlan: (personId: string, plan: Omit<DemoPlan, 'going'>) => void;
+  togglePlanGoing: (personId: string, messageId: string) => void;
   setOpenChatId: (id: string | null) => void;
   setDashboardTab: (tab: DashboardTab) => void;
   setScene: (scene: PlaygroundScene) => void;

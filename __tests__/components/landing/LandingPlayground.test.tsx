@@ -106,7 +106,7 @@ describe('LandingPlayground', () => {
     };
     const removeCalls = mapInstance.remove.mock.calls.length;
 
-    await user.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+    await user.click(screen.getByRole('button', { name: 'Toggle light or dark theme' }));
 
     expect(mapMock).toHaveBeenCalledTimes(constructed);
     expect(mapInstance.remove).toHaveBeenCalledTimes(removeCalls);
@@ -190,5 +190,30 @@ describe('LandingPlayground', () => {
 
     expect(screen.getByText('You going to comedy night?')).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows a new Click as say-hi, then sends a plan that lands in Coming up', async () => {
+    const user = userEvent.setup();
+    renderPlayground();
+
+    await user.click(screen.getByTestId('playground-tap-jordan'));
+    await user.click(screen.getByRole('button', { name: 'Save memory' }));
+    await user.click(screen.getByRole('button', { name: 'Clicks' }));
+    const clicks = screen.getByTestId('playground-scene-clicks');
+    expect(within(clicks).getByText('New Click · say hi')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('playground-clicks-chat-jordan'));
+    const thread = screen.getByTestId('playground-scene-clicks');
+    expect(within(thread).getByTestId('playground-say-hi')).toBeInTheDocument();
+    await user.click(within(thread).getByRole('button', { name: 'Plan a hangout with Jordan' }));
+    // The phone thread and the web companion show the same conversation.
+    const cards = screen.getAllByTestId('playground-plan-card');
+    expect(cards[0]).toHaveTextContent('Coffee');
+    expect(within(cards[0]).getByRole('button', { name: 'Going' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('tab', { name: 'Dashboard' }));
+    await user.click(screen.getByRole('tab', { name: 'Memory Box' }));
+    expect(screen.getByTestId('playground-coming-up')).toHaveTextContent('Coffee with Jordan');
+    expect(screen.queryByText(/Retention Rate|Connection Streak/)).not.toBeInTheDocument();
   });
 });

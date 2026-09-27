@@ -29,6 +29,7 @@ import EventHostActions from "@/components/events/EventHostActions";
 import EventPageShell from "@/components/events/EventPageShell";
 import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import PinMapLazy from "@/components/maps/PinMapLazy";
+import EventChatPanel from "@/components/events/EventChatPanel";
 import { loadViewerEventRsvp } from "@/lib/events/viewerEventGoing";
 import {
   shouldShowEventFullCard,
@@ -142,7 +143,7 @@ export default async function EventShareLandingPage({
           </div>
         </CardVisualHero>
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="space-y-6">
             <FcCard className="space-y-4 p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -198,6 +199,22 @@ export default async function EventShareLandingPage({
               </p>
             </FcCard>
 
+            {hasPin ? (
+              <div>
+                <PinMapLazy
+                  testId="event-pin-map"
+                  markers={[
+                    {
+                      id: beaconId,
+                      lat: event.latitude as number,
+                      lng: event.longitude as number,
+                      label: where || title,
+                    },
+                  ]}
+                />
+              </div>
+            ) : null}
+
             <SeedRoomTeaser beaconId={beaconId} />
             <div className="flex items-center gap-3">
               <div className="min-w-0 max-w-md flex-1">
@@ -209,26 +226,29 @@ export default async function EventShareLandingPage({
               </div>
               <EventCopyLinkButton url={shareUrl} icon />
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <a
-                href={APP_CONFIG.ios_store_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <FcButton type="button" variant="secondary">
-                  Get the app
-                </FcButton>
-              </a>
-              <a
-                href={APP_CONFIG.android_store_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <FcButton type="button" variant="secondary">
-                  Android
-                </FcButton>
-              </a>
-            </div>
+            {/* Store links only once the mobile app is public; before that they resolve to `#waitlist`. */}
+            {APP_CONFIG.app_launched ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <a
+                  href={APP_CONFIG.ios_store_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <FcButton type="button" variant="secondary">
+                    Get the app
+                  </FcButton>
+                </a>
+                <a
+                  href={APP_CONFIG.android_store_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <FcButton type="button" variant="secondary">
+                    Android
+                  </FcButton>
+                </a>
+              </div>
+            ) : null}
             <p>
               <Link href="/events" className="text-sm font-semibold text-primary hover:underline">
                 Browse public events
@@ -258,23 +278,9 @@ export default async function EventShareLandingPage({
                 <p className="mt-2 text-sm text-on-surface-variant">Open in Click for recap and connections.</p>
               </FcCard>
             )}
+            <EventChatPanel beaconId={beaconId} creatorId={event.creator_id} ended={ended} />
           </aside>
         </div>
-        {hasPin ? (
-          <div className="mt-6">
-            <PinMapLazy
-              testId="event-pin-map"
-              markers={[
-                {
-                  id: beaconId,
-                  lat: event.latitude as number,
-                  lng: event.longitude as number,
-                  label: where || title,
-                },
-              ]}
-            />
-          </div>
-        ) : null}
       </article>
     </EventPageShell>
   );
