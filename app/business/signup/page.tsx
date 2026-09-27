@@ -3,7 +3,7 @@ import { BusinessSignupFlow } from './BusinessSignupFlow';
 
 function SignupFallback() {
   return (
-    <div className="min-h-screen bg-[#121212] flex items-center justify-center text-zinc-400 text-sm">
+    <div className="min-h-screen bg-background flex items-center justify-center text-on-surface-variant text-sm">
       Loading…
     </div>
   );
@@ -11,7 +11,7 @@ function SignupFallback() {
 
 export default function BusinessSignupPage() {
   return (
-    <div className="min-h-screen bg-[#121212] text-white">
+    <div className="min-h-screen bg-background text-on-surface">
       <Suspense fallback={<SignupFallback />}>
         <BusinessSignupFlow />
       </Suspense>

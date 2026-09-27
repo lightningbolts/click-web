@@ -224,9 +224,9 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
       <div ref={containerRef} className="absolute inset-0" />
       {mapLoaded && (
         <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl border border-border-hard bg-background/80 px-3 py-2 text-xs text-on-surface-variant">
-          <Users className="h-3.5 w-3.5 text-cyan-400" />
+          <Users className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
           <span>
-            <span className="font-semibold text-cyan-300">{verifiedCount}</span> verified ·{" "}
+            <span className="font-semibold text-cyan-700 dark:text-cyan-300">{verifiedCount}</span> verified ·{" "}
             <span className="font-semibold text-primary">{nodes.length}</span> nodes
           </span>
         </div>

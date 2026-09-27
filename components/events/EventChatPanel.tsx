@@ -58,15 +58,19 @@ export default function EventChatPanel({
   beaconId,
   creatorId,
   ended,
+  initialGoing = null,
 }: {
   beaconId: string;
   creatorId: string | null;
   ended: boolean;
+  /** Server-rendered RSVP state, so going guests never see the locked state first. */
+  initialGoing?: boolean | null;
 }) {
   const { user, loading: authLoading } = useAuth();
   const isHost = Boolean(user?.id && creatorId && user.id === creatorId);
   const { data: rsvp } = useSWR(user && !isHost ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload, {
     revalidateOnFocus: false,
+    fallbackData: initialGoing != null ? { current_user_signed_up: initialGoing } : undefined,
   });
   const going = Boolean(rsvp?.current_user_signed_up);
   const canJoin = Boolean(user) && (isHost || going);
@@ -249,7 +253,7 @@ export default function EventChatPanel({
   );
 
   let body: React.ReactNode;
-  if (authLoading) {
+  if (authLoading || (user && !isHost && rsvp === undefined)) {
     body = <div className="h-40 animate-pulse bg-surface-container-low" />;
   } else if (!user) {
     body = <LockedState title="Sign in to join the chat" body="Guests who RSVP with a Click account can talk before, during, and after the event." />;

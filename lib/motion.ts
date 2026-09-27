@@ -17,9 +17,12 @@ export const fadePresence = {
   exit: { opacity: 0 },
 };
 
-/** Waitlist plate: a desk card opening on the overlay, not a fade-and-rise. */
+/**
+ * Dialog plate. Opacity + transform only: both stay on the compositor, whereas animating
+ * clip-path repainted the scrolling plate every frame and flickered (notably in Safari).
+ */
 export const platePresence = {
-  initial: { opacity: 0, clipPath: "inset(10% 0 14% 0)" },
-  animate: { opacity: 1, clipPath: "inset(0% 0 0% 0)" },
-  exit: { opacity: 0, clipPath: "inset(6% 0 10% 0)" },
+  initial: { opacity: 0, scale: 0.97, y: 8 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.98, y: 4 },
 };

@@ -90,7 +90,7 @@ function encounterTelemetryPills(enc: NonNullable<ConnectionRecord['encounters']
           key: 'lux',
           icon:
             lux < 15 ? (
-              <Moon className="h-2.5 w-2.5 shrink-0 text-sky-200" aria-hidden />
+              <Moon className="h-2.5 w-2.5 shrink-0 text-sky-700 dark:text-sky-200" aria-hidden />
             ) : (
               <Sun className="h-2.5 w-2.5 shrink-0 text-amber-800 dark:text-amber-300" aria-hidden />
             ),
@@ -170,13 +170,13 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="rounded-[8px] bg-on-primary-container p-2">
-            <Clock className="h-4 w-4 text-primary" />
+        <div className="flex items-center gap-3">
+          <div className="rounded-[10px] bg-primary-container p-2">
+            <Clock className="h-5 w-5 text-on-primary-container" />
           </div>
           <div>
-            <h3 className="font-semibold text-on-surface">Time Capsule</h3>
-            <p className="text-xs text-on-surface-variant">
+            <h2 className="text-xl font-bold text-on-surface">Time Capsule</h2>
+            <p className="text-sm text-on-surface-variant">
               {pluralize(chapters.length, 'chapter')} in your journey
             </p>
           </div>
@@ -215,14 +215,14 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
 
       {/* Timeline */}
       <div className="relative">
-        {/* Timeline line */}
-        <div className="absolute top-1/2 left-0 right-0 z-0 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-outline to-transparent" />
+        {/* Timeline line — runs through the chapter dots */}
+        <div className="absolute left-0 right-0 top-6 z-0 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-outline-variant to-transparent" />
         
         {/* Chapters */}
         <div 
           ref={scrollRef}
           onScroll={checkScroll}
-          className="flex gap-4 overflow-x-auto scrollbar-hide py-8 px-4 -mx-4"
+          className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 pt-8"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {chapters.length === 0 ? (
@@ -233,14 +233,8 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
               </div>
             </div>
           ) : (
-            chapters.map((chapter, index) => (
-              <motion.div
-                key={chapter.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="relative flex-shrink-0 w-72"
-              >
+            chapters.map((chapter) => (
+              <div key={chapter.id} className="relative w-72 flex-shrink-0">
                 {/* Timeline dot */}
                 <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-4 z-10">
                   <motion.div
@@ -257,16 +251,14 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
 
                 {/* Chapter card */}
                 <motion.div
-                  whileHover={{ y: -4, scale: 1.02 }}
+                  whileHover={{ y: -4 }}
                   onClick={() => {
                     setSelectedChapter(chapter);
                     onChapterClick?.(chapter);
                   }}
                   className={`
-                    relative overflow-hidden rounded-2xl border cursor-pointer transition-all
-                    ${selectedChapter?.id === chapter.id 
-                      ? 'border-primary shadow-none' 
-                      : 'border-border-hard hover:border-border-hard'}
+                    relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border transition-colors
+                    ${selectedChapter?.id === chapter.id ? 'border-primary' : 'border-border-hard hover:border-outline'}
                   `}
                 >
                   {/* Generated header — the scrim is contrast-searched, so bright hues stay legible */}
@@ -289,17 +281,17 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                   </CardVisualHero>
 
                   {/* Content */}
-                  <div className="space-y-3 bg-surface p-4">
+                  <div className="flex-1 space-y-3 bg-surface p-4">
                     {/* Stats */}
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-1 text-on-surface-variant">
+                    <div className="flex min-w-0 items-center gap-4 text-sm">
+                      <div className="flex shrink-0 items-center gap-1 text-on-surface-variant">
                         <Users className="h-4 w-4" />
                         <span>{pluralize(chapter.connectionCount, 'connection')}</span>
                       </div>
                       {chapter.location && (
-                        <div className="flex items-center gap-1 text-on-surface-variant">
-                          <MapPin className="h-4 w-4" />
-                          <span className="max-w-[100px] truncate">{chapter.location}</span>
+                        <div className="flex min-w-0 items-center gap-1 text-on-surface-variant">
+                          <MapPin className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{chapter.location}</span>
                         </div>
                       )}
                     </div>
@@ -317,7 +309,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                         {chapter.highlights.slice(0, 3).map((highlight, i) => (
                           <span 
                             key={i}
-                            className="rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] font-medium text-on-surface"
+                            className="max-w-full truncate rounded-full border border-border-hard bg-surface-container px-2 py-0.5 text-[10px] font-medium text-on-surface"
                           >
                             {highlight}
                           </span>
@@ -331,7 +323,7 @@ export default function TimeCapsule({ chapters, onChapterClick, onConnectionClic
                     )}
                   </div>
                 </motion.div>
-              </motion.div>
+              </div>
             ))
           )}
         </div>

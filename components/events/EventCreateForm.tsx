@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ImagePlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FcButton } from "@/components/fc";
@@ -91,8 +92,6 @@ export default function EventCreateForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdId, setCreatedId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
@@ -152,6 +151,8 @@ export default function EventCreateForm({
     }
 
     setSubmitting(true);
+    // Stay in the submitting state once navigation starts, so the button never flips back first.
+    let navigating = false;
     try {
       const headers = await getFreshAuthHeaders();
       if (isEdit && beaconId) {
@@ -167,6 +168,7 @@ export default function EventCreateForm({
         }
         router.push(eventManagePath(beaconId));
         router.refresh();
+        navigating = true;
         return;
       }
 
@@ -184,24 +186,22 @@ export default function EventCreateForm({
         return;
       }
       const id = json.beacon.id;
-      setCreatedId(id);
-      const url = `${window.location.origin}${eventSharePath(id)}`;
+      let copied = false;
       try {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
+        await navigator.clipboard.writeText(`${window.location.origin}${eventSharePath(id)}`);
+        copied = true;
       } catch {
         /* clipboard may be blocked */
       }
+      toast.success(copied ? "Event created. Link copied." : "Event created.");
       router.push(eventManagePath(id));
+      navigating = true;
     } catch {
       setError(isEdit ? "Could not save event" : "Could not create event");
     } finally {
-      setSubmitting(false);
+      if (!navigating) setSubmitting(false);
     }
   };
-
-  const shareUrl =
-    createdId && typeof window !== "undefined" ? `${window.location.origin}${eventSharePath(createdId)}` : null;
 
   return (
     <form onSubmit={onSubmit} className="relative space-y-8" data-testid="event-create-form">
@@ -331,12 +331,6 @@ export default function EventCreateForm({
           <FcButton type="submit" className="w-full" disabled={submitting || uploading}>
             {submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save changes" : "Create event"}
           </FcButton>
-          {shareUrl ? (
-            <p className="break-all text-xs text-on-surface-variant">
-              {copied ? "Link copied. " : ""}
-              {shareUrl}
-            </p>
-          ) : null}
         </div>
       </div>
     </form>
