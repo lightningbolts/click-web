@@ -164,11 +164,8 @@ export default function ConnectPage() {
                   <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
                   <p className="text-green-700 dark:text-green-400 font-medium">{waitlistMessage}</p>
                   <p className="text-zinc-500 text-sm mt-1">
-                    Check your inbox and spam folder. Confirm your email to finish joining.
+                    We&apos;ll notify you when Click launches.
                   </p>
-                  <button type="button" className="mt-3 text-primary underline" onClick={() => { setWaitlistStatus('idle'); setWaitlistMessage(''); }}>
-                    Try another email or resend
-                  </button>
                 </motion.div>
               ) : (
                 <form noValidate onSubmit={handleWaitlistSubmit} className="space-y-3">
