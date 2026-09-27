@@ -3,9 +3,10 @@ import { waitlistBodySchema } from '@/lib/api/schemas/user';
 import { validWaitlistEmails, invalidWaitlistEmails } from '../../helpers/waitlistEmails';
 
 describe('waitlist email validation', () => {
-  it.each(validWaitlistEmails)('accepts %s without changing case or aliases', (email) => {
-    expect(waitlistEmailSchema.parse(email)).toBe(email);
-    expect(waitlistBodySchema.parse({ email }).email).toBe(email);
+  it.each(validWaitlistEmails)('accepts %s and normalizes casing', (email) => {
+    const normalized = email.toLowerCase();
+    expect(waitlistEmailSchema.parse(email)).toBe(normalized);
+    expect(waitlistBodySchema.parse({ email }).email).toBe(normalized);
   });
 
   it.each(invalidWaitlistEmails)('rejects %s in both the form and API schema', (email) => {
@@ -18,6 +19,6 @@ describe('waitlist email validation', () => {
   });
 
   it('trims surrounding whitespace before validating', () => {
-    expect(waitlistEmailSchema.parse('  Ada+click@example.com  ')).toBe('Ada+click@example.com');
+    expect(waitlistEmailSchema.parse('  Ada+click@example.com  ')).toBe('ada+click@example.com');
   });
 });
