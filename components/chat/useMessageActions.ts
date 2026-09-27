@@ -18,6 +18,8 @@ import {
 import { encryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
+import { gifMessageMetadata, isKlipyMediaUrl } from '@/lib/chat/gif';
+import { klipySendRendition, triggerKlipyShare, type KlipyGifItem } from '@/lib/chat/klipy';
 
 /**
  * Send / edit / delete / react / typing-broadcast actions for one chat.
@@ -50,6 +52,7 @@ export function useMessageActions({
   getAuthHeaders,
   appendReplyToMetadata,
   snapThreadViewportToBottom,
+  gifCustomerId,
 }: {
   connection: ConnectionRecord;
   currentUserId: string;
@@ -77,20 +80,25 @@ export function useMessageActions({
   getAuthHeaders: () => Promise<HeadersInit>;
   appendReplyToMetadata: (meta: Record<string, unknown>) => Promise<Record<string, unknown>>;
   snapThreadViewportToBottom: () => void;
+  gifCustomerId: string | null;
 }) {
-  const sendMessage = useCallback(async () => {
-    const content = inputText.trim();
-    if (!content || !chatId || mediaBusy || isRecording) return;
-
+  /**
+   * Optimistic insert, encrypt, and POST for a text-type row (plain text and GIFs). The
+   * optimistic row is removed on failure and `onFailure` runs.
+   */
+  const sendTextPayload = useCallback(async (
+    content: string,
+    extraMetadata: Record<string, unknown> | null,
+    onFailure: () => void,
+  ) => {
+    if (!chatId) return;
     const optimisticId = `${CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX}${crypto.randomUUID()}`;
     const optimisticMeta: Message['metadata'] = {
+      ...(extraMetadata ?? {}),
       _bubbleKey: optimisticId,
     };
     if (replyingTo && replyingTo.message_type !== 'call_log') {
-      const replyLabel =
-        replyingTo.message_type === 'image' || replyingTo.message_type === 'audio'
-          ? previewLabelForMessage(replyingTo)
-          : replyingTo.content;
+      const replyLabel = previewLabelForMessage(replyingTo);
       optimisticMeta.reply_to_id = replyingTo.id;
       optimisticMeta.reply_to_content = replySnippetForSend(replyLabel, 140);
     }
@@ -112,8 +120,6 @@ export function useMessageActions({
       reactions: {},
     };
 
-    setInputText('');
-    inputRef.current?.focus();
     setMessages((prev) => [...prev, optimisticMsg]);
     requestAnimationFrame(() => {
       snapThreadViewportToBottom();
@@ -137,9 +143,11 @@ export function useMessageActions({
         replyingTo && replyingTo.message_type !== 'call_log'
           ? await appendReplyToMetadata({})
           : undefined;
-      const metadata = encryptedV2
-        ? { ...(replyMetadata ?? {}), ...encryptedV2.metadata }
-        : replyMetadata;
+      const metadata = {
+        ...(extraMetadata ?? {}),
+        ...(replyMetadata ?? {}),
+        ...(encryptedV2?.metadata ?? {}),
+      };
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers,
@@ -172,14 +180,11 @@ export function useMessageActions({
     } catch (err) {
       console.error('Send error:', err);
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      setInputText(content);
+      onFailure();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    inputText,
     chatId,
-    mediaBusy,
-    isRecording,
     e2eKeys,
     groupMasterKey,
     isGroupClique,
@@ -191,6 +196,32 @@ export function useMessageActions({
     snapThreadViewportToBottom,
     getE2eeV2Session,
   ]);
+
+  const sendMessage = useCallback(async () => {
+    const content = inputText.trim();
+    if (!content || !chatId || mediaBusy || isRecording) return;
+    setInputText('');
+    inputRef.current?.focus();
+    await sendTextPayload(content, null, () => setInputText(content));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputText, chatId, mediaBusy, isRecording, sendTextPayload]);
+
+  /** Sends a KLIPY GIF: its media URL as the encrypted body plus `metadata.gif` layout hints. */
+  const sendGif = useCallback(
+    async (item: KlipyGifItem, query: string) => {
+      const rendition = klipySendRendition(item);
+      if (!rendition || !isKlipyMediaUrl(rendition.url) || !chatId || isRecording) return;
+      if (gifCustomerId) triggerKlipyShare(item.slug, gifCustomerId, query);
+      inputRef.current?.focus();
+      await sendTextPayload(
+        rendition.url,
+        gifMessageMetadata({ provider: 'klipy', width: rendition.width, height: rendition.height }),
+        () => {},
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chatId, isRecording, gifCustomerId, sendTextPayload],
+  );
 
   // Broadcast typing indicator
   const broadcastTyping = useCallback(() => {
@@ -338,6 +369,7 @@ export function useMessageActions({
 
   return {
     sendMessage,
+    sendGif,
     broadcastTyping,
     startEdit,
     submitEdit,

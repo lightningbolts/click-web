@@ -33,6 +33,7 @@ import {
   type AttachmentV2Descriptor,
 } from '@/lib/chat/attachmentCrypto';
 import { isBeaconChatMessage } from '@/lib/chat/messages';
+import { chatGifFromMessage } from '@/lib/chat/gif';
 import AttachmentBubble from './AttachmentBubble';
 import BeaconChatCard from './BeaconChatCard';
 import { useSecureMedia } from '@/lib/chat/useSecureMedia';
@@ -424,6 +425,9 @@ export default function MessageBubble({
     message.message_type === 'file' ? tryDecodeV2AttachmentDescriptor(captionText) : null;
   const isAttachment = attachmentEnvelope !== null || attachmentV2Descriptor !== null;
   const isBeacon = isBeaconChatMessage(message);
+  const gif = chatGifFromMessage(message);
+  // Largest box within 16rem × 18rem that keeps the GIF's aspect ratio.
+  const gifDisplayWidth = gif ? Math.min(256, Math.round((288 * gif.width) / gif.height)) : 0;
   const textBubbleClass = isMine
     ? 'bg-primary text-on-primary rounded-br-sm'
     : 'border border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
@@ -535,6 +539,40 @@ export default function MessageBubble({
               messageMetadata={v2MediaMetadata}
               getE2eeV2Session={getE2eeV2Session}
             />
+          </div>
+        ) : gif ? (
+          <div
+            ref={bubbleRef}
+            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
+          >
+            {replyMeta && (
+              <div
+                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
+                  isMine
+                    ? 'border-white/20 bg-black/15 text-on-primary'
+                    : 'border-border-hard bg-surface text-on-surface-variant'
+                }`}
+              >
+                <span className="flex items-center gap-1 font-medium opacity-90">
+                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
+                  Reply
+                </span>
+                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+              </div>
+            )}
+            <div
+              className="max-w-full overflow-hidden rounded-2xl border border-border-hard bg-surface-container"
+              style={{ width: gifDisplayWidth, aspectRatio: `${gif.width} / ${gif.height}` }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- KLIPY media must load from the URL the API returned */}
+              <img
+                src={gif.url}
+                alt="GIF"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="block h-full w-full object-cover"
+              />
+            </div>
           </div>
         ) : isImage || isAudio ? (
           <div
@@ -709,7 +747,7 @@ export default function MessageBubble({
                   Reply
                 </button>
               )}
-              {isMine && message.message_type === 'text' && (
+              {isMine && message.message_type === 'text' && !gif && (
                 <button
                   type="button"
                   onClick={() => onEdit(message.id, message.content)}

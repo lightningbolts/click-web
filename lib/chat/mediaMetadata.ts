@@ -1,5 +1,6 @@
 import { ENVELOPE_PREFIX, E2EE_V2_ATTACHMENT_PREFIX } from '@/lib/chat/attachmentCrypto';
 import type { Message, MessageMediaMetadata, MessageType } from '@/lib/chat/types';
+import { isKlipyMediaUrl } from '@/lib/chat/gif';
 
 /** Public URL for image/audio from `metadata.media_url` (camelCase fallback for older rows). */
 export function mediaUrlFromMetadata(metadata: MessageMediaMetadata | undefined | null): string | null {
@@ -100,5 +101,7 @@ export function previewLabelForMessage(
   // the chat list / reply banner as raw JSON. Render a neutral "📎 Attachment"
   // placeholder — the full preview is only materialised after client-side decryption.
   if (cap.startsWith(ENVELOPE_PREFIX) || cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX)) return '📎 Attachment';
+  // GIF messages carry only the KLIPY URL as their body.
+  if (isKlipyMediaUrl(cap)) return 'GIF';
   return message.content;
 }

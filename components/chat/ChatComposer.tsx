@@ -1,14 +1,16 @@
 'use client';
 
-import { type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { Send, Loader2, ImagePlus, Paperclip, Mic, Square, X } from 'lucide-react';
 import type { Message } from '@/lib/chat/types';
 import { ATTACHMENT_ACCEPT_STRING } from '@/lib/chat/attachmentValidator';
+import type { KlipyGifItem } from '@/lib/chat/klipy';
+import { GifPicker } from './GifPicker';
 
 /**
  * ChatView's input area: reply banner, photo/file/voice controls, the
  * auto-resizing textarea, and the send button. Extracted verbatim from
- * ChatView.
+ * ChatView. The GIF button appears only when KLIPY is configured (`gifCustomerId`).
  */
 export function ChatComposer({
   chatId,
@@ -33,6 +35,8 @@ export function ChatComposer({
   cancelVoiceRecording,
   broadcastTyping,
   sendMessage,
+  gifCustomerId,
+  sendGif,
 }: {
   chatId: string | null;
   isGroupClique: boolean;
@@ -56,7 +60,12 @@ export function ChatComposer({
   cancelVoiceRecording: () => void;
   broadcastTyping: () => void;
   sendMessage: () => Promise<void>;
+  gifCustomerId: string | null;
+  sendGif: (item: KlipyGifItem, query: string) => Promise<void>;
 }) {
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const closeGifPicker = useCallback(() => setShowGifPicker(false), []);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -66,6 +75,16 @@ export function ChatComposer({
 
   return (
     <div className="relative z-40 shrink-0 overflow-visible border-t border-border-hard bg-surface px-4 py-3">
+      {showGifPicker && gifCustomerId && (
+        <GifPicker
+          customerId={gifCustomerId}
+          onClose={closeGifPicker}
+          onSelect={(item, query) => {
+            setShowGifPicker(false);
+            void sendGif(item, query);
+          }}
+        />
+      )}
       {replyingTo && replyingTo.message_type !== 'call_log' && !editingId && (
         <div className="mb-2 flex w-full items-start gap-2 rounded-[8px] border border-border-hard bg-surface-container px-3 py-2.5 text-xs">
           <span className="shrink-0 font-medium text-primary">Replying</span>
@@ -105,6 +124,22 @@ export function ChatComposer({
           >
             {mediaBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
           </button>
+          {gifCustomerId && (
+            <button
+              type="button"
+              data-gif-toggle
+              onClick={() => setShowGifPicker((open) => !open)}
+              disabled={!chatId || isRecording}
+              className={`rounded-[8px] border bg-surface-container px-2 py-2.5 text-[11px] font-bold leading-4 tracking-wide transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 ${
+                showGifPicker ? 'border-primary text-primary' : 'border-border-hard text-on-surface-variant'
+              }`}
+              title="Send a GIF"
+              aria-label="Send a GIF"
+              aria-expanded={showGifPicker}
+            >
+              GIF
+            </button>
+          )}
           <button
             type="button"
             onClick={() => attachmentInputRef.current?.click()}

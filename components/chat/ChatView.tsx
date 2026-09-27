@@ -17,6 +17,7 @@ import { ConversationDaySeparator } from './ConversationDaySeparator';
 import { ChatHeader } from './ChatHeader';
 import { ChatDialogs } from './ChatDialogs';
 import { ChatComposer } from './ChatComposer';
+import { klipyAppKey, klipyCustomerId } from '@/lib/chat/klipy';
 import { ChatSharedInterestsBanner } from './ChatSharedInterestsBanner';
 import { useChatEncryption } from './useChatEncryption';
 import { useChatConnectionMeta } from './useChatConnectionMeta';
@@ -243,8 +244,23 @@ export default function ChatView({
     firePeerDeliveredAck,
   });
 
+  // KLIPY GIF search is enabled only when the public app key is configured.
+  const [gifCustomer, setGifCustomer] = useState<{ userId: string; id: string } | null>(null);
+  useEffect(() => {
+    if (!klipyAppKey() || !currentUserId) return;
+    let cancelled = false;
+    void klipyCustomerId(currentUserId).then((id) => {
+      if (!cancelled) setGifCustomer({ userId: currentUserId, id });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
+  const gifCustomerId = gifCustomer?.userId === currentUserId ? gifCustomer.id : null;
+
   const {
     sendMessage,
+    sendGif,
     broadcastTyping,
     startEdit,
     submitEdit,
@@ -277,6 +293,7 @@ export default function ChatView({
     getAuthHeaders,
     appendReplyToMetadata,
     snapThreadViewportToBottom,
+    gifCustomerId,
   });
 
   const { beginVoiceRecording, stopVoiceRecording, cancelVoiceRecording } = useVoiceMessages({
@@ -623,6 +640,8 @@ export default function ChatView({
         cancelVoiceRecording={cancelVoiceRecording}
         broadcastTyping={broadcastTyping}
         sendMessage={sendMessage}
+        gifCustomerId={gifCustomerId}
+        sendGif={sendGif}
       />
 
       <ChatDialogs
