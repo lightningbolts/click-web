@@ -33,6 +33,8 @@ import { ScheduleSendDialog } from './ScheduleSendDialog';
 import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION } from '@/lib/chat/plans';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import { replySnippetForSend } from '@/lib/chat/reply';
+import { readSessionCache } from '@/lib/dashboard/sessionCache';
+import { chatThreadCacheKey, type ChatThreadSnapshot } from '@/components/chat/useMessageLoading';
 
 const DETAILS_PREF_KEY = 'click:chat-details-open';
 
@@ -139,12 +141,20 @@ export default function ChatView({
   }, [connection.otherUserId, connection.userIds, currentUserId, isGroupClique]);
   const peerIsOnline = !!(peerUserId && onlineUserIds.has(peerUserId));
 
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Reopening a thread paints its last page from the session cache; loading revalidates it.
+  const [restoredThread] = useState(() => {
+    if (targetMessageId?.trim()) return undefined;
+    const snap = readSessionCache<ChatThreadSnapshot>(currentUserId, chatThreadCacheKey(connection.id));
+    return snap && (!isGroupClique || !connection.groupChatId || snap.chatId === connection.groupChatId)
+      ? snap
+      : undefined;
+  });
+  const [chatId, setChatId] = useState<string | null>(restoredThread?.chatId ?? null);
+  const [messages, setMessages] = useState<Message[]>(restoredThread?.messages ?? []);
   useEffect(() => { onMessagesSnapshot?.(messages); }, [messages, onMessagesSnapshot]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!restoredThread);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(restoredThread?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -262,6 +272,7 @@ export default function ChatView({
     readReceiptsEnabled: active,
     getAuthHeaders,
     firePeerDeliveredAck,
+    restored: Boolean(restoredThread),
   });
 
   useChatRealtime({

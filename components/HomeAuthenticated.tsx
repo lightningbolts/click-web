@@ -28,7 +28,8 @@ export default function HomeAuthenticated({ user }: { user: User }) {
         {ready ? null : (
           <motion.div
             key="boot-loader"
-            className="min-h-[calc(100dvh-var(--navbar-height))]"
+            // Overlay, not in flow: while it fades out the dashboard is already in place beneath it.
+            className="fixed inset-x-0 bottom-0 top-[var(--navbar-height)] z-40"
             exit={reduceMotion ? undefined : { opacity: 0 }}
             transition={fadeTransition(0.22)}
           >

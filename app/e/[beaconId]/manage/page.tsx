@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
@@ -28,6 +29,7 @@ export default function EventManagePage() {
   const [guests, setGuests] = useState<GuestRow[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [summaryPath, setSummaryPath] = useState<string | null>(null);
 
@@ -43,22 +45,23 @@ export default function EventManagePage() {
       if (cancelled) return;
       if (!gRes.ok || !hRes.ok) {
         setError("You need to be the organizer to manage this event.");
+        setLoaded(true);
         return;
       }
       const gJson = (await gRes.json()) as { guests?: GuestRow[] };
       const hJson = (await hRes.json()) as Health;
+      if (cancelled) return;
       setGuests(gJson.guests ?? []);
       setHealth(hJson);
+      setLoaded(true);
     })();
     return () => {
       cancelled = true;
     };
   }, [beaconId, user]);
 
-  const [share, setShare] = useState("");
-  useEffect(() => {
-    setShare(eventShareUrl(beaconId, window.location.origin));
-  }, [beaconId]);
+  const share = eventShareUrl(beaconId);
+  const pending = Boolean(user) && !loaded;
 
   const publish = async () => {
     const headers = await getFreshAuthHeaders();
@@ -73,9 +76,9 @@ export default function EventManagePage() {
         <EventBackLink href={eventSharePath(beaconId)} className="mb-0" />
         <FcSectionHeader title="Event manage" subtitle="Organizer metrics, guest list, and Seed a Room." />
         <div className="flex flex-wrap gap-2">
-          <a href={eventEditPath(beaconId)} className="fc-btn-primary inline-flex h-11 items-center px-4">
+          <Link href={eventEditPath(beaconId)} className="fc-btn-primary inline-flex h-11 items-center px-4">
             Edit details
-          </a>
+          </Link>
         </div>
         {error ? <p className="text-error">{error}</p> : null}
         <GuestListUploadCard beaconId={beaconId} />
@@ -101,26 +104,33 @@ export default function EventManagePage() {
             </a>
           ) : null}
         </FcCard>
-        {health ? (
+        {/* Placeholders hold the layout until metrics arrive, so nothing below jumps. */}
+        {health || pending ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {[
-              ["Connections made", health.connections_made],
-              ["Check-ins", health.check_in_count],
-              ["RSVPs", health.rsvp_count],
-              ["Density", health.density.toFixed(2)],
-              ["Repeat reconnects", health.repeat_reconnect_count],
-              ["New pairs", health.new_pair_count],
+              ["Connections made", health?.connections_made],
+              ["Check-ins", health?.check_in_count],
+              ["RSVPs", health?.rsvp_count],
+              ["Density", health?.density.toFixed(2)],
+              ["Repeat reconnects", health?.repeat_reconnect_count],
+              ["New pairs", health?.new_pair_count],
             ].map(([label, value]) => (
               <FcCard key={String(label)} className="p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">{label}</p>
-                <p className="mt-1 text-2xl font-bold text-on-surface">{value}</p>
+                {health ? (
+                  <p className="mt-1 text-2xl font-bold text-on-surface">{value}</p>
+                ) : (
+                  <div className="mt-1 h-8 w-16 animate-pulse rounded bg-surface-container" />
+                )}
               </FcCard>
             ))}
           </div>
         ) : null}
         <FcCard className="p-4">
           <h2 className="mb-3 text-lg font-bold">Guest RSVPs</h2>
-          {guests.length === 0 ? (
+          {pending ? (
+            <div className="h-5 w-40 animate-pulse rounded bg-surface-container" />
+          ) : guests.length === 0 ? (
             <p className="text-sm text-on-surface-variant">No guest RSVPs yet.</p>
           ) : (
             <ul className="divide-y divide-border-hard">

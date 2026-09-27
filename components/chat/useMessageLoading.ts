@@ -5,6 +5,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type MutableRefObject,
@@ -24,8 +25,16 @@ import {
   type DerivedKeys,
 } from '@/lib/chat/crypto';
 import { decryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { writeSessionCache } from '@/lib/dashboard/sessionCache';
 
 const PAGE_SIZE = 40;
+
+/** Last loaded page of a thread, kept in the memory-only session cache (cleared on sign-out). */
+export type ChatThreadSnapshot = { chatId: string; messages: Message[]; hasMore: boolean };
+
+export function chatThreadCacheKey(connectionId: string): string {
+  return `chat-thread:${connectionId}`;
+}
 
 /**
  * Chat bootstrap and message loading: get/create the chat row, initial page,
@@ -63,6 +72,7 @@ export function useMessageLoading({
   readReceiptsEnabled = true,
   getAuthHeaders,
   firePeerDeliveredAck,
+  restored = false,
 }: {
   connection: ConnectionRecord;
   currentUserId: string;
@@ -95,7 +105,13 @@ export function useMessageLoading({
   readReceiptsEnabled?: boolean;
   getAuthHeaders: () => Promise<HeadersInit>;
   firePeerDeliveredAck: (messageIds: string[]) => Promise<void>;
+  /** State was seeded from a cached snapshot: skip the reset and chat lookup, just revalidate. */
+  restored?: boolean;
 }) {
+  // Which groupChatId the restored snapshot belongs to; cleared once the thread resets.
+  const restoredForRef = useRef<string | null | undefined>(restored ? connection.groupChatId ?? null : undefined);
+  const isRestored = () => restoredForRef.current === (connection.groupChatId ?? null);
+
   const scrollToBottom = useCallback((smooth = true) => {
     programmaticListScrollRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
@@ -115,6 +131,8 @@ export function useMessageLoading({
   }, []);
 
   useEffect(() => {
+    if (isRestored()) return;
+    restoredForRef.current = undefined;
     setChatId(null);
     setLoading(true);
     setMessages([]);
@@ -203,6 +221,7 @@ export function useMessageLoading({
   }, [loading, chatId, connection.id, connection.groupChatId, isGroupClique, snapThreadViewportToBottom]);
 
   useEffect(() => {
+    if (isRestored()) return;
     const init = async () => {
       try {
         if (isGroupClique && connection.groupChatId) {
@@ -234,6 +253,15 @@ export function useMessageLoading({
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection.id, connection.groupChatId, isGroupClique]);
+
+  useEffect(() => {
+    if (loading || !chatId) return;
+    writeSessionCache<ChatThreadSnapshot>(currentUserId, chatThreadCacheKey(connection.id), {
+      chatId,
+      messages,
+      hasMore,
+    });
+  }, [loading, chatId, messages, hasMore, currentUserId, connection.id]);
 
   const fetchMessages = useCallback(async (id: string, cursor?: number, aroundMessageId?: string) => {
     const params = new URLSearchParams({ chatId: id, limit: String(PAGE_SIZE) });

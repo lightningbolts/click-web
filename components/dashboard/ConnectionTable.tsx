@@ -189,14 +189,14 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
         );
       case 'active':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
             <MessageCircle className="w-3 h-3" />
             Active
           </span>
         );
       case 'archived':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-zinc-600/20 text-on-surface-variant border border-zinc-600/30">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-surface-container-high text-on-surface-variant border border-border-hard">
             <Calendar className="w-3 h-3" />
             Archived
           </span>
@@ -256,7 +256,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
           </div>
           <div className="text-sm">
             <span className="text-on-surface-variant">Active:</span>{' '}
-            <span className="text-sky-300 font-semibold">{stats.active}</span>
+            <span className="text-sky-700 dark:text-sky-300 font-semibold">{stats.active}</span>
           </div>
           <div className="text-sm">
             <span className="text-on-surface-variant">Pending:</span>{' '}
@@ -405,7 +405,7 @@ export default function ConnectionTable({ connections, onExport, onSelect, onOpe
             </tr>
           </thead>
           <tbody className="divide-y divide-border-hard">
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {filteredConnections.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-on-surface-variant">

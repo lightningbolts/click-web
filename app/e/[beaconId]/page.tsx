@@ -278,7 +278,12 @@ export default async function EventShareLandingPage({
                 <p className="mt-2 text-sm text-on-surface-variant">Open in Click for recap and connections.</p>
               </FcCard>
             )}
-            <EventChatPanel beaconId={beaconId} creatorId={event.creator_id} ended={ended} />
+            <EventChatPanel
+              beaconId={beaconId}
+              creatorId={event.creator_id}
+              ended={ended}
+              initialGoing={viewerRsvp.kind === "member" ? going : null}
+            />
           </aside>
         </div>
       </article>

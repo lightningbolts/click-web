@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import {
   Users,
   TrendingUp,
@@ -77,7 +76,7 @@ export default function StatsOverview({
     },
     {
       label: 'Connection Streak',
-      value: `${streak} days`,
+      value: `${streak} ${streak === 1 ? 'day' : 'days'}`,
       icon: Flame,
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/20',
@@ -91,41 +90,17 @@ export default function StatsOverview({
     },
   ];
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
-  };
-
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="grid grid-cols-2 md:grid-cols-4 gap-4"
-    >
-      {stats.map((stat, index) => {
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {stats.map((stat) => {
         const Icon = stat.icon;
         return (
-          <motion.div
-            key={stat.label}
-            variants={itemVariants}
-            className="fc-card p-4 rounded-2xl border border-border-hard hover:border-border-hard transition-colors group"
-          >
+          <div key={stat.label} className="fc-card rounded-2xl border border-border-hard p-4">
             <div className="flex items-start justify-between mb-3">
               <div className={`p-2 ${stat.bgColor} rounded-xl`}>
                 <Icon className={`w-4 h-4 ${stat.color}`} />
               </div>
-              {stat.trend && stat.trend.percent !== null && (
+              {stat.trend?.percent ? (
                 <div
                   className={`flex items-center gap-1 text-xs ${
                     stat.trend.percent >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
@@ -144,16 +119,14 @@ export default function StatsOverview({
                   {stat.trend.percent >= 0 ? '+' : ''}
                   {stat.trend.percent}%
                 </div>
-              )}
+              ) : null}
             </div>
-            <div className="text-2xl font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">
-              {stat.value}
-            </div>
+            <div className="mb-1 text-2xl font-bold tabular-nums text-on-surface">{stat.value}</div>
             <div className="text-xs text-on-surface-variant">{stat.label}</div>
-          </motion.div>
+          </div>
         );
       })}
-    </motion.div>
+    </div>
   );
 }
 
@@ -174,9 +147,7 @@ export function AchievementBadge({
   unlocked?: boolean;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
+    <div
       className={`flex items-center gap-3 p-3 fc-card rounded-xl border relative overflow-hidden group ${
         unlocked
           ? 'border-border-hard'
@@ -191,7 +162,7 @@ export function AchievementBadge({
             : 'border border-border-hard bg-surface-container'
         }`}
       >
-        <Icon className={`w-5 h-5 ${unlocked ? 'text-[#FFD93D]' : 'text-outline'}`} />
+        <Icon className={`w-5 h-5 ${unlocked ? 'text-amber-600 dark:text-[#FFD93D]' : 'text-outline'}`} />
       </div>
       <div className="flex-1 min-w-0">
         <div
@@ -216,7 +187,7 @@ export function AchievementBadge({
       {unlocked ? (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
       ) : null}
-    </motion.div>
+    </div>
   );
 }
 
@@ -247,18 +218,13 @@ export function MilestoneProgress({
       </div>
       
       {/* Progress bar */}
-      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 1, ease: 'easeOut' }}
-          className="h-full bg-primary rounded-full"
-        />
+      <div className="h-2 bg-surface-container-high rounded-full overflow-hidden mb-2">
+        <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${progress}%` }} />
       </div>
       
       {/* Reward hint */}
       <div className="flex items-center gap-1 text-xs text-on-surface-variant">
-        <Zap className="w-3 h-3 text-[#FFD93D]" />
+        <Zap className="w-3 h-3 text-amber-600 dark:text-[#FFD93D]" />
         <span>Reward: {reward}</span>
       </div>
     </div>

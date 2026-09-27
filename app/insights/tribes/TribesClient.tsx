@@ -211,7 +211,7 @@ export default function TribesPage() {
                     </p>
                   )}
                   {selected?.id === tribe.id && tribe.isMicroCommunity && tribe.interestTags && tribe.interestTags.length > 0 && (
-                    <p className="text-[10px] text-emerald-200/90 mt-1">
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-200/90 mt-1">
                       Top tags: {tribe.interestTags.slice(0, 6).map((t) => t.tag).join(', ')}
                     </p>
                   )}

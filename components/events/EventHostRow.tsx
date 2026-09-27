@@ -38,14 +38,13 @@ export default function EventHostRow({
         >
           {inner}
         </button>
-        {open ? (
-          <UserProfileModal
-            userId={creatorId}
-            getAuthHeaders={getFreshAuthHeaders}
-            onClose={() => setOpen(false)}
-            currentUserId={user.id}
-          />
-        ) : null}
+        {/* Always mounted so closing plays the exit animation. */}
+        <UserProfileModal
+          userId={open ? creatorId : null}
+          getAuthHeaders={getFreshAuthHeaders}
+          onClose={() => setOpen(false)}
+          currentUserId={user.id}
+        />
       </>
     );
   }
