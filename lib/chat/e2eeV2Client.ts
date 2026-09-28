@@ -317,6 +317,12 @@ type ResolveSessionOptions = {
   getAuthHeaders: () => Promise<HeadersInit>;
   allowUpgrade?: boolean;
   forceRefresh?: boolean;
+  /**
+   * Writes only: return a cached session even when older than the reuse window, re-checking it
+   * in the background. For callers that retry once after `invalidateWebE2eeV2Session` when the
+   * server rejects the epoch (it always validates epoch and devices).
+   */
+  staleWhileRevalidate?: boolean;
 };
 
 /** Read-only resolutions in flight per chat, so an inbox of N rows plus an open thread share one round trip. */
@@ -329,6 +335,16 @@ export async function resolveWebE2eeV2Session(options: ResolveSessionOptions): P
   // the last minute is reused (iOS `sendSessionReuse`), so a send is one round trip, not four.
   if (cached && (options.forceRefresh || options.allowUpgrade)) {
     if (Date.now() - (sessionResolvedAt.get(key) ?? 0) < SEND_SESSION_REUSE_MS) return cached;
+    if (options.staleWhileRevalidate) {
+      // Never make a send wait on the re-check; the next send gets the fresh session.
+      if (!writeRefreshesInFlight.has(key)) {
+        const refresh = resolveSessionUncached(options)
+          .catch(() => null)
+          .finally(() => writeRefreshesInFlight.delete(key));
+        writeRefreshesInFlight.set(key, refresh);
+      }
+      return cached;
+    }
   }
   if (!options.forceRefresh && !options.allowUpgrade) {
     if (cached) return cached;
@@ -341,6 +357,16 @@ export async function resolveWebE2eeV2Session(options: ResolveSessionOptions): P
     return pending;
   }
   return resolveSessionUncached(options);
+}
+
+/** Background write re-checks per chat (`staleWhileRevalidate`), so a burst of sends starts one. */
+const writeRefreshesInFlight = new Map<string, Promise<E2eeV2Session | null>>();
+
+/** Drops a chat's cached session: the server rejected its epoch, so the next resolve re-reads it. */
+export function invalidateWebE2eeV2Session(chatId: string, scope: E2eeV2Scope = 'chat'): void {
+  const key = sessionKey({ chatId, scope });
+  sessionCache.delete(key);
+  sessionResolvedAt.delete(key);
 }
 
 function sessionKey(options: Pick<ResolveSessionOptions, 'chatId' | 'scope'>): string {

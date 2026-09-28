@@ -15,7 +15,7 @@ import {
   encryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
-import { encryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { encryptWebE2eeV2Message, invalidateWebE2eeV2Session, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
 import { gifMessageMetadata, isKlipyMediaUrl } from '@/lib/chat/gif';
@@ -62,7 +62,11 @@ export function useMessageActions({
   chatId: string | null;
   e2eKeys: DerivedKeys | null;
   groupMasterKey: ArrayBuffer | null;
-  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
+  getE2eeV2Session: (
+    allowUpgrade?: boolean,
+    forceRefresh?: boolean,
+    staleWhileRevalidate?: boolean,
+  ) => Promise<E2eeV2Session | null>;
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   inputText: string;
@@ -90,9 +94,9 @@ export function useMessageActions({
    * scheduled message is stored exactly as if it had been sent then.
    */
   const buildTextPost = useCallback(
-    async (content: string, extraMetadata: Record<string, unknown> | null, sentAt: number) => {
+    async (content: string, extraMetadata: Record<string, unknown> | null, sentAt: number, staleOk = false) => {
       if (!chatId) throw new Error('Chat is not ready');
-      const v2Session = await getE2eeV2Session(true, true);
+      const v2Session = await getE2eeV2Session(true, true, staleOk);
       const encryptedV2 = v2Session ? await encryptWebE2eeV2Message(v2Session, chatId, content) : null;
       const wireContent = encryptedV2
         ? encryptedV2.wireContent
@@ -164,13 +168,23 @@ export function useMessageActions({
     });
 
     try {
-      const body = await buildTextPost(content, extraMetadata, sentAt);
       const headers = await getAuthHeaders();
-      const res = await fetch('/api/chat/messages', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+      const post = async (staleOk: boolean) =>
+        fetch('/api/chat/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(await buildTextPost(content, extraMetadata, sentAt, staleOk)),
+        });
+      // Send with the keys at hand (no re-check round trips first); the server validates the
+      // epoch, so if they went stale, re-read them and send once more.
+      let res = await post(true);
+      if (!res.ok && (res.status === 400 || res.status === 409)) {
+        const { code } = (await res.json().catch(() => ({}))) as { code?: unknown };
+        if (code === 'E2EE_V2_INVALID' || code === 'E2EE_V2_REQUIRED') {
+          invalidateWebE2eeV2Session(chatId);
+          res = await post(false);
+        }
+      }
       if (!res.ok) throw new Error('Send failed');
       const payload = (await res.json().catch(() => ({}))) as { id?: unknown; message?: { id?: unknown } };
       const serverId =

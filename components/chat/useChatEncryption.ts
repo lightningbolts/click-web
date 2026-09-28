@@ -49,7 +49,11 @@ export function useChatEncryption({
   const [groupKeyError, setGroupKeyError] = useState<string | null>(null);
   const [replyBannerText, setReplyBannerText] = useState('');
 
-  const getE2eeV2Session = useCallback(async (allowUpgrade = false, forceRefresh = false): Promise<E2eeV2Session | null> => {
+  const getE2eeV2Session = useCallback(async (
+    allowUpgrade = false,
+    forceRefresh = false,
+    staleWhileRevalidate = false,
+  ): Promise<E2eeV2Session | null> => {
     if (!chatId) return null;
     const participantUserIds = connection.userIds ?? (connection.otherUserId ? [currentUserId, connection.otherUserId] : []);
     return resolveWebE2eeV2Session({
@@ -58,6 +62,7 @@ export function useChatEncryption({
       getAuthHeaders,
       allowUpgrade,
       forceRefresh,
+      staleWhileRevalidate,
     });
   }, [chatId, connection.userIds, connection.otherUserId, currentUserId, getAuthHeaders]);
 
