@@ -4,6 +4,11 @@ export const PROXIMITY_MATCH_MAX_M = 15;
 export const PROXIMITY_SIMULTANEOUS_TAP_WINDOW_MS = 45 * 1000;
 export const PROXIMITY_GROUP_COALESCE_MIN_MS = 1_500;
 export const RECENT_CONNECTION_LOCK_MS = 15 * 1000;
+/**
+ * A tap arriving this long after its peers were already matched still joins them (group taps
+ * are staggered by several seconds, so the first two phones can pair before the third posts).
+ */
+export const PROXIMITY_LATE_JOIN_WINDOW_MS = 15 * 1000;
 export const ENCOUNTER_DEBOUNCE_MAX_M = 50;
 export const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 export const EXTENDED_HANGOUT_TAG = 'Extended Hangout';

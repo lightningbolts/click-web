@@ -132,6 +132,7 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             userId?: string;
             expiresAfter?: string;
             unmatchedOnly?: boolean;
+            matchedSince?: string;
             myTokensIn?: string[];
             minLat?: number;
             maxLat?: number;
@@ -145,6 +146,9 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             if (state.userId) rows = rows.filter((r) => r.user_id === state.userId);
             if (state.expiresAfter) rows = rows.filter((r) => r.expires_at > state.expiresAfter!);
             if (state.unmatchedOnly) rows = rows.filter((r) => r.matched_at == null);
+            if (state.matchedSince) {
+              rows = rows.filter((r) => r.matched_at != null && r.matched_at >= state.matchedSince!);
+            }
             if (state.myTokensIn?.length) {
               rows = rows.filter((r) => state.myTokensIn!.includes(r.my_token));
             }
@@ -173,9 +177,10 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             if (col === 'my_token') state.myTokensIn = vals;
             return wrap();
           };
-          chain.gte = (col: string, val: number) => {
-            if (col === 'lat') state.minLat = val;
-            if (col === 'lon') state.minLon = val;
+          chain.gte = (col: string, val: number | string) => {
+            if (col === 'matched_at') state.matchedSince = String(val);
+            if (col === 'lat' && typeof val === 'number') state.minLat = val;
+            if (col === 'lon' && typeof val === 'number') state.minLon = val;
             return wrap();
           };
           chain.lte = (col: string, val: number) => {
@@ -604,6 +609,40 @@ describe('POST /api/connections/proximity contract', () => {
     expect(adminStore._connections).toHaveLength(0);
 
     dateSpy.mockRestore();
+  });
+
+  describe('late group joiner (peers already paired before the third tap posts)', () => {
+    async function pairAThenB() {
+      await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: ['2222', '3333'] }));
+      const resB = await proximityPost(makeRequest(userB, { my_token: '2222', heard_tokens: ['1111', '3333'] }));
+      expect(resB.status).toBe(200);
+      expect(adminStore._connections.map((c) => c.user_ids.sort())).toEqual([[userA, userB].sort()]);
+    }
+    const postC = () => proximityPost(makeRequest(userC, { my_token: '3333', heard_tokens: ['1111', '2222'] }));
+
+    it('joins the already-matched pair and offers host selection', async () => {
+      await pairAThenB();
+      const resC = await postC();
+      expect(resC.status).toBe(200);
+      const body = (await resC.json()) as {
+        awaiting_selection?: boolean;
+        matches: { id: string }[];
+        group_clique_candidate?: { member_user_ids: string[] };
+      };
+      expect(body.awaiting_selection).toBe(true);
+      expect(body.matches.map((m) => m.id).sort()).toEqual([userA, userB].sort());
+      expect(body.group_clique_candidate?.member_user_ids.sort()).toEqual([userA, userB, userC].sort());
+    });
+
+    it('does not pull in peers matched before the late-join window', async () => {
+      await pairAThenB();
+      const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 16_000);
+      try {
+        expect((await postC()).status).toBe(202);
+      } finally {
+        dateSpy.mockRestore();
+      }
+    });
   });
 
   it('keeps GPS/time fallback peers in a partial-token three-phone match', async () => {

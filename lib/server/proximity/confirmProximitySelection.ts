@@ -8,28 +8,26 @@ import {
 } from '@/lib/server/resolveLiveEventBeaconAt';
 import { emitProximityAtEventOutcome } from '@/lib/server/telemetry/connectionFlowEvents';
 import {
-  bfsComponent,
-  buildUserAdjacency,
   buildVibeContextTags,
   ENCOUNTER_DEBOUNCE_MAX_M,
   EXTENDED_HANGOUT_TAG,
   finiteBatteryPct,
   finiteNumber,
   haversineMeters,
-  isDuplicateKeyError,
   isEncounterRateLimitError,
-  latestHandshakeRowPerUser,
   mergeContextTagLists,
-  normalizeToken,
-  PENDING_CANDIDATE_BBOX_RADIUS_M,
-  PENDING_CANDIDATE_MAX_ROWS,
   peerEvidenceTokens,
-  pendingCandidateBBox,
   PROXIMITY_HOST_SELECTION_MAX_MEMBERS,
-  sameMemberSet,
+  PROXIMITY_LATE_JOIN_WINDOW_MS,
   twelveHourUtcBlockId,
-  type HandshakeRowLite,
 } from '@/lib/server/proximity/matching';
+import {
+  PENDING_HANDSHAKE_SELECT,
+  pendingRowToHandshakeLite,
+  USER_PROFILE_SELECT,
+} from '@/lib/server/proximity/bindSupport';
+import { ensureConnectionForMemberSet } from '@/lib/server/proximity/connectionEnsure';
+import { loadMatchGraph } from '@/lib/server/proximity/matchGraph';
 import type {
   PendingHandshakeRow,
   ProximityBindOkResponse,
@@ -38,10 +36,6 @@ import type {
   ProximitySensorPayloadJson,
 } from '@/types/supabase-json';
 import { fireEncounterGeoEnrichment } from '@/lib/server/proximity/encounterEnrichment';
-
-const PENDING_HANDSHAKE_SELECT =
-  'id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at';
-const USER_PROFILE_SELECT = 'id, name, email, image, created_at:createdAt';
 
 type ConfirmResult =
   | { kind: 'ok'; status: 200; body: ProximityBindOkResponse }
@@ -53,85 +47,6 @@ type ConfirmResult =
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-function pendingRowToHandshakeLite(row: PendingHandshakeRow): HandshakeRowLite {
-  return {
-    id: row.id,
-    user_id: row.user_id,
-    my_token: row.my_token,
-    heard_tokens: row.heard_tokens,
-    lat: row.lat,
-    lon: row.lon,
-    created_at: row.created_at,
-    lux_level: row.lux_level,
-    motion_variance: row.motion_variance,
-    compass_azimuth: row.compass_azimuth,
-    battery_level: row.battery_level,
-    sensor_payload: row.sensor_payload,
-  };
-}
-
-async function fetchScopedPendingCandidates(
-  admin: SupabaseClient,
-  opts: {
-    nowIso: string;
-    callerUserId: string;
-    evidenceTokens: string[];
-    lat: number | null;
-    lon: number | null;
-  },
-): Promise<PendingHandshakeRow[]> {
-  const { nowIso, callerUserId, evidenceTokens, lat, lon } = opts;
-  const byId = new Map<string, PendingHandshakeRow>();
-  const mergeRows = (data: unknown) => {
-    for (const raw of Array.isArray(data) ? data : []) {
-      if (!raw || typeof raw !== 'object') continue;
-      const row = raw as PendingHandshakeRow;
-      if (!row.id) continue;
-      byId.set(String(row.id), row);
-    }
-  };
-
-  const { data: selfRows } = await admin
-    .from('pending_handshakes')
-    .select(PENDING_HANDSHAKE_SELECT)
-    .eq('user_id', callerUserId)
-    .gt('expires_at', nowIso)
-    .is('matched_at', null)
-    .limit(PENDING_CANDIDATE_MAX_ROWS);
-  mergeRows(selfRows);
-
-  const tokens = [
-    ...new Set(evidenceTokens.map((t) => normalizeToken(t)).filter((t): t is string => t != null)),
-  ].slice(0, 32);
-  if (tokens.length > 0) {
-    const { data: tokenRows } = await admin
-      .from('pending_handshakes')
-      .select(PENDING_HANDSHAKE_SELECT)
-      .gt('expires_at', nowIso)
-      .is('matched_at', null)
-      .in('my_token', tokens)
-      .limit(PENDING_CANDIDATE_MAX_ROWS);
-    mergeRows(tokenRows);
-  }
-
-  if (lat != null && lon != null && !(lat === 0 && lon === 0)) {
-    const box = pendingCandidateBBox(lat, lon, PENDING_CANDIDATE_BBOX_RADIUS_M);
-    const { data: geoRows } = await admin
-      .from('pending_handshakes')
-      .select(PENDING_HANDSHAKE_SELECT)
-      .gt('expires_at', nowIso)
-      .is('matched_at', null)
-      .gte('lat', box.minLat)
-      .lte('lat', box.maxLat)
-      .gte('lon', box.minLon)
-      .lte('lon', box.maxLon)
-      .limit(PENDING_CANDIDATE_MAX_ROWS);
-    mergeRows(geoRows);
-  }
-
-  return [...byId.values()].slice(0, PENDING_CANDIDATE_MAX_ROWS);
 }
 
 /**
@@ -196,22 +111,27 @@ export async function confirmProximityHandshakeSelection(
   const lat = finiteNumber(hostRow.lat);
   const lon = finiteNumber(hostRow.lon);
 
-  const candidates = await fetchScopedPendingCandidates(admin, {
+  const createdMs = Date.parse(hostRow.created_at);
+  const graph = await loadMatchGraph(admin, {
     nowIso,
     callerUserId: uid,
     evidenceTokens,
     lat,
     lon,
+    // Peers matched shortly before the host tapped (late join) are still selectable.
+    matchedSinceIso: new Date(
+      (Number.isFinite(createdMs) ? createdMs : Date.now()) - PROXIMITY_LATE_JOIN_WINDOW_MS,
+    ).toISOString(),
   });
-  const lites = candidates.map(pendingRowToHandshakeLite);
-  const latestByUser = latestHandshakeRowPerUser(lites);
-  const nodeRows = [...latestByUser.values()];
-  const adj = buildUserAdjacency(nodeRows);
-  const component = bfsComponent(uid, adj);
+  if (graph.error) {
+    console.error('[proximity/confirm] pending query:', graph.error);
+    return { kind: 'error', status: 500, body: { error: 'Failed to load peer handshakes' } };
+  }
+  const { latestByUser, matchedIds } = graph;
 
   for (const memberId of selected) {
     if (memberId === uid) continue;
-    if (!component.has(memberId)) {
+    if (!matchedIds.has(memberId)) {
       return {
         kind: 'error',
         status: 400,
@@ -223,84 +143,12 @@ export async function confirmProximityHandshakeSelection(
   const memberIds = selected;
   const peerIds = memberIds.filter((id) => id !== uid);
 
-  async function lookupConnectionForMemberSet(
-    memberUserIds: string[],
-  ): Promise<{ id: string; user_ids: string[] } | null> {
-    const { data, error } = await admin
-      .from('connections')
-      .select('id, user_ids')
-      .contains('user_ids', memberUserIds);
-    if (error || !data?.length) return null;
-    const found = (data as { id: string; user_ids?: string[] }[]).find((r) =>
-      sameMemberSet(r.user_ids, memberUserIds),
-    );
-    return found?.id ? { id: found.id, user_ids: found.user_ids ?? [] } : null;
-  }
-
-  async function ensureConnectionForMemberSet(
-    memberUserIds: string[],
-    options?: { forceActive?: boolean },
-  ): Promise<{ connectionId: string; isNewConnection: boolean } | null> {
-    const members = [...new Set(memberUserIds)].sort();
-    const forceActive = options?.forceActive === true || members.length > 2;
-    const existing = await lookupConnectionForMemberSet(members);
-    if (existing?.id) {
-      if (forceActive) {
-        await admin
-          .from('connections')
-          .update({ status: 'active', expiry_state: 'active' })
-          .eq('id', existing.id)
-          .eq('status', 'pending');
-      }
-      return { connectionId: String(existing.id), isNewConnection: false };
-    }
-    const nowMs = Date.now();
-    const expiryMs = nowMs + 30 * 24 * 60 * 60 * 1000;
-    const hasGps = lat != null && lon != null && !(lat === 0 && lon === 0);
-    const insertRow: Record<string, unknown> = {
-      user_ids: members,
-      created: nowMs,
-      expiry: expiryMs,
-      should_continue: members.map(() => false),
-      has_begun: false,
-      expiry_state: forceActive ? 'active' : 'pending',
-      status: forceActive ? 'active' : 'pending',
-      include_in_business_insights: true,
-      initiator_id: uid,
-      responder_id: uid,
-      connection_method: 'proximity',
-      proximity_confidence: hasGps ? 65 : 50,
-      proximity_signals: { method: 'proximity_confirm', member_count: members.length },
-      flagged: false,
-      is_group: members.length > 2,
-      created_utc: new Date(nowMs).toISOString(),
-    };
-    const { data: inserted, error: insErr } = await admin
-      .from('connections')
-      .insert(insertRow)
-      .select('id')
-      .single();
-    if (insErr) {
-      if (isDuplicateKeyError(insErr)) {
-        const retry = await lookupConnectionForMemberSet(members);
-        if (retry?.id) return { connectionId: String(retry.id), isNewConnection: false };
-      }
-      console.error('[proximity/confirm] connection insert:', insErr.message);
-      return null;
-    }
-    const connectionId = String(inserted.id);
-    await admin.from('chats').insert({
-      connection_id: connectionId,
-      updated_at: nowMs,
-      created_at: nowMs,
-    });
-    return { connectionId, isNewConnection: true };
-  }
-
   const clientTags = normalizeContextTagsArray(body.context_tags);
   const sensorPayload = (isRecord(hostRow.sensor_payload) ? hostRow.sensor_payload : {}) as ProximitySensorPayloadJson;
 
-  const ensured = await ensureConnectionForMemberSet(memberIds);
+  const encLat = lat != null && lon != null && !(lat === 0 && lon === 0) ? lat : null;
+  const encLon = encLat != null ? lon : null;
+  const ensured = await ensureConnectionForMemberSet(admin, uid, encLat, encLon, memberIds);
   if (!ensured) {
     return {
       kind: 'error',
@@ -460,7 +308,9 @@ export async function confirmProximityHandshakeSelection(
     for (let i = 0; i < memberIds.length; i += 1) {
       for (let j = i + 1; j < memberIds.length; j += 1) {
         const pair = [memberIds[i]!, memberIds[j]!].sort();
-        const pairEnsured = await ensureConnectionForMemberSet(pair, { forceActive: true });
+        const pairEnsured = await ensureConnectionForMemberSet(admin, uid, encLat, encLon, pair, {
+          forceActive: true,
+        });
         if (!pairEnsured) {
           return {
             kind: 'error',

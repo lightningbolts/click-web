@@ -6,6 +6,7 @@ import {
   handshakeCreatedAtMs,
   normalizeToken,
   PROXIMITY_GROUP_COALESCE_MIN_MS,
+  PROXIMITY_LATE_JOIN_WINDOW_MS,
   RECENT_CONNECTION_LOCK_MS,
   tokenEvidenceBetweenRows,
 } from '@/lib/server/proximity/matching';
@@ -160,6 +161,7 @@ export async function bindProximityHandshake(
     evidenceTokens: combinedEvidenceTokens.length > 0 ? combinedEvidenceTokens : heardTokens,
     lat,
     lon,
+    matchedSinceIso: new Date(Date.now() - PROXIMITY_LATE_JOIN_WINDOW_MS).toISOString(),
   };
 
   let graph = await loadMatchGraph(admin, matchGraphOpts);

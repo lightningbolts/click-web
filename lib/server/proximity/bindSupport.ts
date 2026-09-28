@@ -31,8 +31,9 @@ export function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Load unmatched pending rows near the caller (token overlap and/or GPS bbox).
- * Never scans the full unmatched table — required for global scale.
+ * Load pending rows near the caller (token overlap and/or GPS bbox): every unmatched row,
+ * plus rows matched at or after `matchedSinceIso` so a late group member can still join a
+ * tap that already paired the others. Never scans the full table — required for global scale.
  */
 export async function fetchScopedPendingCandidates(
   admin: SupabaseClient,
@@ -42,81 +43,57 @@ export async function fetchScopedPendingCandidates(
     evidenceTokens: string[];
     lat: number | null;
     lon: number | null;
+    matchedSinceIso: string;
   },
 ): Promise<{ rows: PendingHandshakeRow[]; error: string | null }> {
-  const { nowIso, callerUserId, evidenceTokens, lat, lon } = opts;
-  const byId = new Map<string, PendingHandshakeRow>();
+  const { nowIso, callerUserId, evidenceTokens, lat, lon, matchedSinceIso } = opts;
+  const base = () =>
+    admin
+      .from('pending_handshakes')
+      .select(PENDING_HANDSHAKE_SELECT)
+      .gt('expires_at', nowIso)
+      .limit(PENDING_CANDIDATE_MAX_ROWS);
+  // Unmatched rows use the `matched_at IS NULL` partial indexes; recently matched rows use
+  // the `matched_at` index. Kept as separate queries so neither loses its index.
+  type Query = ReturnType<typeof base>;
+  const bothStates = (scope: (q: Query) => Query): Query[] => [
+    scope(base()).is('matched_at', null),
+    scope(base()).gte('matched_at', matchedSinceIso),
+  ];
 
-  const mergeRows = (data: unknown) => {
-    for (const raw of Array.isArray(data) ? data : []) {
-      if (!raw || typeof raw !== 'object') continue;
-      const row = raw as PendingHandshakeRow;
-      if (!row.id) continue;
-      byId.set(String(row.id), row);
-    }
-  };
-
-  // Always include caller's unmatched rows.
-  const { data: selfRows, error: selfErr } = await admin
-    .from('pending_handshakes')
-    .select(PENDING_HANDSHAKE_SELECT)
-    .eq('user_id', callerUserId)
-    .gt('expires_at', nowIso)
-    .is('matched_at', null)
-    .limit(PENDING_CANDIDATE_MAX_ROWS);
-  if (selfErr) {
-    return { rows: [], error: selfErr.message };
-  }
-  mergeRows(selfRows);
+  // Always include caller's unmatched rows (required: a self-query failure fails the bind).
+  const required: Query[] = [base().eq('user_id', callerUserId).is('matched_at', null)];
+  const optional: Query[] = [];
 
   const tokens = [...new Set(evidenceTokens.map((t) => normalizeToken(t)).filter((t): t is string => t != null))];
   if (tokens.length > 0) {
-    const tokenList = tokens.slice(0, 32).join(',');
-    const { data: tokenRows, error: tokenErr } = await admin
-      .from('pending_handshakes')
-      .select(PENDING_HANDSHAKE_SELECT)
-      .gt('expires_at', nowIso)
-      .is('matched_at', null)
-      .in('my_token', tokens.slice(0, 32))
-      .limit(PENDING_CANDIDATE_MAX_ROWS);
-    if (tokenErr) {
-      // Fallback: PostgREST `or` for heard_tokens overlap when .in fails shape
-      console.warn('[proximity] token candidate query:', tokenErr.message);
-      const { data: orRows, error: orErr } = await admin
-        .from('pending_handshakes')
-        .select(PENDING_HANDSHAKE_SELECT)
-        .gt('expires_at', nowIso)
-        .is('matched_at', null)
-        .or(`my_token.in.(${tokenList})`)
-        .limit(PENDING_CANDIDATE_MAX_ROWS);
-      if (orErr) {
-        return { rows: [], error: orErr.message };
-      }
-      mergeRows(orRows);
-    } else {
-      mergeRows(tokenRows);
-    }
+    required.push(...bothStates((q) => q.in('my_token', tokens.slice(0, 32))));
   }
-
   if (lat != null && lon != null && !(lat === 0 && lon === 0)) {
     const box = pendingCandidateBBox(lat, lon, PENDING_CANDIDATE_BBOX_RADIUS_M);
-    const { data: geoRows, error: geoErr } = await admin
-      .from('pending_handshakes')
-      .select(PENDING_HANDSHAKE_SELECT)
-      .gt('expires_at', nowIso)
-      .is('matched_at', null)
-      .gte('lat', box.minLat)
-      .lte('lat', box.maxLat)
-      .gte('lon', box.minLon)
-      .lte('lon', box.maxLon)
-      .limit(PENDING_CANDIDATE_MAX_ROWS);
-    if (geoErr) {
-      console.warn('[proximity] geo candidate query:', geoErr.message);
-    } else {
-      mergeRows(geoRows);
-    }
+    optional.push(
+      ...bothStates((q) =>
+        q.gte('lat', box.minLat).lte('lat', box.maxLat).gte('lon', box.minLon).lte('lon', box.maxLon),
+      ),
+    );
   }
 
+  const [requiredResults, optionalResults] = await Promise.all([Promise.all(required), Promise.all(optional)]);
+  const failed = requiredResults.find((r) => r.error);
+  if (failed?.error) {
+    return { rows: [], error: failed.error.message };
+  }
+  for (const r of optionalResults) {
+    if (r.error) console.warn('[proximity] geo candidate query:', r.error.message);
+  }
+
+  const byId = new Map<string, PendingHandshakeRow>();
+  for (const { data } of [...requiredResults, ...optionalResults]) {
+    for (const raw of Array.isArray(data) ? data : []) {
+      const row = raw as PendingHandshakeRow | null;
+      if (row?.id) byId.set(String(row.id), row);
+    }
+  }
   const rows = [...byId.values()].slice(0, PENDING_CANDIDATE_MAX_ROWS);
   return { rows, error: null };
 }
