@@ -74,6 +74,15 @@ export async function GET(request: NextRequest) {
     const date = new Date(parseInt(raw, 10));
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
   };
+  // Web keyset pagination preserves sub-millisecond precision and same-timestamp rows.
+  // Keep the mobile millisecond cursor contract intact.
+  const before = request.nextUrl.searchParams.get('before');
+  const beforeId = request.nextUrl.searchParams.get('beforeId');
+  if ((before || beforeId) && (!before || !beforeId ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(before) ||
+    !Number.isFinite(Date.parse(before)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(beforeId))) {
+    return NextResponse.json({ error: 'Invalid history cursor' }, { status: 400 });
+  }
   const cursorIso = parseMillis(request.nextUrl.searchParams.get('cursor'));
   const sinceIso = parseMillis(request.nextUrl.searchParams.get('since'));
   const limitRaw = parseInt(request.nextUrl.searchParams.get('limit') ?? String(HUB_THREAD_LIMIT), 10);
@@ -202,8 +211,10 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('hub_id', hubId)
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(limit);
-    if (cursorIso) query = query.lt('created_at', cursorIso);
+    if (before && beforeId) query = query.or(`created_at.lt.${before},and(created_at.eq.${before},id.lt.${beforeId})`);
+    else if (cursorIso) query = query.lt('created_at', cursorIso);
     const { data, error } = await query;
     if (error) {
       console.error('[hub/messages GET] messages:', error.message);

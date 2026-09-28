@@ -212,8 +212,9 @@ Mobile is the primary **data producer** for B2B insights (connections, encounter
 | Availability intents | Yes | Partial (UI yes; match pushes mobile-first) |
 | Memory Capsules | Capture + display | Display only |
 | Prior Connections | On-device contact hashing + skippable onboarding | Discover / request / respond APIs + profile badge |
-| Community Hubs | Mobile-first UI | API-only — `lib/hub/README.md` |
-| Home connection insights | `ReconnectHelper` | Gap (not on web dashboard) |
+| Community Hubs | Mobile UI | Hubs tab: discovery, create/join/leave, text and encrypted attachments — `lib/hub/README.md` |
+| Home connection insights | `ReconnectHelper` | Insights, reconnect suggestions and archive warning |
+| Home recap and saved events | Day/week recap + bookmarks | Day/week recap and saved-event links |
 | B2B Click Insights | `widget-vibe` consumer | Web-only — `lib/insights/README.md` |
 
 Detailed matrices live in colocated module READMEs: `lib/dashboard/README.md`, `lib/connections/README.md`, `lib/insights/README.md`. Mobile companion context: `click/README.md` § Monorepo note.

@@ -351,6 +351,67 @@ export async function encryptWebE2eeV2Message(
   };
 }
 
+/** Mobile HubChatViewModelE2eeV2 contract. Never use the direct-chat session cache for hubs. */
+export async function resolveWebHubE2eeV2Session(options: {
+  hubId: string;
+  participantUserIds: string[];
+  getAuthHeaders: () => Promise<HeadersInit>;
+}): Promise<E2eeV2Session | null> {
+  const headers = await options.getAuthHeaders();
+  const identity = await loadOrCreateWebE2eeV2Identity();
+  await registerDevice(identity, headers);
+  const { devices: rows } = await fetchJson<{ devices: DeviceRow[] }>(
+    `/api/hub/devices?hub_id=${encodeURIComponent(options.hubId)}`, headers,
+  );
+  const devices = rows.filter((d) => d.key_algorithm === 'X25519' && d.crypto_version === 2 && !d.revoked_at);
+  const own = devices.find((d) => d.device_id === identity.deviceId);
+  if (!own) throw new E2eeV2UnavailableError('This device is not registered in this hub');
+  type HubState = Omit<EpochState, 'chat_id' | 'envelopes'> & {
+    hub_id: string;
+    envelopes: (Omit<EpochEnvelopeRow, 'chat_id'> & { hub_id: string })[];
+  };
+  const readState = () => fetchJson<HubState>(
+    `/api/hub/epochs?hub_id=${encodeURIComponent(options.hubId)}&device_id=${encodeURIComponent(identity.deviceId)}`, headers,
+  );
+  let state = await readState();
+  const fingerprint = await membershipFingerprint(devices);
+  if (state.current_epoch == null) {
+    const participants = options.participantUserIds;
+    if (!participants.length || !participants.every((id) => devices.some((d) => d.user_id === id))) return null;
+  }
+  if (state.current_epoch == null || state.membership_fingerprint !== fingerprint) {
+    const epoch = (state.current_epoch ?? 0) + 1;
+    const epochKey = generateEpochKey();
+    try {
+      const envelopes = await Promise.all(devices.map(async (recipient) => ({
+        recipient_device_id: recipient.device_id,
+        envelope: await wrapEpochKey({
+          chatId: options.hubId, epoch, senderDeviceId: identity.deviceId,
+          recipientDeviceId: recipient.device_id, epochKey,
+          recipientPublicKey: await importPublicKey(recipient.identity_public_key),
+        }),
+      })));
+      await fetchJson('/api/hub/epochs', headers, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hub_id: options.hubId, epoch, sender_device_id: identity.deviceId, membership_fingerprint: fingerprint, envelopes }),
+      }).catch(async (error: unknown) => {
+        const concurrent = await readState();
+        if (concurrent.current_epoch !== epoch || concurrent.membership_fingerprint !== fingerprint) throw error;
+      });
+    } finally { epochKey.fill(0); }
+    state = await readState();
+  }
+  if (state.hub_id !== options.hubId || state.device_id !== identity.deviceId) {
+    throw new E2eeV2UnavailableError('Hub encryption response identity mismatch');
+  }
+  return unwrapSession(identity, own.id, {
+    ...state, chat_id: state.hub_id,
+    envelopes: state.envelopes
+      .filter((row) => row.hub_id === options.hubId && row.recipient_device_id === own.id)
+      .map((row) => ({ ...row, chat_id: row.hub_id })),
+  });
+}
+
 /**
  * Approve a new device and transfer every historical epoch key readable by the approving
  * device. The transferred values remain opaque to the server; only the recipient can unwrap

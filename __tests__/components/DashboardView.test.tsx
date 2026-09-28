@@ -220,6 +220,9 @@ describe('DashboardView', () => {
       if (url.includes('/api/connections')) {
         return jsonResponse({ active: [], archived: [], map: [], core: [] });
       }
+      if (url.includes('/api/me/event-bookmarks')) {
+        return jsonResponse({ bookmarks: [] });
+      }
       return jsonResponse({});
     }) as jest.Mock;
   });

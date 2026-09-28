@@ -56,3 +56,9 @@ describe('Hub interaction schemas', () => {
     ).toThrow();
   });
 });
+
+
+test('event interactions may omit location but never invent zero coordinates', () => {
+  expect(hubInteractionBodySchema.parse({ hub_id: 'event-hub', body: 'edit' })).toMatchObject({ userLat: undefined, userLong: undefined });
+  expect(hubReactionBodySchema.parse({ hub_id: 'event-hub', message_id: 'm', reaction_type: 'like' })).toMatchObject({ userLat: undefined, userLong: undefined });
+});

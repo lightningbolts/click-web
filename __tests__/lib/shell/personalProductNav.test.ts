@@ -22,6 +22,7 @@ describe('personalProductNav', () => {
       'events',
       'map',
       'chat',
+      'hubs',
       'identity',
       'settings',
     ]);

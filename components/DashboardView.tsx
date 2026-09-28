@@ -26,6 +26,10 @@ import {
   ConnectionMap,
 } from '@/components/dashboard';
 import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
+import HomeExplore from './dashboard/HomeExplore';
+import HomeSocialFeed from '@/components/dashboard/HomeSocialFeed';
+import HomeConnectionInsights from '@/components/dashboard/HomeConnectionInsights';
+import CommunityHubs from '@/components/dashboard/CommunityHubs';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import CallOverlay from '@/components/chat/CallOverlay';
 import UserProfileModal, { type DecryptedProfileMessage } from '@/components/UserProfileModal';
@@ -105,7 +109,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   const [createClickOpen, setCreateClickOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   /** Re-render countdown labels periodically */
-  const [archiveCountdownTick, setArchiveCountdownTick] = useState(0);
+  const [archiveCountdownTick, setArchiveCountdownTick] = useState(() => Date.now());
   const activeTabRef = useRef<DashboardTab>(activeTab);
   const selectedConnectionRef = useRef<ConnectionRecord | null>(selectedConnection);
   const notificationPreferencesRef = useRef<NotificationPreferences>(notificationPreferences);
@@ -372,14 +376,14 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const c of connectionRecords) {
-      if (!c.otherUserId || !c.intentOverlapLabel) continue;
+      if (!c.otherUserId || !c.intentOverlapLabel || blockedUserIds.has(c.otherUserId) || !isActiveChatListStatus(c.status)) continue;
       if (seen.has(c.otherUserId)) continue;
       seen.add(c.otherUserId);
       const first = c.name.trim().split(/\s+/)[0] || 'them';
       out.push(`You and ${first} are both available right now!`);
     }
     return out;
-  }, [connectionRecords]);
+  }, [connectionRecords, blockedUserIds]);
 
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
@@ -390,7 +394,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   });
 
   useEffect(() => {
-    const id = setInterval(() => setArchiveCountdownTick((t) => t + 1), 60_000);
+    const id = setInterval(() => setArchiveCountdownTick(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -479,7 +483,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
               Welcome back, <span className="text-primary">{userName}</span>
             </>
           ),
-          subtitle: 'Your digital memory box',
+          subtitle: 'Make plans, keep in touch, and remember your moments.',
         };
       case 'events':
         return {
@@ -491,6 +495,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
           title: 'Click Map',
           subtitle: 'Where your memories were made',
         };
+      case 'hubs':
+        return { title: 'Community Hubs', subtitle: 'Conversations rooted in real places.' };
       case 'identity':
         return {
           title: 'QR Identity',
@@ -618,6 +624,11 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
       ) : null}
 
           <AnimatePresence mode="wait">
+            {activeTab === 'hubs' && (
+              <motion.div key="hubs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <CommunityHubs key={user.id} userId={user.id} initialHubId={searchParams.get('hub')} />
+              </motion.div>
+            )}
             {/* Memory Box Tab */}
             {activeTab === 'memory' && (
               <motion.div
@@ -628,18 +639,15 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                 transition={{ duration: 0.3 }}
                 className="space-y-8"
               >
-                {/* Stats Overview Section */}
-                <section>
-                  <StatsOverview
-                    totalConnections={dashboardMetrics.totalConnections}
-                    thisMonth={dashboardMetrics.thisMonth}
-                    streak={dashboardMetrics.streak}
-                    retentionRate={dashboardMetrics.retentionRate}
-                    totalNetworkGrowthPercent={dashboardMetrics.totalNetworkGrowthPercent}
-                    thisMonthTrendPercent={dashboardMetrics.thisMonthTrendPercent}
-                  />
-                </section>
-
+                <HomeSocialFeed
+                  key={user.id}
+                  userId={user.id}
+                  name={userName}
+                  now={archiveCountdownTick}
+                  connections={[...connectionRecordsWithChatPreview, ...groupCliqueRecords].filter((c) => !c.otherUserId || !blockedUserIds.has(c.otherUserId))}
+                  onOpenChat={handleOpenChat}
+                  onOpenProfile={(id, connectionId) => { setProfileConnectionId(connectionId); setProfileUserId(id); }}
+                >
                 <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
 
                 {homeAvailabilityOverlapLines.length > 0 ? (
@@ -654,6 +662,27 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
                     ))}
                   </div>
                 ) : null}
+
+                </HomeSocialFeed>
+                <HomeExplore key={user.id} userId={user.id} now={archiveCountdownTick} />
+                <HomeConnectionInsights
+                  key={`insights-${user.id}`}
+                  userId={user.id}
+                  connections={activeConnections.filter((c) => !c.otherUserId || !blockedUserIds.has(c.otherUserId))}
+                  now={archiveCountdownTick}
+                  onOpenChat={handleOpenChat}
+                />
+                {/* Stats Overview Section */}
+                <section>
+                  <StatsOverview
+                    totalConnections={dashboardMetrics.totalConnections}
+                    thisMonth={dashboardMetrics.thisMonth}
+                    streak={dashboardMetrics.streak}
+                    retentionRate={dashboardMetrics.retentionRate}
+                    totalNetworkGrowthPercent={dashboardMetrics.totalNetworkGrowthPercent}
+                    thisMonthTrendPercent={dashboardMetrics.thisMonthTrendPercent}
+                  />
+                </section>
 
                 {/* Achievements & Milestones Row */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-4">

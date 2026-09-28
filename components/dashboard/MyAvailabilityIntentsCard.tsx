@@ -29,6 +29,7 @@ type Props = {
 export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
   const [intents, setIntents] = useState<IntentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,9 +44,10 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
       const json = (await res.json().catch(() => ({}))) as { intents?: IntentRow[]; error?: string };
       if (!res.ok) throw new Error(json.error || res.statusText);
       setIntents(Array.isArray(json.intents) ? json.intents : []);
+      setHasLoaded(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not load availability');
-      setIntents([]);
+
     } finally {
       setLoading(false);
     }
@@ -113,10 +115,10 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
     >
       <div className="flex items-start gap-3 mb-4">
         <div className="p-2 bg-sky-500/15 rounded-xl shrink-0">
-          <CalendarClock className="w-5 h-5 text-sky-400" aria-hidden />
+          <CalendarClock className="w-5 h-5 text-primary" aria-hidden />
         </div>
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-on-surface">Open to meet</h2>
+          <h2 className="text-xl font-bold text-on-surface">I'm down for…</h2>
           <p className="text-sm text-on-surface-variant mt-0.5">
             Share a short intent (coffee, study, walk…). Connections see it on your profile while it’s active.
           </p>
@@ -162,7 +164,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                       className="flex items-center justify-between gap-2 rounded-xl border border-border-hard/90 bg-surface-container/40 px-3 py-2"
                     >
                       <div className="min-w-0 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-0.5 text-xs text-sky-200 truncate max-w-[200px]">
+                        <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-0.5 text-xs text-primary truncate max-w-[200px]">
                           {row.intent_tag.trim()}
                         </span>
                         <span className="text-xs text-on-surface-variant">{row.timeframe}</span>
@@ -171,7 +173,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                         type="button"
                         onClick={() => remove(row.id)}
                         disabled={deletingId === row.id}
-                        className="shrink-0 rounded-lg p-2 text-on-surface-variant hover:bg-zinc-800 hover:text-red-700 dark:text-red-400 transition-colors disabled:opacity-50"
+                        className="shrink-0 rounded-lg p-2 text-on-surface-variant hover:bg-surface-variant hover:text-red-700 dark:text-red-400 transition-colors disabled:opacity-50"
                         aria-label="Remove intent"
                       >
                         {deletingId === row.id ? (
@@ -192,7 +194,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, ease: easeOut }}
             >
-              No active intent — add one below so friends know what you’re up for.
+              {hasLoaded ? 'No active plans — share what you’re down for.' : 'Your plans are unavailable.'}
             </motion.div>
           )}
 
@@ -204,6 +206,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
+                aria-label="What you’re down for"
                 value={tag}
                 onChange={(e) => setTag(e.target.value.slice(0, 25))}
                 placeholder="e.g. Coffee, Study session"
@@ -211,6 +214,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                 className="flex-1 rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
               <select
+                aria-label="Availability duration"
                 value={durationMs}
                 onChange={(e) => setDurationMs(Number(e.target.value))}
                 className="rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/50 sm:min-w-[140px]"
@@ -236,7 +240,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
 
       {error && (
         <p className="mt-3 text-sm text-red-700 dark:text-red-400" role="alert">
-          {error}
+          {error} <button type="button" className="underline" onClick={() => void load()}>Retry</button>
         </p>
       )}
     </motion.section>

@@ -20,6 +20,7 @@ import { FcButton, FcCard } from "@/components/fc";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
 import { APP_CONFIG } from "@/lib/config";
 import EventRsvpPanel from "@/components/events/EventRsvpPanel";
+import EventChatButton from "@/components/events/EventChatButton";
 import EventBackLink from "@/components/events/EventBackLink";
 import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
 import EventCopyLinkButton from "@/components/events/EventCopyLinkButton";
@@ -251,6 +252,7 @@ export default async function EventShareLandingPage({
                   listing={event.listing}
                   eventEnded={ended}
                 />
+                <EventChatButton beaconId={beaconId} />
               </FcCard>
             ) : (
               <FcCard className="p-6">

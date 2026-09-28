@@ -146,6 +146,13 @@ export async function deriveKeysForConnection(
   return keys;
 }
 
+/** Legacy mobile Hub broadcast media keys; v2 messages use device-wrapped epoch keys. */
+export async function deriveKeysForHub(hubId: string): Promise<DerivedKeys> {
+  const id = hubId.trim();
+  if (!id) throw new Error('Hub id is required');
+  return deriveKeysFromGroupMaster(await sha256(toUtf8(`${E2EE_SALT}:hub-broadcast:${id}`)));
+}
+
 export async function encryptContent(plaintext: string, keys: DerivedKeys): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH)) as Bytes;
   const ciphertext = new Uint8Array(
