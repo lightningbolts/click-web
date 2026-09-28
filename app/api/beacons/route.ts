@@ -20,6 +20,7 @@ import {
 } from "@/lib/map/mapBeaconApiShared";
 import {
   filterActiveBeaconsForDiscovery,
+  parseEventScheduleFromMetadata,
   resolveBeaconExpiresAtIso,
 } from "@/lib/map/eventSchedule";
 import { filterBeaconsForViewer, parseVisibilityAudienceFromBody } from "@/lib/map/beaconVisibility";
@@ -36,6 +37,11 @@ import {
   eventTimeColumnsFromMetadata,
   parseEventListingOptionsFromBody,
 } from "@/lib/events/eventOptions";
+import {
+  expandEventOccurrences,
+  parseEventRecurrenceFromBody,
+  validateEventRecurrence,
+} from "@/lib/events/eventRecurrence";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -429,7 +435,32 @@ export async function POST(request: NextRequest) {
         visibilityAudience = "connections";
       }
     }
-    const eventTimes = eventListing ? eventTimeColumnsFromMetadata(metadata) : null;
+    let occurrenceMetadata: Record<string, unknown>[] = [metadata];
+    let seriesId: string | null = null;
+    if (eventListing) {
+      const recurrenceParsed = parseEventRecurrenceFromBody(body);
+      if ("error" in recurrenceParsed) {
+        return NextResponse.json({ error: recurrenceParsed.error }, { status: 400 });
+      }
+      const { recurrence } = recurrenceParsed;
+      const schedule = parseEventScheduleFromMetadata(metadata);
+      if (recurrence != null && schedule != null) {
+        const recurrenceErr = validateEventRecurrence(schedule, recurrence);
+        if (recurrenceErr != null) {
+          return NextResponse.json({ error: recurrenceErr }, { status: 400 });
+        }
+        seriesId = crypto.randomUUID();
+        occurrenceMetadata = expandEventOccurrences(
+          schedule,
+          recurrence,
+          eventTimeColumnsFromMetadata(metadata).event_timezone,
+        ).map((o) => ({
+          ...metadata,
+          event_start_at: new Date(o.startEpochMs).toISOString(),
+          event_end_at: new Date(o.endEpochMs).toISOString(),
+        }));
+      }
+    }
 
     let venueId: string | null = null;
     const venueIdRaw =
@@ -480,17 +511,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("map_beacons")
-      .insert({
+    // A repeating event inserts every occurrence in one statement (all or nothing).
+    const rows = occurrenceMetadata.map((meta, i) => {
+      const eventTimes = eventListing ? eventTimeColumnsFromMetadata(meta) : null;
+      return {
         creator_id: user.id,
         venue_id: venueId,
         beacon_type,
         show_creator_name: showCreatorName,
         visibility_audience: visibilityAudience,
         location: `POINT(${lon} ${lat})`,
-        metadata,
-        expires_at: expiresAtIso,
+        metadata: meta,
+        expires_at: i === 0 ? expiresAtIso : (eventTimes?.ends_at ?? expiresAtIso),
         ...(eventListing
           ? {
               event_visibility: eventListing.event_visibility,
@@ -503,38 +535,54 @@ export async function POST(request: NextRequest) {
               event_timezone: eventTimes?.event_timezone ?? null,
             }
           : {}),
-      })
+        ...(seriesId != null ? { series_id: seriesId, series_sequence: i + 1 } : {}),
+      };
+    });
+
+    const { data: insertedRows, error: insertError } = await supabase
+      .from("map_beacons")
+      .insert(rows)
       .select(
-        "id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
-      )
-      .maybeSingle();
+        "id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location, series_sequence",
+      );
 
     if (insertError) {
       console.error("map_beacons insert (api/beacons):", insertError.message);
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
-    let insertedRow = inserted as Record<string, unknown> | null;
-    if (beacon_type === "event" && insertedRow != null && typeof insertedRow.id === "string") {
+    const inserted = ((insertedRows ?? []) as Record<string, unknown>[])
+      .filter((row) => isRecord(row) && typeof row.id === "string")
+      .sort((a, b) => Number(a.series_sequence ?? 0) - Number(b.series_sequence ?? 0));
+    let insertedRow: Record<string, unknown> | null = inserted[0] ?? null;
+    if (beacon_type === "event" && inserted.length > 0) {
       const admin = createAdminSupabaseClient();
-      const created = await createHubForEventBeacon(admin, {
-        beaconId: insertedRow.id,
-        creatorId: user.id,
-        lat,
-        lng: lon,
-        metadata,
-      });
-      if ("error" in created) {
-        await admin.from("map_beacons").delete().eq("id", insertedRow.id);
-        console.error("POST /api/beacons event hub:", created.error);
+      const hubs = await Promise.all(
+        inserted.map((row) =>
+          createHubForEventBeacon(admin, {
+            beaconId: row.id as string,
+            creatorId: user.id,
+            lat,
+            lng: lon,
+            metadata: row.metadata as Record<string, unknown>,
+          }),
+        ),
+      );
+      const failures = hubs.flatMap((h) => ("error" in h ? [h.error] : []));
+      const firstHub = hubs[0];
+      if (failures.length > 0 || !("hubId" in firstHub)) {
+        // Deleting the events cascades to any hubs that were created.
+        await admin.from("map_beacons").delete().in("id", inserted.map((row) => row.id as string));
+        console.error("POST /api/beacons event hub:", failures.join("; "));
         return NextResponse.json({ error: "Failed to create event hub" }, { status: 500 });
       }
       insertedRow = {
-        ...insertedRow,
-        hub_id: created.hubId,
-        metadata: { ...metadata, hub_id: created.hubId },
+        ...inserted[0],
+        hub_id: firstHub.hubId,
+        metadata: { ...(inserted[0].metadata as Record<string, unknown>), hub_id: firstHub.hubId },
       };
     }
+    const seriesCount = seriesId != null ? inserted.length : undefined;
 
     const beacon = parseInsertedBeacon(insertedRow, lon, lat);
     if (beacon == null) {
@@ -563,16 +611,16 @@ export async function POST(request: NextRequest) {
       if (!fallbackBeacon.id) {
         return NextResponse.json({ error: "Insert failed" }, { status: 500 });
       }
-      return NextResponse.json({ beacon: fallbackBeacon });
+      return NextResponse.json({ beacon: fallbackBeacon, series_count: seriesCount });
     }
 
     try {
       const admin = createAdminSupabaseClient();
       const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);
-      return NextResponse.json({ beacon: enriched ?? beacon });
+      return NextResponse.json({ beacon: enriched ?? beacon, series_count: seriesCount });
     } catch (enrichErr) {
       console.error("POST /api/beacons enrich:", enrichErr);
-      return NextResponse.json({ beacon });
+      return NextResponse.json({ beacon, series_count: seriesCount });
     }
   } catch (e) {
     console.error("POST /api/beacons:", e);

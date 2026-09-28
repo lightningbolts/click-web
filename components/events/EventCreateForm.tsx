@@ -17,6 +17,7 @@ import { eventManagePath, eventSharePath } from "@/lib/events/eventUrls";
 import EventLocationPicker from "@/components/events/EventLocationPicker";
 import EventDateTimeFields from "@/components/events/EventDateTimeFields";
 import EventOptionsFields from "@/components/events/EventOptionsFields";
+import EventRepeatFields from "@/components/events/EventRepeatFields";
 import EventThemePicker from "@/components/events/EventThemePicker";
 import EventMarkdownEditor from "@/components/events/EventMarkdownEditor";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
@@ -27,6 +28,11 @@ import {
   type GuestListVisibility,
 } from "@/lib/events/eventOptions";
 import { defaultEventWindow, resolvedTimeZone } from "@/lib/events/eventScheduleUi";
+import {
+  parseEventRecurrenceFromBody,
+  validateEventRecurrence,
+  type EventRecurrenceFrequency,
+} from "@/lib/events/eventRecurrence";
 import type { EventFormDraft } from "@/lib/events/eventFormDraft";
 import { cn } from "@/lib/cn";
 
@@ -79,6 +85,8 @@ export default function EventCreateForm({
     initial?.venueScale ?? "neighborhood",
   );
   const [categories, setCategories] = useState<string[]>(initial?.categories ?? []);
+  const [repeatFrequency, setRepeatFrequency] = useState<EventRecurrenceFrequency | null>(null);
+  const [repeatCount, setRepeatCount] = useState("4");
   const {
     uploading,
     error: coverUploadError,
@@ -149,6 +157,24 @@ export default function EventCreateForm({
       setError("End must be after start");
       return;
     }
+    const recurrenceParsed = isEdit
+      ? { recurrence: null }
+      : parseEventRecurrenceFromBody({
+          recurrence: repeatFrequency ? { frequency: repeatFrequency, count: repeatCount } : null,
+        });
+    if ("error" in recurrenceParsed) {
+      setError(recurrenceParsed.error.replace("recurrence.count", "Number of events"));
+      return;
+    }
+    const { recurrence } = recurrenceParsed;
+    const recurrenceError = validateEventRecurrence(
+      { startEpochMs: start.getTime(), endEpochMs: end.getTime() },
+      recurrence,
+    );
+    if (recurrenceError) {
+      setError(recurrenceError);
+      return;
+    }
 
     setSubmitting(true);
     // Stay in the submitting state once navigation starts, so the button never flips back first.
@@ -178,9 +204,14 @@ export default function EventCreateForm({
         body: JSON.stringify({
           kind: "event",
           ...writeBody(latN, lngN),
+          ...(recurrence ? { recurrence } : {}),
         }),
       });
-      const json = (await res.json()) as { beacon?: { id?: string }; error?: string };
+      const json = (await res.json()) as {
+        beacon?: { id?: string };
+        series_count?: number;
+        error?: string;
+      };
       if (!res.ok || !json.beacon?.id) {
         setError(json.error || "Could not create event");
         return;
@@ -193,7 +224,9 @@ export default function EventCreateForm({
       } catch {
         /* clipboard may be blocked */
       }
-      toast.success(copied ? "Event created. Link copied." : "Event created.");
+      const created =
+        json.series_count && json.series_count > 1 ? `${json.series_count} events created` : "Event created";
+      toast.success(copied ? `${created}. Link copied.` : `${created}.`);
       router.push(eventManagePath(id));
       navigating = true;
     } catch {
@@ -301,6 +334,14 @@ export default function EventCreateForm({
             onStartChange={setStart}
             onEndChange={setEnd}
           />
+          {isEdit ? null : (
+            <EventRepeatFields
+              frequency={repeatFrequency}
+              count={repeatCount}
+              onFrequency={setRepeatFrequency}
+              onCount={setRepeatCount}
+            />
+          )}
           <EventLocationPicker
             locationName={locationName}
             lat={lat}
