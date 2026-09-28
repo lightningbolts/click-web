@@ -62,6 +62,11 @@ const DB_NAME = 'click-e2ee-v2';
 const STORE_NAME = 'identities';
 const IDENTITY_KEY = 'current';
 const sessionCache = new Map<string, E2eeV2Session>();
+/** When each cached session was resolved; writes reuse one for `SEND_SESSION_REUSE_MS` (iOS parity). */
+const sessionResolvedAt = new Map<string, number>();
+const SEND_SESSION_REUSE_MS = 60_000;
+/** Devices registered from this page; registration is idempotent, so once per page is enough. */
+const registeredDeviceIds = new Set<string>();
 
 function browserIndexedDb(): IDBFactory {
   if (typeof indexedDB === 'undefined') throw new E2eeV2UnavailableError('IndexedDB is required for E2EE v2');
@@ -158,6 +163,7 @@ async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestIni
 }
 
 async function registerDevice(identity: DeviceIdentity & { deviceId: string }, headers: HeadersInit): Promise<void> {
+  if (registeredDeviceIds.has(identity.deviceId)) return;
   const response = await fetchJson<{ device?: DeviceRow }>('/api/chat/devices', headers, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -167,6 +173,7 @@ async function registerDevice(identity: DeviceIdentity & { deviceId: string }, h
     throw error;
   });
   void response;
+  registeredDeviceIds.add(identity.deviceId);
 }
 
 /**
@@ -317,8 +324,13 @@ const sessionReadsInFlight = new Map<string, Promise<E2eeV2Session | null>>();
 
 export async function resolveWebE2eeV2Session(options: ResolveSessionOptions): Promise<E2eeV2Session | null> {
   const key = sessionKey(options);
+  const cached = sessionCache.get(key);
+  // Writes re-check membership and rotation, but not on every message: a session resolved in
+  // the last minute is reused (iOS `sendSessionReuse`), so a send is one round trip, not four.
+  if (cached && (options.forceRefresh || options.allowUpgrade)) {
+    if (Date.now() - (sessionResolvedAt.get(key) ?? 0) < SEND_SESSION_REUSE_MS) return cached;
+  }
   if (!options.forceRefresh && !options.allowUpgrade) {
-    const cached = sessionCache.get(key);
     if (cached) return cached;
     const inFlight = sessionReadsInFlight.get(key);
     if (inFlight) return inFlight;
@@ -340,11 +352,26 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   const id = options.chatId;
   const headers = await options.getAuthHeaders();
   const identity = await loadOrCreateWebE2eeV2Identity();
+  const wasRegistered = registeredDeviceIds.has(identity.deviceId);
   await registerDevice(identity, headers);
-  const devices = await discoverDevices(id, headers, scope);
+  // Independent reads: the device list and this device's epoch envelopes, together.
+  const read = () => {
+    const epochState = getEpochState(id, identity.deviceId, headers, scope);
+    epochState.catch(() => {}); // Awaited below; ignored when discovery retries first.
+    return { devices: discoverDevices(id, headers, scope), epochState };
+  };
+  let reads = read();
+  let devices = await reads.devices;
+  if (wasRegistered && !devices.some((device) => device.device_id === identity.deviceId)) {
+    // Registered from this page under another account (or revoked since): register again, re-read once.
+    registeredDeviceIds.delete(identity.deviceId);
+    await registerDevice(identity, headers);
+    reads = read();
+    devices = await reads.devices;
+  }
   const own = devices.find((device) => device.device_id === identity.deviceId);
   if (!own) throw new E2eeV2UnavailableError('The current E2EE v2 device is not registered in this chat');
-  let state = await getEpochState(id, identity.deviceId, headers, scope);
+  let state = await reads.epochState;
   const participants = [...new Set(options.participantUserIds.map((pid) => pid.trim()).filter(Boolean))];
   const deviceUsers = new Set(devices.map((device) => device.user_id).filter((uid): uid is string => Boolean(uid)));
   const allParticipantsHaveV2Devices =
@@ -385,6 +412,7 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   }
   const session = await unwrapSession(identity, own.id, state);
   sessionCache.set(sessionKey(options), session);
+  sessionResolvedAt.set(sessionKey(options), Date.now());
   return session;
 }
 
