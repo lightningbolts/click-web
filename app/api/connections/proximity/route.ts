@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { bindProximityHandshake } from '@/lib/server/proximity/bindProximityHandshake';
+import { PENDING_HANDSHAKE_SELECT } from '@/lib/server/proximity/bindSupport';
 import { RECENT_CONNECTION_LOCK_MS, sameMemberSet } from '@/lib/server/proximity/matching';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PendingHandshakeRow, ProximityHandshakeRequest, ProximityMatchUserProfile } from '@/types/supabase-json';
 import { parseBody } from '@/lib/api/parseBody';
 import { proximityHandshakeBodySchema } from '@/lib/api/schemas/connections';
@@ -49,6 +51,8 @@ export async function POST(request: NextRequest) {
  *
  * Lets a client that received HTTP 202 recover when another phone later matched the
  * stored row. Re-posting would create a fresh row after the original was consumed.
+ * After a match, clients keep polling briefly: once a late joiner turns the tap into a
+ * group, this returns the group instead of the original 1:1 match.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -65,7 +69,7 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     const { data: row, error: rowErr } = await admin
       .from('pending_handshakes')
-      .select('id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at')
+      .select(`${PENDING_HANDSHAKE_SELECT}, group_connection_id`)
       .eq('id', pendingHandshakeId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -93,44 +97,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: matchedRows, error: matchedErr } = await admin
-      .from('pending_handshakes')
-      .select('user_id, matched_at')
-      .eq('matched_at', pendingRow.matched_at);
-
-    if (matchedErr) {
-      console.error('[api/connections/proximity GET] matched rows:', matchedErr.message);
-      return NextResponse.json({ error: 'Failed to load matched handshakes' }, { status: 500 });
+    // A tap that grew into a group (including after a 1:1 result) reports the group.
+    const resolved = pendingRow.group_connection_id
+      ? await groupConnectionById(admin, pendingRow.group_connection_id)
+      : await connectionForMatchedTap(admin, pendingRow.matched_at);
+    if ('error' in resolved) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status });
     }
-
-    const memberIds = [
-      ...new Set(
-        (matchedRows ?? [])
-          .map((r: { user_id?: unknown }) => (typeof r.user_id === 'string' ? r.user_id : ''))
-          .filter((id: string) => id.length > 0),
-      ),
-    ].sort();
-
+    const { connection, memberIds } = resolved;
     if (!memberIds.includes(user.id) || memberIds.length < 2) {
       return NextResponse.json({ error: 'Matched handshake is incomplete' }, { status: 409 });
-    }
-
-    const { data: connRows, error: connErr } = await admin
-      .from('connections')
-      .select('id, user_ids, is_group, created, created_utc')
-      .contains('user_ids', memberIds);
-
-    if (connErr) {
-      console.error('[api/connections/proximity GET] connection lookup:', connErr.message);
-      return NextResponse.json({ error: 'Failed to resolve connection' }, { status: 500 });
-    }
-
-    const connection = (connRows ?? []).find((candidate: { user_ids?: string[] | null }) =>
-      sameMemberSet(candidate.user_ids, memberIds),
-    ) as { id?: unknown; user_ids?: string[] | null; is_group?: boolean | null; created?: number | null; created_utc?: string | null } | undefined;
-
-    if (!connection?.id) {
-      return NextResponse.json({ error: 'Matched connection not found' }, { status: 404 });
     }
 
     const ids = memberIds.filter((id) => id !== user.id);
@@ -175,6 +151,7 @@ export async function GET(request: NextRequest) {
       success: true,
       encounter_logged: true,
       matches,
+      pending_handshake_id: pendingRow.id,
       connection_id: String(connection.id),
       is_new_connection: isNewConnection,
       is_group: memberIds.length > 2,
@@ -184,4 +161,66 @@ export async function GET(request: NextRequest) {
     console.error('[api/connections/proximity GET]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+type MatchedConnection = {
+  id: string;
+  user_ids: string[] | null;
+  is_group?: boolean | null;
+  created?: number | null;
+  created_utc?: string | null;
+};
+type ResolvedConnection =
+  | { connection: MatchedConnection; memberIds: string[] }
+  | { error: string; status: number };
+
+const MATCHED_CONNECTION_SELECT = 'id, user_ids, is_group, created, created_utc';
+
+async function groupConnectionById(admin: SupabaseClient, connectionId: string): Promise<ResolvedConnection> {
+  const { data, error } = await admin
+    .from('connections')
+    .select(MATCHED_CONNECTION_SELECT)
+    .eq('id', connectionId)
+    .maybeSingle();
+  if (error) {
+    console.error('[api/connections/proximity GET] group lookup:', error.message);
+    return { error: 'Failed to resolve connection', status: 500 };
+  }
+  const connection = data as MatchedConnection | null;
+  if (!connection?.id) return { error: 'Matched connection not found', status: 404 };
+  return { connection, memberIds: [...new Set(connection.user_ids ?? [])].sort() };
+}
+
+/** The connection for the member set whose taps were matched together (same `matched_at`). */
+async function connectionForMatchedTap(admin: SupabaseClient, matchedAt: string): Promise<ResolvedConnection> {
+  const { data: matchedRows, error: matchedErr } = await admin
+    .from('pending_handshakes')
+    .select('user_id, matched_at')
+    .eq('matched_at', matchedAt);
+  if (matchedErr) {
+    console.error('[api/connections/proximity GET] matched rows:', matchedErr.message);
+    return { error: 'Failed to load matched handshakes', status: 500 };
+  }
+  const memberIds = [
+    ...new Set(
+      (matchedRows ?? [])
+        .map((r: { user_id?: unknown }) => (typeof r.user_id === 'string' ? r.user_id : ''))
+        .filter((id: string) => id.length > 0),
+    ),
+  ].sort();
+  if (memberIds.length < 2) return { error: 'Matched handshake is incomplete', status: 409 };
+
+  const { data: connRows, error: connErr } = await admin
+    .from('connections')
+    .select(MATCHED_CONNECTION_SELECT)
+    .contains('user_ids', memberIds);
+  if (connErr) {
+    console.error('[api/connections/proximity GET] connection lookup:', connErr.message);
+    return { error: 'Failed to resolve connection', status: 500 };
+  }
+  const connection = ((connRows ?? []) as MatchedConnection[]).find((candidate) =>
+    sameMemberSet(candidate.user_ids, memberIds),
+  );
+  if (!connection?.id) return { error: 'Matched connection not found', status: 404 };
+  return { connection, memberIds };
 }

@@ -22,6 +22,7 @@ import {
   twelveHourUtcBlockId,
 } from '@/lib/server/proximity/matching';
 import {
+  markPendingHandshakesMatched,
   PENDING_HANDSHAKE_SELECT,
   pendingRowToHandshakeLite,
   USER_PROFILE_SELECT,
@@ -329,11 +330,7 @@ export async function confirmProximityHandshakeSelection(
     }
   }
 
-  await admin
-    .from('pending_handshakes')
-    .update({ matched_at: nowIso })
-    .in('user_id', memberIds)
-    .is('matched_at', null);
+  await markPendingHandshakesMatched(admin, memberIds, nowIso, { connectionId, latestByUser });
 
   const { data: users, error: uErr } = await admin
     .from('users')
@@ -364,6 +361,7 @@ export async function confirmProximityHandshakeSelection(
     success: true,
     encounter_logged: aggregateEncounterLogged,
     matches,
+    pending_handshake_id: pendingId,
     connection_id: connectionId,
     is_new_connection: isNewConnection,
     is_group: memberIds.length > 2,

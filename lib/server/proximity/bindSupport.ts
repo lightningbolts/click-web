@@ -341,10 +341,16 @@ export function buildSensorPayload(body: ProximityHandshakeRequest, timezoneOffs
   };
 }
 
+/**
+ * Marks the members' unmatched taps as matched. For a group, also records the group on each
+ * member's tap row (`latestByUser`), including rows already matched 1:1 before a late joiner
+ * arrived, so GET recovery reports the group to every member.
+ */
 export async function markPendingHandshakesMatched(
   admin: SupabaseClient,
   memberUserIds: string[],
   matchedAtIso: string,
+  group?: { connectionId: string; latestByUser: Map<string, HandshakeRowLite> },
 ): Promise<void> {
   if (memberUserIds.length === 0) return;
   const { error } = await admin
@@ -354,6 +360,18 @@ export async function markPendingHandshakesMatched(
     .is('matched_at', null);
   if (error) {
     console.warn('[proximity] mark matched:', error.message);
+  }
+  if (!group || memberUserIds.length < 3) return;
+  const rowIds = memberUserIds
+    .map((id) => group.latestByUser.get(id)?.id)
+    .filter((id): id is string => typeof id === 'string');
+  if (rowIds.length === 0) return;
+  const { error: groupErr } = await admin
+    .from('pending_handshakes')
+    .update({ group_connection_id: group.connectionId })
+    .in('id', rowIds);
+  if (groupErr) {
+    console.warn('[proximity] mark group:', groupErr.message);
   }
 }
 

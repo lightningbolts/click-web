@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { isDuplicateKeyError, sameMemberSet, utcTimeOfDayLabelFromMs } from '@/lib/server/proximity/matching';
+import {
+  isDuplicateKeyError,
+  PROXIMITY_GROUP_SUPERSEDE_WINDOW_MS,
+  sameMemberSet,
+  utcTimeOfDayLabelFromMs,
+} from '@/lib/server/proximity/matching';
 
 export async function lookupConnectionForMemberSet(
   admin: SupabaseClient,
@@ -103,6 +108,16 @@ export async function ensureConnectionForMemberSet(
   });
   if (chatErr && !isDuplicateKeyError(chatErr)) {
     console.warn('[proximity] ensureConnection chat:', chatErr.message);
+  }
+  if (members.length > 2) {
+    const { error: supersedeErr } = await admin.rpc('archive_superseded_proximity_groups', {
+      p_member_ids: members,
+      p_keep_id: connectionId,
+      p_since: new Date(nowMs - PROXIMITY_GROUP_SUPERSEDE_WINDOW_MS).toISOString(),
+    });
+    if (supersedeErr) {
+      console.warn('[proximity] ensureConnection supersede:', supersedeErr.message);
+    }
   }
   return { connectionId, isNewConnection: true, isGroup: members.length > 2 };
 }

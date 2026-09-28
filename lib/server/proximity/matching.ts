@@ -9,6 +9,11 @@ export const RECENT_CONNECTION_LOCK_MS = 15 * 1000;
  * are staggered by several seconds, so the first two phones can pair before the third posts).
  */
 export const PROXIMITY_LATE_JOIN_WINDOW_MS = 15 * 1000;
+/**
+ * A proximity group created this recently, with no messages yet, is archived when a larger
+ * group forms around the same people (the hangout grew; one group instead of two).
+ */
+export const PROXIMITY_GROUP_SUPERSEDE_WINDOW_MS = 2 * 60 * 1000;
 export const ENCOUNTER_DEBOUNCE_MAX_M = 50;
 export const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 export const EXTENDED_HANGOUT_TAG = 'Extended Hangout';
