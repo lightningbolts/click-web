@@ -8,7 +8,6 @@ import { DEFAULT_PRESENCE_CONFIG, summarizePresence, type PresenceConfig } from 
 export function presenceConfigFrom(config: Record<string, unknown>): PresenceConfig {
   return {
     heartbeatTtlMinutes: configNumber(config, 'heartbeat_ttl_minutes', DEFAULT_PRESENCE_CONFIG.heartbeatTtlMinutes, { min: 2, max: 60 }),
-    radiusMeters: configNumber(config, 'radius_meters', DEFAULT_PRESENCE_CONFIG.radiusMeters, { min: 25, max: 2000 }),
   };
 }
 

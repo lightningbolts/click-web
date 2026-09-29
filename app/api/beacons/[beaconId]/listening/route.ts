@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
-import { parseBody } from '@/lib/api/parseBody';
-import { listeningHeartbeatBodySchema } from '@/lib/api/schemas/beacons';
 import { requireFeature } from '@/lib/server/featureFlags';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
-import { haversineMeters } from '@/lib/server/eventEngagement';
 import { loadVisibleBeacon } from '@/lib/map/beaconVisibility';
 import type { MapBeaconRecord } from '@/lib/map/mapBeacons';
 import { loadListening, presenceConfigFrom } from '@/lib/server/soundtrackPresence';
@@ -52,8 +49,8 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
 }
 
 /**
- * POST { lat, lng } — "I'm listening here": a heartbeat, accepted only within the beacon's area.
- * Clients repeat it every `heartbeat_seconds` while the listener stays; it lapses on its own.
+ * POST — "I'm listening": a heartbeat from anywhere (people listen on the map, not only at the
+ * pin). Clients repeat it every `heartbeat_seconds` while listening; it lapses on its own.
  */
 export async function POST(request: NextRequest, { params }: Params): Promise<Response> {
   try {
@@ -61,15 +58,6 @@ export async function POST(request: NextRequest, { params }: Params): Promise<Re
     if (!auth.ok) return auth.response;
     const limited = await featureMutationRateLimitResponse('soundtrack_presence', auth.userId);
     if (limited) return limited;
-    const parsed = await parseBody(request, listeningHeartbeatBodySchema);
-    if (!parsed.ok) return parsed.response;
-    const distance = haversineMeters(parsed.data.lat, parsed.data.lng, auth.beacon.lat, auth.beacon.lng);
-    if (distance > auth.config.radiusMeters) {
-      return NextResponse.json(
-        { error: 'You need to be near this soundtrack to listen here.', code: 'out_of_range' },
-        { status: 403 },
-      );
-    }
     const { error } = await auth.admin
       .from('beacon_presence')
       .upsert({ beacon_id: auth.beacon.id, user_id: auth.userId, last_seen_at: new Date().toISOString() });

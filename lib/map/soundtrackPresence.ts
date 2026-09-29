@@ -3,9 +3,10 @@
  * listening, and names only for the viewer's connections who aren't ghosted.
  */
 
-export type PresenceConfig = { heartbeatTtlMinutes: number; radiusMeters: number };
+/** Anyone can listen from anywhere on the map (no location gate); a heartbeat just lapses. */
+export type PresenceConfig = { heartbeatTtlMinutes: number };
 
-export const DEFAULT_PRESENCE_CONFIG: PresenceConfig = { heartbeatTtlMinutes: 12, radiusMeters: 150 };
+export const DEFAULT_PRESENCE_CONFIG: PresenceConfig = { heartbeatTtlMinutes: 12 };
 
 export type PresenceRow = { userId: string; lastSeenAtMs: number };
 
