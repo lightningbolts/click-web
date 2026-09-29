@@ -154,3 +154,12 @@ Alert (hazard) beacons get crowd upkeep so stale pins don't linger. Logic: `lib/
 Clearing sets `expires_at = cleared_at = now()`, so every client's fetch (which filters `expires_at > now()`)
 drops the pin, older builds included. Voter coordinates are checked and never stored. All numbers are
 `feature_flags.config` keys.
+
+## Listening now (F5, flag `soundtrack_presence`)
+
+A soundtrack beacon is a song link pinned at a place (30 s preview; no full playback). "Listening
+now" is a heartbeat from someone standing within `radius_meters` of the pin that lapses after
+`heartbeat_ttl_minutes`. `GET|POST|DELETE /api/beacons/{id}/listening` return
+`{ count, is_listening, connections, heartbeat_seconds }`: the count includes everyone (ghosted
+people too); names only for the viewer's active connections (`lib/server/connections/viewerPeers.ts`)
+who aren't ghosted. No pushes, rankings or likes. Lapsed rows are purged by cron-hourly-maintenance.
