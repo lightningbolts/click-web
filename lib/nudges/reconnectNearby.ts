@@ -111,5 +111,5 @@ export function reconnectNearbyCopy(peerFirstName: string, metAtMs: number, nowM
   const met = new Date(metAtMs);
   const sameYear = met.getUTCFullYear() === new Date(nowMs).getUTCFullYear();
   const when = new Intl.DateTimeFormat('en-US', { month: 'long', ...(sameYear ? {} : { year: 'numeric' }), timeZone }).format(met);
-  return { title: `You met ${name} near here`, body: `You met ${name} near here in ${when}. Say hi?` };
+  return { title: `You met ${name} near here`, body: `Back in ${when}. Say hi?` };
 }

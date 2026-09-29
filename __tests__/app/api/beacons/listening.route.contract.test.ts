@@ -76,10 +76,10 @@ describe('POST /api/beacons/[beaconId]/listening', () => {
     expect(mockUpsert).toHaveBeenCalledWith(expect.objectContaining({ beacon_id: BEACON_ID, user_id: 'me' }));
   });
 
-  it('rejects listeners outside the area without recording them', async () => {
-    const res = await post({ lat: PIN.lat + 0.01, lng: PIN.lng });
-    expect(res.status).toBe(403);
-    expect(mockUpsert).not.toHaveBeenCalled();
+  it('accepts a heartbeat from anywhere (people listen on the map)', async () => {
+    const res = await post({ lat: PIN.lat + 1, lng: PIN.lng });
+    expect(res.status).toBe(200);
+    expect(mockUpsert).toHaveBeenCalled();
   });
 
   it('is a 404 for non-soundtrack or expired beacons and outside the cohort', async () => {

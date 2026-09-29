@@ -188,9 +188,3 @@ export const alertConfirmBodySchema = z.object({
 export const beaconReportBodySchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
-
-/** POST /api/beacons/{id}/listening — a heartbeat from someone near the pin (checked, never stored). */
-export const listeningHeartbeatBodySchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});

@@ -157,9 +157,17 @@ drops the pin, older builds included. Voter coordinates are checked and never st
 
 ## Listening now (F5, flag `soundtrack_presence`)
 
-A soundtrack beacon is a song link pinned at a place (30 s preview; no full playback). "Listening
-now" is a heartbeat from someone standing within `radius_meters` of the pin that lapses after
-`heartbeat_ttl_minutes`. `GET|POST|DELETE /api/beacons/{id}/listening` return
+A soundtrack beacon is a song link pinned at a place (30 s preview; no full playback). People
+listen on the map from anywhere, so "Listening now" is not location-gated: a heartbeat that lapses
+after `heartbeat_ttl_minutes`. `GET|POST|DELETE /api/beacons/{id}/listening` return
 `{ count, is_listening, connections, heartbeat_seconds }`: the count includes everyone (ghosted
 people too); names only for the viewer's active connections (`lib/server/connections/viewerPeers.ts`)
 who aren't ghosted. No pushes, rankings or likes. Lapsed rows are purged by cron-hourly-maintenance.
+
+## Reactions (soundtracks and shared drops)
+
+`GET|PUT /api/reactions/{soundtrack|shared_drop}/{id}` (`lib/server/reactions.ts`): one emoji from a
+fixed palette per person, replaceable; `null` removes it. Allowed exactly where the target is: a
+live soundtrack the viewer can see (flag `soundtrack_presence`), or a shared drop's audience once it
+has developed (flag `shared_drops`). Owners see everyone's reaction; others see their own and their
+connections'. Not on your own.
