@@ -3,6 +3,8 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { requireFeature } from '@/lib/server/featureFlags';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { sharedDropCreateBodySchema } from '@/lib/api/schemas/drops';
 import { DROP_MAX_ORIGINAL_BYTES, DROP_MAX_PREVIEW_BYTES, decodeDropUpload } from '@/lib/server/drops/storage';
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
       return NextResponse.json({ error: 'Failed to share the drop. Try again.' }, { status: 500 });
     }
+    runAfterResponse('product events', () => emitProductEvent(auth.admin, auth.userId, 'drop_posted', { kind: 'shared' }));
     return respond(result.row, 201);
   } catch (e) {
     console.error('POST /api/me/shared-drops:', e);

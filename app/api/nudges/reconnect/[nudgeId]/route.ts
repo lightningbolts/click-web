@@ -4,6 +4,8 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { parseBody } from '@/lib/api/parseBody';
 import { placeCell } from '@/lib/nudges/reconnectNearby';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,6 +40,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) throw new Error(error.message);
     const row = data as { connection_id: string; encounter_id: string | null } | null;
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (parsed.data.action === 'acted') {
+      runAfterResponse('product events', () => emitProductEvent(admin, user.id, 'nudge_acted', { kind: 'reconnect_nearby' }));
+    }
 
     if (parsed.data.action === 'dismissed' && parsed.data.mute) {
       let targetId: string | null = null;

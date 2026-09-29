@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseBody } from '@/lib/api/parseBody';
 import { eventDropCreateBodySchema } from '@/lib/api/schemas/drops';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { isEventDropWindowOpen } from '@/lib/events/eventDropSchedule';
 import { DROP_MAX_ORIGINAL_BYTES, DROP_MAX_PREVIEW_BYTES, decodeDropUpload } from '@/lib/server/drops/storage';
 import {
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest, { params }: Params): Promise<Re
       }
       return NextResponse.json({ error: 'Failed to save the drop. Try again.' }, { status: 500 });
     }
+    runAfterResponse('product events', () => emitProductEvent(admin, userId, 'drop_posted', { kind: 'event' }));
     return NextResponse.json({ drop: (await serializeEventDrops(admin, [result.row], userId))[0] }, { status: 201 });
   } catch (e) {
     console.error('POST /api/beacons/[beaconId]/drops:', e);

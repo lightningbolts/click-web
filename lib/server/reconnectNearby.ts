@@ -2,6 +2,8 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { configNumber } from '@/lib/server/featureFlags';
 import { loadViewerPeers } from '@/lib/server/connections/viewerPeers';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 import {
   DEFAULT_RECONNECT_CONFIG,
   pickReconnectNudge,
@@ -134,6 +136,7 @@ export async function reconnectNudgeFor(
     .select('id, connection_id, encounter_id')
     .single();
   if (error) throw new Error(`place_nudges insert: ${error.message}`);
+  runAfterResponse('product events', () => emitProductEvent(admin, viewerId, 'nudge_shown', { kind: 'reconnect_nearby' }));
   return payloadFor(
     admin,
     inserted as { id: string; connection_id: string; encounter_id: string | null },

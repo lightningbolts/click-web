@@ -11,6 +11,7 @@ import { isActiveChatListStatus, normalizeConnectionStatus } from '@/lib/dashboa
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 import { parseBody } from '@/lib/api/parseBody';
 import { runAfterResponse } from '@/lib/server/afterResponse';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { cronPushBearer, pushFunctionUrl } from '@/lib/server/cronAuth';
 import { chatMessagePostBodySchema } from '@/lib/api/schemas/chat';
 import {
@@ -372,6 +373,10 @@ export async function insertChatMessage(
   }
 
   await admin.from('chats').update({ updated_at: now }).eq('id', message.chat_id);
+
+  if ((insertRow.metadata as Record<string, unknown>).disposable_roll === true) {
+    runAfterResponse('product events', () => emitProductEvent(admin, m.userId, 'drop_posted', { kind: 'chat' }));
+  }
 
   if (!skipsPush(m.messageType, m.metadata)) {
     // Push delivery is not part of message durability. Keep it attached to the request

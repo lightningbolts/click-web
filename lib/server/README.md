@@ -136,3 +136,15 @@ Used by middleware and insights API routes.
 - **Business insights** — businessInsightsEligibility gate.
 - **Event reminders** — Cron service role.
 - **Achievements & stats** — User-scoped queries.
+
+## Pilot product events (spec §11, flag `pilot_analytics`)
+
+`lib/server/telemetry/productEvents.ts` writes allowlisted events to `product_events` for users in
+the pilot cohort: property keys are allowlisted per event and values must be short scalars (never
+user content, other people's IDs or coordinates). The server emits where it is authoritative —
+`beacon_created` (type), `beacon_joined` (event RSVP), `drop_posted` (chat / event / shared),
+`drop_ready_opened` (kind; first develop only), `nudge_shown` / `nudge_acted` — after the response.
+Clients send only `install`, `app_open` (once a day) and `recap_opened` to
+`POST /api/telemetry/events`, which also records `day2_return` / `day7_return` once from the latest
+install. Handshake completion with group size stays in `connection_flow_events`
+(`proximity_handshake_matched` + `peer_count`). Rows are deleted with the account.
