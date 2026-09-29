@@ -82,14 +82,33 @@ export default function UserProfileModal({
   onClose,
   currentUserId = null,
   forceOwnProfileBirthdayCompletion = false,
-  connectionId = null,
-  chatId = null,
-  groupId = null,
+  connectionId: connectionIdProp = null,
+  chatId: chatIdProp = null,
+  groupId: groupIdProp = null,
   decryptedMessages = EMPTY_DECRYPTED_MESSAGES,
 }: UserProfileModalProps) {
   const { mutate } = useSWRConfig();
   const rollInputRef = useRef<HTMLInputElement>(null);
-  const requestedUserId = userId?.trim() || null;
+  const openUserId = userId?.trim() || null;
+  const open = !!openUserId;
+  // Keep the last subject while closed so the sheet keeps its content through the exit
+  // animation instead of blanking (callers clear these props the moment they close it).
+  const [subject, setSubject] = useState({
+    userId: openUserId,
+    connectionId: connectionIdProp,
+    chatId: chatIdProp,
+    groupId: groupIdProp,
+  });
+  if (
+    open &&
+    (subject.userId !== openUserId ||
+      subject.connectionId !== connectionIdProp ||
+      subject.chatId !== chatIdProp ||
+      subject.groupId !== groupIdProp)
+  ) {
+    setSubject({ userId: openUserId, connectionId: connectionIdProp, chatId: chatIdProp, groupId: groupIdProp });
+  }
+  const { userId: requestedUserId, connectionId, chatId, groupId } = subject;
   const [activeTab, setActiveTab] = useState<ProfileTabKey>('timeline');
   const [birthdayDraft, setBirthdayDraft] = useState('');
   const [birthdaySaveError, setBirthdaySaveError] = useState<string | null>(null);
@@ -347,8 +366,8 @@ export default function UserProfileModal({
   );
 
   useEffect(() => {
-    // Reset derived state whenever the sheet opens for a new user.
-    if (!requestedUserId) return;
+    // Reset derived state whenever the sheet opens.
+    if (!openUserId) return;
     setActiveTab('timeline');
     setBirthdayDraft('');
     setBirthdaySaveError(null);
@@ -356,7 +375,7 @@ export default function UserProfileModal({
     setRollStatus('idle');
     setRecommendationDismissed(false);
     setBeaconDetail(null);
-  }, [requestedUserId]);
+  }, [openUserId]);
 
   useEffect(() => {
     if (!forceOwnProfileBirthdayCompletion || !profileData?.user) return;
@@ -370,7 +389,6 @@ export default function UserProfileModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceOwnProfileBirthdayCompletion, profileData?.user?.birthday, profileData?.user?.id]);
 
-  const open = !!requestedUserId;
   const errorMessage = error instanceof Error ? error.message : error ? 'Failed to load' : null;
   const loading = Boolean(requestedUserId) && !profileData && !errorMessage;
 
@@ -489,7 +507,7 @@ export default function UserProfileModal({
     <AnimatePresence>
       {open && (
         <motion.div
-          key={requestedUserId}
+          key="profile-sheet"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -565,12 +583,7 @@ export default function UserProfileModal({
                 <p className="py-6 text-center text-sm font-medium text-error">{errorMessage}</p>
               )}
               {profileData && !loading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                  className="space-y-5"
-                >
+                <div className="space-y-5">
                   <div className="flex flex-col items-center gap-3">
                     {profileData.user.image ? (
                       <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border border-border-hard transform-gpu translate-z-0">
@@ -762,7 +775,7 @@ export default function UserProfileModal({
                       sharedInterestTagKeys={sharedInterestTagKeys}
                     />
                   )}
-                </motion.div>
+                </div>
               )}
             </div>
           </motion.div>

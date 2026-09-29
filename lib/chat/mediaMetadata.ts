@@ -1,5 +1,7 @@
 import { ENVELOPE_PREFIX, E2EE_V2_ATTACHMENT_PREFIX } from '@/lib/chat/attachmentCrypto';
 import type { Message, MessageMediaMetadata, MessageType } from '@/lib/chat/types';
+import { isKlipyMediaUrl } from '@/lib/chat/gif';
+import { isEncryptedWireContent } from '@/lib/chat/crypto';
 
 /** Public URL for image/audio from `metadata.media_url` (camelCase fallback for older rows). */
 export function mediaUrlFromMetadata(metadata: MessageMediaMetadata | undefined | null): string | null {
@@ -75,10 +77,13 @@ export function originalMimeTypeFromMetadata(
 export function previewLabelForMessage(
   message: Pick<Message, 'message_type' | 'content'> & { metadata?: Message['metadata'] },
 ): string {
-  const cap = message.content.replace(/\n/g, ' ').trim();
+  // Ciphertext that could not be decrypted is never a label: fall back to the type.
+  const encrypted = isEncryptedWireContent(message.content);
+  const cap = encrypted ? '' : message.content.replace(/\n/g, ' ').trim();
   const t = message.message_type as MessageType;
   if (t === 'image') return cap || 'Photo';
   if (t === 'audio') return cap || 'Voice message';
+  if (t === 'file') return cap && !cap.startsWith(ENVELOPE_PREFIX) && !cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX) ? cap : 'File';
   if (t === 'call_log') return 'Call';
   if (t === 'beacon') {
     const meta = message.metadata && typeof message.metadata === 'object' ? message.metadata : null;
@@ -100,5 +105,8 @@ export function previewLabelForMessage(
   // the chat list / reply banner as raw JSON. Render a neutral "📎 Attachment"
   // placeholder — the full preview is only materialised after client-side decryption.
   if (cap.startsWith(ENVELOPE_PREFIX) || cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX)) return '📎 Attachment';
+  // GIF messages carry only the KLIPY URL as their body.
+  if (isKlipyMediaUrl(cap)) return 'GIF';
+  if (encrypted) return 'Encrypted message';
   return message.content;
 }

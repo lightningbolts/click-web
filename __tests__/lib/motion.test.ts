@@ -13,9 +13,10 @@ describe("prefersReducedMotion", () => {
     expect(fadeTransition(0.2).duration).toBe(0);
   });
 
-  it("opens the waitlist plate with a clip, not a fade-and-rise", () => {
-    expect(platePresence.initial).toMatchObject({ opacity: 0 });
-    expect(String(platePresence.initial.clipPath)).toMatch(/inset/);
-    expect(platePresence.animate.clipPath).toBe("inset(0% 0 0% 0)");
+  it("animates the dialog plate with compositor-only properties", () => {
+    for (const state of [platePresence.initial, platePresence.animate, platePresence.exit]) {
+      expect(Object.keys(state).every((k) => ["opacity", "scale", "x", "y"].includes(k))).toBe(true);
+    }
+    expect(platePresence.animate).toMatchObject({ opacity: 1, scale: 1 });
   });
 });

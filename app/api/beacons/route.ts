@@ -20,6 +20,7 @@ import {
 } from "@/lib/map/mapBeaconApiShared";
 import {
   filterActiveBeaconsForDiscovery,
+  parseEventScheduleFromMetadata,
   resolveBeaconExpiresAtIso,
 } from "@/lib/map/eventSchedule";
 import { filterBeaconsForViewer, parseVisibilityAudienceFromBody } from "@/lib/map/beaconVisibility";
@@ -36,6 +37,11 @@ import {
   eventTimeColumnsFromMetadata,
   parseEventListingOptionsFromBody,
 } from "@/lib/events/eventOptions";
+import {
+  expandEventOccurrences,
+  parseEventRecurrenceFromBody,
+  validateEventRecurrence,
+} from "@/lib/events/eventRecurrence";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -139,9 +145,42 @@ async function relocateSoundtrackBeacon(
   return parseInsertedBeacon(updated, lon, lat);
 }
 
+const BEACON_PAGE_DEFAULT = 200;
+const BEACON_PAGE_MAX = 500;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type BeaconPageCursor = { createdAt: string; id: string };
+
+/** Opaque `cursor`: base64url of `{"c": created_at, "i": id}` of the last row of a page. */
+function encodeBeaconCursor(cursor: BeaconPageCursor): string {
+  return Buffer.from(JSON.stringify({ c: cursor.createdAt, i: cursor.id })).toString("base64url");
+}
+
+function decodeBeaconCursor(raw: string | null): BeaconPageCursor | null | "invalid" {
+  if (raw == null || raw.trim() === "") return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw.trim(), "base64url").toString("utf8")) as { c?: unknown; i?: unknown };
+    if (typeof parsed.c !== "string" || Number.isNaN(Date.parse(parsed.c))) return "invalid";
+    if (typeof parsed.i !== "string" || !UUID_RE.test(parsed.i)) return "invalid";
+    return { createdAt: parsed.c, id: parsed.i };
+  } catch {
+    return "invalid";
+  }
+}
+
+function parsePageLimit(searchParams: URLSearchParams): number {
+  const raw = Number(searchParams.get("limit"));
+  if (!Number.isFinite(raw) || raw <= 0) return BEACON_PAGE_DEFAULT;
+  return Math.min(Math.floor(raw), BEACON_PAGE_MAX);
+}
+
 /**
  * Proximity map beacons (PostGIS ST_DWithin via caller-scoped SECURITY DEFINER RPC)
  * after JWT verification. The route never accepts a creator id for own-pin hydration.
+ *
+ * Paginated newest first: `limit` (default 200, max 500) and an opaque `cursor` from the
+ * previous response's `next_cursor` (null once there are no more pages). Pages are cut before
+ * visibility filtering, so a page can hold fewer than `limit` beacons while more remain.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -161,51 +200,70 @@ export async function GET(request: NextRequest) {
     const { lat, lng } = latLon;
     const radius = parseRadiusMeters(searchParams);
     const typeFilter = parseBeaconTypeFilters(searchParams);
+    const limit = parsePageLimit(searchParams);
+    const cursor = decodeBeaconCursor(searchParams.get("cursor"));
+    if (cursor === "invalid") {
+      return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
+    }
 
     // Use the user-scoped client so RPC visibility (auth.uid()) works for connections /
     // core_connections — admin RPC leaves auth.uid() null and drops those rows.
-    const { data, error } = await supabase.rpc("fetch_map_beacons_within", {
+    // One extra row tells whether another page exists.
+    const { data, error } = await supabase.rpc("fetch_map_beacons_within_page", {
       lat,
       lng,
       radius_meters: radius,
-      p_limit: 200,
+      p_limit: limit + 1,
+      p_before_created_at: cursor?.createdAt ?? null,
+      p_before_id: cursor?.id ?? null,
     });
 
     if (error) {
-      console.error("fetch_map_beacons_within:", error.message);
+      console.error("fetch_map_beacons_within_page:", error.message);
       return NextResponse.json({ error: "Failed to load beacons" }, { status: 500 });
     }
 
     const admin = createAdminSupabaseClient();
-    const rawList = normalizeBeaconRpcRows(data);
+    const fetched = normalizeBeaconRpcRows(data);
+    const rawList = fetched.slice(0, limit);
+    let nextCursor: string | null = null;
+    if (fetched.length > limit) {
+      const last = rawList[rawList.length - 1] as { created_at?: unknown; id?: unknown } | undefined;
+      if (last && typeof last.created_at === "string" && typeof last.id === "string") {
+        nextCursor = encodeBeaconCursor({ createdAt: last.created_at, id: last.id });
+      }
+    }
     let beacons: MapBeaconRecord[] = rawList.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null);
 
     // Always merge the caller's own active beacons (any location) so creators still see
     // pins they dropped even when the map/GPS center is far from the drop site.
     // Use RPC (lat/lng in JSON) — selecting geography `location` via PostgREST often yields
     // opaque EWKB that parseInsertedBeacon cannot decode → own pins silently dropped.
-    try {
-      // This function deliberately has no user-id parameter. Calling it with the
-      // authenticated client keeps auth.uid() scoped to the caller; using the
-      // service role here would turn an arbitrary UUID into a location oracle.
-      const { data: ownData, error: ownErr } = await supabase.rpc("fetch_my_active_map_beacons", {
-        p_limit: 50,
-      });
-      if (ownErr) {
-        console.warn("GET /api/beacons own beacons:", ownErr.message);
-      } else {
-        const ownParsed = normalizeBeaconRpcRows(ownData)
-          .map(parseMapBeacon)
-          .filter((b): b is MapBeaconRecord => b != null);
-        if (ownParsed.length > 0) {
-          const byId = new Map<string, MapBeaconRecord>();
-          for (const b of beacons) byId.set(b.id, b);
-          for (const b of ownParsed) byId.set(b.id, b);
-          beacons = Array.from(byId.values());
+    // First page only: later pages would repeat them.
+    if (cursor == null) {
+      try {
+        // This function deliberately has no user-id parameter. Calling it with the
+        // authenticated client keeps auth.uid() scoped to the caller; using the
+        // service role here would turn an arbitrary UUID into a location oracle.
+        const { data: ownData, error: ownErr } = await supabase.rpc("fetch_my_active_map_beacons", {
+          p_limit: 50,
+        });
+        if (ownErr) {
+          console.warn("GET /api/beacons own beacons:", ownErr.message);
+        } else {
+          const ownParsed = normalizeBeaconRpcRows(ownData)
+            .map(parseMapBeacon)
+            .filter((b): b is MapBeaconRecord => b != null);
+          if (ownParsed.length > 0) {
+            const byId = new Map<string, MapBeaconRecord>();
+            for (const b of beacons) byId.set(b.id, b);
+            for (const b of ownParsed) byId.set(b.id, b);
+            beacons = Array.from(byId.values());
+          }
         }
+      } catch (e) {
+        console.warn("GET /api/beacons own beacons merge failed:", e);
       }
-    } catch (e) {
-      console.warn("GET /api/beacons own beacons merge failed:", e);
     }
 
     beacons = filterBeaconRecords(beacons, typeFilter);
@@ -213,7 +271,7 @@ export async function GET(request: NextRequest) {
     beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
-    return NextResponse.json({ beacons, radius_meters: radius });
+    return NextResponse.json({ beacons, radius_meters: radius, next_cursor: nextCursor });
   } catch (e) {
     console.error("GET /api/beacons:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -377,7 +435,32 @@ export async function POST(request: NextRequest) {
         visibilityAudience = "connections";
       }
     }
-    const eventTimes = eventListing ? eventTimeColumnsFromMetadata(metadata) : null;
+    let occurrenceMetadata: Record<string, unknown>[] = [metadata];
+    let seriesId: string | null = null;
+    if (eventListing) {
+      const recurrenceParsed = parseEventRecurrenceFromBody(body);
+      if ("error" in recurrenceParsed) {
+        return NextResponse.json({ error: recurrenceParsed.error }, { status: 400 });
+      }
+      const { recurrence } = recurrenceParsed;
+      const schedule = parseEventScheduleFromMetadata(metadata);
+      if (recurrence != null && schedule != null) {
+        const recurrenceErr = validateEventRecurrence(schedule, recurrence);
+        if (recurrenceErr != null) {
+          return NextResponse.json({ error: recurrenceErr }, { status: 400 });
+        }
+        seriesId = crypto.randomUUID();
+        occurrenceMetadata = expandEventOccurrences(
+          schedule,
+          recurrence,
+          eventTimeColumnsFromMetadata(metadata).event_timezone,
+        ).map((o) => ({
+          ...metadata,
+          event_start_at: new Date(o.startEpochMs).toISOString(),
+          event_end_at: new Date(o.endEpochMs).toISOString(),
+        }));
+      }
+    }
 
     let venueId: string | null = null;
     const venueIdRaw =
@@ -428,17 +511,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("map_beacons")
-      .insert({
+    // A repeating event inserts every occurrence in one statement (all or nothing).
+    const rows = occurrenceMetadata.map((meta, i) => {
+      const eventTimes = eventListing ? eventTimeColumnsFromMetadata(meta) : null;
+      return {
         creator_id: user.id,
         venue_id: venueId,
         beacon_type,
         show_creator_name: showCreatorName,
         visibility_audience: visibilityAudience,
         location: `POINT(${lon} ${lat})`,
-        metadata,
-        expires_at: expiresAtIso,
+        metadata: meta,
+        expires_at: i === 0 ? expiresAtIso : (eventTimes?.ends_at ?? expiresAtIso),
         ...(eventListing
           ? {
               event_visibility: eventListing.event_visibility,
@@ -451,38 +535,54 @@ export async function POST(request: NextRequest) {
               event_timezone: eventTimes?.event_timezone ?? null,
             }
           : {}),
-      })
+        ...(seriesId != null ? { series_id: seriesId, series_sequence: i + 1 } : {}),
+      };
+    });
+
+    const { data: insertedRows, error: insertError } = await supabase
+      .from("map_beacons")
+      .insert(rows)
       .select(
-        "id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location",
-      )
-      .maybeSingle();
+        "id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, visibility_audience, metadata, created_at, expires_at, location, series_sequence",
+      );
 
     if (insertError) {
       console.error("map_beacons insert (api/beacons):", insertError.message);
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
-    let insertedRow = inserted as Record<string, unknown> | null;
-    if (beacon_type === "event" && insertedRow != null && typeof insertedRow.id === "string") {
+    const inserted = ((insertedRows ?? []) as Record<string, unknown>[])
+      .filter((row) => isRecord(row) && typeof row.id === "string")
+      .sort((a, b) => Number(a.series_sequence ?? 0) - Number(b.series_sequence ?? 0));
+    let insertedRow: Record<string, unknown> | null = inserted[0] ?? null;
+    if (beacon_type === "event" && inserted.length > 0) {
       const admin = createAdminSupabaseClient();
-      const created = await createHubForEventBeacon(admin, {
-        beaconId: insertedRow.id,
-        creatorId: user.id,
-        lat,
-        lng: lon,
-        metadata,
-      });
-      if ("error" in created) {
-        await admin.from("map_beacons").delete().eq("id", insertedRow.id);
-        console.error("POST /api/beacons event hub:", created.error);
+      const hubs = await Promise.all(
+        inserted.map((row) =>
+          createHubForEventBeacon(admin, {
+            beaconId: row.id as string,
+            creatorId: user.id,
+            lat,
+            lng: lon,
+            metadata: row.metadata as Record<string, unknown>,
+          }),
+        ),
+      );
+      const failures = hubs.flatMap((h) => ("error" in h ? [h.error] : []));
+      const firstHub = hubs[0];
+      if (failures.length > 0 || !("hubId" in firstHub)) {
+        // Deleting the events cascades to any hubs that were created.
+        await admin.from("map_beacons").delete().in("id", inserted.map((row) => row.id as string));
+        console.error("POST /api/beacons event hub:", failures.join("; "));
         return NextResponse.json({ error: "Failed to create event hub" }, { status: 500 });
       }
       insertedRow = {
-        ...insertedRow,
-        hub_id: created.hubId,
-        metadata: { ...metadata, hub_id: created.hubId },
+        ...inserted[0],
+        hub_id: firstHub.hubId,
+        metadata: { ...(inserted[0].metadata as Record<string, unknown>), hub_id: firstHub.hubId },
       };
     }
+    const seriesCount = seriesId != null ? inserted.length : undefined;
 
     const beacon = parseInsertedBeacon(insertedRow, lon, lat);
     if (beacon == null) {
@@ -511,16 +611,16 @@ export async function POST(request: NextRequest) {
       if (!fallbackBeacon.id) {
         return NextResponse.json({ error: "Insert failed" }, { status: 500 });
       }
-      return NextResponse.json({ beacon: fallbackBeacon });
+      return NextResponse.json({ beacon: fallbackBeacon, series_count: seriesCount });
     }
 
     try {
       const admin = createAdminSupabaseClient();
       const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);
-      return NextResponse.json({ beacon: enriched ?? beacon });
+      return NextResponse.json({ beacon: enriched ?? beacon, series_count: seriesCount });
     } catch (enrichErr) {
       console.error("POST /api/beacons enrich:", enrichErr);
-      return NextResponse.json({ beacon });
+      return NextResponse.json({ beacon, series_count: seriesCount });
     }
   } catch (e) {
     console.error("POST /api/beacons:", e);

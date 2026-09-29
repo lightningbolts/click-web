@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, Suspense } from "react";
@@ -14,6 +14,7 @@ import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
 import useSWR from "swr";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import { cn } from "@/lib/cn";
+import { useHydrated } from "@/lib/react/useHydrated";
 import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
 import {
   personalProductNavItems,
@@ -63,7 +64,25 @@ function LoginLoadingShell({ onClose }: { onClose: () => void }) {
 }
 
 const navItemClass =
-  "inline-flex h-9 items-center rounded-[8px] px-3 text-sm font-semibold leading-none";
+  "relative inline-flex h-9 items-center rounded-[8px] px-3 text-sm font-semibold leading-none";
+
+/**
+ * Fixed-size underline inside a nav Link: solid for the current section, pulsing while a
+ * navigation to it is pending (dynamic routes have no global spinner, so the current page
+ * stays put until the next one is ready). Always rendered, so it never shifts layout.
+ */
+function NavItemIndicator({ active }: { active: boolean }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-3 bottom-0.5 h-0.5 rounded-full bg-primary transition-opacity duration-150",
+        pending ? "animate-pulse opacity-60" : active ? "opacity-100" : "opacity-0",
+      )}
+    />
+  );
+}
 
 function navLinkClass(active: boolean) {
   return cn(
@@ -89,7 +108,12 @@ export default function Navbar({
 }: {
   initialHasSession?: boolean;
 }) {
-  const { user, signOut, loading } = useAuth();
+  const auth = useAuth();
+  // The navbar sits in a Suspense boundary and can hydrate after auth has resolved; render
+  // what the server rendered until hydration is done, so React never discards the bar.
+  const hydrated = useHydrated();
+  const { user, loading } = hydrated ? auth : (auth.serverSnapshot ?? auth);
+  const { signOut } = auth;
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -232,6 +256,7 @@ export default function Navbar({
                     className={navLinkClass(productNavItemIsActive(item, pathname, tab))}
                   >
                     {item.label}
+                    <NavItemIndicator active={productNavItemIsActive(item, pathname, tab)} />
                   </Link>
                 ))
               : marketingLinks}

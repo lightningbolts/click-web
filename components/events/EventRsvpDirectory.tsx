@@ -75,14 +75,13 @@ export default function EventRsvpDirectory({
           </li>
         ))}
       </ul>
-      {profileUserId ? (
-        <UserProfileModal
-          userId={profileUserId}
-          getAuthHeaders={getFreshAuthHeaders}
-          onClose={() => setProfileUserId(null)}
-          currentUserId={user?.id}
-        />
-      ) : null}
+      {/* Always mounted so closing plays the exit animation. */}
+      <UserProfileModal
+        userId={profileUserId}
+        getAuthHeaders={getFreshAuthHeaders}
+        onClose={() => setProfileUserId(null)}
+        currentUserId={user?.id}
+      />
     </div>
   );
 }

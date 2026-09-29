@@ -62,6 +62,11 @@ const DB_NAME = 'click-e2ee-v2';
 const STORE_NAME = 'identities';
 const IDENTITY_KEY = 'current';
 const sessionCache = new Map<string, E2eeV2Session>();
+/** When each cached session was resolved; writes reuse one for `SEND_SESSION_REUSE_MS` (iOS parity). */
+const sessionResolvedAt = new Map<string, number>();
+const SEND_SESSION_REUSE_MS = 60_000;
+/** Devices registered from this page; registration is idempotent, so once per page is enough. */
+const registeredDeviceIds = new Set<string>();
 
 function browserIndexedDb(): IDBFactory {
   if (typeof indexedDB === 'undefined') throw new E2eeV2UnavailableError('IndexedDB is required for E2EE v2');
@@ -158,6 +163,7 @@ async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestIni
 }
 
 async function registerDevice(identity: DeviceIdentity & { deviceId: string }, headers: HeadersInit): Promise<void> {
+  if (registeredDeviceIds.has(identity.deviceId)) return;
   const response = await fetchJson<{ device?: DeviceRow }>('/api/chat/devices', headers, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -167,11 +173,26 @@ async function registerDevice(identity: DeviceIdentity & { deviceId: string }, h
     throw error;
   });
   void response;
+  registeredDeviceIds.add(identity.deviceId);
 }
 
-async function discoverDevices(chatId: string, headers: HeadersInit): Promise<DeviceRow[]> {
+/**
+ * Conversation kind for epoch keys. Chats (direct and group) and Community Hubs (event chat)
+ * share the v2 wire format; they differ only in which BFF routes hold devices and epochs.
+ */
+export type E2eeV2Scope = 'chat' | 'hub';
+
+function scopeBase(scope: E2eeV2Scope): string {
+  return scope === 'hub' ? '/api/hub' : '/api/chat';
+}
+
+function scopeParam(scope: E2eeV2Scope): string {
+  return scope === 'hub' ? 'hub_id' : 'chat_id';
+}
+
+async function discoverDevices(chatId: string, headers: HeadersInit, scope: E2eeV2Scope = 'chat'): Promise<DeviceRow[]> {
   const payload = await fetchJson<{ devices?: DeviceRow[] }>(
-    `/api/chat/devices?chat_id=${encodeURIComponent(chatId)}`,
+    `${scopeBase(scope)}/devices?${scopeParam(scope)}=${encodeURIComponent(chatId)}`,
     headers,
   );
   return (payload.devices ?? []).filter(
@@ -179,11 +200,24 @@ async function discoverDevices(chatId: string, headers: HeadersInit): Promise<De
   );
 }
 
-async function getEpochState(chatId: string, deviceId: string, headers: HeadersInit): Promise<EpochState> {
-  return fetchJson<EpochState>(
-    `/api/chat/epochs?chat_id=${encodeURIComponent(chatId)}&device_id=${encodeURIComponent(deviceId)}`,
+async function getEpochState(
+  chatId: string,
+  deviceId: string,
+  headers: HeadersInit,
+  scope: E2eeV2Scope = 'chat',
+): Promise<EpochState> {
+  type HubEnvelopeRow = Omit<EpochEnvelopeRow, 'chat_id'> & { chat_id?: string; hub_id?: string };
+  const state = await fetchJson<Omit<EpochState, 'envelopes'> & { envelopes?: HubEnvelopeRow[] }>(
+    `${scopeBase(scope)}/epochs?${scopeParam(scope)}=${encodeURIComponent(chatId)}&device_id=${encodeURIComponent(deviceId)}`,
     headers,
   );
+  if (scope === 'chat') return state as EpochState;
+  // Hub rows carry `hub_id`; the wrap metadata binds the hub id as its `chatId`.
+  return {
+    ...state,
+    chat_id: chatId,
+    envelopes: (state.envelopes ?? []).map((row) => ({ ...row, chat_id: row.chat_id ?? row.hub_id ?? chatId })),
+  };
 }
 
 async function membershipFingerprint(devices: DeviceRow[]): Promise<string> {
@@ -200,6 +234,7 @@ async function createEpoch(
   devices: DeviceRow[],
   epoch: number,
   headers: HeadersInit,
+  scope: E2eeV2Scope = 'chat',
 ): Promise<void> {
   const epochKey = generateEpochKey();
   const envelopes = await Promise.all(devices.map(async (recipient) => ({
@@ -213,11 +248,11 @@ async function createEpoch(
       recipientPublicKey: await importPublicKey(recipient.identity_public_key),
     }),
   })));
-  await fetchJson('/api/chat/epochs', headers, {
+  await fetchJson(`${scopeBase(scope)}/epochs`, headers, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      chat_id: chatId,
+      [scopeParam(scope)]: chatId,
       epoch,
       sender_device_id: identity.deviceId,
       membership_fingerprint: await membershipFingerprint(devices),
@@ -231,8 +266,9 @@ async function createInitialEpoch(
   identity: DeviceIdentity & { deviceId: string },
   devices: DeviceRow[],
   headers: HeadersInit,
+  scope: E2eeV2Scope = 'chat',
 ): Promise<void> {
-  return createEpoch(chatId, identity, devices, 1, headers);
+  return createEpoch(chatId, identity, devices, 1, headers, scope);
 }
 
 async function importPublicKey(spki: string): Promise<CryptoKey> {
@@ -273,57 +309,136 @@ async function unwrapSession(
   return { identity, deviceId: identity.deviceId, deviceRowId, currentEpoch, epochKeys: keys };
 }
 
-export async function resolveWebE2eeV2Session(options: {
+type ResolveSessionOptions = {
+  /** Chat id, or the hub id when `scope` is `'hub'`. */
   chatId: string;
+  scope?: E2eeV2Scope;
   participantUserIds: string[];
   getAuthHeaders: () => Promise<HeadersInit>;
   allowUpgrade?: boolean;
   forceRefresh?: boolean;
-}): Promise<E2eeV2Session | null> {
-  if (!options.forceRefresh && !options.allowUpgrade) {
-    const cached = sessionCache.get(options.chatId);
-    if (cached) return cached;
+  /**
+   * Writes only: return a cached session even when older than the reuse window, re-checking it
+   * in the background. For callers that retry once after `invalidateWebE2eeV2Session` when the
+   * server rejects the epoch (it always validates epoch and devices).
+   */
+  staleWhileRevalidate?: boolean;
+};
+
+/** Read-only resolutions in flight per chat, so an inbox of N rows plus an open thread share one round trip. */
+const sessionReadsInFlight = new Map<string, Promise<E2eeV2Session | null>>();
+
+export async function resolveWebE2eeV2Session(options: ResolveSessionOptions): Promise<E2eeV2Session | null> {
+  const key = sessionKey(options);
+  const cached = sessionCache.get(key);
+  // Writes re-check membership and rotation, but not on every message: a session resolved in
+  // the last minute is reused (iOS `sendSessionReuse`), so a send is one round trip, not four.
+  if (cached && (options.forceRefresh || options.allowUpgrade)) {
+    if (Date.now() - (sessionResolvedAt.get(key) ?? 0) < SEND_SESSION_REUSE_MS) return cached;
+    if (options.staleWhileRevalidate) {
+      // Never make a send wait on the re-check; the next send gets the fresh session.
+      if (!writeRefreshesInFlight.has(key)) {
+        const refresh = resolveSessionUncached(options)
+          .catch(() => null)
+          .finally(() => writeRefreshesInFlight.delete(key));
+        writeRefreshesInFlight.set(key, refresh);
+      }
+      return cached;
+    }
   }
+  if (!options.forceRefresh && !options.allowUpgrade) {
+    if (cached) return cached;
+    const inFlight = sessionReadsInFlight.get(key);
+    if (inFlight) return inFlight;
+    const pending = resolveSessionUncached(options).finally(() => {
+      sessionReadsInFlight.delete(key);
+    });
+    sessionReadsInFlight.set(key, pending);
+    return pending;
+  }
+  return resolveSessionUncached(options);
+}
+
+/** Background write re-checks per chat (`staleWhileRevalidate`), so a burst of sends starts one. */
+const writeRefreshesInFlight = new Map<string, Promise<E2eeV2Session | null>>();
+
+/** Drops a chat's cached session: the server rejected its epoch, so the next resolve re-reads it. */
+export function invalidateWebE2eeV2Session(chatId: string, scope: E2eeV2Scope = 'chat'): void {
+  const key = sessionKey({ chatId, scope });
+  sessionCache.delete(key);
+  sessionResolvedAt.delete(key);
+}
+
+function sessionKey(options: Pick<ResolveSessionOptions, 'chatId' | 'scope'>): string {
+  return options.scope === 'hub' ? `hub:${options.chatId}` : options.chatId;
+}
+
+async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E2eeV2Session | null> {
+  const scope = options.scope ?? 'chat';
+  const id = options.chatId;
   const headers = await options.getAuthHeaders();
   const identity = await loadOrCreateWebE2eeV2Identity();
+  const wasRegistered = registeredDeviceIds.has(identity.deviceId);
   await registerDevice(identity, headers);
-  const devices = await discoverDevices(options.chatId, headers);
+  // Independent reads: the device list and this device's epoch envelopes, together.
+  const read = () => {
+    const epochState = getEpochState(id, identity.deviceId, headers, scope);
+    epochState.catch(() => {}); // Awaited below; ignored when discovery retries first.
+    return { devices: discoverDevices(id, headers, scope), epochState };
+  };
+  let reads = read();
+  let devices = await reads.devices;
+  if (wasRegistered && !devices.some((device) => device.device_id === identity.deviceId)) {
+    // Registered from this page under another account (or revoked since): register again, re-read once.
+    registeredDeviceIds.delete(identity.deviceId);
+    await registerDevice(identity, headers);
+    reads = read();
+    devices = await reads.devices;
+  }
   const own = devices.find((device) => device.device_id === identity.deviceId);
   if (!own) throw new E2eeV2UnavailableError('The current E2EE v2 device is not registered in this chat');
-  let state = await getEpochState(options.chatId, identity.deviceId, headers);
-  const participants = [...new Set(options.participantUserIds.map((id) => id.trim()).filter(Boolean))];
-  const deviceUsers = new Set(devices.map((device) => device.user_id).filter((id): id is string => Boolean(id)));
+  let state = await reads.epochState;
+  const participants = [...new Set(options.participantUserIds.map((pid) => pid.trim()).filter(Boolean))];
+  const deviceUsers = new Set(devices.map((device) => device.user_id).filter((uid): uid is string => Boolean(uid)));
   const allParticipantsHaveV2Devices =
-    participants.length > 0 && participants.every((id) => deviceUsers.has(id));
+    participants.length > 0 && participants.every((pid) => deviceUsers.has(pid));
   if (state.current_epoch == null) {
     if (options.allowUpgrade && allParticipantsHaveV2Devices) {
-      await createInitialEpoch(options.chatId, identity, devices, headers).catch(async (error: unknown) => {
+      await createInitialEpoch(id, identity, devices, headers, scope).catch(async (error: unknown) => {
         // A concurrent device may have initialized epoch 1; re-read before failing.
         if (!(error instanceof E2eeV2UnavailableError)) throw error;
-        state = await getEpochState(options.chatId, identity.deviceId, headers);
+        state = await getEpochState(id, identity.deviceId, headers, scope);
         if (state.current_epoch == null) throw error;
       });
-      state = await getEpochState(options.chatId, identity.deviceId, headers);
+      state = await getEpochState(id, identity.deviceId, headers, scope);
     } else {
       return null;
     }
   } else if (options.allowUpgrade) {
-    if (!allParticipantsHaveV2Devices) {
+    // Hub participant lists can be hidden (host-only guest lists); the server RPC verifies
+    // every participant has a device, so only chats require the full list here (iOS parity).
+    if (scope === 'chat' && !allParticipantsHaveV2Devices) {
       throw new E2eeV2UnavailableError('All chat participants must have an active E2EE v2 device');
     }
     const fingerprint = await membershipFingerprint(devices);
-    if (state.membership_fingerprint && state.membership_fingerprint !== fingerprint) {
-      await createEpoch(options.chatId, identity, devices, state.current_epoch + 1, headers).catch(async (error: unknown) => {
+    // Hubs rotate on any fingerprint difference; chats only when one is recorded.
+    const mismatch =
+      scope === 'hub'
+        ? state.membership_fingerprint !== fingerprint
+        : Boolean(state.membership_fingerprint && state.membership_fingerprint !== fingerprint);
+    if (mismatch) {
+      await createEpoch(id, identity, devices, state.current_epoch + 1, headers, scope).catch(async (error: unknown) => {
         // Another active device may have rotated first; the fresh state is authoritative.
         if (!(error instanceof E2eeV2UnavailableError)) throw error;
-        state = await getEpochState(options.chatId, identity.deviceId, headers);
+        state = await getEpochState(id, identity.deviceId, headers, scope);
         if (state.membership_fingerprint !== fingerprint) throw error;
       });
-      state = await getEpochState(options.chatId, identity.deviceId, headers);
+      state = await getEpochState(id, identity.deviceId, headers, scope);
     }
   }
   const session = await unwrapSession(identity, own.id, state);
-  sessionCache.set(options.chatId, session);
+  sessionCache.set(sessionKey(options), session);
+  sessionResolvedAt.set(sessionKey(options), Date.now());
   return session;
 }
 

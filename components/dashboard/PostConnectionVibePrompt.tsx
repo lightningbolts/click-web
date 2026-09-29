@@ -167,7 +167,7 @@ export default function PostConnectionVibePrompt({
           <button
             type="button"
             onClick={skip}
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-on-surface-variant hover:bg-white/10 hover:text-on-surface"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -216,7 +216,7 @@ export default function PostConnectionVibePrompt({
                 onClick={() => setCategory(c.id)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   category === c.id
-                    ? "bg-teal-500/20 text-teal-300 ring-1 ring-teal-500/40"
+                    ? "bg-teal-500/20 text-teal-700 dark:text-teal-300 ring-1 ring-teal-500/40"
                     : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                 }`}
               >

@@ -65,6 +65,8 @@ export interface PendingHandshakeRow {
   created_at: string;
   expires_at: string;
   matched_at: string | null;
+  /** Group connection this tap ended up in (set when a group is created or reconnected). */
+  group_connection_id?: string | null;
 }
 
 export interface ProximityMatchUserProfile {

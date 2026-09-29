@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarClock, Loader2, Plus, Trash2 } from 'lucide-react';
 import {
@@ -19,6 +20,8 @@ const DURATION_OPTIONS = AVAILABILITY_INTENT_DURATION_PRESETS;
 
 const easeOut = [0.22, 1, 0.36, 1] as const;
 
+const INTENTS_KEY = '/api/user/availability-intents';
+
 type Props = {
   getAuthHeaders: () => Promise<HeadersInit>;
 };
@@ -27,35 +30,20 @@ type Props = {
  * Memory Box card: shows your active availability intents and lets you add one (matches mobile presets).
  */
 export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
-  const [intents, setIntents] = useState<IntentRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  // SWR keeps the last list across tab switches, so the card never re-shows its loader.
+  const { data, error: loadError, mutate } = useSWR(INTENTS_KEY, async (url: string) => {
+    const res = await fetch(url, { headers: await getAuthHeaders() });
+    const json = (await res.json().catch(() => ({}))) as { intents?: IntentRow[]; error?: string };
+    if (!res.ok) throw new Error(json.error || res.statusText);
+    return Array.isArray(json.intents) ? json.intents : [];
+  }, { revalidateOnFocus: false });
+  const intents = data ?? [];
+  const loading = data === undefined && !loadError;
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tag, setTag] = useState('');
   const [durationMs, setDurationMs] = useState(DEFAULT_AVAILABILITY_INTENT_DURATION_MS);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/user/availability-intents', { headers });
-      const json = (await res.json().catch(() => ({}))) as { intents?: IntentRow[]; error?: string };
-      if (!res.ok) throw new Error(json.error || res.statusText);
-      setIntents(Array.isArray(json.intents) ? json.intents : []);
-      setHasLoaded(true);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Could not load availability');
-
-    } finally {
-      setLoading(false);
-    }
-  }, [getAuthHeaders]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +56,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
     setError(null);
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch('/api/user/availability-intents', {
+      const res = await fetch(INTENTS_KEY, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +67,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(json.error || res.statusText);
       setTag('');
-      await load();
+      await mutate();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not save');
     } finally {
@@ -92,13 +80,13 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
     setError(null);
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/user/availability-intents?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`${INTENTS_KEY}?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers,
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(json.error || res.statusText);
-      setIntents((prev) => prev.filter((r) => r.id !== id));
+      await mutate((prev) => prev?.filter((r) => r.id !== id), { revalidate: false });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not remove');
     } finally {
@@ -107,15 +95,10 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
   };
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: easeOut }}
-      className="fc-card rounded-[16px] border border-border-hard p-6"
-    >
+    <section className="fc-card rounded-[16px] border border-border-hard p-5">
       <div className="flex items-start gap-3 mb-4">
         <div className="p-2 bg-sky-500/15 rounded-xl shrink-0">
-          <CalendarClock className="w-5 h-5 text-primary" aria-hidden />
+          <CalendarClock className="w-5 h-5 text-sky-700 dark:text-sky-400" aria-hidden />
         </div>
         <div className="min-w-0">
           <h2 className="text-xl font-bold text-on-surface">I'm down for…</h2>
@@ -131,21 +114,10 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
           Loading…
         </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.32, ease: easeOut }}
-        >
+        <div>
           {intents.length > 0 ? (
             <div className="mb-5 space-y-2">
-              <motion.p
-                className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.28, delay: 0.04, ease: easeOut }}
-              >
-                Active now
-              </motion.p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">Active now</p>
               <ul className="space-y-2">
                 <AnimatePresence initial={false} mode="popLayout">
                   {intents.map((row, i) => (
@@ -164,7 +136,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                       className="flex items-center justify-between gap-2 rounded-xl border border-border-hard/90 bg-surface-container/40 px-3 py-2"
                     >
                       <div className="min-w-0 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-0.5 text-xs text-primary truncate max-w-[200px]">
+                        <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-0.5 text-xs text-on-surface truncate max-w-[200px]">
                           {row.intent_tag.trim()}
                         </span>
                         <span className="text-xs text-on-surface-variant">{row.timeframe}</span>
@@ -173,7 +145,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                         type="button"
                         onClick={() => remove(row.id)}
                         disabled={deletingId === row.id}
-                        className="shrink-0 rounded-lg p-2 text-on-surface-variant hover:bg-surface-variant hover:text-red-700 dark:text-red-400 transition-colors disabled:opacity-50"
+                        className="shrink-0 rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-red-700 dark:hover:text-red-400 transition-colors disabled:opacity-50"
                         aria-label="Remove intent"
                       >
                         {deletingId === row.id ? (
@@ -188,22 +160,17 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
               </ul>
             </div>
           ) : (
-            <motion.div
-              className="mb-5 rounded-xl border border-border-hard/80 bg-surface-container/30 px-3 py-3 text-sm text-on-surface-variant"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: easeOut }}
-            >
-              {hasLoaded ? 'No active plans — share what you’re down for.' : 'Your plans are unavailable.'}
-            </motion.div>
+            <div className="mb-5 rounded-xl border border-border-hard/80 bg-surface-container/30 px-3 py-3 text-sm text-on-surface-variant">
+              {data !== undefined ? 'No active plans — share what you’re down for.' : 'Your plans are unavailable.'}
+            </div>
           )}
 
-          <motion.form
+          <form
             onSubmit={submit}
             className={`space-y-3 ${intents.length > 0 ? 'mt-4 border-t border-border-hard/80 pt-4' : ''}`}
           >
             <p className="text-[10px] font-semibold uppercase tracking-wide text-on-surface-variant">Add intent</p>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <input
                 type="text"
                 aria-label="What you’re down for"
@@ -211,13 +178,13 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                 onChange={(e) => setTag(e.target.value.slice(0, 25))}
                 placeholder="e.g. Coffee, Study session"
                 maxLength={25}
-                className="flex-1 rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="min-w-0 rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
               <select
                 aria-label="Availability duration"
                 value={durationMs}
                 onChange={(e) => setDurationMs(Number(e.target.value))}
-                className="rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/50 sm:min-w-[140px]"
+                className="rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/50"
               >
                 {DURATION_OPTIONS.map((o) => (
                   <option key={o.ms} value={o.ms}>
@@ -229,20 +196,21 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
             <button
               type="submit"
               disabled={saving || !tag.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Share availability
             </button>
-          </motion.form>
-        </motion.div>
+          </form>
+        </div>
       )}
 
-      {error && (
+      {(error ?? loadError) && (
         <p className="mt-3 text-sm text-red-700 dark:text-red-400" role="alert">
-          {error} <button type="button" className="underline" onClick={() => void load()}>Retry</button>
+          {error ?? (loadError instanceof Error ? loadError.message : 'Could not load availability')}
+          {loadError ? <button type="button" className="ml-1 underline" onClick={() => void mutate()}>Retry</button> : null}
         </p>
       )}
-    </motion.section>
+    </section>
   );
 }

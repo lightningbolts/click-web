@@ -77,7 +77,7 @@ describe('LandingPage', () => {
   it('renders the refined playground framing and demo', () => {
     renderLanding();
 
-    expect(screen.getByRole('heading', { name: /Try Click before launch/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Try Click in your browser/i })).toBeInTheDocument();
     expect(screen.getByText(/Demo state is local to this page/i)).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground-heading')).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground')).toBeInTheDocument();

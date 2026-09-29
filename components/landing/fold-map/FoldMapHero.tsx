@@ -1,6 +1,8 @@
 'use client';
 
+import { Smartphone } from 'lucide-react';
 import ClickLogo from '@/components/ClickLogo';
+import { IOS_TESTFLIGHT_URL } from '@/lib/config';
 import FoldMapLazy from '@/components/landing/fold-map/FoldMapLazy';
 import type { PresenceHeatmapCell } from '@/lib/landing/presenceHeatmap';
 
@@ -47,18 +49,31 @@ export default function FoldMapHero({
             Your phones confirm you were in the same room. No feed. Just the people you actually
             met.
           </p>
-          <div className="mt-6 flex flex-col items-start gap-4">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <a
+              href={IOS_TESTFLIGHT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="testflight-cta"
+              className="fc-btn-primary inline-flex h-11 items-center gap-2 px-6 py-2.5"
+            >
+              <Smartphone className="h-4 w-4" aria-hidden />
+              Join the iOS beta
+            </a>
             <button
               type="button"
               onClick={onJoinWaitlist}
               onPointerEnter={onPrefetchWaitlist}
               onFocus={onPrefetchWaitlist}
               data-testid="waitlist-cta"
-              className="fc-btn-primary h-11 px-8 py-2.5"
+              className="h-11 rounded-[8px] border border-border-hard bg-surface px-6 py-2.5 text-sm font-bold text-on-surface hover:border-primary hover:text-primary"
             >
               Join the Waitlist
             </button>
           </div>
+          <p className="mt-3 text-xs font-medium text-on-surface-variant">
+            iPhone beta via TestFlight. Android coming soon: join the waitlist to hear first.
+          </p>
         </div>
       </div>
     </section>

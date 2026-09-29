@@ -57,8 +57,8 @@ export default function HubAttachment({ message, participantIds, name }: { messa
         }, payload);
       } else if (meta.is_encrypted_media === true) {
         const keys = await deriveKeysForHub(message.hub_id);
-        try { bytes = await decryptMediaBytes(payload, keys); }
-        finally { new Uint8Array(keys.encKeyRaw).fill(0); new Uint8Array(keys.macKeyRaw).fill(0); }
+        // Legacy keys belong to the shared cache; callers must not zero them.
+        bytes = await decryptMediaBytes(payload, keys);
       }
       // Preview only known raster/audio/video types; documents and SVG remain opaque downloads.
       const next = URL.createObjectURL(new Blob([bytes as BlobPart], { type: imageMime || audioMime || videoMime ? mime : 'application/octet-stream' }));

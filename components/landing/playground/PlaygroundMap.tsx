@@ -214,6 +214,9 @@ export default function PlaygroundMap({
         maxPitch: 0,
         pixelRatio: 1,
         cooperativeGestures: true,
+        // cooperativeGestures does not cover tap-then-drag zoom, which preventDefaults a
+        // quick second swipe and stalls page scrolling on phones. Zoom via the +/- control.
+        touchZoomRotate: !(window.matchMedia?.('(pointer: coarse)').matches ?? false),
         transformRequest: playgroundTransformRequest,
       });
       mapRef.current = map;

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Users, Smartphone, ArrowRight, CheckCircle, XCircle, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { APP_CONFIG } from '@/lib/config';
+import { WAITLIST_EMAIL_ERROR, waitlistEmailSchema } from '@/lib/validation/waitlistEmail';
 
 /**
  * Connect Page - Handles QR code scans
@@ -61,7 +62,13 @@ export default function ConnectPage() {
 
   const handleWaitlistSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!waitlistEmail.includes('@')) return;
+    if (waitlistStatus === 'loading') return;
+    const parsedEmail = waitlistEmailSchema.safeParse(waitlistEmail);
+    if (!parsedEmail.success) {
+      setWaitlistStatus('error');
+      setWaitlistMessage(WAITLIST_EMAIL_ERROR);
+      return;
+    }
 
     setWaitlistStatus('loading');
     try {
@@ -69,7 +76,7 @@ export default function ConnectPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: waitlistEmail,
+          email: parsedEmail.data,
           source: 'deep_link',
           referrer_user_id: userId,
         }),
@@ -161,11 +168,21 @@ export default function ConnectPage() {
                   </p>
                 </motion.div>
               ) : (
-                <form onSubmit={handleWaitlistSubmit} className="space-y-3">
+                <form noValidate onSubmit={handleWaitlistSubmit} className="space-y-3">
                   <input
                     type="email"
+                    aria-label="Email"
+                    autoComplete="email"
+                    aria-invalid={waitlistStatus === 'error'}
+                    aria-describedby={waitlistStatus === 'error' ? 'connect-waitlist-error' : undefined}
                     value={waitlistEmail}
-                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    onChange={(e) => {
+                      setWaitlistEmail(e.target.value);
+                      if (waitlistStatus === 'error') {
+                        setWaitlistStatus('idle');
+                        setWaitlistMessage('');
+                      }
+                    }}
                     placeholder="your@email.com"
                     className="w-full py-3 px-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-[#8338EC] transition-colors"
                     required
@@ -178,7 +195,7 @@ export default function ConnectPage() {
                     {waitlistStatus === 'loading' ? 'Joining...' : 'Join the Waitlist'}
                   </button>
                   {waitlistStatus === 'error' && (
-                    <p className="text-red-700 dark:text-red-400 text-sm">{waitlistMessage}</p>
+                    <p id="connect-waitlist-error" role="alert" className="text-red-700 dark:text-red-400 text-sm">{waitlistMessage}</p>
                   )}
                 </form>
               )}

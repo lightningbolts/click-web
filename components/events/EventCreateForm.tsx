@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ImagePlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FcButton } from "@/components/fc";
@@ -16,6 +17,7 @@ import { eventManagePath, eventSharePath } from "@/lib/events/eventUrls";
 import EventLocationPicker from "@/components/events/EventLocationPicker";
 import EventDateTimeFields from "@/components/events/EventDateTimeFields";
 import EventOptionsFields from "@/components/events/EventOptionsFields";
+import EventRepeatFields from "@/components/events/EventRepeatFields";
 import EventThemePicker from "@/components/events/EventThemePicker";
 import EventMarkdownEditor from "@/components/events/EventMarkdownEditor";
 import { CardVisualHero } from "@/components/ui/CardVisualSurface";
@@ -26,6 +28,11 @@ import {
   type GuestListVisibility,
 } from "@/lib/events/eventOptions";
 import { defaultEventWindow, resolvedTimeZone } from "@/lib/events/eventScheduleUi";
+import {
+  parseEventRecurrenceFromBody,
+  validateEventRecurrence,
+  type EventRecurrenceFrequency,
+} from "@/lib/events/eventRecurrence";
 import type { EventFormDraft } from "@/lib/events/eventFormDraft";
 import { cn } from "@/lib/cn";
 
@@ -78,6 +85,8 @@ export default function EventCreateForm({
     initial?.venueScale ?? "neighborhood",
   );
   const [categories, setCategories] = useState<string[]>(initial?.categories ?? []);
+  const [repeatFrequency, setRepeatFrequency] = useState<EventRecurrenceFrequency | null>(null);
+  const [repeatCount, setRepeatCount] = useState("4");
   const {
     uploading,
     error: coverUploadError,
@@ -91,8 +100,6 @@ export default function EventCreateForm({
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdId, setCreatedId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
@@ -150,8 +157,28 @@ export default function EventCreateForm({
       setError("End must be after start");
       return;
     }
+    const recurrenceParsed = isEdit
+      ? { recurrence: null }
+      : parseEventRecurrenceFromBody({
+          recurrence: repeatFrequency ? { frequency: repeatFrequency, count: repeatCount } : null,
+        });
+    if ("error" in recurrenceParsed) {
+      setError(recurrenceParsed.error.replace("recurrence.count", "Number of events"));
+      return;
+    }
+    const { recurrence } = recurrenceParsed;
+    const recurrenceError = validateEventRecurrence(
+      { startEpochMs: start.getTime(), endEpochMs: end.getTime() },
+      recurrence,
+    );
+    if (recurrenceError) {
+      setError(recurrenceError);
+      return;
+    }
 
     setSubmitting(true);
+    // Stay in the submitting state once navigation starts, so the button never flips back first.
+    let navigating = false;
     try {
       const headers = await getFreshAuthHeaders();
       if (isEdit && beaconId) {
@@ -167,6 +194,7 @@ export default function EventCreateForm({
         }
         router.push(eventManagePath(beaconId));
         router.refresh();
+        navigating = true;
         return;
       }
 
@@ -176,32 +204,37 @@ export default function EventCreateForm({
         body: JSON.stringify({
           kind: "event",
           ...writeBody(latN, lngN),
+          ...(recurrence ? { recurrence } : {}),
         }),
       });
-      const json = (await res.json()) as { beacon?: { id?: string }; error?: string };
+      const json = (await res.json()) as {
+        beacon?: { id?: string };
+        series_count?: number;
+        error?: string;
+      };
       if (!res.ok || !json.beacon?.id) {
         setError(json.error || "Could not create event");
         return;
       }
       const id = json.beacon.id;
-      setCreatedId(id);
-      const url = `${window.location.origin}${eventSharePath(id)}`;
+      let copied = false;
       try {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
+        await navigator.clipboard.writeText(`${window.location.origin}${eventSharePath(id)}`);
+        copied = true;
       } catch {
         /* clipboard may be blocked */
       }
+      const created =
+        json.series_count && json.series_count > 1 ? `${json.series_count} events created` : "Event created";
+      toast.success(copied ? `${created}. Link copied.` : `${created}.`);
       router.push(eventManagePath(id));
+      navigating = true;
     } catch {
       setError(isEdit ? "Could not save event" : "Could not create event");
     } finally {
-      setSubmitting(false);
+      if (!navigating) setSubmitting(false);
     }
   };
-
-  const shareUrl =
-    createdId && typeof window !== "undefined" ? `${window.location.origin}${eventSharePath(createdId)}` : null;
 
   return (
     <form onSubmit={onSubmit} className="relative space-y-8" data-testid="event-create-form">
@@ -301,6 +334,14 @@ export default function EventCreateForm({
             onStartChange={setStart}
             onEndChange={setEnd}
           />
+          {isEdit ? null : (
+            <EventRepeatFields
+              frequency={repeatFrequency}
+              count={repeatCount}
+              onFrequency={setRepeatFrequency}
+              onCount={setRepeatCount}
+            />
+          )}
           <EventLocationPicker
             locationName={locationName}
             lat={lat}
@@ -331,12 +372,6 @@ export default function EventCreateForm({
           <FcButton type="submit" className="w-full" disabled={submitting || uploading}>
             {submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save changes" : "Create event"}
           </FcButton>
-          {shareUrl ? (
-            <p className="break-all text-xs text-on-surface-variant">
-              {copied ? "Link copied. " : ""}
-              {shareUrl}
-            </p>
-          ) : null}
         </div>
       </div>
     </form>

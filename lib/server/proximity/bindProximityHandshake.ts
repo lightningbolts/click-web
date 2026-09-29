@@ -6,6 +6,7 @@ import {
   handshakeCreatedAtMs,
   normalizeToken,
   PROXIMITY_GROUP_COALESCE_MIN_MS,
+  PROXIMITY_LATE_JOIN_WINDOW_MS,
   RECENT_CONNECTION_LOCK_MS,
   tokenEvidenceBetweenRows,
 } from '@/lib/server/proximity/matching';
@@ -160,6 +161,7 @@ export async function bindProximityHandshake(
     evidenceTokens: combinedEvidenceTokens.length > 0 ? combinedEvidenceTokens : heardTokens,
     lat,
     lon,
+    matchedSinceIso: new Date(Date.now() - PROXIMITY_LATE_JOIN_WINDOW_MS).toISOString(),
   };
 
   let graph = await loadMatchGraph(admin, matchGraphOpts);
@@ -257,7 +259,10 @@ export async function bindProximityHandshake(
         encounter_persisted_on_bind: true,
       }));
 
-      await markPendingHandshakesMatched(admin, memberIds, nowIso);
+      await markPendingHandshakesMatched(admin, memberIds, nowIso, {
+        connectionId: String(recentConnection.id),
+        latestByUser,
+      });
 
       return {
         kind: 'ok',
@@ -266,6 +271,7 @@ export async function bindProximityHandshake(
           success: true,
           encounter_logged: true,
           matches,
+          pending_handshake_id: insertedRow.id,
           connection_id: String(recentConnection.id),
           is_new_connection: false,
           is_group: isGroup,
@@ -493,7 +499,12 @@ export async function bindProximityHandshake(
     });
   }
 
-  await markPendingHandshakesMatched(admin, memberIds, nowIso);
+  await markPendingHandshakesMatched(
+    admin,
+    memberIds,
+    nowIso,
+    aggregateConnectionId ? { connectionId: aggregateConnectionId, latestByUser } : undefined,
+  );
 
   const aggregateEncounterLogged = peerEncounterLogged.some((p) => p.encounterLogged);
 
@@ -536,6 +547,7 @@ export async function bindProximityHandshake(
     success: true,
     encounter_logged: aggregateEncounterLogged,
     matches,
+    pending_handshake_id: insertedRow.id,
   };
   const sharedConnectionId = aggregateConnectionId ?? peerEncounterLogged.find((p) => p.connectionId != null)?.connectionId ?? null;
   if (sharedConnectionId != null) {

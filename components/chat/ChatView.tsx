@@ -7,16 +7,17 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { notifyMessagesDelivered } from '@/lib/chat/messages';
-import { CHAT_PANEL_CLASS } from '@/lib/chat/layout';
 import MessageBubble from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { useAuth } from '@/lib/AuthContext';
 import { bubbleStableListKey } from '@/lib/chat/clientOptimistic';
 import { buildTimelineEntries } from '@/lib/chat/conversationTimeline';
 import { ConversationDaySeparator } from './ConversationDaySeparator';
+import { CHAT_THREAD_PANEL_CLASS } from '@/lib/chat/layout';
 import { ChatHeader } from './ChatHeader';
 import { ChatDialogs } from './ChatDialogs';
 import { ChatComposer } from './ChatComposer';
+import { klipyAppKey, klipyCustomerId } from '@/lib/chat/klipy';
 import { ChatSharedInterestsBanner } from './ChatSharedInterestsBanner';
 import { useChatEncryption } from './useChatEncryption';
 import { useChatConnectionMeta } from './useChatConnectionMeta';
@@ -25,6 +26,39 @@ import { useChatRealtime } from './useChatRealtime';
 import { useMessageActions } from './useMessageActions';
 import { useVoiceMessages } from './useVoiceMessages';
 import { useChatAttachments } from './useChatAttachments';
+import { useChatMutes, useConversationExtras } from './useConversationExtras';
+import { ConversationDetailsPanel } from './ConversationDetailsPanel';
+import { PlanDialog } from './PlanDialog';
+import { ScheduleSendDialog } from './ScheduleSendDialog';
+import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION } from '@/lib/chat/plans';
+import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
+import { replySnippetForSend } from '@/lib/chat/reply';
+import { readSessionCache } from '@/lib/dashboard/sessionCache';
+import { chatThreadCacheKey, type ChatThreadSnapshot } from '@/components/chat/useMessageLoading';
+
+const DETAILS_PREF_KEY = 'click:chat-details-open';
+
+/** Details panel defaults open on wide screens; the reader's last choice wins after that. */
+function readDetailsPreference(): boolean {
+  if (typeof window === 'undefined') return false;
+  // Below xl the panel is a sheet over the thread: never open it unasked.
+  if (!window.matchMedia('(min-width: 1280px)').matches) return false;
+  try {
+    const stored = window.localStorage.getItem(DETAILS_PREF_KEY);
+    if (stored === 'true' || stored === 'false') return stored === 'true';
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
+
+function writeDetailsPreference(open: boolean) {
+  try {
+    window.localStorage.setItem(DETAILS_PREF_KEY, String(open));
+  } catch {
+    /* ignore */
+  }
+}
 
 interface ChatViewProps {
   connection: ConnectionRecord;
@@ -42,8 +76,11 @@ interface ChatViewProps {
   onReport: (reason: string) => Promise<boolean> | boolean;
   onBlock: () => Promise<boolean> | boolean;
   onUnblock: () => Promise<boolean> | boolean;
-  onStartCall: (videoEnabled: boolean) => void;
   onClose: () => void;
+  /** False while the chat pane is hidden (tab kept alive in the background). */
+  active?: boolean;
+  /** Load a window around a message that is not in the current timeline. */
+  onRequestJump?: (messageId: string) => void;
   /** Open profile sheet for the given user (e.g. peer avatar tap). */
   onOpenProfile?: (userId: string) => void;
   /** After leave/delete verified click; parent should refresh group list. */
@@ -84,8 +121,9 @@ export default function ChatView({
   onReport,
   onBlock,
   onUnblock,
-  onStartCall,
   onClose,
+  active = true,
+  onRequestJump,
   onOpenProfile,
   onGroupChatChanged,
   onMessagesSnapshot,
@@ -103,12 +141,20 @@ export default function ChatView({
   }, [connection.otherUserId, connection.userIds, currentUserId, isGroupClique]);
   const peerIsOnline = !!(peerUserId && onlineUserIds.has(peerUserId));
 
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Reopening a thread paints its last page from the session cache; loading revalidates it.
+  const [restoredThread] = useState(() => {
+    if (targetMessageId?.trim()) return undefined;
+    const snap = readSessionCache<ChatThreadSnapshot>(currentUserId, chatThreadCacheKey(connection.id));
+    return snap && (!isGroupClique || !connection.groupChatId || snap.chatId === connection.groupChatId)
+      ? snap
+      : undefined;
+  });
+  const [chatId, setChatId] = useState<string | null>(restoredThread?.chatId ?? null);
+  const [messages, setMessages] = useState<Message[]>(restoredThread?.messages ?? []);
   useEffect(() => { onMessagesSnapshot?.(messages); }, [messages, onMessagesSnapshot]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!restoredThread);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(restoredThread?.hasMore ?? true);
   const [error, setError] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -223,8 +269,10 @@ export default function ChatView({
     programmaticListScrollRef,
     snapScrollToLatestOnOpenRef,
     searchFocusConsumedRef,
+    readReceiptsEnabled: active,
     getAuthHeaders,
     firePeerDeliveredAck,
+    restored: Boolean(restoredThread),
   });
 
   useChatRealtime({
@@ -243,8 +291,25 @@ export default function ChatView({
     firePeerDeliveredAck,
   });
 
+  // KLIPY GIF search is enabled only when the public app key is configured.
+  const [gifCustomer, setGifCustomer] = useState<{ userId: string; id: string } | null>(null);
+  useEffect(() => {
+    if (!klipyAppKey() || !currentUserId) return;
+    let cancelled = false;
+    void klipyCustomerId(currentUserId).then((id) => {
+      if (!cancelled) setGifCustomer({ userId: currentUserId, id });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
+  const gifCustomerId = gifCustomer?.userId === currentUserId ? gifCustomer.id : null;
+
   const {
     sendMessage,
+    sendGif,
+    sendPlan,
+    scheduleMessage,
     broadcastTyping,
     startEdit,
     submitEdit,
@@ -277,6 +342,7 @@ export default function ChatView({
     getAuthHeaders,
     appendReplyToMetadata,
     snapThreadViewportToBottom,
+    gifCustomerId,
   });
 
   const { beginVoiceRecording, stopVoiceRecording, cancelVoiceRecording } = useVoiceMessages({
@@ -332,6 +398,72 @@ export default function ChatView({
     appendReplyToMetadata,
   });
 
+  // ── Conversation extras (iOS parity): mute, pins, plans, scheduled, hangouts ──
+  const { muteFor, setMuted } = useChatMutes();
+  const mute = muteFor([chatId, connection.id]);
+  const extras = useConversationExtras({
+    chatId,
+    connectionId: isGroupClique ? null : connection.id,
+    isGroupClique,
+    decryptForDisplay: decryptWireMessageContent,
+  });
+  const [detailsOpen, setDetailsOpen] = useState(() => readDetailsPreference());
+  const toggleDetails = useCallback(() => {
+    setDetailsOpen((open) => {
+      writeDetailsPreference(!open);
+      return !open;
+    });
+  }, []);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  const jumpToMessage = useCallback(
+    (messageId: string) => {
+      const el = scrollContainerRef.current?.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setHighlightedMessageId(messageId);
+        window.setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 2400);
+      } else {
+        onRequestJump?.(messageId);
+      }
+      if (typeof window !== 'undefined' && !window.matchMedia('(min-width: 1280px)').matches) {
+        setDetailsOpen(false);
+      }
+    },
+    [onRequestJump],
+  );
+
+  const handlePlanRsvp = useCallback(
+    async (message: Message, going: boolean) => {
+      const want = going ? PLAN_GOING_REACTION : PLAN_DECLINED_REACTION;
+      const other = going ? PLAN_DECLINED_REACTION : PLAN_GOING_REACTION;
+      const mine = (emoji: string) => (message.reactions?.[emoji] ?? []).some((r) => r.user_id === currentUserId);
+      if (mine(other)) await handleReact(message.id, other);
+      await handleReact(message.id, want);
+    },
+    [currentUserId, handleReact],
+  );
+
+  const replySnippetById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of messages) map.set(m.id, replySnippetForSend(previewLabelForMessage(m), 140));
+    return map;
+  }, [messages]);
+  const resolveReplySnippet = useCallback((id: string) => replySnippetById.get(id) ?? null, [replySnippetById]);
+
+  const handleTogglePin = useCallback(
+    async (message: Message) => {
+      try {
+        const pinned = await extras.togglePin(message.id, currentUserId);
+        setActionToast({ type: 'success', message: pinned ? 'Message pinned' : 'Message unpinned' });
+      } catch {
+        setActionToast({ type: 'error', message: "Couldn't update the pin. Try again." });
+      }
+    },
+    [currentUserId, extras],
+  );
+
   // ─────────────────────────── render ──────────────────────────────────────
 
   const otherInitial = otherUserName.charAt(0).toUpperCase();
@@ -344,11 +476,12 @@ export default function ChatView({
   return (
     <div
       data-testid="chat-panel"
-      className={`${CHAT_PANEL_CLASS} relative`}
+      className={CHAT_THREAD_PANEL_CLASS}
       onDragOver={onAttachmentDragOver}
       onDragLeave={onAttachmentDragLeave}
       onDrop={onAttachmentDrop}
     >
+      <div className="relative flex min-w-0 flex-1 flex-col">
       {isDraggingAttachment && (
         <div
           className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-primary/10 text-primary "
@@ -378,7 +511,9 @@ export default function ChatView({
         isBlocked={isBlocked}
         onClose={onClose}
         onOpenProfile={onOpenProfile}
-        onStartCall={onStartCall}
+        muted={Boolean(mute)}
+        detailsOpen={detailsOpen}
+        onToggleDetails={toggleDetails}
         onGroupChatChanged={onGroupChatChanged}
         onAddToCore={onAddToCore}
         onRemoveFromCore={onRemoveFromCore}
@@ -534,6 +669,10 @@ export default function ChatView({
                     setPendingDeleteMessageId(messageId);
                     setShowDeleteConfirm(true);
                   }}
+                  pinned={extras.pinnedIds.has(entry.message.id)}
+                  onTogglePin={(m) => void handleTogglePin(m)}
+                  onPlanRsvp={(m, going) => void handlePlanRsvp(m, going)}
+                  resolveReplySnippet={resolveReplySnippet}
                 />
               )
             ))}
@@ -623,6 +762,86 @@ export default function ChatView({
         cancelVoiceRecording={cancelVoiceRecording}
         broadcastTyping={broadcastTyping}
         sendMessage={sendMessage}
+        gifCustomerId={gifCustomerId}
+        sendGif={sendGif}
+        onPlan={() => setPlanOpen(true)}
+        onSchedule={() => setScheduleOpen(true)}
+      />
+      </div>
+
+      {detailsOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close details"
+            className="absolute inset-0 z-[55] bg-black/25 xl:hidden"
+            onClick={toggleDetails}
+          />
+          <aside
+            id="conversation-details"
+            aria-label="Conversation details"
+            className="absolute inset-y-0 right-0 z-[60] w-[min(100%,20rem)] border-l border-border-hard shadow-xl xl:static xl:z-auto xl:w-[18.5rem] xl:shrink-0 xl:shadow-none"
+          >
+            <ConversationDetailsPanel
+              connection={connection}
+              isGroupClique={isGroupClique}
+              title={headerTitle}
+              subtitle={
+                isGroupClique
+                  ? groupHeaderSubtitle ?? `${connection.userIds?.length ?? 0} members`
+                  : `Met ${connection.location ? `at ${connection.location} · ` : ''}${metDate}`
+              }
+              currentUserId={currentUserId}
+              messages={messages}
+              mute={mute}
+              onSetMuted={(muted, ms) => setMuted(chatId ?? connection.id, muted, ms)}
+              pins={extras.pins}
+              onUnpin={(id) => {
+                const message = messages.find((m) => m.id === id);
+                if (message) void handleTogglePin(message);
+                else void extras.togglePin(id, currentUserId);
+              }}
+              scheduled={extras.scheduled}
+              onCancelScheduled={extras.cancelScheduled}
+              hangouts={extras.hangouts}
+              onAnswerHangout={extras.answerHangout}
+              onLogHangout={() => extras.requestHangout(null)}
+              onJumpToMessage={jumpToMessage}
+              onPlan={() => setPlanOpen(true)}
+              onOpenProfile={peerUserId && onOpenProfile ? () => onOpenProfile(peerUserId) : undefined}
+              onShowMembers={
+                isGroupClique && groupMemberProfileRows.length > 0 ? () => setShowGroupMemberPicker(true) : undefined
+              }
+              onClose={toggleDetails}
+            />
+          </aside>
+        </>
+      ) : null}
+
+      <PlanDialog
+        open={planOpen}
+        onOpenChange={setPlanOpen}
+        withName={isGroupClique ? null : otherUserName.split(/\s+/)[0]}
+        onSend={sendPlan}
+      />
+      <ScheduleSendDialog
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        preview={inputText.trim()}
+        onSchedule={async (sendAt) => {
+          try {
+            const row = await scheduleMessage(sendAt);
+            if (!row) return false;
+            extras.addScheduled(row);
+            setActionToast({
+              type: 'success',
+              message: `Scheduled for ${new Date(sendAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`,
+            });
+            return true;
+          } catch {
+            return false;
+          }
+        }}
       />
 
       <ChatDialogs

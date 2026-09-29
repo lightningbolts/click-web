@@ -56,7 +56,7 @@ export default function DeleteAccountSection({
           <AlertTriangle className="w-6 h-6 text-red-500" />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-red-500">Danger Zone</h3>
+          <h3 className="text-xl font-bold text-red-700 dark:text-red-400">Danger Zone</h3>
           <p className="text-on-surface-variant text-sm">Irreversible account actions</p>
         </div>
       </div>
@@ -68,14 +68,14 @@ export default function DeleteAccountSection({
             setDeleteConfirmName('');
             setDeleteError('');
           }}
-          className="flex items-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl font-semibold transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-500/20 rounded-xl font-semibold transition-colors"
         >
           <Trash2 className="w-4 h-4" />
           Delete Account
         </button>
       ) : (
         <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
-          <h4 className="font-bold text-red-500 mb-2">Are you absolutely sure?</h4>
+          <h4 className="font-bold text-red-700 dark:text-red-400 mb-2">Are you absolutely sure?</h4>
           <p className="text-on-surface-variant text-sm mb-4">
             This action cannot be undone. This will permanently delete your account and remove your data from our servers.
           </p>

@@ -3,12 +3,13 @@
 import { cardVisualStyle } from '@/lib/ui/cardVisualPattern';
 import { generateCardVisual } from '@/lib/ui/generateCardVisual';
 
-type Size = 'sm' | 'md' | 'lg';
+type Size = 'sm' | 'md' | 'lg' | 'xl';
 
 const sizeClass: Record<Size, string> = {
   sm: 'h-8 w-8 min-h-8 min-w-8 text-xs',
   md: 'h-10 w-10 min-h-10 min-w-10 text-sm',
   lg: 'h-11 w-11 min-h-11 min-w-11 text-sm',
+  xl: 'h-16 w-16 min-h-16 min-w-16 text-xl',
 };
 
 /**
@@ -36,8 +37,8 @@ export function ConnectionPeerAvatar({
   const showImg = trimmed.length > 0;
   const dim = sizeClass[size];
 
-  const coreRing =
-    'rounded-full p-[2.5px] bg-gradient-to-br from-[#9D4EDD] via-[#E8B923] to-[#7B2CBF] shadow-[0_0_12px_rgba(157,78,221,0.35)]';
+  // Core is a selected state: the one violet switch, not a second accent or a glow.
+  const coreRing = 'rounded-full p-[2px] bg-primary';
 
   const avatarNode = showImg ? (
     <img src={trimmed} alt="" className={`${dim} rounded-full object-cover`} />
@@ -55,14 +56,14 @@ export function ConnectionPeerAvatar({
     <div className={`relative shrink-0 ${className}`}>
       {isCore ? (
         <div className={coreRing} title="Core connection">
-          <div className="rounded-full bg-zinc-950 p-[1.5px]">{avatarNode}</div>
+          <div className="rounded-full bg-surface p-[1.5px]">{avatarNode}</div>
         </div>
       ) : (
         avatarNode
       )}
       {showOnline ? (
         <span
-          className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-zinc-950"
+          className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-surface"
           aria-hidden
         />
       ) : null}

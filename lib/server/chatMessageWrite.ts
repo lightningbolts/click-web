@@ -162,10 +162,29 @@ export async function prepareChatMessageWrite(req: NextRequest): Promise<NextRes
     const trimmedChatId = chatId.trim();
     const trimmedConnectionId = connectionId.trim();
 
+    const bodyRecord = body as Record<string, unknown>;
+    const v2GateFor = (gateChatId: string) =>
+      assertE2eeV2MessageWrite(admin, {
+        chatId: gateChatId,
+        requestedChatId: trimmedChatId || undefined,
+        userId: user.id,
+        content,
+        epoch: messageBodyV2Field(bodyRecord, 'epoch', 'epoch', meta),
+        senderDeviceId: messageBodyV2Field(bodyRecord, 'sender_device_id', 'senderDeviceId', meta),
+        clientMessageId: messageBodyV2Field(bodyRecord, 'client_message_id', 'clientMessageId', meta),
+        allowLegacy: isCallLog || isBeacon,
+      });
+    // The E2EE gate only reads, so for a chat named by UUID it runs alongside the access check
+    // below. Its result is used only if that check passes for the same chat, so responses and
+    // their precedence are unchanged; an unused result can't surface as an unhandled rejection.
+    let earlyV2Gate: ReturnType<typeof v2GateFor> | null = null;
+
     // Reject optimistic/temp client ids (e.g. temp-…) — fall through to connection_id.
     // If a UUID chat_id is stale/missing, also fall through when connection_id is present
     // (avoids "Chat not found" while the user is already inside the thread).
     if (trimmedChatId && CHAT_UUID_RE.test(trimmedChatId)) {
+      earlyV2Gate = v2GateFor(trimmedChatId);
+      earlyV2Gate.catch(() => {});
       const denied = await assertChatWritable(admin, user.id, trimmedChatId);
       if (!denied) {
         resolvedChatId = trimmedChatId;
@@ -176,6 +195,7 @@ export async function prepareChatMessageWrite(req: NextRequest): Promise<NextRes
       }
     }
 
+    const resolvedViaConnection = !resolvedChatId && !!trimmedConnectionId;
     if (!resolvedChatId && trimmedConnectionId) {
       const { data: conn, error: connErr } = await admin
         .from('connections')
@@ -202,17 +222,10 @@ export async function prepareChatMessageWrite(req: NextRequest): Promise<NextRes
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
 
-    const bodyRecord = body as Record<string, unknown>;
-    const v2Gate = await assertE2eeV2MessageWrite(admin, {
-      chatId: resolvedChatId,
-      requestedChatId: trimmedChatId || undefined,
-      userId: user.id,
-      content,
-      epoch: messageBodyV2Field(bodyRecord, 'epoch', 'epoch', meta),
-      senderDeviceId: messageBodyV2Field(bodyRecord, 'sender_device_id', 'senderDeviceId', meta),
-      clientMessageId: messageBodyV2Field(bodyRecord, 'client_message_id', 'clientMessageId', meta),
-      allowLegacy: isCallLog || isBeacon,
-    });
+    // Reused only when the access check passed for that same chat (not a connection fallback).
+    const v2Gate = await (earlyV2Gate && resolvedChatId === trimmedChatId && !resolvedViaConnection
+      ? earlyV2Gate
+      : v2GateFor(resolvedChatId));
     if (!v2Gate.ok) return v2Gate.response;
     if (isV2Content && (isMedia || messageType === 'file')) {
       if (!v2Gate.envelope) return NextResponse.json({ error: 'Invalid E2EE v2 message envelope' }, { status: 400 });
