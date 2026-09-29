@@ -80,7 +80,7 @@ describe('reconnect copy and coarsening', () => {
   });
 
   it('recalls only the past meeting', () => {
-    expect(reconnectNearbyCopy('Maya', Date.parse('2026-06-12T18:00:00Z'), NOW).body).toBe('You met Maya near here in June. Say hi?');
-    expect(reconnectNearbyCopy('Maya', Date.parse('2025-06-12T18:00:00Z'), NOW).body).toBe('You met Maya near here in June 2025. Say hi?');
+    expect(reconnectNearbyCopy('Maya', Date.parse('2026-06-12T18:00:00Z'), NOW).body).toBe('Back in June. Say hi?');
+    expect(reconnectNearbyCopy('Maya', Date.parse('2025-06-12T18:00:00Z'), NOW).body).toBe('Back in June 2025. Say hi?');
   });
 });
