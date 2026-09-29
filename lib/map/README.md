@@ -139,3 +139,18 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 - **Business insights** — Beacon density on Vibe Radar.
 - **Event reminders** — Event beacon type + cron.
 - **Achievements & stats** — Map exploration milestones.
+
+## Alert confirmations (F4, flag `alert_confirmations`)
+
+Alert (hazard) beacons get crowd upkeep so stale pins don't linger. Logic: `lib/map/alertConfirmations.ts`
+(pure) and `lib/server/alertConfirmations.ts`.
+
+| Route | Role |
+|-------|------|
+| `GET /api/beacons/{id}/confirm` | `{ state, expires_at, last_still_here_at, my_vote, is_creator, radius_meters }` — no counts |
+| `POST /api/beacons/{id}/confirm` | `{ status: still_here \| cleared, lat, lng }`; voter must be within `radius_meters` (creator may clear from anywhere); one vote per person per `vote_window_minutes`. "Still here" extends to now + `ttl_minutes` (capped at `max_lifetime_hours` after creation); `cleared_threshold` distinct clearers since the last sighting clear it |
+| `POST /api/beacons/{id}/report` | Quiet report into `beacon_reports` (any visible beacon) |
+
+Clearing sets `expires_at = cleared_at = now()`, so every client's fetch (which filters `expires_at > now()`)
+drops the pin, older builds included. Voter coordinates are checked and never stored. All numbers are
+`feature_flags.config` keys.

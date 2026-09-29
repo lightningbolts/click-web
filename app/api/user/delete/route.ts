@@ -60,6 +60,8 @@ export async function DELETE(request: Request) {
     });
 
     await removeAllDropMediaForUser(adminAuthClient, user.id);
+    // beacon_reports.reporter_id has no ON DELETE action, so the user's reports would block deletion.
+    await adminAuthClient.from('beacon_reports').delete().eq('reporter_id', user.id);
 
     const { error } = await adminAuthClient.auth.admin.deleteUser(
       user.id
