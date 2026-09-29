@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { removeAllDropMediaForUser } from '@/lib/server/drops/storage';
 
 export async function DELETE(request: Request) {
   try {
@@ -57,6 +58,8 @@ export async function DELETE(request: Request) {
         persistSession: false,
       },
     });
+
+    await removeAllDropMediaForUser(adminAuthClient, user.id);
 
     const { error } = await adminAuthClient.auth.admin.deleteUser(
       user.id

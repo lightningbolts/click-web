@@ -3,6 +3,10 @@
  * application/json: { chat_id, mime_type, file_b64 }
  *
  * Verifies JWT and chat write access, then uploads with the service role (opaque bytes, no decryption).
+ *
+ * `drop_original: true` (flag `drops_develop`): the E2EE original of a gated Click Drop. It goes to
+ * the private `click-drops` bucket and the response carries only its path (`url: null`); the message
+ * names it in `metadata.drop_original_path` and viewers get it from /api/drops/develop after reveal.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,6 +22,9 @@ import {
   messageBodyV2Field,
 } from '@/lib/server/e2eeV2Gate';
 import { createHash } from 'node:crypto';
+import { requireFeature } from '@/lib/server/featureFlags';
+import { DROPS_BUCKET, DROP_IMAGE_MIME_TYPES, newDropObjectPath } from '@/lib/server/drops/storage';
+import { chatDropOriginalPrefix } from '@/lib/server/drops/chatDrops';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -151,6 +158,15 @@ export async function POST(request: NextRequest) {
     const denied = await assertChatWritable(admin, auth.user.id, chatId);
     if (denied) return denied;
 
+    const isDropOriginal = bodyRecord.drop_original === true;
+    if (isDropOriginal) {
+      const feature = await requireFeature(admin, 'drops_develop', auth.user.id);
+      if (!feature.ok) return feature.response;
+      if (!DROP_IMAGE_MIME_TYPES.has(mimeType)) {
+        return NextResponse.json({ error: 'Click Drop originals must be images' }, { status: 415 });
+      }
+    }
+
     const v2 = v2EnvelopeAndMetadata(bodyRecord);
     const mediaDigest = messageBodyV2Field(bodyRecord, 'media_ciphertext_sha256', 'mediaCiphertextSha256', v2.metadata);
     if (fileB64.length > MAX_MEDIA_BASE64_CHARS || !isStrictBase64(fileB64)) {
@@ -179,7 +195,10 @@ export async function POST(request: NextRequest) {
     });
     if (!v2Gate.ok) return v2Gate.response;
 
-    const objectPath = `${chatId}/${auth.user.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${mediaFilename(mimeType)}`;
+    const bucket = isDropOriginal ? DROPS_BUCKET : CHAT_ATTACHMENTS_BUCKET;
+    const objectPath = isDropOriginal
+      ? newDropObjectPath(chatDropOriginalPrefix(chatId, auth.user.id), 'original', mimeType)
+      : `${chatId}/${auth.user.id}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${mediaFilename(mimeType)}`;
 
     if (v2Gate.currentEpoch !== null && computedDigest !== v2Gate.envelope.mediaCiphertextSha256) {
       return NextResponse.json({ error: 'Uploaded bytes do not match the E2EE v2 authorization envelope' }, { status: 400 });
@@ -188,7 +207,7 @@ export async function POST(request: NextRequest) {
     // Opaque E2EE ciphertext may be wrapped from media bytes; keep caller-declared mime for extension/content-type consistency.
     const contentType = mimeType;
 
-    const { error: uploadError } = await admin.storage.from(CHAT_ATTACHMENTS_BUCKET).upload(objectPath, buffer, {
+    const { error: uploadError } = await admin.storage.from(bucket).upload(objectPath, buffer, {
       contentType,
       upsert: false,
     });
@@ -202,6 +221,11 @@ export async function POST(request: NextRequest) {
         byteLength: buffer.length,
       });
       return NextResponse.json({ error: uploadError.message }, { status: 400 });
+    }
+
+    if (isDropOriginal) {
+      // Never signed here: the original is only reachable after reveal, via /api/drops/develop.
+      return NextResponse.json({ url: null, path: objectPath, ttl_seconds: null }, { status: 201 });
     }
 
     const { data: signed, error: signedError } = await admin.storage

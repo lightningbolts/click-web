@@ -28,6 +28,7 @@ import {
 import { parseBody } from '@/lib/api/parseBody';
 import { chatMessagePatchBodySchema } from '@/lib/api/schemas/chat';
 import { insertChatMessage, prepareChatMessageWrite } from '@/lib/server/chatMessageWrite';
+import { chatDropOriginalPath, removeChatDropOriginal } from '@/lib/server/drops/chatDrops';
 import {
   assertE2eeV2MessageWrite,
   assertE2eeV2MediaMessageWrite,
@@ -374,6 +375,9 @@ export async function DELETE(req: NextRequest) {
     .eq('user_id', user.id)
     .maybeSingle();
 
+  // The registry row cascades with the message, so read a gated drop's original first.
+  const dropOriginal = existing ? await chatDropOriginalPath(createChatGatekeeperAdmin(), messageId) : null;
+
   const { error } = await supabase
     .from('messages')
     .delete()
@@ -381,6 +385,7 @@ export async function DELETE(req: NextRequest) {
     .eq('user_id', user.id); // ensure ownership
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await removeChatDropOriginal(createChatGatekeeperAdmin(), dropOriginal);
 
   if (existing && typeof (existing as any).chat_id === 'string') {
     const row = existing as { id: string; chat_id: string; user_id: string; time_created: number | string };

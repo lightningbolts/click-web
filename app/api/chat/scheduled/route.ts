@@ -33,6 +33,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const prepared = await prepareChatMessageWrite(req);
   if (prepared instanceof NextResponse) return prepared;
+  if (prepared.dropOriginalPath) {
+    return NextResponse.json({ error: 'Click Drops cannot be scheduled' }, { status: 400 });
+  }
 
   const sendAt = Number(prepared.body.send_at ?? prepared.body.sendAt);
   const now = Date.now();

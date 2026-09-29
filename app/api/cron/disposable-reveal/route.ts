@@ -26,6 +26,8 @@ async function hasRevealedDisposableMessage(
     .eq('chat_id', session.chat_id)
     .eq('metadata->>disposable_roll', 'true')
     .eq('metadata->>encounter_id', session.id)
+    // Gated drops (drops_develop) get the batched ready push from /api/cron/drops instead.
+    .is('metadata->>drop_gated', null)
     .lte('metadata->>collaboration_ttl', nowIso)
     .limit(1);
 

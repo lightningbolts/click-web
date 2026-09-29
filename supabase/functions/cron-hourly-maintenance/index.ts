@@ -3,6 +3,7 @@
  *   1. Click Drops reveal pushes after collaboration_ttl
  *   2. Event beacon day-of + 30-minutes-before reminders and Seed-a-Room teasers (via click-web /api/cron/event-reminders)
  *   2b. Encounter reconnect / shared-event nudges (via click-web /api/cron/nudges-reconnect)
+ *   2c. Gated Click Drops: batched "ready to develop" pushes (via click-web /api/cron/drops)
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
  *   4. Delete expired pending_handshakes (expires_at < now())
  *
@@ -43,6 +44,8 @@ async function hasRevealedDisposableMessage(
     .eq('chat_id', session.chat_id)
     .eq('metadata->>disposable_roll', 'true')
     .eq('metadata->>encounter_id', session.id)
+    // Gated drops (drops_develop) get the batched ready push from /api/cron/drops instead.
+    .is('metadata->>drop_gated', null)
     .lte('metadata->>collaboration_ttl', nowIso)
     .limit(1);
 
@@ -341,7 +344,11 @@ Deno.serve(async (req: Request) => {
     const friction = await runFrictionIntentExpirations(admin);
     const pendingHandshakes = await runPendingHandshakesCleanup(admin);
     const nudges = await runClickWebCron('/api/cron/nudges-reconnect', 'nudges-reconnect');
-    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges };
+    // Isolated: a drops failure must not stop the maintenance jobs above from reporting.
+    const drops = await runClickWebCron('/api/cron/drops', 'drops').catch((e) => ({
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges, drops };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,

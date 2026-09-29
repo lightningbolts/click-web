@@ -18,6 +18,7 @@ import {
   assertE2eeV2MediaMessageWrite,
   messageBodyV2Field,
 } from '@/lib/server/e2eeV2Gate';
+import { extractGatedChatDrop, registerChatDropOriginal, removeChatDropOriginal } from '@/lib/server/drops/chatDrops';
 
 /** A validated message, ready to insert now or at its scheduled time. */
 export type PreparedChatMessage = {
@@ -30,6 +31,8 @@ export type PreparedChatMessage = {
   metadata: unknown;
   localSentAtMs: number | null;
   body: Record<string, unknown>;
+  /** Gated Click Drop original (click-drops bucket), registered server-side after insert. */
+  dropOriginalPath?: string | null;
 };
 
 const CHAT_UUID_RE =
@@ -238,6 +241,9 @@ export async function prepareChatMessageWrite(req: NextRequest): Promise<NextRes
       if (!mediaMessageGate.ok) return mediaMessageGate.response;
     }
 
+    const gatedDrop = extractGatedChatDrop({ metadata: meta, messageType, chatId: resolvedChatId, userId: user.id });
+    if ('error' in gatedDrop) return NextResponse.json({ error: gatedDrop.error }, { status: 400 });
+
     const localSentAtMs = parseLocalSentAtMs(
       (body as Record<string, unknown>).local_sent_at ?? (body as Record<string, unknown>).localSentAt,
     );
@@ -256,9 +262,10 @@ export async function prepareChatMessageWrite(req: NextRequest): Promise<NextRes
       bearer: token,
       content: wireContent,
       messageType,
-      metadata,
+      metadata: gatedDrop.originalPath ? gatedDrop.metadata : metadata,
       localSentAtMs,
       body: bodyRecord,
+      dropOriginalPath: gatedDrop.originalPath,
     };
   } catch (err: any) {
     return NextResponse.json({ error: err.message ?? 'Failed to send message' }, { status: 500 });
@@ -345,6 +352,23 @@ export async function insertChatMessage(
   if (insertErr) {
     console.error('Message insert failed', { chatId: m.chatId, userId: m.userId, error: insertErr.message });
     return { error: insertErr.message };
+  }
+
+  if (m.dropOriginalPath) {
+    const registered = await registerChatDropOriginal(admin, {
+      messageId: message.id,
+      chatId: message.chat_id,
+      senderId: m.userId,
+      originalPath: m.dropOriginalPath,
+      revealAtIso: String((insertRow.metadata as Record<string, unknown>).reveal_at),
+    });
+    if (registered) {
+      // A gated drop whose original can't be reached must not be left behind half-sent.
+      console.error('Click Drop registration failed', { chatId: m.chatId, error: registered.error });
+      await admin.from('messages').delete().eq('id', message.id);
+      await removeChatDropOriginal(admin, m.dropOriginalPath);
+      return { error: 'Failed to send Click Drop' };
+    }
   }
 
   await admin.from('chats').update({ updated_at: now }).eq('id', message.chat_id);

@@ -8,6 +8,7 @@ export const READ_HEAVY_API_PREFIXES = [
   '/api/map/beacons',
   '/api/hub/nearby',
   '/api/livekit/token',
+  '/api/drops',
 ] as const;
 
 export function isReadHeavyApiPath(pathname: string): boolean {
