@@ -14,6 +14,7 @@ export const FEATURE_KEYS = [
   'soundtrack_presence',
   'event_drops',
   'event_history',
+  'shared_drops',
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 

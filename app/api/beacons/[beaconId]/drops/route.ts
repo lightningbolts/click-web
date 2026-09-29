@@ -3,9 +3,8 @@ import { parseBody } from '@/lib/api/parseBody';
 import { eventDropCreateBodySchema } from '@/lib/api/schemas/drops';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
 import { isEventDropWindowOpen } from '@/lib/events/eventDropSchedule';
+import { DROP_MAX_ORIGINAL_BYTES, DROP_MAX_PREVIEW_BYTES, decodeDropUpload } from '@/lib/server/drops/storage';
 import {
-  EVENT_DROP_MAX_ORIGINAL_BYTES,
-  EVENT_DROP_MAX_PREVIEW_BYTES,
   authorizeEventDropRequest,
   eventDropAccess,
   findEventDropByClientId,
@@ -63,12 +62,6 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
   }
 }
 
-function decode(b64: string, maxBytes: number): Buffer | null {
-  if (b64.length > Math.ceil(maxBytes / 3) * 4 + 4) return null;
-  const buffer = Buffer.from(b64, 'base64');
-  return buffer.length > 0 && buffer.length <= maxBytes ? buffer : null;
-}
-
 /**
  * POST /api/beacons/{id}/drops — post an event drop (checked-in attendees, inside the window, up to
  * the cap). Retrying with the same `client_drop_id` returns the drop already made.
@@ -94,8 +87,8 @@ export async function POST(request: NextRequest, { params }: Params): Promise<Re
     if (!role.checkedIn) {
       return NextResponse.json({ error: 'Check in to this event to add drops.', code: 'not_checked_in' }, { status: 403 });
     }
-    const original = decode(body.original_b64, EVENT_DROP_MAX_ORIGINAL_BYTES);
-    const preview = decode(body.preview_b64, EVENT_DROP_MAX_PREVIEW_BYTES);
+    const original = decodeDropUpload(body.original_b64, DROP_MAX_ORIGINAL_BYTES);
+    const preview = decodeDropUpload(body.preview_b64, DROP_MAX_PREVIEW_BYTES);
     if (!original || !preview) {
       return NextResponse.json({ error: 'Photo is empty or too large.', code: 'invalid_media' }, { status: 413 });
     }

@@ -5,6 +5,7 @@ import { signDropObjects } from '@/lib/server/drops/storage';
 import { resolveChatDrops } from '@/lib/server/drops/chatDrops';
 import { eventDropResolver, eventDropsConfigFrom } from '@/lib/server/eventDrops';
 import { resolveFeature } from '@/lib/server/featureFlags';
+import { resolveSharedDrops } from '@/lib/server/sharedDrops';
 
 /** A drop the viewer may see, with its reveal time and (if gated) the original's object path. */
 export type ResolvedDrop = { revealAtMs: number; originalPath: string | null };
@@ -17,6 +18,7 @@ const RESOLVERS: Partial<Record<DropKind, Resolver>> = {
   // Config (absentee limit, reveal hour) is global; the flag's cohort only gates posting and GET.
   event: async (admin, viewerId, ids) =>
     eventDropResolver(eventDropsConfigFrom((await resolveFeature(admin, 'event_drops', viewerId)).config))(admin, viewerId, ids),
+  shared: resolveSharedDrops,
 };
 
 /** Drops of one kind this viewer may see (reports, develop). */

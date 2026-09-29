@@ -40,3 +40,14 @@ export const dropReportBodySchema = z.object({
   id: uuid,
   reason: z.string().trim().min(1).max(500),
 });
+
+/** POST /api/me/shared-drops — one drop to all or core connections (original + pixelated preview). */
+export const sharedDropCreateBodySchema = z.object({
+  client_drop_id: uuid,
+  audience: z.enum(['all', 'core']),
+  mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']),
+  original_b64: base64,
+  preview_b64: base64,
+  width: z.number().int().positive().max(20000).optional(),
+  height: z.number().int().positive().max(20000).optional(),
+});

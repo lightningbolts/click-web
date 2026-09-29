@@ -5,7 +5,7 @@ import { configNumber, requireFeature } from '@/lib/server/featureFlags';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { loadBlockedUserIds } from '@/lib/server/connections/viewerPeers';
-import { dropObjectPrefix, newDropObjectPath, removeDropObjects, signDropObjects, DROPS_BUCKET } from '@/lib/server/drops/storage';
+import { dropObjectPrefix, removeDropObjects, signDropObjects, uploadDropRenditions } from '@/lib/server/drops/storage';
 import type { ResolvedDrop } from '@/lib/server/drops/develop';
 import { eventDropSchedule, orderRecap, selectAbsenteeDrops, type EventDropSchedule } from '@/lib/events/eventDropSchedule';
 import { eventDisplayTitle, eventTitleFromMetadata } from '@/lib/events/eventMetadata';
@@ -192,9 +192,6 @@ export function eventDropResolver(config: EventDropsConfig) {
   };
 }
 
-export const EVENT_DROP_MAX_ORIGINAL_BYTES = 15 * 1024 * 1024;
-export const EVENT_DROP_MAX_PREVIEW_BYTES = 1024 * 1024;
-
 /** Uploads both renditions and inserts the row; storage is cleaned up if the insert fails. */
 export async function insertEventDrop(
   admin: SupabaseClient,
@@ -210,19 +207,15 @@ export async function insertEventDrop(
     showToAbsentees: boolean;
   },
 ): Promise<{ row: EventDropRow } | { error: 'cap_reached' | 'duplicate' | 'failed' }> {
-  const prefix = dropObjectPrefix('event', args.event.id, args.userId);
-  const originalPath = newDropObjectPath(prefix, 'original', args.mimeType);
-  const previewPath = newDropObjectPath(prefix, 'preview', 'image/jpeg');
-  const bucket = admin.storage.from(DROPS_BUCKET);
-  const [originalUpload, previewUpload] = await Promise.all([
-    bucket.upload(originalPath, args.original, { contentType: args.mimeType, upsert: false }),
-    bucket.upload(previewPath, args.preview, { contentType: 'image/jpeg', upsert: false }),
-  ]);
-  if (originalUpload.error || previewUpload.error) {
-    console.error('[eventDrops] upload:', originalUpload.error?.message ?? previewUpload.error?.message);
-    await removeDropObjects(admin, [originalPath, previewPath]);
-    return { error: 'failed' };
-  }
+  const uploaded = await uploadDropRenditions(
+    admin,
+    dropObjectPrefix('event', args.event.id, args.userId),
+    args.mimeType,
+    args.original,
+    args.preview,
+  );
+  if (!uploaded) return { error: 'failed' };
+  const { originalPath, previewPath } = uploaded;
   const { data, error } = await admin
     .from('event_drops')
     .insert({

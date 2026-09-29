@@ -47,6 +47,24 @@ the recap develops everything through `POST /api/drops/develop` (kind `event`). 
 `/api/cron/drops` sends one "Your recap from {event} is ready" to checked-in attendees in the
 cohort; events with drops skip the older end-of-event recap push so nobody gets two.
 
+## Shared drops (F3, flag `shared_drops`)
+
+One drop to all your connections or only core ones, developing `develop_hours` (24) after posting.
+Multi-recipient, so **not end-to-end encrypted** like chat drops: media sits in `click-drops`
+(`shared/{user}/…`) behind server access checks, originals signed only after reveal. The audience
+is resolved on every read (`lib/drops/sharedAudience.ts`): both people must have each other as an
+active connection (not archived, hidden or blocked on either side), and a core-only drop also needs
+the poster's core mark — so archiving, un-coring or blocking applies immediately. Cap: `daily_cap`
+(3) per rolling 24 h, deleted drops included, enforced by a trigger.
+
+| Route | Role |
+|-------|------|
+| `GET /api/me/shared-drops` | The bounded Home strip (`strip_days`, `strip_limit`): yours and your connections', newest first, with your `developed_at`. Pending ones show as pixelated teasers when `teaser` is `pixelated` |
+| `POST /api/me/shared-drops` | `{ client_drop_id, audience: all\|core, mime_type, original_b64, preview_b64, width?, height? }`; 409 `cap_reached` |
+| `DELETE /api/me/shared-drops/{id}` | Poster only, any time (not flag-gated) |
+
+No likes, views or counts; replying opens the existing 1-1 chat (`connection_id` in each item).
+
 ## Event history (F2, flag `event_history`)
 
 `GET /api/me/event-history?filter=all|went|rsvpd|saved|hosted` (private), `GET

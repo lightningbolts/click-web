@@ -45,6 +45,7 @@ function setup() {
         error: null,
       },
       feature_flags: { data: [], error: null },
+      shared_drops: { data: [], error: null },
       event_drops: { data: [], error: null },
       drop_views: {
         data: [
@@ -94,7 +95,7 @@ describe('developDrops', () => {
     expectFilter(mock.builder('drop_views'), 'viewer_id', VIEWER);
   });
 
-  it('reports unsupported kinds as not found without touching storage', async () => {
+  it('reports drops nobody can find as not found without touching storage', async () => {
     const { admin, createSignedUrls } = setup();
     const results = await developDrops(admin as never, VIEWER, [{ kind: 'shared', id: READY }], NOW);
     expect(results).toEqual([{ kind: 'shared', id: READY, status: 'not_found' }]);
