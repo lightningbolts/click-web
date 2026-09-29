@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendPush, userAllowsPush } from '@/lib/nudges/moments';
+import { resolveFeature } from '@/lib/server/featureFlags';
+import { eventDropsConfigFrom, loadDropEvent } from '@/lib/server/eventDrops';
 
 /**
  * Batched "ready to develop" push for gated Click Drops (spec §2): once per recipient per sweep,
@@ -137,4 +139,60 @@ export async function runChatDropsReady(
   if (markError) throw new Error(`drops-ready mark: ${markError.message}`);
 
   return { ready: rows.length, pushed };
+}
+
+export function eventRecapCopy(eventTitle: string): { title: string; body: string } {
+  return { title: 'Click Drops', body: `Your recap from ${eventTitle.trim().slice(0, 80) || 'last night'} is ready.` };
+}
+
+/**
+ * Event recaps (F1): once an event's drops reveal, one "Your recap from {event} is ready" push to
+ * each checked-in attendee in the event_drops cohort. Events with no live drops get no push.
+ */
+export async function runEventRecapsReady(
+  admin: SupabaseClient,
+  pushUrl: string | null,
+  bearer: string | null,
+  nowMs: number = Date.now(),
+): Promise<{ recaps: number; pushed: number }> {
+  const nowIso = new Date(nowMs).toISOString();
+  const { data, error } = await admin
+    .from('event_drop_recaps')
+    .select('beacon_id, reveal_at')
+    .is('notified_at', null)
+    .lte('reveal_at', nowIso)
+    .limit(100);
+  if (error) throw new Error(`event-recaps fetch: ${error.message}`);
+  const recaps = (data ?? []) as Array<{ beacon_id: string; reveal_at: string }>;
+  let pushed = 0;
+
+  for (const recap of recaps) {
+    const fresh = nowMs - Date.parse(recap.reveal_at) <= DROP_READY_STALE_MS;
+    const { count } = await admin
+      .from('event_drops')
+      .select('id', { count: 'exact', head: true })
+      .eq('beacon_id', recap.beacon_id)
+      .is('deleted_at', null);
+    if (fresh && (count ?? 0) > 0 && pushUrl && bearer) {
+      const config = eventDropsConfigFrom((await resolveFeature(admin, 'event_drops', '')).config);
+      const event = await loadDropEvent(admin, recap.beacon_id, config);
+      const { data: checkIns } = await admin.from('event_check_ins').select('user_id').eq('beacon_id', recap.beacon_id);
+      const recipients = [...new Set(((checkIns ?? []) as Array<{ user_id: string }>).map((r) => r.user_id))];
+      for (const userId of recipients) {
+        if (!(await resolveFeature(admin, 'event_drops', userId)).enabled) continue;
+        if (!(await userAllowsPush(admin, userId, 'event_reminder_push_enabled'))) continue;
+        const ok = await sendPush(pushUrl, bearer, userId, eventRecapCopy(event?.title ?? ''), {
+          type: 'event_drop_recap',
+          beacon_id: recap.beacon_id,
+        });
+        if (ok) pushed += 1;
+      }
+    }
+    const { error: markError } = await admin
+      .from('event_drop_recaps')
+      .update({ notified_at: nowIso })
+      .eq('beacon_id', recap.beacon_id);
+    if (markError) throw new Error(`event-recaps mark: ${markError.message}`);
+  }
+  return { recaps: recaps.length, pushed };
 }

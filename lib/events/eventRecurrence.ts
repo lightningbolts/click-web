@@ -52,7 +52,7 @@ export function parseEventRecurrenceFromBody(
   return { recurrence: { frequency: frequency as EventRecurrenceFrequency, count } };
 }
 
-function safeTimeZone(timeZone: string | null | undefined): string {
+export function safeTimeZone(timeZone: string | null | undefined): string {
   if (timeZone) {
     try {
       new Intl.DateTimeFormat("en-US", { timeZone });
@@ -64,9 +64,9 @@ function safeTimeZone(timeZone: string | null | undefined): string {
   return "UTC";
 }
 
-type WallClock = { y: number; mo: number; d: number; h: number; mi: number; s: number };
+export type WallClock = { y: number; mo: number; d: number; h: number; mi: number; s: number };
 
-function wallClock(epochMs: number, timeZone: string): WallClock {
+export function wallClock(epochMs: number, timeZone: string): WallClock {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hourCycle: "h23",
@@ -89,7 +89,7 @@ function zoneOffsetMs(epochMs: number, timeZone: string): number {
 }
 
 /** The instant a wall-clock time occurs in `timeZone` (a time skipped by DST lands an hour off). */
-function zonedWallClockToEpochMs(w: WallClock, timeZone: string): number {
+export function zonedWallClockToEpochMs(w: WallClock, timeZone: string): number {
   const asUtc = Date.UTC(w.y, w.mo - 1, w.d, w.h, w.mi, w.s);
   const guess = asUtc - zoneOffsetMs(asUtc, timeZone);
   return asUtc - zoneOffsetMs(guess, timeZone);

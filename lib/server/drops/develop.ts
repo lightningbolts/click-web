@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DropKind } from '@/lib/drops/developState';
 import { signDropObjects } from '@/lib/server/drops/storage';
 import { resolveChatDrops } from '@/lib/server/drops/chatDrops';
+import { eventDropResolver, eventDropsConfigFrom } from '@/lib/server/eventDrops';
+import { resolveFeature } from '@/lib/server/featureFlags';
 
 /** A drop the viewer may see, with its reveal time and (if gated) the original's object path. */
 export type ResolvedDrop = { revealAtMs: number; originalPath: string | null };
@@ -12,7 +14,21 @@ type Resolver = (admin: SupabaseClient, viewerId: string, ids: string[]) => Prom
 /** One resolver per kind; each returns only drops the viewer is authorized to see. */
 const RESOLVERS: Partial<Record<DropKind, Resolver>> = {
   chat: resolveChatDrops,
+  // Config (absentee limit, reveal hour) is global; the flag's cohort only gates posting and GET.
+  event: async (admin, viewerId, ids) =>
+    eventDropResolver(eventDropsConfigFrom((await resolveFeature(admin, 'event_drops', viewerId)).config))(admin, viewerId, ids),
 };
+
+/** Drops of one kind this viewer may see (reports, develop). */
+export async function resolveVisibleDrops(
+  admin: SupabaseClient,
+  viewerId: string,
+  kind: DropKind,
+  ids: string[],
+): Promise<Map<string, ResolvedDrop>> {
+  const resolver = RESOLVERS[kind];
+  return resolver ? resolver(admin, viewerId, [...new Set(ids)]) : new Map();
+}
 
 export type DevelopItem = { kind: DropKind; id: string };
 
@@ -38,9 +54,7 @@ export async function developDrops(
   const resolved = new Map<string, ResolvedDrop>();
   await Promise.all(
     [...byKind].map(async ([kind, ids]) => {
-      const resolver = RESOLVERS[kind];
-      if (!resolver) return;
-      for (const [id, drop] of await resolver(admin, viewerId, [...new Set(ids)])) {
+      for (const [id, drop] of await resolveVisibleDrops(admin, viewerId, kind, ids)) {
         resolved.set(`${kind}:${id}`, drop);
       }
     }),

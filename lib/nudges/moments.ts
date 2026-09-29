@@ -120,7 +120,7 @@ export function isGroupRevivalDue(lastMessageMs: number, nowMs: number): boolean
 
 // MARK: - Delivery
 
-type PushPreference = 'reconnect_nudge_push_enabled' | 'message_push_enabled';
+type PushPreference = 'reconnect_nudge_push_enabled' | 'message_push_enabled' | 'event_reminder_push_enabled';
 
 export async function userAllowsPush(admin: SupabaseClient, userId: string, preference: PushPreference): Promise<boolean> {
   const { data } = await admin.from('notification_preferences').select(preference).eq('user_id', userId).maybeSingle();

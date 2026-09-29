@@ -44,6 +44,8 @@ function setup() {
         ],
         error: null,
       },
+      feature_flags: { data: [], error: null },
+      event_drops: { data: [], error: null },
       drop_views: {
         data: [
           { drop_kind: 'chat', drop_id: READY, developed_at: '2026-10-02T11:00:00.000Z' },
@@ -94,8 +96,8 @@ describe('developDrops', () => {
 
   it('reports unsupported kinds as not found without touching storage', async () => {
     const { admin, createSignedUrls } = setup();
-    const results = await developDrops(admin as never, VIEWER, [{ kind: 'event', id: READY }], NOW);
-    expect(results).toEqual([{ kind: 'event', id: READY, status: 'not_found' }]);
+    const results = await developDrops(admin as never, VIEWER, [{ kind: 'shared', id: READY }], NOW);
+    expect(results).toEqual([{ kind: 'shared', id: READY, status: 'not_found' }]);
     expect(createSignedUrls).not.toHaveBeenCalled();
   });
 });

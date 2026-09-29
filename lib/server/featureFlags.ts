@@ -8,7 +8,13 @@ import { NextResponse } from 'next/server';
  * cohort. `config` holds the feature's tunable numbers; code defaults fill any missing key.
  */
 
-export const FEATURE_KEYS = ['drops_develop', 'alert_confirmations', 'soundtrack_presence'] as const;
+export const FEATURE_KEYS = [
+  'drops_develop',
+  'alert_confirmations',
+  'soundtrack_presence',
+  'event_drops',
+  'event_history',
+] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 export type FeatureFlagRow = {

@@ -32,6 +32,8 @@ const AUTH_MARKERS = [
   'STRIPE_WEBHOOK_SECRET',
   'constructEvent',
   'publicRoute',
+  // lib/server/eventDrops.ts: getSupabaseFromRouteRequest + the event_drops flag.
+  'authorizeEventDropRequest',
 ];
 
 /** Intentionally unauthenticated or secret-gated via non-JWT means. */

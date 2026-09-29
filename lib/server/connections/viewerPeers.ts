@@ -24,14 +24,22 @@ async function ids(
   );
 }
 
+/** Everyone the viewer blocked or who blocked the viewer: never shown to each other anywhere. */
+export async function loadBlockedUserIds(admin: SupabaseClient, viewerId: string): Promise<Set<string>> {
+  const [blockedByViewer, blockedViewer] = await Promise.all([
+    ids(admin.from('user_blocks').select('blocked_id').eq('blocker_id', viewerId), 'blocked_id', 'blocks'),
+    ids(admin.from('user_blocks').select('blocker_id').eq('blocked_id', viewerId), 'blocker_id', 'blocked-by'),
+  ]);
+  return new Set([...blockedByViewer, ...blockedViewer]);
+}
+
 export async function loadViewerPeers(admin: SupabaseClient, viewerId: string): Promise<Map<string, ViewerPeer>> {
-  const [connections, archived, hidden, core, blockedByViewer, blockedViewer] = await Promise.all([
+  const [connections, archived, hidden, core, blocked] = await Promise.all([
     admin.from('connections').select('id, user_ids, status, expiry_state').contains('user_ids', [viewerId]),
     ids(admin.from('connection_archives').select('connection_id').eq('user_id', viewerId), 'connection_id', 'archives'),
     ids(admin.from('connection_hidden').select('connection_id').eq('user_id', viewerId), 'connection_id', 'hidden'),
     ids(admin.from('connection_core').select('connection_id').eq('user_id', viewerId), 'connection_id', 'core'),
-    ids(admin.from('user_blocks').select('blocked_id').eq('blocker_id', viewerId), 'blocked_id', 'blocks'),
-    ids(admin.from('user_blocks').select('blocker_id').eq('blocked_id', viewerId), 'blocker_id', 'blocked-by'),
+    loadBlockedUserIds(admin, viewerId),
   ]);
   if (connections.error) throw new Error(`viewerPeers connections: ${connections.error.message}`);
 
@@ -43,7 +51,7 @@ export async function loadViewerPeers(admin: SupabaseClient, viewerId: string): 
     const userIds = Array.isArray(row.user_ids) ? (row.user_ids as unknown[]) : [];
     for (const raw of userIds) {
       const userId = typeof raw === 'string' ? raw.trim() : '';
-      if (!userId || userId === viewerId || blockedByViewer.has(userId) || blockedViewer.has(userId)) continue;
+      if (!userId || userId === viewerId || blocked.has(userId)) continue;
       const isCore = core.has(connectionId);
       const existing = peers.get(userId);
       // Several connections to one person (reconnects, groups): keep one, core if any is core.

@@ -84,10 +84,13 @@ export async function removeDropObjects(admin: SupabaseClient, paths: string[]):
  * the user uploaded (their registry rows name them) before the account goes.
  */
 export async function removeAllDropMediaForUser(admin: SupabaseClient, userId: string): Promise<void> {
-  const { data, error } = await admin.from('chat_drop_originals').select('object_path').eq('sender_id', userId);
-  if (error) {
-    console.warn('[drops] account deletion lookup:', error.message);
-    return;
-  }
-  await removeDropObjects(admin, ((data ?? []) as Array<{ object_path: string }>).map((r) => r.object_path));
+  const [chat, event] = await Promise.all([
+    admin.from('chat_drop_originals').select('object_path').eq('sender_id', userId),
+    admin.from('event_drops').select('original_path, preview_path').eq('user_id', userId),
+  ]);
+  if (chat.error || event.error) console.warn('[drops] account deletion lookup:', chat.error?.message ?? event.error?.message);
+  await removeDropObjects(admin, [
+    ...((chat.data ?? []) as Array<{ object_path: string }>).map((r) => r.object_path),
+    ...((event.data ?? []) as Array<{ original_path: string; preview_path: string }>).flatMap((r) => [r.original_path, r.preview_path]),
+  ]);
 }

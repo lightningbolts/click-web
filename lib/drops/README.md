@@ -24,6 +24,36 @@ Clients must only ever hold the pixelated rendition before `reveal_at`.
 - Legacy drops (original already in the message) still develop through the same endpoint; they just
   have no original to sign.
 
+## Event drops (F1, flag `event_drops`)
+
+Checked-in attendees post up to `per_user_cap` (10) drops from event start until local midnight at
+the end of the event (`lib/events/eventDropSchedule.ts`, event timezone, DST-safe). Every drop of an
+event reveals together at `reveal_hour_local` (10:00) the next morning. The client uploads the
+original and its pixelated preview together; both go to `click-drops` under
+`event/{beacon}/{user}/`. Eligibility keys off check-in, never RSVP or ticket source.
+
+| Route | Role |
+|-------|------|
+| `GET /api/beacons/{id}/drops` | `{ state: before\|open\|developing\|revealed, opens_at, closes_at, reveal_at, access, can_post, remaining, show_to_absentees, drops }` |
+| `POST /api/beacons/{id}/drops` | `{ client_drop_id, mime_type, original_b64, preview_b64, width?, height?, show_to_absentees? }`; 403 `not_checked_in` / `window_closed`, 409 `cap_reached`; retries with the same `client_drop_id` return the same drop |
+| `DELETE /api/beacons/{id}/drops/{dropId}` | Poster only, any time; media removed |
+| `PUT /api/beacons/{id}/drops/settings` | `{ show_to_absentees }` for the poster's drops at this event |
+| `POST /api/drops/report` | Quiet report on any drop the reporter can see |
+
+Visibility (`visibleEventDrops`): before reveal, only your own; after, participants (checked in or
+host) see all, own first; people who RSVP'd but never checked in see up to `absentee_limit` (6)
+drops from posters who allow it, round-robin across posters; blocked people never appear. Opening
+the recap develops everything through `POST /api/drops/develop` (kind `event`). The hourly
+`/api/cron/drops` sends one "Your recap from {event} is ready" to checked-in attendees in the
+cohort; events with drops skip the older end-of-event recap push so nobody gets two.
+
+## Event history (F2, flag `event_history`)
+
+`GET /api/me/event-history?filter=all|went|rsvpd|saved|hosted` (private), `GET
+/api/me/event-history/recap-card` (the one Home card: an event you were at or hosted that ended in
+the last `recap_card_hours`), `GET /api/users/{id}/events-together` (only events both checked in
+to). Built from the live tables — `event_participation` isn't dual-written yet.
+
 ## API
 
 | Route | Role |
