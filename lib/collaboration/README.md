@@ -59,6 +59,9 @@ Core pins (`connection_core` table, `/api/connections/core`) affect map beacon v
 3. **Cron** — `hasRevealedDisposableMessage` checks `messages.metadata.disposable_roll`, `encounter_id`, `collaboration_ttl`
 4. **Push** — `type: disposable_reveal` via `send-push-notification`
 
+Tap-to-develop, gated originals and the batched ready push (flag `drops_develop`) live in
+[`lib/drops`](../drops/README.md).
+
 ---
 
 ## E2EE / API constraints

@@ -105,3 +105,45 @@ describe('prepareChatMessageWrite: access check and E2EE gate overlap', () => {
     expect(mockAssertE2eeV2MessageWrite).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('prepareChatMessageWrite: gated Click Drops', () => {
+  const originalPath = `chat/${CHAT_ID}/${USER_ID}/1759312800000-abcdef01-original.jpg`;
+
+  beforeEach(() => {
+    mockRequireBearerUser.mockReset().mockResolvedValue({ ok: true, user: { id: USER_ID }, bearer: 'jwt' });
+    mockAssertChatWritable.mockReset().mockResolvedValue(null);
+    mockAssertE2eeV2MessageWrite.mockReset().mockResolvedValue({ ok: true, currentEpoch: null });
+  });
+
+  it('moves the original path out of stored metadata', async () => {
+    const prepared = await prepareChatMessageWrite(
+      request({
+        chat_id: CHAT_ID,
+        content: '',
+        message_type: 'image',
+        metadata: { media_url: 'https://signed/preview', disposable_roll: true, drop_original_path: originalPath },
+      }),
+    );
+    expect(prepared).toMatchObject({
+      dropOriginalPath: originalPath,
+      metadata: { media_url: 'https://signed/preview', disposable_roll: true, drop_gated: true },
+    });
+    expect((prepared as { metadata: Record<string, unknown> }).metadata).not.toHaveProperty('drop_original_path');
+  });
+
+  it("rejects a path in someone else's folder", async () => {
+    const prepared = await prepareChatMessageWrite(
+      request({
+        chat_id: CHAT_ID,
+        content: '',
+        message_type: 'image',
+        metadata: {
+          media_url: 'https://signed/preview',
+          disposable_roll: true,
+          drop_original_path: `chat/${CHAT_ID}/someone-else/1759312800000-abcdef01-original.jpg`,
+        },
+      }),
+    );
+    expect((prepared as NextResponse).status).toBe(400);
+  });
+});

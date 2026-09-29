@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/afterResponse";
+import { emitProductEvent } from "@/lib/server/telemetry/productEvents";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import {
@@ -302,6 +304,7 @@ export async function POST(
     });
 
     const profile = (await loadAttendeeProfiles(admin, [user.id])).get(user.id) ?? null;
+    runAfterResponse("product events", () => emitProductEvent(admin, user.id, "beacon_joined", { type: "event" }));
 
     void maybeCreateSharedEventNudges(admin, user.id, beaconId, {
       pushUrl: process.env.NEXT_PUBLIC_SUPABASE_URL

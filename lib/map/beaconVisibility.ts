@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MapBeaconRecord } from "@/lib/map/mapBeacons";
+import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
+import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
 
 export type BeaconVisibilityAudience = "everyone" | "connections" | "core_connections";
 
@@ -96,4 +97,27 @@ export function parseVisibilityAudienceFromBody(body: Record<string, unknown>): 
     body.audience ??
     body.visibility;
   return parseBeaconVisibilityAudience(raw);
+}
+
+/**
+ * One beacon this viewer may see (creator audience applied), with its raw row; null when it is
+ * missing, unparseable or hidden from them — callers answer 404 for all three alike.
+ */
+export async function loadVisibleBeacon(
+  admin: SupabaseClient,
+  beaconId: string,
+  viewerId: string,
+): Promise<{ beacon: MapBeaconRecord; row: Record<string, unknown> } | null> {
+  const { data, error } = await admin
+    .from("map_beacons")
+    .select("*")
+    .eq("id", beaconId)
+    .maybeSingle();
+  if (error) throw new Error(`loadVisibleBeacon: ${error.message}`);
+  if (data == null) return null;
+  const row = data as Record<string, unknown>;
+  const beacon = parseMapBeacon(rowFromInsertWithLocation(row, Number.NaN, Number.NaN));
+  if (beacon == null) return null;
+  const [visible] = await filterBeaconsForViewer(admin, viewerId, [beacon]);
+  return visible ? { beacon: visible, row } : null;
 }

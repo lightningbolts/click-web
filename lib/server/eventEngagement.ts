@@ -247,7 +247,7 @@ export function isEventLiveForCheckIn(
   return true;
 }
 
-function parseBeaconLatLng(row: Record<string, unknown>): { lat: number | null; lng: number | null } {
+export function parseBeaconLatLng(row: Record<string, unknown>): { lat: number | null; lng: number | null } {
   const latDirect =
     typeof row.lat === "number"
       ? row.lat

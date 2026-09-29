@@ -80,6 +80,14 @@
         "limit": 6,
         "period": 60
       }
+    },
+    {
+      "name": "FEATURE_MUTATION_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
     }
   ]
 }

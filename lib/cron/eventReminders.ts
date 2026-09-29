@@ -111,6 +111,16 @@ async function recipientIdsForKind(
   return [...ids];
 }
 
+async function eventHasLiveDrops(admin: SupabaseClient, beaconId: string): Promise<boolean> {
+  const { count, error } = await admin
+    .from('event_drops')
+    .select('id', { count: 'exact', head: true })
+    .eq('beacon_id', beaconId)
+    .is('deleted_at', null);
+  // Unknown (e.g. the table isn't there yet): keep the existing recap push.
+  return !error && (count ?? 0) > 0;
+}
+
 /** Hourly sweep: event beacons → day-of and 30-minutes-before push notifications. */
 export async function runEventReminders(
   admin: SupabaseClient,
@@ -147,6 +157,13 @@ export async function runEventReminders(
     for (const kind of kinds) {
       const creatorId = row.creator_id?.trim();
       if (!creatorId || !pushUrl) continue;
+
+      if (kind === 'recap_ready' && (await eventHasLiveDrops(admin, row.id))) {
+        // Events with Click Drops get one recap push the next morning (F1), not two.
+        nextMeta = { ...nextMeta, [sentKeyForKind(kind)]: true };
+        await admin.from('map_beacons').update({ metadata: nextMeta }).eq('id', row.id);
+        continue;
+      }
 
       const title =
         kind === 'day_of' ? 'Event today' : kind === 'thirty_min' ? 'Event starting soon' : 'Your event recap is ready';

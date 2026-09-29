@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runAfterResponse } from "@/lib/server/afterResponse";
+import { emitProductEvent } from "@/lib/server/telemetry/productEvents";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
@@ -583,6 +585,9 @@ export async function POST(request: NextRequest) {
       };
     }
     const seriesCount = seriesId != null ? inserted.length : undefined;
+    runAfterResponse("product events", () =>
+      emitProductEvent(createAdminSupabaseClient(), user.id, "beacon_created", { type: beacon_type }),
+    );
 
     const beacon = parseInsertedBeacon(insertedRow, lon, lat);
     if (beacon == null) {

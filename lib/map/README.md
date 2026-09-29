@@ -139,3 +139,27 @@ Event beacons support server-backed bookmarks / check-ins / impressions (not Map
 - **Business insights** — Beacon density on Vibe Radar.
 - **Event reminders** — Event beacon type + cron.
 - **Achievements & stats** — Map exploration milestones.
+
+## Alert confirmations (F4, flag `alert_confirmations`)
+
+Alert (hazard) beacons get crowd upkeep so stale pins don't linger. Logic: `lib/map/alertConfirmations.ts`
+(pure) and `lib/server/alertConfirmations.ts`.
+
+| Route | Role |
+|-------|------|
+| `GET /api/beacons/{id}/confirm` | `{ state, expires_at, last_still_here_at, my_vote, is_creator, radius_meters }` — no counts |
+| `POST /api/beacons/{id}/confirm` | `{ status: still_here \| cleared, lat, lng }`; voter must be within `radius_meters` (creator may clear from anywhere); one vote per person per `vote_window_minutes`. "Still here" extends to now + `ttl_minutes` (capped at `max_lifetime_hours` after creation); `cleared_threshold` distinct clearers since the last sighting clear it |
+| `POST /api/beacons/{id}/report` | Quiet report into `beacon_reports` (any visible beacon) |
+
+Clearing sets `expires_at = cleared_at = now()`, so every client's fetch (which filters `expires_at > now()`)
+drops the pin, older builds included. Voter coordinates are checked and never stored. All numbers are
+`feature_flags.config` keys.
+
+## Listening now (F5, flag `soundtrack_presence`)
+
+A soundtrack beacon is a song link pinned at a place (30 s preview; no full playback). "Listening
+now" is a heartbeat from someone standing within `radius_meters` of the pin that lapses after
+`heartbeat_ttl_minutes`. `GET|POST|DELETE /api/beacons/{id}/listening` return
+`{ count, is_listening, connections, heartbeat_seconds }`: the count includes everyone (ghosted
+people too); names only for the viewer's active connections (`lib/server/connections/viewerPeers.ts`)
+who aren't ghosted. No pushes, rankings or likes. Lapsed rows are purged by cron-hourly-maintenance.

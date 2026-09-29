@@ -106,6 +106,8 @@ export const CONNECTIONS_RATE_LIMIT_BINDING = 'CONNECTIONS_RATE_LIMITER';
 export const READ_HEAVY_RATE_LIMIT_BINDING = 'READ_HEAVY_RATE_LIMITER';
 export const HUB_MESSAGE_RATE_LIMIT_BINDING = 'HUB_MESSAGE_RATE_LIMITER';
 export const HUB_UPLOAD_RATE_LIMIT_BINDING = 'HUB_UPLOAD_RATE_LIMITER';
+/** Shared by the post-9/29 feature writes (drops, beacon reactions, nudges); keyed per feature + user. */
+export const FEATURE_MUTATION_RATE_LIMIT_BINDING = 'FEATURE_MUTATION_RATE_LIMITER';
 
 export const CONNECTIONS_RATE_LIMIT = 10;
 export const CONNECTIONS_RATE_WINDOW_MS = 60_000;
@@ -114,3 +116,23 @@ export const READ_HEAVY_RATE_WINDOW_MS = 60_000;
 export const HUB_MESSAGE_RATE_LIMIT = 30;
 export const HUB_UPLOAD_RATE_LIMIT = 6;
 export const HUB_MUTATION_RATE_WINDOW_MS = 60_000;
+export const FEATURE_MUTATION_RATE_LIMIT = 30;
+export const FEATURE_MUTATION_RATE_WINDOW_MS = 60_000;
+
+/** 429 when `userId` exceeds the shared feature-write budget for `feature`, else null. */
+export async function featureMutationRateLimitResponse(
+  feature: string,
+  userId: string,
+): Promise<Response | null> {
+  const limited = await isRateLimited({
+    bindingName: FEATURE_MUTATION_RATE_LIMIT_BINDING,
+    key: `${feature}:${userId}`,
+    limit: FEATURE_MUTATION_RATE_LIMIT,
+    windowMs: FEATURE_MUTATION_RATE_WINDOW_MS,
+  });
+  if (!limited) return null;
+  return Response.json(
+    { error: 'Too many requests. Please wait a moment and try again.', code: 'rate_limited' },
+    { status: 429 },
+  );
+}
