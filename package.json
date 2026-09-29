@@ -6,7 +6,7 @@
     "predev": "node scripts/copy-maplibre-worker.mjs",
     "dev": "next dev",
     "prepare:env": "bash scripts/materialize-ci-env.sh",
-    "postinstall": "bash scripts/maybe-materialize-ci-env.sh",
+    "postinstall": "node scripts/maybe-materialize-ci-env.mjs",
     "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "prebuild:worker": "node scripts/copy-maplibre-worker.mjs",

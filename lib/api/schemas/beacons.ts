@@ -94,8 +94,8 @@ export const hubInteractionBodySchema = z.preprocess((raw) => {
   };
 }, z.object({
   hubId: nonEmptyString,
-  userLat: z.number(),
-  userLong: z.number(),
+  userLat: z.number().optional(),
+  userLong: z.number().optional(),
   body: z.string().trim().min(1).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).passthrough());
@@ -114,8 +114,8 @@ export const hubReactionBodySchema = z.preprocess((raw) => {
   hubId: nonEmptyString,
   messageId: nonEmptyString,
   reactionType: z.string().trim().min(1).max(32),
-  userLat: z.number(),
-  userLong: z.number(),
+  userLat: z.number().optional(),
+  userLong: z.number().optional(),
 }).passthrough());
 
 export const hubJoinBodySchema = z.preprocess((raw) => {

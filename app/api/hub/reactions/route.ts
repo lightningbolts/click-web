@@ -32,8 +32,8 @@ async function authorize(
     hubId: string;
     messageId: string;
     userId: string;
-    userLat: number;
-    userLong: number;
+    userLat: number | undefined;
+    userLong: number | undefined;
   },
 ): Promise<{ target: HubMessageTarget } | { response: NextResponse }> {
   const target = await loadTarget(admin, args.messageId);
@@ -43,8 +43,8 @@ async function authorize(
   const denied = await assertHubGeofenceFromCoords(
     admin,
     target.hub_id,
-    args.userLat,
-    args.userLong,
+    args.userLat ?? Number.NaN,
+    args.userLong ?? Number.NaN,
     args.userId,
   );
   return denied ? { response: denied } : { target };

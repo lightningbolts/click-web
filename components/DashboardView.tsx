@@ -25,6 +25,10 @@ import {
   ConnectionMap,
 } from '@/components/dashboard';
 import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
+import HomeExplore from './dashboard/HomeExplore';
+import HomeSocialFeed from '@/components/dashboard/HomeSocialFeed';
+import HomeConnectionInsights from '@/components/dashboard/HomeConnectionInsights';
+import CommunityHubs from '@/components/dashboard/CommunityHubs';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import UserProfileModal, { type DecryptedProfileMessage } from '@/components/UserProfileModal';
 import type { Message } from '@/lib/chat/types';
@@ -104,7 +108,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   const [createClickOpen, setCreateClickOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useSessionCachedState<NotificationPreferences>(userId, 'notificationPreferences', DEFAULT_NOTIFICATION_PREFERENCES);
   /** Re-render countdown labels periodically */
-  const [archiveCountdownTick, setArchiveCountdownTick] = useState(0);
+  const [archiveCountdownTick, setArchiveCountdownTick] = useState(() => Date.now());
   const activeTabRef = useRef<DashboardTab>(activeTab);
   /** Tabs whose panes have mounted at least once (map/chat are kept alive after that). */
   const [visitedTabs, setVisitedTabs] = useState<ReadonlySet<DashboardTab>>(() => new Set([activeTab]));
@@ -333,14 +337,14 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const c of connectionRecords) {
-      if (!c.otherUserId || !c.intentOverlapLabel) continue;
+      if (!c.otherUserId || !c.intentOverlapLabel || blockedUserIds.has(c.otherUserId) || !isActiveChatListStatus(c.status)) continue;
       if (seen.has(c.otherUserId)) continue;
       seen.add(c.otherUserId);
       const first = c.name.trim().split(/\s+/)[0] || 'them';
       out.push(`You and ${first} are both available right now!`);
     }
     return out;
-  }, [connectionRecords]);
+  }, [connectionRecords, blockedUserIds]);
 
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
@@ -351,7 +355,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   });
 
   useEffect(() => {
-    const id = setInterval(() => setArchiveCountdownTick((t) => t + 1), 60_000);
+    const id = setInterval(() => setArchiveCountdownTick(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -442,7 +446,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
               Welcome back, <span className="text-primary">{userName}</span>
             </>
           ),
-          subtitle: 'Your digital memory box',
+          subtitle: 'Make plans, keep in touch, and remember your moments.',
         };
       case 'events':
         return {
@@ -454,6 +458,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
           title: 'Click Map',
           subtitle: 'Where your memories were made',
         };
+      case 'hubs':
+        return { title: 'Community Hubs', subtitle: 'Conversations rooted in real places.' };
       case 'identity':
         return {
           title: 'QR Identity',
@@ -580,9 +586,42 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
         />
       ) : null}
 
+          {activeTab === 'hubs' ? (
+            <CommunityHubs key={user.id} userId={user.id} initialHubId={searchParams.get('hub')} />
+          ) : null}
           {activeTab === 'memory' ? (
             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="min-w-0 space-y-6">
+                <HomeSocialFeed
+                  key={user.id}
+                  userId={user.id}
+                  name={userName}
+                  now={archiveCountdownTick}
+                  connections={[...connectionRecordsWithChatPreview, ...groupCliqueRecords].filter((c) => !c.otherUserId || !blockedUserIds.has(c.otherUserId))}
+                  onOpenChat={handleOpenChat}
+                  onOpenProfile={(id, connectionId) => { setProfileConnectionId(connectionId); setProfileUserId(id); }}
+                >
+                <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
+
+                {homeAvailabilityOverlapLines.length > 0 ? (
+                  <div className="space-y-1.5 rounded-[16px] border border-primary/30 bg-primary-container p-4">
+                    {homeAvailabilityOverlapLines.map((line, i) => (
+                      <p key={`${line}-${i}`} className="text-sm font-semibold text-on-primary-container">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+
+                </HomeSocialFeed>
+                <HomeExplore key={user.id} userId={user.id} now={archiveCountdownTick} />
+                <HomeConnectionInsights
+                  key={`insights-${user.id}`}
+                  userId={user.id}
+                  connections={activeConnections.filter((c) => !c.otherUserId || !blockedUserIds.has(c.otherUserId))}
+                  now={archiveCountdownTick}
+                  onOpenChat={handleOpenChat}
+                />
                 <section aria-label="Your stats">
                   <StatsOverview
                     totalConnections={dashboardMetrics.totalConnections}
@@ -625,18 +664,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
               </div>
 
               <aside className="space-y-4 lg:sticky lg:top-6" aria-label="Right now">
-                <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
-
-                {homeAvailabilityOverlapLines.length > 0 ? (
-                  <div className="space-y-1.5 rounded-[16px] border border-primary/30 bg-primary-container p-4">
-                    {homeAvailabilityOverlapLines.map((line, i) => (
-                      <p key={`${line}-${i}`} className="text-sm font-semibold text-on-primary-container">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-
                 <section className="space-y-2">
                   <h3 className="text-sm font-bold text-on-surface-variant">Next milestone</h3>
                   <MilestoneProgress
@@ -830,4 +857,3 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     </div>
   );
 }
-

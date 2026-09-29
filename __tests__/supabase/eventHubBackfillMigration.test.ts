@@ -8,7 +8,7 @@ describe('event hub backfill migration', () => {
       'supabase/migrations/20260915023000_backfill_event_hubs_and_align_rsvp_rls.sql',
     ),
     'utf8',
-  );
+  ).replace(/\r\n/g, '\n');
 
   it('backfills only event beacons without a canonical hub', () => {
     expect(migration).toContain("mb.beacon_type = 'event'");

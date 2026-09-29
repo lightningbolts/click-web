@@ -101,7 +101,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
           <CalendarClock className="w-5 h-5 text-sky-700 dark:text-sky-400" aria-hidden />
         </div>
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-on-surface">Open to meet</h2>
+          <h2 className="text-xl font-bold text-on-surface">I'm down for…</h2>
           <p className="text-sm text-on-surface-variant mt-0.5">
             Share a short intent (coffee, study, walk…). Connections see it on your profile while it’s active.
           </p>
@@ -161,7 +161,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
             </div>
           ) : (
             <div className="mb-5 rounded-xl border border-border-hard/80 bg-surface-container/30 px-3 py-3 text-sm text-on-surface-variant">
-              No active intent — add one below so friends know what you’re up for.
+              {data !== undefined ? 'No active plans — share what you’re down for.' : 'Your plans are unavailable.'}
             </div>
           )}
 
@@ -173,6 +173,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <input
                 type="text"
+                aria-label="What you’re down for"
                 value={tag}
                 onChange={(e) => setTag(e.target.value.slice(0, 25))}
                 placeholder="e.g. Coffee, Study session"
@@ -180,6 +181,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
                 className="min-w-0 rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
               <select
+                aria-label="Availability duration"
                 value={durationMs}
                 onChange={(e) => setDurationMs(Number(e.target.value))}
                 className="rounded-xl border border-border-hard bg-surface px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/50"
@@ -206,6 +208,7 @@ export default function MyAvailabilityIntentsCard({ getAuthHeaders }: Props) {
       {(error ?? loadError) && (
         <p className="mt-3 text-sm text-red-700 dark:text-red-400" role="alert">
           {error ?? (loadError instanceof Error ? loadError.message : 'Could not load availability')}
+          {loadError ? <button type="button" className="ml-1 underline" onClick={() => void mutate()}>Retry</button> : null}
         </p>
       )}
     </section>

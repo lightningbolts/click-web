@@ -86,8 +86,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   const denied = await assertHubGeofenceFromCoords(
     admin,
     owned.target.hub_id,
-    userLat,
-    userLong,
+    userLat ?? Number.NaN,
+    userLong ?? Number.NaN,
     auth.user.id,
   );
   if (denied) return denied;
@@ -162,8 +162,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   const denied = await assertHubGeofenceFromCoords(
     admin,
     owned.target.hub_id,
-    userLat,
-    userLong,
+    userLat ?? Number.NaN,
+    userLong ?? Number.NaN,
     auth.user.id,
   );
   if (denied) return denied;

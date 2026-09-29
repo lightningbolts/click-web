@@ -467,4 +467,33 @@ describe('Hub interaction routes', () => {
     expect(response.status).toBe(403);
     expect(from).toHaveBeenCalledTimes(1);
   });
+  it('passes absent event coordinates to the authoritative gate as invalid standalone coordinates', async () => {
+    mockParseBody.mockResolvedValue({ ok: true, data: { hubId: HUB_ID } });
+    const target = queryWithMaybeSingle({ id: MESSAGE_ID, hub_id: HUB_ID, user_id: USER_ID, message_type: 'text' });
+    const deletion = deleteQuery();
+    const admin = { from: jest.fn().mockReturnValueOnce(target).mockReturnValueOnce(deletion) };
+    mockCreateAdmin.mockReturnValue(admin);
+    const response = await deleteMessage(request('DELETE', `/api/hub/messages/${MESSAGE_ID}`), context());
+    expect(response.status).toBe(200);
+    expect(mockAssertHubGeofence).toHaveBeenCalledWith(admin, HUB_ID, Number.NaN, Number.NaN, USER_ID);
+  });
+
+  it('rejects a malformed history cursor before querying messages', async () => {
+    const response = await getHubMessages(new NextRequest(`https://click.example/api/hub/messages?hubId=${HUB_ID}&before=invalid&beforeId=bad`));
+    expect(response.status).toBe(400);
+    expect(mockCreateAdmin).not.toHaveBeenCalled();
+  });
+
+  it('uses both timestamp and id for older history without dropping timestamp ties', async () => {
+    const participants = resolvedQuery([{ user_id: USER_ID }]);
+    const venue = queryWithMaybeSingle({ event_beacon_id: null });
+    const messages = resolvedQuery([]);
+    messages.or = jest.fn(() => messages);
+    mockCreateAdmin.mockReturnValue({ from: jest.fn().mockReturnValueOnce(participants).mockReturnValueOnce(venue).mockReturnValueOnce(messages) });
+    const before = '2026-09-26T12:00:00.123456+00:00';
+    const response = await getHubMessages(new NextRequest(`https://click.example/api/hub/messages?hubId=${HUB_ID}&before=${encodeURIComponent(before)}&beforeId=${MESSAGE_ID}`));
+    expect(response.status).toBe(200);
+    expect(messages.or).toHaveBeenCalledWith(`created_at.lt.${before},and(created_at.eq.${before},id.lt.${MESSAGE_ID})`);
+  });
+
 });

@@ -151,6 +151,7 @@ export async function deriveKeysForConnection(
  * derivation as iOS `ClickCryptoV1.deriveKeysForHub`: `SHA-256("<salt>:hub-broadcast:<hubId>")`.
  */
 export async function deriveKeysForHub(hubId: string): Promise<DerivedKeys> {
+  if (!hubId.trim()) throw new Error('Hub id is required');
   const cacheKey = `hub:${hubId.trim()}`;
   const cached = keyCache.get(cacheKey);
   if (cached) return cached;

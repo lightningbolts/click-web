@@ -1,7 +1,7 @@
 /**
  * POST /api/hub/join
  * Register as a hub participant.
- * Event hubs: check-in or host (no GPS). Standalone hubs: use verify-hub-proximity.
+ * Event hubs: RSVP or host (no GPS). Standalone hubs: fresh geofence coordinates.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createChatGatekeeperAdmin();
-  const denied = await assertHubAccess(admin, hubId, auth.user.id);
+  const denied = await assertHubAccess(
+    admin, hubId, auth.user.id,
+    typeof parsed.data.user_lat === 'number' ? parsed.data.user_lat : undefined,
+    typeof parsed.data.user_long === 'number' ? parsed.data.user_long : undefined,
+  );
   if (denied) return denied;
 
   const { data: venue, error: venueErr } = await admin
