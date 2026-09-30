@@ -38,9 +38,16 @@ export type SharedDropRow = {
   height: number | null;
   created_at: string;
   reveal_at: string;
+  caption: string | null;
 };
 
-const DROP_COLUMNS = 'id, user_id, audience, client_drop_id, original_path, preview_path, width, height, created_at, reveal_at';
+const DROP_COLUMNS = 'id, user_id, audience, client_drop_id, original_path, preview_path, width, height, created_at, reveal_at, caption';
+
+/** A caption belongs to the photo: the poster always sees it, everyone else once it develops. */
+export function visibleCaption(row: Pick<SharedDropRow, 'user_id' | 'reveal_at' | 'caption'>, viewerId: string, nowMs = Date.now()): string | null {
+  if (!row.caption) return null;
+  return row.user_id === viewerId || Date.parse(row.reveal_at) <= nowMs ? row.caption : null;
+}
 
 /**
  * For each poster, how the viewer and that poster stand right now: connected on the viewer's
@@ -147,6 +154,7 @@ export async function serializeSharedDrops(
       width: r.width,
       height: r.height,
       preview_url: previews.get(r.preview_path) ?? null,
+      caption: visibleCaption(r, viewerId),
     };
   });
 }
@@ -181,6 +189,7 @@ export async function insertSharedDrop(
     preview: Buffer;
     width: number | null;
     height: number | null;
+    caption: string | null;
     config: SharedDropsConfig;
   },
 ): Promise<{ row: SharedDropRow } | { error: 'cap_reached' | 'duplicate' | 'failed' }> {
@@ -202,6 +211,7 @@ export async function insertSharedDrop(
       preview_path: uploaded.previewPath,
       width: args.width,
       height: args.height,
+      caption: args.caption,
       reveal_at: new Date(Date.now() + args.config.developHours * 3_600_000).toISOString(),
     })
     .select(DROP_COLUMNS)
