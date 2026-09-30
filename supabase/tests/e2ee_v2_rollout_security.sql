@@ -87,6 +87,9 @@ SELECT is((SELECT count(*)::integer FROM public.chat_recipient_key_envelopes WHE
 
 INSERT INTO public.chat_devices (id, user_id, device_id, identity_public_key, created_at)
 VALUES ('88000000-0000-0000-0000-000000000008', '82000000-0000-0000-0000-000000000002', 'rollout-b-new', 'public-b-new', now() + interval '1 day');
+-- History only moves between one user's own devices, after they approve it by email.
+INSERT INTO public.chat_device_history_requests (user_id, recipient_device_id, status, decided_at)
+VALUES ('82000000-0000-0000-0000-000000000002', '88000000-0000-0000-0000-000000000008', 'approved', now());
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '82000000-0000-0000-0000-000000000002', true);
@@ -130,14 +133,14 @@ SET LOCAL ROLE service_role;
 SELECT is(
     (public.approve_chat_key_transfer(
         '85000000-0000-0000-0000-000000000005',
-        '81000000-0000-0000-0000-000000000001',
-        'rollout-a',
+        '82000000-0000-0000-0000-000000000002',
+        'rollout-b',
         'rollout-b-new',
         jsonb_build_array(
             jsonb_build_object(
                 'epoch', 1,
                 'recipient_device_id', 'rollout-b-new',
-                'sender_device_id', 'rollout-a',
+                'sender_device_id', 'rollout-b',
                 'envelope', 'e2e2:historical-b-new'
             )
         )
@@ -218,7 +221,7 @@ SELECT is((SELECT count(*)::integer FROM public.chat_recipient_key_envelopes WHE
 
 SET LOCAL ROLE service_role;
 UPDATE public.chat_devices SET revoked_at = now()
-WHERE id = '86000000-0000-0000-0000-000000000006';
+WHERE id IN ('86000000-0000-0000-0000-000000000006', '87000000-0000-0000-0000-000000000007');
 RESET ROLE;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '82000000-0000-0000-0000-000000000002', true);
