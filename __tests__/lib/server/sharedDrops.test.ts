@@ -96,6 +96,7 @@ describe('shared drop captions', () => {
 
   it('counts caption length as people do and drops blank captions', () => {
     expect(sharedDropCreateBodySchema.safeParse({ ...base, caption: '👨‍👩‍👧'.repeat(100) }).success).toBe(true);
+    expect(sharedDropCreateBodySchema.safeParse({ ...base, caption: '👨‍👩‍👧‍👦'.repeat(100) }).success).toBe(true);
     expect(sharedDropCreateBodySchema.safeParse({ ...base, caption: 'a'.repeat(101) }).success).toBe(false);
     expect(sharedDropCreateBodySchema.parse({ ...base, caption: '   ' }).caption).toBeUndefined();
     expect(sharedDropCreateBodySchema.parse({ ...base, caption: ' sunset ' }).caption).toBe('sunset');

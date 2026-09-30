@@ -56,7 +56,8 @@ export const sharedDropCreateBodySchema = z.object({
   caption: z
     .string()
     .trim()
-    .max(1000)
+    // Same unit as the database backstop (char_length counts code points, not UTF-16 units).
+    .refine((s) => [...s].length <= 1000, 'Caption is too long.')
     .refine((s) => [...new Intl.Segmenter().segment(s)].length <= SHARED_DROP_CAPTION_MAX, 'Caption is too long.')
     .transform((s) => s || undefined)
     .optional(),
