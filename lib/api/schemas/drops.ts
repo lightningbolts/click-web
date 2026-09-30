@@ -41,6 +41,8 @@ export const dropReportBodySchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 
+export const SHARED_DROP_CAPTION_MAX = 100;
+
 /** POST /api/me/shared-drops — one drop to all or core connections (original + pixelated preview). */
 export const sharedDropCreateBodySchema = z.object({
   client_drop_id: uuid,
@@ -50,4 +52,12 @@ export const sharedDropCreateBodySchema = z.object({
   preview_b64: base64,
   width: z.number().int().positive().max(20000).optional(),
   height: z.number().int().positive().max(20000).optional(),
+  /** Locket-style caption: up to 100 characters as people count them (emoji count once). */
+  caption: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine((s) => [...new Intl.Segmenter().segment(s)].length <= SHARED_DROP_CAPTION_MAX, 'Caption is too long.')
+    .transform((s) => s || undefined)
+    .optional(),
 });

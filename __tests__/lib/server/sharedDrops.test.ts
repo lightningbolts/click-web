@@ -80,3 +80,24 @@ describe('shared drop audience resolution', () => {
     expect([...resolved.keys()].sort()).toEqual(['ana-core', 'cal-all', 'mine']);
   });
 });
+
+describe('shared drop captions', () => {
+  const { visibleCaption } = jest.requireActual('@/lib/server/sharedDrops');
+  const { sharedDropCreateBodySchema } = jest.requireActual('@/lib/api/schemas/drops');
+  const base = { client_drop_id: '00000000-0000-4000-8000-000000000001', audience: 'all', mime_type: 'image/jpeg', original_b64: 'AA==', preview_b64: 'AA==' };
+
+  it('shows the caption to the poster always and to others only once developed', () => {
+    const row = { user_id: 'poster', reveal_at: new Date(2000).toISOString(), caption: 'hi' };
+    expect(visibleCaption(row, 'poster', 1000)).toBe('hi');
+    expect(visibleCaption(row, 'viewer', 1000)).toBeNull();
+    expect(visibleCaption(row, 'viewer', 2000)).toBe('hi');
+    expect(visibleCaption({ ...row, caption: null }, 'poster', 3000)).toBeNull();
+  });
+
+  it('counts caption length as people do and drops blank captions', () => {
+    expect(sharedDropCreateBodySchema.safeParse({ ...base, caption: '👨‍👩‍👧'.repeat(100) }).success).toBe(true);
+    expect(sharedDropCreateBodySchema.safeParse({ ...base, caption: 'a'.repeat(101) }).success).toBe(false);
+    expect(sharedDropCreateBodySchema.parse({ ...base, caption: '   ' }).caption).toBeUndefined();
+    expect(sharedDropCreateBodySchema.parse({ ...base, caption: ' sunset ' }).caption).toBe('sunset');
+  });
+});

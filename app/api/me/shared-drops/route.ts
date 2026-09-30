@@ -80,6 +80,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       preview,
       width: body.width ?? null,
       height: body.height ?? null,
+      caption: body.caption ?? null,
       config: auth.config,
     });
     if ('error' in result) {
