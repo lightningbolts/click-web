@@ -1,5 +1,7 @@
 # Click Places — Product + Architecture Brainstorm
 
+> **Superseded for implementation by [`CLICK_PLACES_SPEC.md`](CLICK_PLACES_SPEC.md).** Where they differ, the spec wins. In particular: (1) there are **no display thresholds or k-anonymity cut-offs**; Pulse, counts and history are always shown with their sample size and age, and users narrow them with filters; (2) the database is renamed to **`places` / `place_managers` / `place_check_ins`** (with compatibility views), not just the product copy. This memo remains the product reasoning.
+
 **Status:** exploration memo. Nothing here is implemented, and nothing here changes production behavior.
 **Grounding:** `click-web` (Next.js BFF and the canonical Supabase migrations) and `click-ios` (native Swift client), branch `claude/vibrant-hamilton-g3beyz`, inspected 2026-10-01. Where repository docs disagree with code, this memo follows the code.
 
