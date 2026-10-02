@@ -1,10 +1,11 @@
 import 'server-only';
 
+import type Stripe from 'stripe';
+import { mayViewTicketing } from './access';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStripe, getAppBaseUrl } from '@/lib/server/stripe';
 import { CURRENT_FEE_POLICY, priceOrder } from '@/lib/server/ticketing/feePolicy';
 
-const CHECKOUT_SESSION_MINUTES = 30; // Stripe minimum lifetime
 const HOLD_MINUTES = 32; // small reconciliation window past session expiry
 
 export type CheckoutItemInput = { tierId: string; quantity: number };
@@ -42,7 +43,7 @@ const RESERVE_FAILURE_STATUS: Record<string, number> = {
  * Reserve inventory in Postgres first, then create the Stripe Checkout
  * Session. The client submitted only tier ids + quantities; every financial
  * value is loaded and computed here. If Stripe session creation fails the
- * reservation is released; the Stripe call itself is idempotent on the order
+ * reservation stays held until reconciled; the Stripe call itself is idempotent on the order
  * id so a lost HTTP response can be retried without a second checkout.
  */
 export async function createTicketCheckout(
@@ -50,7 +51,10 @@ export async function createTicketCheckout(
   buyerUserId: string,
   beaconId: string,
   items: readonly CheckoutItemInput[],
+  attemptId: string,
 ): Promise<CheckoutResult> {
+  if (!(await mayViewTicketing(admin, beaconId, buyerUserId)))
+    return { ok: false, status: 403, code: 'invitation_required' };
   const tierIds = items.map((i) => i.tierId);
   const { data: tierRows, error: tierError } = await admin
     .from('ticket_tiers')
@@ -77,6 +81,7 @@ export async function createTicketCheckout(
 
   const { data: reserveRaw, error: reserveError } = await admin.rpc('ticketing_reserve_order', {
     p_buyer: buyerUserId,
+    p_attempt: attemptId,
     p_beacon: beaconId,
     p_items: items.map((i) => ({
       tier_id: i.tierId,
@@ -92,7 +97,12 @@ export async function createTicketCheckout(
   });
   if (reserveError) throw new Error(`ticketing_reserve_order failed: ${reserveError.message}`);
 
-  const reserve = reserveRaw as { ok: boolean; code?: string; order_id?: string; remaining?: number };
+  const reserve = reserveRaw as {
+    ok: boolean;
+    code?: string;
+    order_id?: string;
+    remaining?: number;
+  };
   if (!reserve.ok || !reserve.order_id) {
     const code = reserve.code ?? 'reservation_failed';
     return {
@@ -104,61 +114,84 @@ export async function createTicketCheckout(
   }
   const orderId = reserve.order_id;
 
+  const { data: order, error: orderError } = await admin
+    .from('ticket_orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+  if (orderError) throw new Error(orderError.message);
+  const stripe = getStripe();
+  if (order.stripe_checkout_session_id) {
+    const session = await stripe.checkout.sessions.retrieve(order.stripe_checkout_session_id);
+    if (session.status === 'open' && session.url)
+      return { ok: true, orderId, checkoutUrl: session.url };
+    return { ok: false, status: 409, code: 'checkout_finished', extra: { order_id: orderId } };
+  }
+  if (order.order_state !== 'reserved')
+    return { ok: false, status: 409, code: 'checkout_finished', extra: { order_id: orderId } };
+  // Never recreate an uncertain request after Stripe's 24-hour idempotency retention.
+  if (Date.now() - Date.parse(order.created_at) > 23 * 60 * 60 * 1000)
+    return { ok: false, status: 409, code: 'checkout_needs_attention' };
+  const { data: snapshots, error: snapshotError } = await admin
+    .from('ticket_order_items')
+    .select('quantity,unit_amount,tier_name_snapshot')
+    .eq('order_id', orderId)
+    .order('ticket_tier_id');
+  if (snapshotError) throw new Error(snapshotError.message);
   const organizer = await loadOrganizerStripeAccountForBeacon(admin, beaconId);
   const base = getAppBaseUrl();
-  const expiresAt = Math.floor(Date.now() / 1000) + CHECKOUT_SESSION_MINUTES * 60;
-
-  try {
-    const stripe = getStripe();
-    const session = await stripe.checkout.sessions.create(
-      {
-        mode: 'payment',
-        client_reference_id: orderId,
-        metadata: { click_order_id: orderId, click_event_id: beaconId },
-        line_items: items.map((i) => ({
-          quantity: i.quantity,
-          price_data: {
-            currency,
-            unit_amount: tiers.get(i.tierId)!.unit_amount,
-            product_data: { name: tiers.get(i.tierId)!.name },
-          },
-        })),
-        expires_at: expiresAt,
-        payment_intent_data: {
-          transfer_data: { destination: organizer.stripeAccountId },
-          application_fee_amount: pricing.platformFeeCents,
-          metadata: { click_order_id: orderId },
-        },
-        success_url: `${base}/events/${beaconId}/tickets/return?order=${orderId}`,
-        cancel_url: `${base}/events/${beaconId}/tickets/return?order=${orderId}&canceled=1`,
+  const proposed: Stripe.Checkout.SessionCreateParams = {
+    mode: 'payment',
+    payment_method_types: ['card'],
+    client_reference_id: orderId,
+    metadata: { click_order_id: orderId, click_event_id: beaconId },
+    line_items: (snapshots ?? []).map((i) => ({
+      quantity: i.quantity,
+      price_data: {
+        currency: order.currency,
+        unit_amount: i.unit_amount,
+        product_data: { name: i.tier_name_snapshot },
       },
-      { idempotencyKey: `checkout-order:${orderId}` },
-    );
-
-    const { error: updateError } = await admin
+    })),
+    expires_at: Math.floor(Date.parse(order.checkout_expires_at) / 1000),
+    payment_intent_data: {
+      transfer_data: { destination: organizer.stripeAccountId },
+      application_fee_amount: order.platform_fee_amount,
+      metadata: { click_order_id: orderId },
+    },
+    success_url: base + '/e/' + beaconId + '/tickets/return?order=' + orderId,
+    cancel_url: base + '/e/' + beaconId + '/tickets/return?order=' + orderId + '&canceled=1',
+  };
+  // Freeze all Stripe parameters before the network request; concurrent callers read the winner.
+  if (!order.checkout_request) {
+    const { error } = await admin
       .from('ticket_orders')
-      .update({
-        order_state: 'checkout_created',
-        stripe_checkout_session_id: session.id,
-        checkout_expires_at: new Date(expiresAt * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update({ checkout_request: proposed })
       .eq('id', orderId)
-      .eq('order_state', 'reserved');
-    if (updateError) throw new Error(`order update failed: ${updateError.message}`);
-
-    if (!session.url) throw new Error('Stripe session has no hosted URL');
-    return { ok: true, orderId, checkoutUrl: session.url };
-  } catch (err) {
-    // Release the reservation; ticketing_cancel_order is idempotent so a
-    // client retry of this request is safe.
-    await admin
-      .rpc('ticketing_cancel_order', { p_order: orderId, p_target_state: 'canceled' })
-      .then(({ error }) => {
-        if (error) console.error('ticketing_cancel_order after Stripe failure:', error.message);
-      });
-    throw err;
+      .is('checkout_request', null);
+    if (error) throw new Error(error.message);
   }
+  const { data: frozen, error: frozenError } = await admin
+    .from('ticket_orders')
+    .select('checkout_request')
+    .eq('id', orderId)
+    .single();
+  if (frozenError || !frozen?.checkout_request)
+    throw new Error('Could not persist checkout request');
+  // Ambiguous failures keep inventory reserved until Stripe reconciliation proves nonpayment.
+  const session = await stripe.checkout.sessions.create(
+    frozen.checkout_request as Stripe.Checkout.SessionCreateParams,
+    { idempotencyKey: 'checkout-order:' + orderId },
+  );
+  const { error } = await admin
+    .from('ticket_orders')
+    .update({ stripe_checkout_session_id: session.id, order_state: 'checkout_created' })
+    .eq('id', orderId)
+    .eq('order_state', 'reserved');
+  if (error) throw new Error(error.message);
+  if (!session.url)
+    return { ok: false, status: 409, code: 'checkout_finished', extra: { order_id: orderId } };
+  return { ok: true, orderId, checkoutUrl: session.url };
 }
 
 async function loadOrganizerStripeAccountForBeacon(

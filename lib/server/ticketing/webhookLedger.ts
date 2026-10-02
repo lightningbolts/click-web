@@ -32,7 +32,7 @@ export async function recordTicketingWebhookEvent(
     // Ledger unavailable: process anyway rather than dropping a payment
     // event; the RPCs are idempotent.
     console.error('Ticketing webhook ledger insert failed:', error.message);
-    return { process: true, duplicate: false };
+    throw new Error('Ticketing ledger unavailable');
   }
 
   const { data, error: readError } = await admin
@@ -40,7 +40,7 @@ export async function recordTicketingWebhookEvent(
     .select('processing_state, attempt_count')
     .eq('id', event.id)
     .maybeSingle();
-  if (readError || !data) return { process: false, duplicate: true };
+  if (readError || !data) throw new Error('Ticketing ledger unavailable');
   const row = data as { processing_state: string; attempt_count: number };
   if (row.processing_state === 'processed' || row.processing_state === 'ignored') {
     return { process: false, duplicate: true };
@@ -56,16 +56,18 @@ export async function recordTicketingWebhookEvent(
 export async function markTicketingWebhookOutcome(
   admin: SupabaseClient,
   eventId: string,
-  outcome: 'processed' | 'failed',
+  outcome: 'processed' | 'ignored' | 'retryable_failure' | 'needs_attention' | 'failed',
   lastError?: string,
 ): Promise<void> {
   const { error } = await admin
     .from('stripe_webhook_events')
     .update({
       processing_state: outcome,
-      last_error: outcome === 'failed' ? (lastError ?? 'unknown error') : null,
+      last_error: ['failed', 'retryable_failure', 'needs_attention'].includes(outcome)
+        ? (lastError ?? 'unknown error')
+        : null,
       processed_at: outcome === 'processed' ? new Date().toISOString() : null,
     })
     .eq('id', eventId);
-  if (error) console.error('Ticketing webhook ledger update failed:', error.message);
+  if (error) throw new Error(`Ticketing webhook ledger update failed: ${error.message}`);
 }

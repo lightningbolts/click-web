@@ -20,7 +20,11 @@ function projection(row: OrganizerAccountRow) {
     payouts_enabled: row.payouts_enabled,
     transfers_enabled: row.transfers_enabled,
     requirements_currently_due_count: row.requirements_currently_due_count,
-    can_sell: row.onboarding_state === 'ready' && row.transfers_enabled,
+    can_sell:
+      row.onboarding_state === 'ready' &&
+      row.transfers_enabled &&
+      row.charges_enabled &&
+      row.payouts_enabled,
   };
 }
 
@@ -49,7 +53,11 @@ export async function GET(request: NextRequest) {
     try {
       row = await syncOrganizerAccount(admin, row);
     } catch (e) {
-      console.error('Connect status sync failed; serving local state:', e);
+      console.error('Connect status sync failed:', e);
+      return NextResponse.json(
+        { error: 'Could not refresh payout readiness', can_sell: false },
+        { status: 502 },
+      );
     }
   }
 

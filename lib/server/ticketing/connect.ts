@@ -1,4 +1,5 @@
 import 'server-only';
+import { safeTicketingReturnTo } from '@/lib/ticketing/returnTo';
 
 import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -94,14 +95,18 @@ export async function ensureOrganizerAccount(
  * Single-use hosted onboarding link. Never stored: possession grants access
  * to sensitive onboarding context and Stripe treats links as single-use.
  */
-export async function createOnboardingLink(stripeAccountId: string): Promise<string> {
+export async function createOnboardingLink(
+  stripeAccountId: string,
+  returnTo: unknown = '/events',
+): Promise<string> {
   const stripe = getStripe();
   const base = getAppBaseUrl();
+  const suffix = '?return_to=' + encodeURIComponent(safeTicketingReturnTo(returnTo));
   const link = await stripe.accountLinks.create({
     account: stripeAccountId,
     type: 'account_onboarding',
-    refresh_url: `${base}/payments/connect/refresh`,
-    return_url: `${base}/payments/connect/return`,
+    refresh_url: `${base}/payments/connect/refresh${suffix}`,
+    return_url: `${base}/payments/connect/return${suffix}`,
   });
   return link.url;
 }

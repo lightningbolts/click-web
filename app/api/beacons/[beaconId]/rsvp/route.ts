@@ -207,6 +207,12 @@ export async function POST(
     const loaded = await loadEventBeaconOrResponse(admin, beaconId);
     if ("response" in loaded) return loaded.response;
     const { beacon } = loaded;
+    if (beacon.admission_type === "paid") {
+      return NextResponse.json(
+        { error: "Paid events require a ticket", code: "ticket_required" },
+        { status: 409 },
+      );
+    }
     if (!rsvpEnabledFromMetadata(beacon.metadata)) {
       return NextResponse.json({ error: "RSVP is closed for this event" }, { status: 403 });
     }
@@ -349,6 +355,12 @@ export async function DELETE(
     const admin = createAdminSupabaseClient();
     // allowExpired: cancel must work after the event window so users can leave a stuck RSVP.
     const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
+    if ("beacon" in loaded && loaded.beacon.admission_type === "paid") {
+      return NextResponse.json(
+        { error: "Paid events require a ticket", code: "ticket_required" },
+        { status: 409 },
+      );
+    }
     const venueId = "beacon" in loaded ? loaded.beacon.venue_id : null;
 
     // Admin client: user-scoped DELETE was hitting RLS and surfacing as RSVP failures.

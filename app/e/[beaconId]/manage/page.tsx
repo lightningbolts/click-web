@@ -11,6 +11,7 @@ import GuestListUploadCard from "@/components/events/GuestListUploadCard";
 import EventPageShell from "@/components/events/EventPageShell";
 import EventRsvpRequestsCard from "@/components/events/EventRsvpRequestsCard";
 import EventBackLink from "@/components/events/EventBackLink";
+import TicketingSetupCard from "@/components/events/ticketing/TicketingSetupCard";
 
 type GuestRow = { id: string; name: string; contact: string; created_at: string };
 type Health = {
@@ -81,6 +82,7 @@ export default function EventManagePage() {
           </Link>
         </div>
         {error ? <p className="text-error">{error}</p> : null}
+        <TicketingSetupCard beaconId={beaconId} />
         <GuestListUploadCard beaconId={beaconId} />
         <EventRsvpRequestsCard beaconId={beaconId} />
         <FcCard className="flex flex-wrap items-center gap-3 p-4">

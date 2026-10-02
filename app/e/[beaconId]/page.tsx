@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
+import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
+import { mayViewTicketing } from "@/lib/server/ticketing/access";
+import { ticketingEnabled } from "@/lib/server/ticketing/flags";
+import TicketPurchasePanel from "@/components/events/ticketing/TicketPurchasePanel";
 import { CalendarDays, MapPin } from "lucide-react";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadPublicEventPayload } from "@/lib/events/publicEvent";
@@ -43,12 +47,28 @@ function isUuidLike(v: string): boolean {
   return EVENT_BEACON_UUID_RE.test(v);
 }
 
-const loadEvent = (beaconId: string) =>
+const loadCachedEvent = (beaconId: string) =>
   unstable_cache(
     async () => loadPublicEventPayload(createAdminSupabaseClient(), beaconId),
     ["public-event-v1", beaconId],
     { revalidate: 60 },
   )();
+
+const loadEvent = async (beaconId: string) => {
+  const event = await loadCachedEvent(beaconId);
+  if (
+    event?.ticketing?.admission_type === "paid" &&
+    event.listing?.event_visibility === "invite_only"
+  ) {
+    const admin = createAdminSupabaseClient();
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!(await mayViewTicketing(admin, beaconId, user?.id))) return null;
+  }
+  return event;
+};
 
 export async function generateMetadata({
   params,
@@ -258,13 +278,21 @@ export default async function EventShareLandingPage({
           </div>
 
           <aside className="order-first space-y-4 lg:order-none lg:sticky lg:top-24">
-            {showFullCard ? (
+            {showFullCard && event.ticketing?.admission_type !== "paid" ? (
               <FcCard className="p-6" data-testid="event-state-full">
                 <h2 className="text-lg font-bold text-on-surface">This event is full</h2>
                 <p className="mt-2 text-sm text-on-surface-variant">Ask the host about the waitlist.</p>
               </FcCard>
             ) : null}
-            {showRsvpPanel ? (
+            {event.ticketing?.admission_type === "paid" ? (
+              <FcCard className="p-6">
+                <TicketPurchasePanel
+                  beaconId={beaconId}
+                  initial={event.ticketing}
+                  enabled={ticketingEnabled()}
+                />
+              </FcCard>
+            ) : showRsvpPanel ? (
               <FcCard className="p-6">
                 <EventRsvpPanel
                   beaconId={beaconId}

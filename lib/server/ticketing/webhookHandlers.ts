@@ -1,10 +1,13 @@
 import 'server-only';
+import { getStripe } from '@/lib/server/stripe';
+import { reconcileSession, TicketingAttentionError } from './reconcile';
 
 import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fulfillFromCheckoutSession, loadOrder } from '@/lib/server/ticketing/fulfillment';
+import { loadOrder } from '@/lib/server/ticketing/fulfillment';
 import { snapshotFromStripeAccount } from '@/lib/server/ticketing/connect';
 import { accountRowPatch } from '@/lib/server/ticketing/accountState';
+import { syncRefundedFees } from './refundFees';
 
 /**
  * Ticketing slice of the Stripe webhook. Deliberately constrained event set;
@@ -43,55 +46,24 @@ export function isTicketingEvent(event: Stripe.Event): boolean {
 export async function handleTicketingEvent(
   admin: SupabaseClient,
   event: Stripe.Event,
-): Promise<void> {
+): Promise<'processed' | 'ignored'> {
   switch (event.type) {
     case 'checkout.session.completed':
-    case 'checkout.session.async_payment_succeeded': {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const result = await fulfillFromCheckoutSession(admin, session);
-      if (!result.ok && result.code !== 'not_paid_yet') {
-        // Reconciliation mismatches are operator-visible, not retried forever.
-        console.error(
-          `Ticketing fulfillment rejected (order=${session.metadata?.click_order_id}, session=${session.id}): ${result.code}`,
-        );
-      }
-      return;
-    }
-
-    case 'checkout.session.expired': {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const orderId = session.metadata?.click_order_id ?? session.client_reference_id;
-      if (!orderId) return;
-      const { error } = await admin.rpc('ticketing_cancel_order', {
-        p_order: orderId,
-        p_target_state: 'expired',
-      });
-      if (error) throw new Error(`ticketing_cancel_order failed: ${error.message}`);
-      return;
-    }
-
-    case 'checkout.session.async_payment_failed': {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const orderId = session.metadata?.click_order_id ?? session.client_reference_id;
-      if (!orderId) return;
-      const { error } = await admin.rpc('ticketing_cancel_order', {
-        p_order: orderId,
-        p_target_state: 'payment_failed',
-      });
-      if (error) throw new Error(`ticketing_cancel_order failed: ${error.message}`);
-      return;
-    }
+    case 'checkout.session.async_payment_succeeded':
+    case 'checkout.session.expired':
+    case 'checkout.session.async_payment_failed':
+      return reconcileSession(admin, (event.data.object as Stripe.Checkout.Session).id);
 
     case 'refund.updated': {
-      const refund = event.data.object as Stripe.Refund;
+      const refund = await getStripe().refunds.retrieve((event.data.object as Stripe.Refund).id);
       await applyRefundObject(admin, refund);
-      return;
+      return 'processed';
     }
 
     case 'charge.dispute.created': {
       const dispute = event.data.object as Stripe.Dispute;
       const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
-      if (!chargeId) return;
+      if (!chargeId) return 'ignored';
       const { data, error } = await admin
         .from('ticket_orders')
         .select('id')
@@ -99,37 +71,39 @@ export async function handleTicketingEvent(
         .maybeSingle();
       if (error) throw new Error(`dispute order lookup failed: ${error.message}`);
       const orderId = (data as { id: string } | null)?.id;
-      if (!orderId) return; // not a ticket charge
+      if (!orderId) return 'ignored'; // not a ticket charge
       const { error: rpcError } = await admin.rpc('ticketing_mark_disputed', { p_order: orderId });
       if (rpcError) throw new Error(`ticketing_mark_disputed failed: ${rpcError.message}`);
-      console.error(`Ticket order ${orderId} disputed (${dispute.id}); operator action required.`);
-      return;
+      throw new TicketingAttentionError(`Ticket order ${orderId} disputed (${dispute.id})`);
     }
 
     case 'account.updated': {
-      const account = event.data.object as Stripe.Account;
+      const account = await getStripe().accounts.retrieve((event.data.object as Stripe.Account).id);
       const { data, error } = await admin
         .from('organizer_payment_accounts')
         .update(accountRowPatch(snapshotFromStripeAccount(account)))
         .eq('stripe_account_id', account.id)
         .select('id');
       if (error) throw new Error(`account.updated sync failed: ${error.message}`);
-      if ((data ?? []).length === 0) return; // not an organizer account (e.g. platform)
-      return;
+      if ((data ?? []).length === 0) return 'ignored'; // not an organizer account (e.g. platform)
+      return 'processed';
     }
 
     default:
-      return;
+      return 'ignored';
   }
 }
 
-async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): Promise<void> {
+export async function applyRefundObject(
+  admin: SupabaseClient,
+  refund: Stripe.Refund,
+): Promise<void> {
   const orderId = refund.metadata?.click_order_id;
   if (!orderId) return;
+  if(!refund.metadata?.click_refund_request_id)throw new TicketingAttentionError('refund_request_reference_missing');
   const order = await loadOrder(admin, orderId);
   if (!order) {
-    console.error(`refund ${refund.id} references unknown order ${orderId}`);
-    return;
+    throw new TicketingAttentionError('refund_order_not_found');
   }
   const status =
     refund.status === 'succeeded'
@@ -139,12 +113,25 @@ async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): 
         : refund.status === 'canceled'
           ? 'canceled'
           : 'pending';
-  const ticketIds = (refund.metadata?.click_ticket_ids ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const { data: claim, error: claimError } = await admin
+    .from('ticket_refunds')
+    .select('ticket_ids,order_id,amount')
+    .eq('id', refund.metadata?.click_refund_request_id ?? '')
+    .maybeSingle();
+  if (claimError) throw new Error(claimError.message);
+  const intent =
+    typeof refund.payment_intent === 'string' ? refund.payment_intent : refund.payment_intent?.id;
+  if (
+    !claim ||
+    claim.order_id !== orderId ||
+    claim.amount !== refund.amount ||
+    intent !== order.stripe_payment_intent_id
+  )
+    throw new TicketingAttentionError('refund_mismatch');
+  const ticketIds = claim.ticket_ids;
   const { data, error } = await admin.rpc('ticketing_apply_refund', {
     p_order: orderId,
+    p_request: refund.metadata?.click_refund_request_id,
     p_stripe_refund: refund.id,
     p_amount: refund.amount,
     p_status: status,
@@ -153,6 +140,7 @@ async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): 
   if (error) throw new Error(`ticketing_apply_refund failed: ${error.message}`);
   const result = data as { ok: boolean; code?: string };
   if (!result.ok) {
-    console.error(`refund ${refund.id} not applied to order ${orderId}: ${result.code}`);
+    throw new TicketingAttentionError(result.code);
   }
+  if (status === 'succeeded') await syncRefundedFees(admin, orderId);
 }

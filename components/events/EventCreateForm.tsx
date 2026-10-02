@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import TicketingGate from "@/components/events/ticketing/TicketingGate";
 import { toast } from "sonner";
 import { ImagePlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -54,6 +55,7 @@ export default function EventCreateForm({
   initial,
 }: EventCreateFormProps) {
   const router = useRouter();
+  const [ticketed, setTicketed] = useState(false);
   const reduceMotion = useReducedMotion();
   const isEdit = Boolean(beaconId);
   const initialWindow = useMemo(() => defaultEventWindow(), []);
@@ -227,7 +229,7 @@ export default function EventCreateForm({
       const created =
         json.series_count && json.series_count > 1 ? `${json.series_count} events created` : "Event created";
       toast.success(copied ? `${created}. Link copied.` : `${created}.`);
-      router.push(eventManagePath(id));
+      router.push(eventManagePath(id) + (ticketed ? "#ticketing" : ""));
       navigating = true;
     } catch {
       setError(isEdit ? "Could not save event" : "Could not create event");
@@ -352,6 +354,36 @@ export default function EventCreateForm({
               setLng(nextLng);
             }}
           />
+          <TicketingGate>
+            {isEdit ? (
+              <a href={"/e/" + beaconId + "/manage#ticketing"}>Manage ticketing and payouts</a>
+            ) : (
+              <fieldset className="space-y-2">
+                <legend>Admission</legend>
+                <label className="mr-4">
+                  <input
+                    type="radio"
+                    name="admission-intent"
+                    checked={!ticketed}
+                    onChange={() => setTicketed(false)}
+                  />{" "}
+                  Free
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="admission-intent"
+                    checked={ticketed}
+                    onChange={() => setTicketed(true)}
+                  />{" "}
+                  Ticketed
+                </label>
+                {ticketed ? (
+                  <p>After creating your event, set up payouts and tickets in event management.</p>
+                ) : null}
+              </fieldset>
+            )}
+          </TicketingGate>
           <EventOptionsFields
             visibility={visibility}
             capacity={capacity}
