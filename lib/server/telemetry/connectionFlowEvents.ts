@@ -34,7 +34,69 @@ export type ConnectionFlowEventFields = {
   selectedCount?: number | null;
   candidateCount?: number | null;
   reason?: string | null;
+  /** Already sanitized with `sanitizeCaptureQuality`. */
+  captureQuality?: CaptureQuality | null;
 };
+
+/**
+ * Aggregate capture-quality metrics a client may attach to a flow event (spec: connection
+ * sensor capture §43). Only these keys, only finite numbers / booleans / short enum strings:
+ * no identifiers, tokens or coordinates can be stored this way.
+ */
+const CAPTURE_QUALITY_NUMBERS = {
+  location_accuracy_m: [0, 100_000],
+  location_capture_ms: [0, 600_000],
+  location_update_count: [0, 10_000],
+  barometer_accuracy_m: [0, 100_000],
+  ble_peer_count: [0, 100],
+  ble_rssi_median_dbm: [-130, 20],
+  ble_rssi_sample_count: [0, 10_000],
+  ble_discovery_ms: [0, 600_000],
+  ble_gatt_read_ms: [0, 600_000],
+  ultrasonic_peer_count: [0, 100],
+  ultrasonic_snr_db: [-60, 120],
+  ultrasonic_peak_ratio: [0, 1_000_000],
+  ultrasonic_decode_ms: [0, 600_000],
+  motion_sample_count: [0, 10_000],
+  capture_duration_ms: [0, 600_000],
+} as const satisfies Record<string, readonly [number, number]>;
+
+const CAPTURE_QUALITY_BOOLEANS = [
+  'location_full_accuracy',
+  'location_available',
+  'barometer_available',
+  'motion_available',
+  'heading_available',
+  'uwb_available',
+  'floor_available',
+] as const;
+
+const CAPTURE_QUALITY_ENUMS = {
+  location_accuracy_bucket: ['excellent', 'good', 'usable', 'coarse', 'unusable', 'none'],
+  sensor_failure: ['none', 'location_unavailable', 'location_denied', 'barometer_unavailable', 'motion_unavailable', 'bluetooth_no_peer', 'ultrasonic_no_peer'],
+} as const satisfies Record<string, readonly string[]>;
+
+export type CaptureQuality = Record<string, number | boolean | string>;
+
+export function sanitizeCaptureQuality(raw: unknown): CaptureQuality | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const input = raw as Record<string, unknown>;
+  const out: CaptureQuality = {};
+  for (const [key, [min, max]] of Object.entries(CAPTURE_QUALITY_NUMBERS)) {
+    const value = input[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max) {
+      out[key] = Math.round(value * 100) / 100;
+    }
+  }
+  for (const key of CAPTURE_QUALITY_BOOLEANS) {
+    if (typeof input[key] === 'boolean') out[key] = input[key] as boolean;
+  }
+  for (const [key, allowed] of Object.entries(CAPTURE_QUALITY_ENUMS)) {
+    const value = input[key];
+    if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 function sanitizeNonNegInt(raw: number | null | undefined): number | null {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
@@ -68,6 +130,8 @@ export async function emitConnectionFlowEvent(
       selected_count: sanitizeNonNegInt(fields.selectedCount ?? null),
       candidate_count: sanitizeNonNegInt(fields.candidateCount ?? null),
       reason: sanitizeReason(fields.reason ?? null),
+      // Omitted (not null) when absent so events still insert before the column exists.
+      ...(fields.captureQuality ? { capture_quality: fields.captureQuality } : {}),
     });
 
     if (error) {
