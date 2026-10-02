@@ -465,7 +465,7 @@ async function fetchSubscriptions(
   verificationQueue: VenueVerificationQueueItem[];
 }> {
   const { data: rawVenues, error: venueError } = await admin
-    .from('venues')
+    .from('places')
     .select('id, name, location, subscription_status, stripe_subscription_id, created_at')
     .order('created_at', { ascending: false });
 
@@ -496,16 +496,16 @@ async function fetchSubscriptions(
   const managerCountByVenue = new Map<string, number>();
   if (venueIds.length > 0) {
     const { data: managerRows, error: managerError } = await admin
-      .from('venue_managers')
-      .select('venue_id')
-      .in('venue_id', venueIds);
+      .from('place_managers')
+      .select('place_id')
+      .in('place_id', venueIds);
 
     if (managerError) {
       warnings.push(`venue_managers unavailable: ${managerError.message}`);
     } else {
       for (const raw of managerRows ?? []) {
         const row = asRecord(raw);
-        const venueId = row ? asString(row.venue_id) : null;
+        const venueId = row ? asString(row.place_id) : null;
         if (!venueId) continue;
         managerCountByVenue.set(venueId, (managerCountByVenue.get(venueId) ?? 0) + 1);
       }
@@ -593,7 +593,7 @@ async function fetchActiveBeacons(
 
   if (venueIds.length > 0) {
     const { data: rawVenues, error: venueError } = await admin
-      .from('venues')
+      .from('places')
       .select('id, name, latitude, longitude')
       .in('id', venueIds);
 

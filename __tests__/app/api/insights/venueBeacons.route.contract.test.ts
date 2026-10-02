@@ -63,8 +63,8 @@ type Overrides = {
 function setupSupabase(overrides: Overrides = {}) {
   const mock = makeSupabaseMock({
     tables: {
-      venue_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }),
-      venues: overrides.venues ?? VERIFIED_VENUE,
+      place_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }),
+      places: overrides.venues ?? VERIFIED_VENUE,
       map_beacons: overrides.mapBeacons ?? INSERTED_BEACON,
     },
     rpc: overrides.rpc,
@@ -150,8 +150,8 @@ describe('GET /api/insights/[venueId]/beacons contract', () => {
 
       await callGet();
 
-      const managers = mock.builder('venue_managers');
-      expectFilter(managers, 'venue_id', MOCK_VENUE_ID);
+      const managers = mock.builder('place_managers');
+      expectFilter(managers, 'place_id', MOCK_VENUE_ID);
       expectFilter(managers, 'user_id', MOCK_USER_ID);
       expectRpcCalledWith(mock.rpc, 'insights_venue_map_beacons_list', {
         venue_id_param: MOCK_VENUE_ID,
@@ -289,8 +289,8 @@ describe('POST /api/insights/[venueId]/beacons contract', () => {
 
       await callPost();
 
-      const managers = mock.builder('venue_managers');
-      expectFilter(managers, 'venue_id', MOCK_VENUE_ID);
+      const managers = mock.builder('place_managers');
+      expectFilter(managers, 'place_id', MOCK_VENUE_ID);
       expectFilter(managers, 'user_id', MOCK_USER_ID);
     });
 

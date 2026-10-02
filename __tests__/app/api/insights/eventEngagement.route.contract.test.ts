@@ -39,7 +39,7 @@ function setupSupabase(
   overrides: { venueManagers?: QueryResult; events?: QueryResult } = {},
 ) {
   const auth = makeSupabaseMock({
-    tables: { venue_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }) },
+    tables: { place_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }) },
   });
   const admin = makeSupabaseMock({
     tables: { event_engagement_events: overrides.events ?? ok([]) },
@@ -125,8 +125,8 @@ describe('GET /api/insights/[venueId]/event-engagement contract', () => {
 
       await callRoute();
 
-      const managers = auth.builder('venue_managers');
-      expectFilter(managers, 'venue_id', MOCK_VENUE_ID);
+      const managers = auth.builder('place_managers');
+      expectFilter(managers, 'place_id', MOCK_VENUE_ID);
       expectFilter(managers, 'user_id', MOCK_USER_ID);
 
       const events = admin.builder('event_engagement_events');

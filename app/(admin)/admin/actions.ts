@@ -142,7 +142,7 @@ export async function approveVenueAction(formData: FormData): Promise<void> {
 
   const admin = createAdminSupabaseClient();
   const { error } = await admin
-    .from('venues')
+    .from('places')
     .update({ subscription_status: 'trialing' })
     .eq('id', venueId);
 
@@ -164,7 +164,7 @@ export async function rejectVenueAction(formData: FormData): Promise<void> {
 
   const admin = createAdminSupabaseClient();
   const { error } = await admin
-    .from('venues')
+    .from('places')
     .update({ subscription_status: 'canceled' })
     .eq('id', venueId);
 
