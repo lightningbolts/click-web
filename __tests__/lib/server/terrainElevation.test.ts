@@ -3,7 +3,9 @@
  */
 
 import {
+  BAROMETRIC_CATEGORY_MAX_ACCURACY_M,
   deriveHeightCategoryFromRelativeAltitudeM,
+  deriveTerrainRelativeAltitude,
   fetchTerrainElevationMeters,
 } from '@/lib/server/terrainElevation';
 
@@ -50,5 +52,33 @@ describe('fetchTerrainElevationMeters', () => {
       } as Response;
     }) as typeof fetch;
     await expect(fetchTerrainElevationMeters(47.6, -122.3)).resolves.toBe(38.2);
+  });
+});
+
+describe('deriveTerrainRelativeAltitude', () => {
+  it('keeps the DEM input with the derived altitude', () => {
+    expect(
+      deriveTerrainRelativeAltitude({ barometricAltitudeM: 43.7, barometricAccuracyM: 1.6, terrainElevationM: 31 }),
+    ).toEqual({ relative_altitude_m: 43.7 - 31, terrain_elevation_m: 31, elevation_category: 'ELEVATED' });
+  });
+
+  it('derives no height band from a poor barometer reading but keeps the altitude', () => {
+    const derived = deriveTerrainRelativeAltitude({
+      barometricAltitudeM: 43.7,
+      barometricAccuracyM: BAROMETRIC_CATEGORY_MAX_ACCURACY_M + 0.1,
+      terrainElevationM: 31,
+    });
+    expect(derived).toEqual({ relative_altitude_m: 43.7 - 31, terrain_elevation_m: 31 });
+  });
+
+  it('keeps legacy behavior when the barometer uncertainty is unknown', () => {
+    expect(
+      deriveTerrainRelativeAltitude({ barometricAltitudeM: 33, terrainElevationM: 31 })?.elevation_category,
+    ).toBe('GROUND_LEVEL');
+  });
+
+  it('requires both inputs', () => {
+    expect(deriveTerrainRelativeAltitude({ barometricAltitudeM: null, terrainElevationM: 31 })).toBeNull();
+    expect(deriveTerrainRelativeAltitude({ barometricAltitudeM: 40, terrainElevationM: null })).toBeNull();
   });
 });

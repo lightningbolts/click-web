@@ -20,7 +20,19 @@ export interface ProximityHandshakeRequest {
   longitude?: unknown;
   gps_lat?: unknown;
   gps_lon?: unknown;
+  /** Optional per-device observation quality (see lib/server/encounterObservation.ts). */
+  gps_horizontal_accuracy_m?: unknown;
+  gps_vertical_accuracy_m?: unknown;
+  gps_altitude_m?: unknown;
+  gps_ellipsoidal_altitude_m?: unknown;
+  gps_observed_at?: unknown;
+  gps_floor?: unknown;
+  gps_full_accuracy?: unknown;
   exact_barometric_elevation_m?: unknown;
+  barometric_accuracy_m?: unknown;
+  barometric_precision_m?: unknown;
+  barometric_relative_altitude_m?: unknown;
+  barometric_pressure_kpa?: unknown;
   noise_level?: unknown;
   exact_noise_level_db?: unknown;
   context_tags?: unknown;
@@ -48,6 +60,19 @@ export interface ProximitySensorPayloadJson extends Record<string, Json | undefi
   detected_devices_ble?: string[];
   heard_tokens_audio?: string[];
   timezone_offset_minutes?: number;
+  /**
+   * This user's own observation quality. Horizontal accuracy and the fix timestamp live in
+   * dedicated `pending_handshakes` columns; the rest is kept here.
+   */
+  gps_vertical_accuracy_m?: number;
+  gps_altitude_m?: number;
+  gps_ellipsoidal_altitude_m?: number;
+  gps_floor?: number;
+  gps_full_accuracy?: boolean;
+  barometric_accuracy_m?: number;
+  barometric_precision_m?: number;
+  barometric_relative_altitude_m?: number;
+  barometric_pressure_kpa?: number;
 }
 
 export interface PendingHandshakeRow {
@@ -57,6 +82,8 @@ export interface PendingHandshakeRow {
   heard_tokens: string[];
   lat: number | null;
   lon: number | null;
+  horizontal_accuracy_m?: number | null;
+  location_observed_at?: string | null;
   lux_level: number | null;
   motion_variance: number | null;
   compass_azimuth: number | null;

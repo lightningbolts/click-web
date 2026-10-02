@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import {
-  deriveHeightCategoryFromRelativeAltitudeM,
+  deriveTerrainRelativeAltitude,
   fetchTerrainElevationMeters,
 } from '@/lib/server/terrainElevation';
 import { type ContextTagPayload } from '@/lib/server/connectionEncounterContextTag';
@@ -116,7 +116,9 @@ export async function enrichEncounterWeather(
 }
 
 /**
- * Computes terrain-relative altitude after insert so Open-Elevation latency never delays the POST response.
+ * Computes terrain-relative altitude after insert so the DEM lookup never delays the response.
+ * Targets `encounterId` when known (otherwise the connection's newest row), stores the DEM
+ * value with the derived altitude, and derives no height category from a poor barometer.
  */
 export async function enrichEncounterRelativeAltitude(
   adminClient: ReturnType<typeof createAdminClient>,
@@ -124,6 +126,7 @@ export async function enrichEncounterRelativeAltitude(
   barometricElevationM: number,
   lat: number,
   lon: number,
+  opts: { encounterId?: string | null; barometricAccuracyM?: number | null } = {},
 ) {
   if (
     !Number.isFinite(barometricElevationM) ||
@@ -135,31 +138,34 @@ export async function enrichEncounterRelativeAltitude(
   }
 
   try {
-    const terrainM = await fetchTerrainElevationMeters(lat, lon);
-    if (terrainM == null) return;
+    const terrain = deriveTerrainRelativeAltitude({
+      barometricAltitudeM: barometricElevationM,
+      barometricAccuracyM: opts.barometricAccuracyM,
+      terrainElevationM: await fetchTerrainElevationMeters(lat, lon),
+    });
+    if (terrain == null) return;
 
-    const { data: latestEnc, error: encLookupErr } = await adminClient
-      .from('connection_encounters')
-      .select('id')
-      .eq('connection_id', connectionId)
-      .order('encountered_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let encounterId = opts.encounterId ?? null;
+    if (encounterId == null) {
+      const { data: latestEnc, error: encLookupErr } = await adminClient
+        .from('connection_encounters')
+        .select('id')
+        .eq('connection_id', connectionId)
+        .order('encountered_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (encLookupErr || !latestEnc?.id) {
-      if (encLookupErr) console.error('Encounter lookup for relative altitude:', encLookupErr);
-      return;
+      if (encLookupErr || !latestEnc?.id) {
+        if (encLookupErr) console.error('Encounter lookup for relative altitude:', encLookupErr);
+        return;
+      }
+      encounterId = String(latestEnc.id);
     }
 
-    const relativeAltitudeM = barometricElevationM - terrainM;
-    const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
     const { error } = await adminClient
       .from('connection_encounters')
-      .update({
-        relative_altitude_m: relativeAltitudeM,
-        ...(elevationCategory != null ? { elevation_category: elevationCategory } : {}),
-      })
-      .eq('id', latestEnc.id);
+      .update(terrain)
+      .eq('id', encounterId);
 
     if (error) {
       console.error('Encounter relative altitude update error:', error);

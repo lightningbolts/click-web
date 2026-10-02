@@ -39,6 +39,7 @@ import {
   memberSensorValues,
 } from '@/lib/server/proximity/encounterPersistence';
 import { simulatorProximityMocksEnabled } from '@/lib/server/runtimeEnv';
+import { encounterObservationColumns, parseEncounterObservation } from '@/lib/server/encounterObservation';
 
 export async function bindProximityHandshake(
   admin: SupabaseClient,
@@ -103,7 +104,15 @@ export async function bindProximityHandshake(
   const selfAz = finiteNumber(body.compass_azimuth);
   const selfBattery = finiteBatteryPct(body.battery_level);
   const timezoneOffsetMinutes = finiteNumber(body.timezone_offset_minutes) ?? 0;
-  const sensorPayload = buildSensorPayload(body, timezoneOffsetMinutes);
+  // This phone's own observation quality, kept only alongside the readings it describes.
+  const selfObservation = encounterObservationColumns(
+    parseEncounterObservation(body as Record<string, unknown>),
+    {
+      hasOwnCoordinate: lat != null && lon != null,
+      hasBarometricAltitude: finiteNumber(body.exact_barometric_elevation_m) != null,
+    },
+  );
+  const sensorPayload = buildSensorPayload(body, timezoneOffsetMinutes, selfObservation);
   sensorPayload.detected_devices_ble = detectedDevices;
   sensorPayload.heard_tokens_audio = heardTokens;
   const clientContextTags = sensorPayload.context_tags ?? [];
@@ -134,6 +143,8 @@ export async function bindProximityHandshake(
       heard_tokens: combinedEvidenceTokens.length > 0 ? combinedEvidenceTokens : heardTokens,
       lat,
       lon,
+      horizontal_accuracy_m: selfObservation.gps_horizontal_accuracy_m ?? null,
+      location_observed_at: selfObservation.gps_observed_at ?? null,
       lux_level: selfLux,
       motion_variance: selfMotion,
       compass_azimuth: selfAz,
@@ -299,6 +310,7 @@ export async function bindProximityHandshake(
     exactNoiseLevelDb,
     noiseLevel,
     exactBarometricElevationM,
+    selfObservation,
     clientHeightCategory,
     manualLocationName,
     clientWeatherSnapshot,
@@ -411,6 +423,7 @@ export async function bindProximityHandshake(
           values.exactBarometricElevationM,
           values.manualLocationName,
           values.weatherSnapshot,
+          values.observation.barometric_accuracy_m ?? null,
         );
       }
       if (memberId === uid) {
@@ -467,6 +480,7 @@ export async function bindProximityHandshake(
               pairValues.exactBarometricElevationM,
               pairValues.manualLocationName,
               pairValues.weatherSnapshot,
+              pairValues.observation.barometric_accuracy_m ?? null,
             );
           }
         }

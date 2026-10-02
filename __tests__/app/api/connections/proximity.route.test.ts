@@ -114,6 +114,8 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
                 heard_tokens: row.heard_tokens,
                 lat: row.lat ?? null,
                 lon: row.lon ?? null,
+                horizontal_accuracy_m: row.horizontal_accuracy_m ?? null,
+                location_observed_at: row.location_observed_at ?? null,
                 lux_level: row.lux_level ?? null,
                 motion_variance: row.motion_variance ?? null,
                 compass_azimuth: row.compass_azimuth ?? null,
@@ -839,7 +841,149 @@ describe('POST /api/connections/proximity contract', () => {
       compass_azimuth: 12,
       battery_level: 55,
     });
+    // Legacy payloads (no observation metadata) are accepted and add no quality columns.
+    expect(userARow).not.toHaveProperty('gps_horizontal_accuracy_m');
 
+    dateSpy.mockRestore();
+  });
+
+  it('persists each phone own location and altimeter quality without merging peers', async () => {
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    const observedA = new Date(t0 - 400).toISOString();
+    const observedB = new Date(t0 - 900).toISOString();
+
+    await proximityPost(
+      makeRequest(userA, {
+        my_token: '1234',
+        heard_tokens: ['5678'],
+        latitude: 47.6101,
+        longitude: -122.3421,
+        gps_horizontal_accuracy_m: 4.8,
+        gps_vertical_accuracy_m: 8.2,
+        gps_altitude_m: 52.3,
+        gps_ellipsoidal_altitude_m: 71.1,
+        gps_observed_at: observedA,
+        gps_floor: 3,
+        gps_full_accuracy: true,
+        exact_barometric_elevation_m: 50.9,
+        barometric_accuracy_m: 1.6,
+        barometric_precision_m: 0.3,
+        barometric_relative_altitude_m: 0.2,
+        barometric_pressure_kpa: 100.82,
+      }),
+    );
+    expect(adminStore._pending[0]).toMatchObject({
+      horizontal_accuracy_m: 4.8,
+      location_observed_at: observedA,
+      sensor_payload: expect.objectContaining({ gps_floor: 3, barometric_accuracy_m: 1.6 }),
+    });
+
+    const resB = await proximityPost(
+      makeRequest(userB, {
+        my_token: '5678',
+        heard_tokens: ['1234'],
+        latitude: 47.6102,
+        longitude: -122.3422,
+        gps_horizontal_accuracy_m: 18.5,
+        // Invalid vertical accuracy: Core Location altitude must be dropped.
+        gps_vertical_accuracy_m: -1,
+        gps_altitude_m: 999,
+        gps_observed_at: observedB,
+        gps_full_accuracy: false,
+      }),
+    );
+
+    expect(resB.status).toBe(200);
+    const userARow = adminStore._encounters.find((row) => row.reporting_user_id === userA);
+    const userBRow = adminStore._encounters.find((row) => row.reporting_user_id === userB);
+    expect(userARow).toMatchObject({
+      gps_lat: 47.6101,
+      gps_lon: -122.3421,
+      gps_horizontal_accuracy_m: 4.8,
+      gps_vertical_accuracy_m: 8.2,
+      gps_altitude_m: 52.3,
+      gps_ellipsoidal_altitude_m: 71.1,
+      gps_observed_at: observedA,
+      gps_floor: 3,
+      gps_full_accuracy: true,
+      exact_barometric_elevation_m: 50.9,
+      barometric_accuracy_m: 1.6,
+      barometric_precision_m: 0.3,
+      barometric_relative_altitude_m: 0.2,
+      barometric_pressure_kpa: 100.82,
+    });
+    expect(userBRow).toMatchObject({
+      gps_lat: 47.6102,
+      gps_lon: -122.3422,
+      gps_horizontal_accuracy_m: 18.5,
+      gps_observed_at: observedB,
+      gps_full_accuracy: false,
+    });
+    // B never inherits A's better accuracy, altitude, floor or barometer.
+    for (const key of [
+      'gps_vertical_accuracy_m',
+      'gps_altitude_m',
+      'gps_floor',
+      'exact_barometric_elevation_m',
+      'barometric_accuracy_m',
+      'barometric_pressure_kpa',
+    ]) {
+      expect(userBRow).not.toHaveProperty(key);
+    }
+
+    dateSpy.mockRestore();
+  });
+
+  it('host selection never fills a member row with the host location or altitude', async () => {
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: ['2222', '3333'] }));
+    await proximityPost(
+      makeRequest(userB, {
+        my_token: '2222',
+        heard_tokens: ['1111', '3333'],
+        gps_lat: sharedLat,
+        gps_lon: sharedLon,
+        gps_horizontal_accuracy_m: 12,
+      }),
+    );
+    const resC = await proximityPost(
+      makeRequest(userC, {
+        my_token: '3333',
+        heard_tokens: ['1111', '2222'],
+        gps_lat: sharedLat + 0.00002,
+        gps_lon: sharedLon + 0.00002,
+        gps_horizontal_accuracy_m: 3.5,
+        exact_barometric_elevation_m: 50.9,
+        barometric_accuracy_m: 1.2,
+      }),
+    );
+    const { pending_handshake_id: tapC, awaiting_selection } = (await resC.json()) as Record<string, unknown>;
+    expect(awaiting_selection).toBe(true);
+
+    mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({ supabase: {}, user: { id: userC }, authError: null });
+    const confirmRes = await proximityConfirm(
+      new NextRequest('http://localhost/api/connections/proximity/confirm', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pending_handshake_id: tapC, selected_member_ids: [userA, userB] }),
+      }),
+    );
+    expect(confirmRes.status).toBe(200);
+    const { connection_id: groupId } = (await confirmRes.json()) as { connection_id: string };
+    const groupRows = adminStore._encounters.filter((row) => row.connection_id === groupId);
+    const rowFor = (id: string) => groupRows.find((row) => row.reporting_user_id === id);
+
+    expect(rowFor(userC)).toMatchObject({
+      gps_horizontal_accuracy_m: 3.5,
+      exact_barometric_elevation_m: 50.9,
+      barometric_accuracy_m: 1.2,
+    });
+    expect(rowFor(userB)).toMatchObject({ gps_lat: sharedLat, gps_horizontal_accuracy_m: 12, exact_barometric_elevation_m: null });
+    expect(rowFor(userB)).not.toHaveProperty('barometric_accuracy_m');
+    expect(rowFor(userA)).toMatchObject({ gps_lat: null, gps_lon: null, exact_barometric_elevation_m: null });
+    expect(rowFor(userA)).not.toHaveProperty('gps_horizontal_accuracy_m');
     dateSpy.mockRestore();
   });
 

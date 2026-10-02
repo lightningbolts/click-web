@@ -27,6 +27,46 @@ export function deriveHeightCategoryFromRelativeAltitudeM(
   return 'HIGH_RISE';
 }
 
+/**
+ * Above this reported barometric 1σ uncertainty the broad height band is not trustworthy
+ * (GROUND_LEVEL is only 11 m wide), so no category is derived. The raw reading and the
+ * terrain-relative altitude are still stored. Readings with unknown uncertainty (legacy
+ * clients) keep the previous behavior.
+ */
+export const BAROMETRIC_CATEGORY_MAX_ACCURACY_M = 10;
+
+export type TerrainRelativeAltitude = {
+  relative_altitude_m: number;
+  /** DEM input, stored so the derived value keeps its provenance. */
+  terrain_elevation_m: number;
+  elevation_category?: HeightCategoryName;
+};
+
+/**
+ * `relative_altitude_m = barometric AMSL − DEM terrain AMSL`, computed only when both inputs
+ * are valid. Both inputs belong to the same reporting device's observation.
+ */
+export function deriveTerrainRelativeAltitude(input: {
+  barometricAltitudeM: number | null | undefined;
+  barometricAccuracyM?: number | null;
+  terrainElevationM: number | null | undefined;
+}): TerrainRelativeAltitude | null {
+  const { barometricAltitudeM, barometricAccuracyM, terrainElevationM } = input;
+  if (barometricAltitudeM == null || !Number.isFinite(barometricAltitudeM)) return null;
+  if (terrainElevationM == null || !Number.isFinite(terrainElevationM)) return null;
+  const relativeAltitudeM = barometricAltitudeM - terrainElevationM;
+  const out: TerrainRelativeAltitude = {
+    relative_altitude_m: relativeAltitudeM,
+    terrain_elevation_m: terrainElevationM,
+  };
+  const confident =
+    barometricAccuracyM == null ||
+    (Number.isFinite(barometricAccuracyM) && barometricAccuracyM <= BAROMETRIC_CATEGORY_MAX_ACCURACY_M);
+  const category = confident ? deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM) : null;
+  if (category != null) out.elevation_category = category;
+  return out;
+}
+
 export async function fetchTerrainElevationMeters(lat: number, lon: number): Promise<number | null> {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +

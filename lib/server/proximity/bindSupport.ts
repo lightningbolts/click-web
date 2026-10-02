@@ -16,6 +16,10 @@ import type {
   ProximityHandshakeRequest,
   ProximitySensorPayloadJson,
 } from '@/types/supabase-json';
+import {
+  parseEncounterObservation,
+  type EncounterObservationColumns,
+} from '@/lib/server/encounterObservation';
 
 export const DISPLAY_LOCATION_FALLBACK = 'A new city';
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
@@ -23,7 +27,7 @@ const OPEN_METEO_TIMEOUT_MS = 3_500;
 const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 
 export const PENDING_HANDSHAKE_SELECT =
-  'id, user_id, my_token, heard_tokens, lat, lon, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at';
+  'id, user_id, my_token, heard_tokens, lat, lon, horizontal_accuracy_m, location_observed_at, lux_level, motion_variance, compass_azimuth, battery_level, sensor_payload, created_at, expires_at, matched_at';
 export const USER_PROFILE_SELECT = 'id, name, email, image, created_at:createdAt';
 
 export function sleep(ms: number): Promise<void> {
@@ -292,6 +296,8 @@ export function pendingRowToHandshakeLite(row: PendingHandshakeRow): HandshakeRo
     heard_tokens: row.heard_tokens,
     lat: row.lat,
     lon: row.lon,
+    horizontal_accuracy_m: row.horizontal_accuracy_m,
+    location_observed_at: row.location_observed_at,
     created_at: row.created_at,
     lux_level: row.lux_level,
     motion_variance: row.motion_variance,
@@ -305,11 +311,28 @@ export function sensorPayloadFromRow(row: HandshakeRowLite | null | undefined): 
   return isRecord(row?.sensor_payload) ? (row.sensor_payload as ProximitySensorPayloadJson) : {};
 }
 
+/**
+ * The user's own observation quality from their pending tap: dedicated columns for the
+ * horizontal accuracy and fix time, the rest from `sensor_payload`.
+ */
+export function observationFromHandshakeRow(row: HandshakeRowLite | null | undefined): EncounterObservationColumns {
+  if (!row) return {};
+  return parseEncounterObservation({
+    ...sensorPayloadFromRow(row),
+    gps_horizontal_accuracy_m: row.horizontal_accuracy_m,
+    gps_observed_at: row.location_observed_at,
+  });
+}
+
 export function nonEmptyPayloadString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-export function buildSensorPayload(body: ProximityHandshakeRequest, timezoneOffsetMinutes: number): ProximitySensorPayloadJson {
+export function buildSensorPayload(
+  body: ProximityHandshakeRequest,
+  timezoneOffsetMinutes: number,
+  observation: EncounterObservationColumns = {},
+): ProximitySensorPayloadJson {
   const exactBarometricElevationM = finiteNumber(body.exact_barometric_elevation_m);
   const exactNoiseLevelDb = finiteNumber(body.exact_noise_level_db);
   const noiseLevel =
@@ -338,7 +361,14 @@ export function buildSensorPayload(body: ProximityHandshakeRequest, timezoneOffs
     location_name: manualLocationName,
     weather_snapshot: clientWeatherSnapshot,
     timezone_offset_minutes: timezoneOffsetMinutes,
+    ...pendingPayloadObservation(observation),
   };
+}
+
+/** Observation fields kept in `sensor_payload` (the rest have dedicated pending columns). */
+function pendingPayloadObservation(observation: EncounterObservationColumns): ProximitySensorPayloadJson {
+  const { gps_horizontal_accuracy_m: _horizontal, gps_observed_at: _observedAt, ...rest } = observation;
+  return rest;
 }
 
 /**
@@ -396,6 +426,8 @@ export type BindContext = {
   exactNoiseLevelDb: number | null;
   noiseLevel: string | null;
   exactBarometricElevationM: number | null;
+  /** The caller's own location/altimeter quality, parsed from the request body. */
+  selfObservation: EncounterObservationColumns;
   clientHeightCategory: string | null;
   manualLocationName: string | null;
   clientWeatherSnapshot: string | null;

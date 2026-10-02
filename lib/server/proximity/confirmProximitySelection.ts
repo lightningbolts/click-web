@@ -23,6 +23,8 @@ import {
 } from '@/lib/server/proximity/matching';
 import {
   markPendingHandshakesMatched,
+  nonEmptyPayloadString,
+  observationFromHandshakeRow,
   PENDING_HANDSHAKE_SELECT,
   pendingRowToHandshakeLite,
   USER_PROFILE_SELECT,
@@ -37,6 +39,7 @@ import type {
   ProximitySensorPayloadJson,
 } from '@/types/supabase-json';
 import { fireEncounterGeoEnrichment } from '@/lib/server/proximity/encounterEnrichment';
+import { encounterObservationColumns } from '@/lib/server/encounterObservation';
 
 type ConfirmResult =
   | { kind: 'ok'; status: 200; body: ProximityBindOkResponse }
@@ -168,15 +171,21 @@ export async function confirmProximityHandshakeSelection(
     memberId: string,
     participantIds: string[],
   ): Promise<boolean> {
-    const memberLite = latestByUser.get(memberId);
-    const memberLat = finiteNumber(memberLite?.lat) ?? lat;
-    const memberLon = finiteNumber(memberLite?.lon) ?? lon;
+    // Location and altitude are this member's own observation, never the host's.
+    const memberLite = memberId === uid ? pendingRowToHandshakeLite(hostRow) : latestByUser.get(memberId);
+    const ownLat = finiteNumber(memberLite?.lat);
+    const ownLon = finiteNumber(memberLite?.lon);
+    const hasOwnCoordinate = ownLat != null && ownLon != null && !(ownLat === 0 && ownLon === 0);
+    const memberLat = hasOwnCoordinate ? ownLat : null;
+    const memberLon = hasOwnCoordinate ? ownLon : null;
     const memberPayload = (
       isRecord(memberLite?.sensor_payload) ? memberLite!.sensor_payload : {}
     ) as ProximitySensorPayloadJson;
-    const memberBaro =
-      finiteNumber(memberPayload.exact_barometric_elevation_m) ??
-      finiteNumber(sensorPayload.exact_barometric_elevation_m);
+    const memberBaro = finiteNumber(memberPayload.exact_barometric_elevation_m);
+    const memberObservation = encounterObservationColumns(observationFromHandshakeRow(memberLite), {
+      hasOwnCoordinate,
+      hasBarometricAltitude: memberBaro != null,
+    });
     const memberLocationName =
       (typeof memberPayload.location_name === 'string' && memberPayload.location_name.trim()) ||
       (typeof sensorPayload.location_name === 'string' && sensorPayload.location_name.trim()) ||
@@ -195,6 +204,7 @@ export async function confirmProximityHandshakeSelection(
         memberBaro,
         memberLocationName,
         memberWeather,
+        memberObservation.barometric_accuracy_m ?? null,
       );
     };
     const vibeTags = buildVibeContextTags({
@@ -219,8 +229,9 @@ export async function confirmProximityHandshakeSelection(
       battery_level: finiteBatteryPct(memberLite?.battery_level),
       noise_level: sensorPayload.noise_level ?? null,
       exact_noise_level_db: sensorPayload.exact_noise_level_db ?? null,
-      elevation_category: sensorPayload.height_category ?? null,
-      exact_barometric_elevation_m: sensorPayload.exact_barometric_elevation_m ?? null,
+      elevation_category: nonEmptyPayloadString(memberPayload.height_category),
+      exact_barometric_elevation_m: memberBaro,
+      ...memberObservation,
     };
     const attachment = await resolveLiveEventBeaconForReportingUser(
       admin,

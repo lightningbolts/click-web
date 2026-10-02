@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { deriveHeightCategoryFromRelativeAltitudeM } from '@/lib/server/terrainElevation';
+import { deriveTerrainRelativeAltitude } from '@/lib/server/terrainElevation';
 import {
   DISPLAY_LOCATION_FALLBACK,
   fetchNominatimReverseGeocode,
@@ -11,6 +11,9 @@ import { runAfterResponse } from '@/lib/server/afterResponse';
  * Post-insert enrichment of the member's newest encounter row: reverse geocode,
  * weather (when the client did not supply a snapshot), and terrain-relative
  * altitude. Never blocks the bind response — see fireEncounterGeoEnrichment.
+ *
+ * Every input is the reporting member's own observation; the DEM value is stored with the
+ * derived altitude, and a poor barometer reading yields no height category.
  */
 export async function scheduleEncounterGeoEnrichment(
   admin: SupabaseClient,
@@ -21,6 +24,7 @@ export async function scheduleEncounterGeoEnrichment(
   memberExactBarometricElevationM: number | null,
   manualLocationName: string | null,
   clientWeatherSnapshot: string | null,
+  memberBarometricAccuracyM: number | null = null,
 ): Promise<void> {
   if (memberLat == null || memberLon == null) return;
 
@@ -50,14 +54,12 @@ export async function scheduleEncounterGeoEnrichment(
     updates.weather_snapshot = forecast.weatherSnapshot;
   }
 
-  if (memberExactBarometricElevationM != null && forecast.elevationM != null) {
-    const relativeAltitudeM = memberExactBarometricElevationM - forecast.elevationM;
-    updates.relative_altitude_m = relativeAltitudeM;
-    const elevationCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
-    if (elevationCategory != null) {
-      updates.elevation_category = elevationCategory;
-    }
-  }
+  const terrainRelative = deriveTerrainRelativeAltitude({
+    barometricAltitudeM: memberExactBarometricElevationM,
+    barometricAccuracyM: memberBarometricAccuracyM,
+    terrainElevationM: forecast.elevationM,
+  });
+  if (terrainRelative != null) Object.assign(updates, terrainRelative);
 
   if (Object.keys(updates).length === 0) return;
 
@@ -76,6 +78,7 @@ export function fireEncounterGeoEnrichment(
   memberExactBarometricElevationM: number | null,
   manualLocationName: string | null,
   clientWeatherSnapshot: string | null,
+  memberBarometricAccuracyM: number | null = null,
 ): void {
   runAfterResponse('proximity encounter enrichment', () =>
     scheduleEncounterGeoEnrichment(
@@ -87,6 +90,7 @@ export function fireEncounterGeoEnrichment(
       memberExactBarometricElevationM,
       manualLocationName,
       clientWeatherSnapshot,
+      memberBarometricAccuracyM,
     ),
   );
 }
