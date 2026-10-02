@@ -34,6 +34,8 @@ const AUTH_MARKERS = [
   'publicRoute',
   // lib/server/eventDrops.ts: getSupabaseFromRouteRequest + the event_drops flag.
   'authorizeEventDropRequest',
+  // lib/server/places/routeContext.ts: getSupabaseFromRouteRequest + the click_places flag.
+  'requirePlacesUser',
 ];
 
 /** Intentionally unauthenticated or secret-gated via non-JWT means. */

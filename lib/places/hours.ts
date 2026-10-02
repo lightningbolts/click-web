@@ -116,3 +116,10 @@ export function todayHoursLabel(hours: PlaceHours | null | undefined, timezone: 
   if (intervals.length === 0) return 'Closed today';
   return intervals.map(([open, close]) => `${formatClock(open)} – ${formatClock(close)}`).join(', ');
 }
+
+/** The instant the current local day ends in `timezone` (next local midnight, minute precision). */
+export function localDayEndMs(timezone: string, nowMs: number): number {
+  const { hour, minute } = localParts(timezone, nowMs);
+  const flooredNow = nowMs - (nowMs % 60_000);
+  return flooredNow + (24 * 60 - (hour * 60 + minute)) * 60_000;
+}
