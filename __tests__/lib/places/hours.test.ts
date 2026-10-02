@@ -1,4 +1,4 @@
-import { isOpenAt, localParts, parsePlaceHours, todayHoursLabel } from '@/lib/places/hours';
+import { isOpenAt, localDayEndMs, localParts, parsePlaceHours, todayHoursLabel } from '@/lib/places/hours';
 
 const TZ = 'America/Los_Angeles';
 
@@ -74,5 +74,12 @@ describe('todayHoursLabel', () => {
     // 2026-10-06T05:00Z is Monday 22:00 in Los Angeles but Tuesday in UTC.
     expect(localParts(TZ, Date.parse('2026-10-06T05:00:00Z')).weekday).toBe('mon');
     expect(todayHoursLabel(hours, TZ, Date.parse('2026-10-06T05:00:00Z'))).toBe('7 AM – 3 PM');
+  });
+});
+
+describe('localDayEndMs', () => {
+  it('returns the next local midnight in the Place timezone', () => {
+    // 2026-10-01T20:30Z is 13:30 PDT → local midnight is 2026-10-02T07:00Z.
+    expect(new Date(localDayEndMs(TZ, Date.parse('2026-10-01T20:30:00Z'))).toISOString()).toBe('2026-10-02T07:00:00.000Z');
   });
 });
