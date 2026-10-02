@@ -4,6 +4,7 @@
  *   2. Event beacon day-of + 30-minutes-before reminders and Seed-a-Room teasers (via click-web /api/cron/event-reminders)
  *   2b. Encounter reconnect / shared-event nudges (via click-web /api/cron/nudges-reconnect)
  *   2c. Gated Click Drops: batched "ready to develop" pushes (via click-web /api/cron/drops)
+ *   2d. Click Places: daily stats rollup + check-in / Pulse retention (via click-web /api/cron/places)
  *   5. Delete lapsed "Listening now" heartbeats (beacon_presence older than an hour)
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
  *   4. Delete expired pending_handshakes (expires_at < now())
@@ -359,10 +360,11 @@ Deno.serve(async (req: Request) => {
     const drops = await runClickWebCron('/api/cron/drops', 'drops').catch((e) => ({
       error: e instanceof Error ? e.message : String(e),
     }));
+    const places = await runClickWebCron('/api/cron/places', 'places').catch((e) => ({ error: String(e) }));
     const presence = await runBeaconPresenceCleanup(admin).catch((e) => ({
       error: e instanceof Error ? e.message : String(e),
     }));
-    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges, drops, presence };
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges, drops, places, presence };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,
