@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadPlaceRefs, type PlaceRef } from "@/lib/server/places/placeRefs";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
 import {
   eventDescriptionFromMetadata,
@@ -50,6 +51,8 @@ export type PublicEventPayload = {
   visual_seed: string;
   attendees: EventAttendeePreview[];
   listing: EventListingOptions;
+  /** The listed Place hosting this official event (Click Places §5.11), else null. */
+  place: PlaceRef | null;
 };
 
 export type PublicEventListItem = {
@@ -70,6 +73,7 @@ export type PublicEventListItem = {
   visual_seed: string;
   attendees: EventAttendeePreview[];
   timezone: string | null;
+  place: PlaceRef | null;
 };
 
 export async function countEventRsvps(
@@ -218,7 +222,7 @@ export async function loadPublicEventPayload(
   const { data, error } = await admin
     .from("map_beacons")
     .select(
-      "id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at, starts_at, ends_at, event_timezone, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id",
+      "id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at, starts_at, ends_at, event_timezone, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id, venue_id",
     )
     .eq("id", beaconId)
     .maybeSingle();
@@ -257,6 +261,8 @@ export async function loadPublicEventPayload(
   const timezone =
     (typeof data.event_timezone === "string" && data.event_timezone.trim()) ||
     eventTimezoneFromMetadata(meta);
+  const venueId = typeof data.venue_id === "string" ? data.venue_id : null;
+  const place = venueId ? (await loadPlaceRefs(admin, [venueId])).get(venueId) ?? null : null;
 
   return {
     beacon_id: typeof data.id === "string" ? data.id : beaconId,
@@ -280,6 +286,7 @@ export async function loadPublicEventPayload(
     visual_seed: coverVisualSeed(typeof data.id === "string" ? data.id : beaconId, coverThemeId),
     attendees: previews,
     listing,
+    place,
   };
 }
 
@@ -293,7 +300,7 @@ async function loadPublicDiscoverableEvents(
   const { data, error } = await admin
     .from("map_beacons")
     .select(
-      "id, beacon_type, metadata, location, visibility_audience, expires_at, creator_id, show_creator_name, starts_at, ends_at, event_timezone, event_visibility, cover_theme_id, guest_list_visibility",
+      "id, beacon_type, metadata, location, visibility_audience, expires_at, creator_id, show_creator_name, starts_at, ends_at, event_timezone, event_visibility, cover_theme_id, guest_list_visibility, venue_id",
     )
     .eq("beacon_type", "event")
     .eq("visibility_audience", "everyone")
@@ -320,6 +327,7 @@ async function loadPublicDiscoverableEvents(
     cover_theme_id: string | null;
     timezone: string | null;
     guest_list_public: boolean;
+    venue_id: string | null;
   }> = [];
 
   for (const row of data) {
@@ -350,6 +358,7 @@ async function loadPublicDiscoverableEvents(
         (typeof row.event_timezone === "string" && row.event_timezone.trim()) ||
         eventTimezoneFromMetadata(meta),
       guest_list_public: listing.guest_list_visibility === "public",
+      venue_id: typeof row.venue_id === "string" ? row.venue_id : null,
     });
     if (pending.length >= limit) break;
   }
@@ -364,6 +373,7 @@ async function loadPublicDiscoverableEvents(
   const hostProfiles = await loadHostProfilesByCreatorIds(admin, hostIds);
   const previewIds = pending.filter((item) => item.guest_list_public).map((item) => item.beacon_id);
   const previews = await loadAttendeePreviewsByBeaconIds(admin, previewIds);
+  const places = await loadPlaceRefs(admin, pending.map((item) => item.venue_id));
 
   const items: PublicEventListItem[] = pending.map((item) => {
     const host = item.show_creator_name && item.creator_id ? hostProfiles.get(item.creator_id) : null;
@@ -385,6 +395,7 @@ async function loadPublicDiscoverableEvents(
       visual_seed: coverVisualSeed(item.beacon_id, item.cover_theme_id),
       attendees: item.guest_list_public ? previews.get(item.beacon_id) ?? [] : [],
       timezone: item.timezone,
+      place: (item.venue_id && places.get(item.venue_id)) || null,
     };
   });
 

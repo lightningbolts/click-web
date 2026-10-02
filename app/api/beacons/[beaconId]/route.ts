@@ -6,6 +6,7 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { withPlaceRefs } from "@/lib/server/places/placeRefs";
 import { parseMapBeacon, type MapBeaconType } from "@/lib/map/mapBeacons";
 import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
@@ -147,8 +148,9 @@ export async function GET(
     if (beacon == null) {
       return NextResponse.json({ error: "Malformed beacon" }, { status: 500 });
     }
+    const [withPlace] = await withPlaceRefs(admin, [beacon]);
 
-    return NextResponse.json({ beacon, expired });
+    return NextResponse.json({ beacon: withPlace, expired });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
