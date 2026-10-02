@@ -3,6 +3,7 @@ import { runAfterResponse } from "@/lib/server/afterResponse";
 import { emitProductEvent } from "@/lib/server/telemetry/productEvents";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { withPlaceRefs } from "@/lib/server/places/placeRefs";
 import { parseMapBeacon, type MapBeaconRecord } from "@/lib/map/mapBeacons";
 import {
   enrichSoundtrackMetadata,
@@ -273,7 +274,7 @@ export async function GET(request: NextRequest) {
     beacons = await filterBeaconsForViewer(admin, user.id, beacons);
     beacons = await enrichBeaconCreatorNames(admin, beacons);
 
-    return NextResponse.json({ beacons, radius_meters: radius, next_cursor: nextCursor });
+    return NextResponse.json({ beacons: await withPlaceRefs(admin, beacons), radius_meters: radius, next_cursor: nextCursor });
   } catch (e) {
     console.error("GET /api/beacons:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

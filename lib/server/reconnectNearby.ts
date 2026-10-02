@@ -4,6 +4,7 @@ import { configNumber } from '@/lib/server/featureFlags';
 import { loadViewerPeers } from '@/lib/server/connections/viewerPeers';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { runAfterResponse } from '@/lib/server/afterResponse';
+import { loadPlaceRefs } from '@/lib/server/places/placeRefs';
 import {
   DEFAULT_RECONNECT_CONFIG,
   pickReconnectNudge,
@@ -31,6 +32,9 @@ export type ReconnectNudgePayload = {
   user: { id: string; name: string; avatar_url: string | null };
   met_at: string;
   place_name: string | null;
+  /** Set when the encounter was at a listed Click Place (additive; older clients ignore it). */
+  place_id: string | null;
+  place_slug: string | null;
   title: string;
   body: string;
 };
@@ -39,12 +43,13 @@ async function payloadFor(
   admin: SupabaseClient,
   row: { id: string; connection_id: string; encounter_id: string | null },
   peerId: string,
-  encounter: { atMs: number; placeName: string | null },
+  encounter: { atMs: number; placeName: string | null; placeId?: string | null },
   nowMs: number,
 ): Promise<ReconnectNudgePayload | null> {
   const { data } = await admin.from('users').select('id, name, first_name, image').eq('id', peerId).maybeSingle();
   const user = data as UserRow | null;
   if (!user) return null;
+  const place = encounter.placeId ? (await loadPlaceRefs(admin, [encounter.placeId])).get(encounter.placeId) ?? null : null;
   const first = user.first_name?.trim() || user.name?.trim()?.split(/\s+/)[0] || 'someone';
   const copy = reconnectNearbyCopy(first, encounter.atMs, nowMs);
   return {
@@ -52,7 +57,9 @@ async function payloadFor(
     connection_id: row.connection_id,
     user: { id: user.id, name: user.name?.trim() || first, avatar_url: user.image },
     met_at: new Date(encounter.atMs).toISOString(),
-    place_name: encounter.placeName,
+    place_name: place?.name ?? encounter.placeName,
+    place_id: place?.id ?? null,
+    place_slug: place?.slug ?? null,
     ...copy,
   };
 }
@@ -83,10 +90,16 @@ export async function reconnectNudgeFor(
   if (today) {
     if (today.acted_at || today.dismissed_at || !today.encounter_id) return null;
     const peer = [...peers.values()].find((p) => p.connectionId === today.connection_id);
-    const { data: e } = await admin.from('connection_encounters').select('encountered_at, location_name').eq('id', today.encounter_id).maybeSingle();
-    const enc = e as { encountered_at: string; location_name: string | null } | null;
+    const { data: e } = await admin.from('connection_encounters').select('encountered_at, location_name, place_id').eq('id', today.encounter_id).maybeSingle();
+    const enc = e as { encountered_at: string; location_name: string | null; place_id?: string | null } | null;
     if (!peer || !enc) return null;
-    return payloadFor(admin, today, peer.userId, { atMs: Date.parse(enc.encountered_at), placeName: enc.location_name }, nowMs);
+    return payloadFor(
+      admin,
+      today,
+      peer.userId,
+      { atMs: Date.parse(enc.encountered_at), placeName: enc.location_name, placeId: enc.place_id ?? null },
+      nowMs,
+    );
   }
 
   if (peers.size === 0) return null;
@@ -94,7 +107,7 @@ export async function reconnectNudgeFor(
   const [encRes, ghostRes] = await Promise.all([
     admin
       .from('connection_encounters')
-      .select('id, connection_id, encountered_at, gps_lat, gps_lon, location_name')
+      .select('id, connection_id, encountered_at, gps_lat, gps_lon, location_name, place_id')
       .in('connection_id', [...peerByConnection.keys()])
       .not('gps_lat', 'is', null)
       .not('gps_lon', 'is', null)
@@ -103,11 +116,13 @@ export async function reconnectNudgeFor(
   ]);
   if (encRes.error) throw new Error(`reconnect nearby encounters: ${encRes.error.message}`);
   const ghosted = new Set(((ghostRes.data ?? []) as Array<{ id: string }>).map((r) => r.id));
+  const placeByEncounter = new Map<string, string>();
   const encounters: PeerEncounter[] = ((encRes.data ?? []) as Array<Record<string, unknown>>).flatMap((r) => {
     const peerId = peerByConnection.get(String(r.connection_id));
     const lat = Number(r.gps_lat);
     const lng = Number(r.gps_lon);
     if (!peerId || ghosted.has(peerId) || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+    if (typeof r.place_id === 'string') placeByEncounter.set(String(r.id), r.place_id);
     return [{
       encounterId: String(r.id),
       connectionId: String(r.connection_id),
@@ -141,7 +156,7 @@ export async function reconnectNudgeFor(
     admin,
     inserted as { id: string; connection_id: string; encounter_id: string | null },
     pick.encounter.peerId,
-    pick.encounter,
+    { ...pick.encounter, placeId: placeByEncounter.get(pick.encounter.encounterId) ?? null },
     nowMs,
   );
 }

@@ -74,3 +74,30 @@ export async function ensurePlaceHub(
     placeId: place.id,
   });
 }
+
+/**
+ * `POST /api/hub/create` guard (§5.11): a point inside a listed Place that has its hub on maps to
+ * that Place Hub. Null when there's no such Place (or the lookup fails: creation proceeds as today).
+ */
+export async function placeHubConflict(
+  admin: SupabaseClient,
+  lat: number,
+  lng: number,
+): Promise<{ place_id: string; slug: string | null; hub_id: string | null } | null> {
+  try {
+    const { data: placeId, error } = await admin.rpc('resolve_place_at', { p_lat: lat, p_lng: lng });
+    if (error || typeof placeId !== 'string') return null;
+    const { data: place } = await admin
+      .from('places')
+      .select('id, slug, listed, hub_enabled')
+      .eq('id', placeId)
+      .maybeSingle();
+    const row = place as { id: string; slug: string | null; listed: boolean; hub_enabled: boolean } | null;
+    if (!row?.listed || !row.hub_enabled) return null;
+    const { data: hub } = await admin.from('hub_venues').select('id').eq('place_id', row.id).maybeSingle();
+    return { place_id: row.id, slug: row.slug, hub_id: (hub as { id?: string } | null)?.id ?? null };
+  } catch (e) {
+    console.warn('[places] placeHubConflict:', e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
