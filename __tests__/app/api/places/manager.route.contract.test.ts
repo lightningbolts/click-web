@@ -18,8 +18,9 @@ jest.mock('@/lib/server/admin/supabaseAdmin', () => ({ createAdminSupabaseClient
 jest.mock('@/lib/server/businessInsightsEligibility', () => ({ userMayAccessBusinessInsights: async () => mockState.insights }));
 
 const params = ctx({ placeId: IDS.cafe });
-const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
-const daysAgoKey = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10);
+const NOW_MS = Date.parse('2026-10-01T19:00:00.000Z');
+const hoursAgo = (h: number) => new Date(NOW_MS - h * 3_600_000).toISOString();
+const daysAgoKey = (d: number) => new Date(NOW_MS - d * 86_400_000).toISOString().slice(0, 10);
 
 function statsWorld() {
   // The flag is OFF: manager routes must still work (owners prepare before launch).
@@ -62,10 +63,15 @@ function statsWorld() {
 }
 
 beforeEach(() => {
+  jest.spyOn(Date, 'now').mockReturnValue(NOW_MS);
   resetFeatureFlagCache();
   mockState.userId = IDS.manager;
   mockState.insights = false;
   mockState.db = statsWorld();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('GET /api/places/[placeId]/stats', () => {

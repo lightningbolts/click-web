@@ -15,11 +15,10 @@ SELECT hasnt_column('public', 'place_daily_stats', 'user_id', 'daily stats carry
 SELECT ok(NOT has_function_privilege('authenticated', 'public.purge_place_presence(integer, integer, integer)', 'EXECUTE'), 'purge is service role only');
 
 -- Retention.
-INSERT INTO public.place_check_ins (id, place_id, user_id, checked_at, expires_at, proof, proof_weight)
+INSERT INTO public.place_check_ins (id, place_id, user_id, checked_at, expires_at, checked_out_at, proof, proof_weight)
 VALUES
-    ('d3000000-0000-4000-8000-000000000001', 'd2000000-0000-4000-8000-000000000002', 'd1000000-0000-4000-8000-000000000001', now() - interval '4 hours', now() - interval '1 hour', 'gps', 0.8),
-    ('d3000000-0000-4000-8000-000000000002', 'd2000000-0000-4000-8000-000000000002', 'd1000000-0000-4000-8000-000000000001', now() - interval '100 days', now() - interval '100 days', 'gps', 0.8);
-UPDATE public.place_check_ins SET checked_out_at = now() - interval '100 days' WHERE id = 'd3000000-0000-4000-8000-000000000002';
+    ('d3000000-0000-4000-8000-000000000001', 'd2000000-0000-4000-8000-000000000002', 'd1000000-0000-4000-8000-000000000001', now() - interval '4 hours', now() - interval '1 hour', NULL, 'gps', 0.8),
+    ('d3000000-0000-4000-8000-000000000002', 'd2000000-0000-4000-8000-000000000002', 'd1000000-0000-4000-8000-000000000001', now() - interval '100 days', now() - interval '100 days', now() - interval '100 days', 'gps', 0.8);
 INSERT INTO public.place_pulses (place_id, user_id, proof, proof_weight, energy, created_at)
 VALUES
     ('d2000000-0000-4000-8000-000000000002', 'd1000000-0000-4000-8000-000000000001', 'gps', 0.8, 3, now() - interval '40 days'),
