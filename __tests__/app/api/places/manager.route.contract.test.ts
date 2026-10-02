@@ -18,6 +18,7 @@ jest.mock('@/lib/server/admin/supabaseAdmin', () => ({ createAdminSupabaseClient
 jest.mock('@/lib/server/businessInsightsEligibility', () => ({ userMayAccessBusinessInsights: async () => mockState.insights }));
 
 const params = ctx({ placeId: IDS.cafe });
+const FIXED_NOW = new Date('2026-09-30T19:00:00.000Z');
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const daysAgoKey = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10);
 
@@ -60,6 +61,15 @@ function statsWorld() {
     },
   });
 }
+
+beforeAll(() => {
+  jest.useFakeTimers();
+  jest.setSystemTime(FIXED_NOW);
+});
+
+afterAll(() => {
+  jest.useRealTimers();
+});
 
 beforeEach(() => {
   resetFeatureFlagCache();
