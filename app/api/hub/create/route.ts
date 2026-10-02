@@ -3,9 +3,9 @@
  * Community hub: inserts hub + creator participant. Hubs do not expire (`expires_at` null).
  */
 
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { insertHub } from '@/lib/server/hubCreate';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubCreateBodySchema } from '@/lib/api/schemas/beacons';
 
@@ -61,34 +61,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Hub creation requires server configuration' }, { status: 503 });
   }
 
-  const hubId = `hub_${randomUUID().replace(/-/g, '')}`;
-
   const admin = createChatGatekeeperAdmin();
 
-  const { error: hubErr } = await admin.from('hub_venues').insert({
-    id: hubId,
+  const created = await insertHub(admin, {
     name,
     category,
-    geofence_lat: location.lat,
-    geofence_long: location.lng,
-    radius_meters: location.radius,
-    expires_at: null,
-    creator_id: auth.user.id,
+    lat: location.lat,
+    lng: location.lng,
+    radiusMeters: location.radius,
+    creatorId: auth.user.id,
   });
 
-  if (hubErr) {
-    console.error('hub/create insert error:', hubErr.message);
+  if (!created.ok) {
+    console.error('hub/create insert error:', created.error);
     return NextResponse.json({ error: 'Failed to create hub' }, { status: 500 });
   }
-
-  const { error: partErr } = await admin.from('hub_participants').insert({
-    hub_id: hubId,
-    user_id: auth.user.id,
-  });
-
-  if (partErr) {
-    console.error('hub/create participant insert error:', partErr.message);
-  }
+  const hubId = created.hubId;
 
   return NextResponse.json({
     hub_id: hubId,

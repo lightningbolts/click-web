@@ -16,6 +16,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assertHubGeofenceFromCoords, assertHubReadable } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { placeHubDisabledResponse } from '@/lib/server/places/placeHub';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubMessagesBodySchema } from '@/lib/api/schemas/beacons';
 import {
@@ -122,12 +125,19 @@ export async function GET(request: NextRequest) {
   const senderProfilesVisible = true;
   const { data: hubVenue, error: venueErr } = await admin
     .from('hub_venues')
-    .select('event_beacon_id')
+    .select('event_beacon_id, place_id')
     .eq('id', hubId)
     .maybeSingle();
   if (venueErr) {
     console.error('[hub/messages GET] event venue:', venueErr.message);
     return NextResponse.json({ error: 'Failed to load hub' }, { status: 500 });
+  }
+  if (
+    (hubVenue as { place_id?: unknown } | null)?.place_id &&
+    !aroundMessageId && !before && !beforeId && !cursorIso && !sinceIso
+  ) {
+    const viewerId = auth.user.id;
+    runAfterResponse('place_hub_opened', () => emitProductEvent(admin, viewerId, 'place_hub_opened'));
   }
   const eventBeaconId =
     hubVenue != null && typeof (hubVenue as { event_beacon_id?: unknown }).event_beacon_id === 'string'
@@ -291,6 +301,8 @@ export async function POST(request: NextRequest) {
     auth.user.id,
   );
   if (denied) return denied;
+  const disabled = await placeHubDisabledResponse(admin, hubId);
+  if (disabled) return disabled;
 
   // Geofence passed — make sure the sender is registered as a participant so
   // participant-scoped hub_messages RLS lets them read replies and realtime rows.

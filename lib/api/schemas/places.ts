@@ -64,3 +64,23 @@ export const placePulsePatchBodySchema = z
   })
   .passthrough();
 export type PlacePulsePatchBody = z.infer<typeof placePulsePatchBodySchema>;
+
+const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
+
+/**
+ * `PATCH /api/places/[placeId]` (managers). Only these fields; name, slug, category,
+ * coordinates, radius, verification and listing are admin-only in v1 (strict → 400 otherwise).
+ */
+export const placeManagerPatchBodySchema = z
+  .object({
+    description: optionalText(500),
+    hours: z.unknown().optional(),
+    website_url: optionalText(500),
+    hub_enabled: z.boolean().optional(),
+    address_line: optionalText(200),
+    city: optionalText(100),
+    region: optionalText(100),
+    postal_code: optionalText(20),
+  })
+  .strict();
+export type PlaceManagerPatchBody = z.infer<typeof placeManagerPatchBodySchema>;

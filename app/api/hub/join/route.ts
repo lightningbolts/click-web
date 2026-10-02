@@ -9,6 +9,7 @@ import { assertHubAccess } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubJoinBodySchema } from '@/lib/api/schemas/beacons';
+import { hubDisabledResponse, placeHubEnabled } from '@/lib/server/places/placeHub';
 
 export async function POST(request: NextRequest) {
   const auth = await requireBearerUser(request);
@@ -32,13 +33,14 @@ export async function POST(request: NextRequest) {
 
   const { data: venue, error: venueErr } = await admin
     .from('hub_venues')
-    .select('id, name, creator_id, event_beacon_id')
+    .select('id, name, creator_id, event_beacon_id, place_id')
     .eq('id', hubId)
     .maybeSingle();
 
   if (venueErr || venue == null) {
     return NextResponse.json({ error: 'Unknown hub' }, { status: 404 });
   }
+  if (venue.place_id && !(await placeHubEnabled(admin, venue.place_id))) return hubDisabledResponse();
 
   const { error: participantErr } = await admin
     .from('hub_participants')
