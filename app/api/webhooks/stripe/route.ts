@@ -59,7 +59,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const admin = createSupabaseServiceRoleClient();
 
   const { error: venueError } = await admin
-    .from('venues')
+    .from('places')
     .update({
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
@@ -72,9 +72,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  const { error: insertError } = await admin.from('venue_managers').insert({
+  const { error: insertError } = await admin.from('place_managers').insert({
     user_id: supabaseUserId,
-    venue_id: venueId,
+    place_id: venueId,
     role: 'owner',
   });
 
@@ -90,7 +90,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   if (venueIdFromMeta) {
     const { error } = await admin
-      .from('venues')
+      .from('places')
       .update({ subscription_status: status })
       .eq('id', venueIdFromMeta);
     if (error) {
@@ -100,7 +100,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   const { error } = await admin
-    .from('venues')
+    .from('places')
     .update({ subscription_status: status })
     .eq('stripe_subscription_id', subscription.id);
 

@@ -50,7 +50,7 @@ export async function createVenueForCheckout(
   }
 
   const { data: venue, error: venueError } = await supabase
-    .from('venues')
+    .from('places')
     .insert({
       name: trimmedName,
       location: trimmedLocation || null,
@@ -63,9 +63,9 @@ export async function createVenueForCheckout(
     return { ok: false, error: venueError?.message ?? 'Could not create venue.' };
   }
 
-  const { error: managerError } = await supabase.from('venue_managers').insert({
+  const { error: managerError } = await supabase.from('place_managers').insert({
     user_id: user.id,
-    venue_id: venue.id,
+    place_id: venue.id,
     role: 'owner',
   });
 
@@ -99,9 +99,9 @@ export async function createStripeCheckoutSession(
   }
 
   const { data: membership, error: vmError } = await supabase
-    .from('venue_managers')
+    .from('place_managers')
     .select('id, role')
-    .eq('venue_id', venueId)
+    .eq('place_id', venueId)
     .eq('user_id', user.id)
     .maybeSingle();
 

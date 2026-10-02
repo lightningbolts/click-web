@@ -34,9 +34,9 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { data: membership } = await supabase
-      .from("venue_managers")
+      .from("place_managers")
       .select("id")
-      .eq("venue_id", venueId)
+      .eq("place_id", venueId)
       .eq("user_id", user.id)
       .maybeSingle();
     if (!membership) {

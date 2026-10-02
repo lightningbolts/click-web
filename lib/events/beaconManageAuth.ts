@@ -40,9 +40,9 @@ export async function userMayManageBeacon(
   if (beacon.creator_id === userId) return true;
   if (!beacon.venue_id) return false;
   const { data } = await admin
-    .from("venue_managers")
+    .from("place_managers")
     .select("id")
-    .eq("venue_id", beacon.venue_id)
+    .eq("place_id", beacon.venue_id)
     .eq("user_id", userId)
     .maybeSingle();
   return data != null;

@@ -49,8 +49,8 @@ type Overrides = {
 function setupSupabase(overrides: Overrides = {}) {
   const mock = makeSupabaseMock({
     tables: {
-      venue_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }),
-      venues: overrides.venues ?? ok({ id: MOCK_VENUE_ID, name: 'Nova Bar', location: '9 Pike St' }),
+      place_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }),
+      places: overrides.venues ?? ok({ id: MOCK_VENUE_ID, name: 'Nova Bar', location: '9 Pike St' }),
       connections: overrides.connections ?? ok(connectionRows(6, 3)),
       connection_encounters: ok([]),
       nfc_anchors: ok([]),
@@ -114,7 +114,7 @@ describe('GET /api/insights/venue contract', () => {
       const json = await res.json();
       expect(json.error).toBe('Not a manager for this venue');
       // The venue row is never read for a non-manager.
-      expect(mock.from).not.toHaveBeenCalledWith('venues');
+      expect(mock.from).not.toHaveBeenCalledWith('places');
     });
 
     it('cannot be pointed at another venue by query string alone', async () => {
@@ -123,8 +123,8 @@ describe('GET /api/insights/venue contract', () => {
       const res = await callRoute('?venue_id=someone-elses-venue');
 
       expect(res.status).toBe(403);
-      const managers = mock.builder('venue_managers');
-      expectFilter(managers, 'venue_id', 'someone-elses-venue');
+      const managers = mock.builder('place_managers');
+      expectFilter(managers, 'place_id', 'someone-elses-venue');
       expectFilter(managers, 'user_id', MOCK_USER_ID);
     });
 
@@ -206,7 +206,7 @@ describe('GET /api/insights/venue contract', () => {
 
       await callRoute('');
 
-      expectFilter(mock.builder('venue_managers'), 'venue_id', 'venue-from-metadata');
+      expectFilter(mock.builder('place_managers'), 'place_id', 'venue-from-metadata');
     });
 
     it('prefers the explicit query parameter over user metadata', async () => {
@@ -216,7 +216,7 @@ describe('GET /api/insights/venue contract', () => {
 
       await callRoute(`?venue_id=${MOCK_VENUE_ID}`);
 
-      expectFilter(mock.builder('venue_managers'), 'venue_id', MOCK_VENUE_ID);
+      expectFilter(mock.builder('place_managers'), 'place_id', MOCK_VENUE_ID);
     });
 
     it('returns 404 when the venue row is missing', async () => {

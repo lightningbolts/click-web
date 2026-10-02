@@ -73,9 +73,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: membership, error: membershipError } = await supabase
-      .from("venue_managers")
+      .from("place_managers")
       .select("id")
-      .eq("venue_id", venueId)
+      .eq("place_id", venueId)
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: venueRow, error: venueError } = await supabase
-      .from("venues")
+      .from("places")
       .select("id, name, location")
       .eq("id", venueId)
       .maybeSingle();

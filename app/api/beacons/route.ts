@@ -472,9 +472,9 @@ export async function POST(request: NextRequest) {
     if (venueIdRaw.length > 0) {
       const adminForVenue = createAdminSupabaseClient();
       const { data: membership } = await adminForVenue
-        .from("venue_managers")
+        .from("place_managers")
         .select("id")
-        .eq("venue_id", venueIdRaw)
+        .eq("place_id", venueIdRaw)
         .eq("user_id", user.id)
         .maybeSingle();
       if (!membership) {

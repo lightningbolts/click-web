@@ -50,7 +50,7 @@ function setupSupabase(
 ) {
   const mock = makeSupabaseMock({
     tables: {
-      venue_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }),
+      place_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }),
       venue_pop_up_hubs: overrides.hubs ?? INSERTED_HUB,
     },
   });
@@ -120,8 +120,8 @@ describe('POST /api/insights/beacons contract', () => {
 
       await callRoute({ ...VALID_BODY, venue_id: 'someone-elses-venue' });
 
-      const managers = mock.builder('venue_managers');
-      expectFilter(managers, 'venue_id', 'someone-elses-venue');
+      const managers = mock.builder('place_managers');
+      expectFilter(managers, 'place_id', 'someone-elses-venue');
       expectFilter(managers, 'user_id', MOCK_USER_ID);
     });
 

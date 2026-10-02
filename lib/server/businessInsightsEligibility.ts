@@ -18,12 +18,12 @@ function subscriptionAllowsInsights(status: string | null | undefined): boolean 
 }
 
 function embeddedVenueSubscription(row: {
-  venues:
+  places:
     | { subscription_status?: string | null }
     | { subscription_status?: string | null }[]
     | null;
 }): string | null | undefined {
-  const v = row.venues;
+  const v = row.places;
   if (Array.isArray(v)) {
     return v[0]?.subscription_status;
   }
@@ -54,8 +54,8 @@ export async function userMayAccessBusinessInsights(
   }
 
   const { data: memberships, error: vmError } = await supabase
-    .from('venue_managers')
-    .select('venues!inner(subscription_status)')
+    .from('place_managers')
+    .select('places!inner(subscription_status)')
     .eq('user_id', user.id);
 
   if (vmError) {
