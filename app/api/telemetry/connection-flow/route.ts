@@ -4,6 +4,7 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import {
   CONNECTION_FLOW_ALLOWED_EVENTS,
   emitConnectionFlowEvent,
+  sanitizeCaptureQuality,
 } from '@/lib/server/telemetry/connectionFlowEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { connectionFlowTelemetryBodySchema } from '@/lib/api/schemas/user';
@@ -17,6 +18,7 @@ type ConnectionFlowBody = {
   selected_count?: unknown;
   candidate_count?: unknown;
   reason?: unknown;
+  capture_quality?: unknown;
 };
 
 /** Per-process sliding window: soft abuse guard (not shared across instances). */
@@ -73,7 +75,8 @@ function sanitizeReason(raw: unknown): string | null {
 
 /**
  * Ingest anonymized proximity handshake / connection-flow telemetry from the KMP client.
- * Auth validates the session; no user_id or coordinates are persisted.
+ * Auth validates the session; no user_id or coordinates are persisted. An optional
+ * `capture_quality` object carries allowlisted aggregate sensor-quality metrics.
  * Separate from map friction (`system_friction_logs` / `/api/telemetry/friction`).
  *
  * Rate limit: 60 requests / minute / authenticated user (in-memory per instance).
@@ -107,6 +110,7 @@ export async function POST(request: NextRequest) {
     selectedCount: sanitizeNonNegInt(body.selected_count),
     candidateCount: sanitizeNonNegInt(body.candidate_count),
     reason: sanitizeReason(body.reason),
+    captureQuality: sanitizeCaptureQuality(body.capture_quality),
   });
 
   if (!ok) {

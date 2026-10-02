@@ -871,6 +871,7 @@ describe('POST /api/connections/proximity contract', () => {
         barometric_precision_m: 0.3,
         barometric_relative_altitude_m: 0.2,
         barometric_pressure_kpa: 100.82,
+        sensor_observation: { schema_version: 2, motion: { samples: [{ t_ms: -40, gravity: [0, -1, 0] }] } },
       }),
     );
     expect(adminStore._pending[0]).toMatchObject({
@@ -912,6 +913,7 @@ describe('POST /api/connections/proximity contract', () => {
       barometric_precision_m: 0.3,
       barometric_relative_altitude_m: 0.2,
       barometric_pressure_kpa: 100.82,
+      sensor_observation: { schema_version: 2, motion: { samples: [{ t_ms: -40, gravity: [0, -1, 0] }] } },
     });
     expect(userBRow).toMatchObject({
       gps_lat: 47.6102,
@@ -928,6 +930,7 @@ describe('POST /api/connections/proximity contract', () => {
       'exact_barometric_elevation_m',
       'barometric_accuracy_m',
       'barometric_pressure_kpa',
+      'sensor_observation',
     ]) {
       expect(userBRow).not.toHaveProperty(key);
     }

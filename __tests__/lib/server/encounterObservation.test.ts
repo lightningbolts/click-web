@@ -4,7 +4,9 @@
 
 import {
   encounterObservationColumns,
+  MAX_SENSOR_OBSERVATION_BYTES,
   parseEncounterObservation,
+  parseSensorObservation,
 } from '@/lib/server/encounterObservation';
 
 const NOW = Date.parse('2026-10-02T06:12:14.000Z');
@@ -95,5 +97,72 @@ describe('encounterObservationColumns', () => {
       gps_horizontal_accuracy_m: 6,
       gps_floor: 1,
     });
+  });
+});
+
+describe('velocity and provenance', () => {
+  it('keeps valid speed, course and source flags', () => {
+    expect(
+      parseEncounterObservation(
+        {
+          gps_speed_mps: 0.2,
+          gps_speed_accuracy_mps: 0.7,
+          gps_course_deg: 271.5,
+          gps_course_accuracy_deg: 12,
+          gps_simulated: false,
+          gps_external_accessory: true,
+        },
+        NOW,
+      ),
+    ).toEqual({
+      gps_speed_mps: 0.2,
+      gps_speed_accuracy_mps: 0.7,
+      gps_course_deg: 271.5,
+      gps_course_accuracy_deg: 12,
+      gps_simulated: false,
+      gps_external_accessory: true,
+    });
+  });
+
+  it('treats negative speed or course as unavailable, never substituting a value', () => {
+    expect(
+      parseEncounterObservation(
+        { gps_speed_mps: -1, gps_speed_accuracy_mps: 0.5, gps_course_deg: -1, gps_course_accuracy_deg: 4 },
+        NOW,
+      ),
+    ).toEqual({});
+  });
+});
+
+describe('parseSensorObservation', () => {
+  const observation = {
+    schema_version: 2,
+    connection_moment: '2026-10-02T06:12:13.421Z',
+    bluetooth: { peers: [{ token: '1234', rssi_samples_dbm: [-57, -59, -58] }] },
+  };
+
+  it('round-trips a versioned observation', () => {
+    expect(parseSensorObservation(observation)).toEqual(observation);
+    expect(parseEncounterObservation({ sensor_observation: observation }, NOW)).toEqual({
+      sensor_observation: observation,
+    });
+  });
+
+  it('rejects unversioned, non-object and oversized observations', () => {
+    expect(parseSensorObservation({ motion: {} })).toBeNull();
+    expect(parseSensorObservation({ schema_version: 2.5 })).toBeNull();
+    expect(parseSensorObservation([observation])).toBeNull();
+    expect(parseSensorObservation('{"schema_version":2}')).toBeNull();
+    const huge = { schema_version: 2, padding: 'x'.repeat(MAX_SENSOR_OBSERVATION_BYTES) };
+    expect(parseSensorObservation(huge)).toBeNull();
+  });
+
+  it('travels with the reporting row even without a coordinate', () => {
+    expect(
+      encounterObservationColumns(parseEncounterObservation({ sensor_observation: observation }, NOW), {
+        hasOwnCoordinate: false,
+        hasBarometricAltitude: false,
+      }),
+    ).toEqual({ sensor_observation: observation });
   });
 });
