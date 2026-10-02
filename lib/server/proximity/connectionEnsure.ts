@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { allMembersOptedIntoInsights } from '@/lib/server/connections/insightsOptIn';
 import {
   isDuplicateKeyError,
   PROXIMITY_GROUP_SUPERSEDE_WINDOW_MS,
@@ -59,6 +60,7 @@ export async function ensureConnectionForMemberSet(
   const expiryMs = nowMs + 30 * 24 * 60 * 60 * 1000;
   const hasGps = encLat != null && encLon != null;
   const proximityConfidence = hasGps ? 65 : 50;
+  const includeInBusinessInsights = await allMembersOptedIntoInsights(admin, members);
   const insertRow: Record<string, unknown> = {
     user_ids: members,
     created: nowMs,
@@ -67,7 +69,7 @@ export async function ensureConnectionForMemberSet(
     has_begun: false,
     expiry_state: forceActive ? 'active' : 'pending',
     status: forceActive ? 'active' : 'pending',
-    include_in_business_insights: true,
+    include_in_business_insights: includeInBusinessInsights,
     initiator_id: uid,
     responder_id: uid,
     connection_method: 'proximity',
