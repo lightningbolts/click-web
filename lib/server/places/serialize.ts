@@ -93,3 +93,54 @@ export function serializePlaceDetail(
     ...extras,
   };
 }
+
+/** What a Place's managers see about their own Place (no per-user data). */
+export type ManagerPlace = {
+  id: string;
+  slug: string | null;
+  name: string;
+  category: PlaceRow['category'];
+  verification_status: PlaceRow['verification_status'];
+  listed: boolean;
+  hub_enabled: boolean;
+  photo_url: string | null;
+  role: 'owner' | 'manager' | 'viewer';
+  subscription_status: string | null;
+  description: string | null;
+  hours: ReturnType<typeof parsePlaceHours>;
+  website_url: string | null;
+  address_line: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+  radius_meters: number;
+};
+
+export function serializeManagerPlace(place: PlaceRow, role: ManagerPlace['role']): ManagerPlace {
+  return {
+    id: place.id,
+    slug: place.slug,
+    name: place.name,
+    category: place.category,
+    verification_status: place.verification_status,
+    listed: place.listed,
+    hub_enabled: place.hub_enabled,
+    photo_url: placePhotoUrl(place.photo_path),
+    role,
+    subscription_status: place.subscription_status,
+    description: place.description,
+    hours: parsePlaceHours(place.hours),
+    website_url: place.website_url,
+    address_line: place.address_line ?? place.location,
+    city: place.city,
+    region: place.region,
+    postal_code: place.postal_code,
+    timezone: placeTimezone(place),
+    latitude: place.latitude,
+    longitude: place.longitude,
+    radius_meters: place.radius_meters,
+  };
+}
