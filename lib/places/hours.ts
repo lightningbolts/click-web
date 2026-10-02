@@ -123,3 +123,25 @@ export function localDayEndMs(timezone: string, nowMs: number): number {
   const flooredNow = nowMs - (nowMs % 60_000);
   return flooredNow + (24 * 60 - (hour * 60 + minute)) * 60_000;
 }
+
+/** UTC instant of local midnight starting `dateKey` (`YYYY-MM-DD`) in `timezone`. */
+export function zonedDayStartMs(timezone: string, dateKey: string): number {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const target = Date.UTC(y, m - 1, d);
+  let t = target;
+  for (let i = 0; i < 3; i += 1) {
+    const p = localParts(timezone, t);
+    const [py, pm, pd] = p.dateKey.split('-').map(Number);
+    const localAsUtc = Date.UTC(py, pm - 1, pd, p.hour, p.minute);
+    const diff = localAsUtc - target;
+    if (diff === 0) break;
+    t -= diff;
+  }
+  return t;
+}
+
+/** `YYYY-MM-DD` shifted by `days` (calendar arithmetic, timezone-free). */
+export function addDaysToKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
