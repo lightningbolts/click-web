@@ -39,6 +39,7 @@ import {
 } from '@/lib/server/connections/encounterEnrichment';
 import { finiteBatteryPct } from '@/lib/server/proximity/matching';
 import { runAfterResponse } from '@/lib/server/afterResponse';
+import { encounterObservationColumns, parseEncounterObservation } from '@/lib/server/encounterObservation';
 import {
   BUNDLE_PARAM,
   DASHBOARD_ENCOUNTERS_PER_CONNECTION,
@@ -778,6 +779,13 @@ export async function POST(request: NextRequest) {
     if (encElev != null) {
       encounterInsert.exact_barometric_elevation_m = encElev;
     }
+    // Quality metadata describes the caller's own device, so location quality is attached
+    // only when the stored coordinate is the caller's own `location1`.
+    const encounterObservation = encounterObservationColumns(parseEncounterObservation(body), {
+      hasOwnCoordinate: loc1Valid && user.id === userId1,
+      hasBarometricAltitude: encElev != null,
+    });
+    Object.assign(encounterInsert, encounterObservation);
 
     const liveEventAttachment = await resolveLiveEventBeaconForReportingUser(
       adminClient,
@@ -851,6 +859,10 @@ export async function POST(request: NextRequest) {
           encElev,
           geoLocation.lat,
           geoLocation.lon,
+          {
+            encounterId: insertedEnc?.id != null ? String(insertedEnc.id) : null,
+            barometricAccuracyM: encounterObservation.barometric_accuracy_m ?? null,
+          },
         ),
       );
     }

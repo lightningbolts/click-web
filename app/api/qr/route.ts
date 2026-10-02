@@ -3,10 +3,9 @@ import crypto from 'crypto';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
-import {
-  deriveHeightCategoryFromRelativeAltitudeM,
-  fetchTerrainElevationMeters,
-} from '@/lib/server/terrainElevation';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { enrichEncounterRelativeAltitude } from '@/lib/server/connections/encounterEnrichment';
+import { encounterObservationColumns, parseEncounterObservation } from '@/lib/server/encounterObservation';
 import {
   normalizeContextTag,
   normalizeContextTagsArray,
@@ -60,10 +59,6 @@ function normalizeNoiseLevelCategory(
     value === 'VERY_LOUD'
     ? value
     : null;
-}
-
-function normalizeElevationCategoryString(value: unknown): string | null {
-  return normalizeClientNoiseLevelString(value);
 }
 
 function finiteBatteryPct(v: unknown): number | null {
@@ -430,8 +425,6 @@ export async function POST(request: NextRequest) {
           : null;
 
       const noiseLevelCategory = body.noiseLevelCategory ?? body.noise_level_category;
-      const heightCategoryRaw = body.height_category ?? body.heightCategory;
-      const elevationCategoryRaw = body.elevation_category ?? body.elevationCategory;
       const exactNoiseLevelDb = body.exactNoiseLevelDb ?? body.exact_noise_level_db;
       const exactBarometricElevationMeters =
         body.exactBarometricElevationMeters ?? body.exact_barometric_elevation_m;
@@ -440,9 +433,6 @@ export async function POST(request: NextRequest) {
       );
       const enumNoiseLevel = normalizeNoiseLevelCategory(noiseLevelCategory);
       const resolvedNoiseForEncounter = enumNoiseLevel ?? clientNoiseLevelString;
-      const resolvedElevationCategory =
-        normalizeElevationCategoryString(elevationCategoryRaw) ??
-        normalizeElevationCategoryString(heightCategoryRaw);
 
       const resolvedSingleContextTagId = resolveContextTagId(
         normalizeContextTag(
@@ -600,31 +590,13 @@ export async function POST(request: NextRequest) {
           encounterInsert.exact_barometric_elevation_m = encElev;
         }
 
-        let relativeAltitudeM: number | null = null;
-        if (
-          encElev != null &&
-          gpsPair.lat != null &&
-          gpsPair.lon != null &&
-          !(gpsPair.lat === 0 && gpsPair.lon === 0)
-        ) {
-          try {
-            const terrainM = await fetchTerrainElevationMeters(gpsPair.lat, gpsPair.lon);
-            if (terrainM != null) {
-              relativeAltitudeM = encElev - terrainM;
-            }
-          } catch (openElevErr) {
-            console.error('Open-Elevation lookup failed (non-fatal):', openElevErr);
-          }
-        }
-        if (relativeAltitudeM != null) {
-          encounterInsert.relative_altitude_m = relativeAltitudeM;
-          const aglCategory = deriveHeightCategoryFromRelativeAltitudeM(relativeAltitudeM);
-          if (aglCategory != null) {
-            encounterInsert.elevation_category = aglCategory;
-          }
-        } else if (encElev != null && resolvedElevationCategory != null) {
-          // No DEM yet — do not persist client AMSL-derived category.
-        }
+        // The scanner's own observation quality. Terrain-relative altitude (and the height
+        // band) is derived after the response from the same device's barometer and fix.
+        const observation = encounterObservationColumns(parseEncounterObservation(body), {
+          hasOwnCoordinate: gpsPair.lat != null && gpsPair.lon != null,
+          hasBarometricAltitude: encElev != null,
+        });
+        Object.assign(encounterInsert, observation);
 
         encounterInsert.context_tags = mergedEncounterContextTags;
 
@@ -643,9 +615,11 @@ export async function POST(request: NextRequest) {
           applyLiveEventBeaconToEncounterRow(encounterInsert, liveEventAttachment),
         );
 
-        const { error: encounterErr } = await adminClient
+        const { data: insertedEncounter, error: encounterErr } = await adminClient
           .from('connection_encounters')
-          .insert(encounterInsert);
+          .insert(encounterInsert)
+          .select('id')
+          .maybeSingle();
 
         if (encounterErr) {
           if (isEncounterRateLimitError(encounterErr)) {
@@ -692,6 +666,16 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             { error: 'Failed to log encounter context' },
             { status: 500 }
+          );
+        }
+
+        if (encElev != null && gpsPair.lat != null && gpsPair.lon != null) {
+          const [encLat, encLon] = [gpsPair.lat, gpsPair.lon];
+          runAfterResponse('qr altitude enrichment', () =>
+            enrichEncounterRelativeAltitude(adminClient, existingConnection.id, encElev, encLat, encLon, {
+              encounterId: insertedEncounter?.id != null ? String(insertedEncounter.id) : null,
+              barometricAccuracyM: observation.barometric_accuracy_m ?? null,
+            }),
           );
         }
 

@@ -57,6 +57,8 @@ export type HandshakeRowLite = {
   heard_tokens: unknown;
   lat: unknown;
   lon: unknown;
+  horizontal_accuracy_m?: unknown;
+  location_observed_at?: unknown;
   created_at: string;
   lux_level?: unknown;
   motion_variance?: unknown;

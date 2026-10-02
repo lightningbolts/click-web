@@ -21,7 +21,12 @@ import {
 } from '@/lib/server/proximity/matching';
 import type { ProximitySensorPayloadJson } from '@/types/supabase-json';
 import {
+  encounterObservationColumns,
+  type EncounterObservationColumns,
+} from '@/lib/server/encounterObservation';
+import {
   nonEmptyPayloadString,
+  observationFromHandshakeRow,
   pendingRowToHandshakeLite,
   sensorPayloadFromRow,
   type BindContext,
@@ -40,6 +45,8 @@ export function memberSensorValues(ctx: BindContext, memberId: string): {
   exactNoiseLevelDb: number | null;
   noiseLevel: string | null;
   exactBarometricElevationM: number | null;
+  /** This member's own location/altimeter quality — never another member's. */
+  observation: EncounterObservationColumns;
   heightCategory: string | null;
   manualLocationName: string | null;
   weatherSnapshot: string | null;
@@ -53,19 +60,25 @@ export function memberSensorValues(ctx: BindContext, memberId: string): {
   const payload = sensorPayloadFromRow(row);
   const latValue = memberId === uid ? ctx.encLat : finiteNumber(row?.lat);
   const lonValue = memberId === uid ? ctx.encLon : finiteNumber(row?.lon);
+  const hasCoordinate = latValue != null && lonValue != null && !(latValue === 0 && lonValue === 0);
+  const exactBarometricElevationM =
+    memberId === uid ? ctx.exactBarometricElevationM : finiteNumber(payload.exact_barometric_elevation_m);
   return {
     row,
     payload,
-    lat: latValue != null && lonValue != null && !(latValue === 0 && lonValue === 0) ? latValue : null,
-    lon: latValue != null && lonValue != null && !(latValue === 0 && lonValue === 0) ? lonValue : null,
+    lat: hasCoordinate ? latValue : null,
+    lon: hasCoordinate ? lonValue : null,
     lux: memberId === uid ? ctx.selfLux : finiteNumber(row?.lux_level),
     motion: memberId === uid ? ctx.selfMotion : finiteNumber(row?.motion_variance),
     azimuth: memberId === uid ? ctx.selfAz : finiteNumber(row?.compass_azimuth),
     battery: memberId === uid ? ctx.selfBattery : finiteBatteryPct(row?.battery_level),
     exactNoiseLevelDb: memberId === uid ? ctx.exactNoiseLevelDb : finiteNumber(payload.exact_noise_level_db),
     noiseLevel: memberId === uid ? ctx.noiseLevel : nonEmptyPayloadString(payload.noise_level),
-    exactBarometricElevationM:
-      memberId === uid ? ctx.exactBarometricElevationM : finiteNumber(payload.exact_barometric_elevation_m),
+    exactBarometricElevationM,
+    observation: encounterObservationColumns(
+      memberId === uid ? ctx.selfObservation : observationFromHandshakeRow(row),
+      { hasOwnCoordinate: hasCoordinate, hasBarometricAltitude: exactBarometricElevationM != null },
+    ),
     heightCategory: memberId === uid ? ctx.clientHeightCategory : nonEmptyPayloadString(payload.height_category),
     manualLocationName: memberId === uid ? ctx.manualLocationName : nonEmptyPayloadString(payload.location_name),
     weatherSnapshot: memberId === uid ? ctx.clientWeatherSnapshot : nonEmptyPayloadString(payload.weather_snapshot),
@@ -129,6 +142,7 @@ export async function buildEncounterRowForMember(
   if (values.noiseLevel != null) row.noise_level = values.noiseLevel;
   if (values.exactNoiseLevelDb != null) row.exact_noise_level_db = values.exactNoiseLevelDb;
   if (values.exactBarometricElevationM != null) row.exact_barometric_elevation_m = values.exactBarometricElevationM;
+  Object.assign(row, values.observation);
   if (values.heightCategory != null) row.elevation_category = values.heightCategory;
   if (memberRelativeAltitudeM != null) row.relative_altitude_m = memberRelativeAltitudeM;
   if (values.lux != null) row.lux_level = values.lux;
