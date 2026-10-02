@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  ACTIVE_CONNECTIONS_DB_OR_FILTER,
   isActiveChatListStatus,
   normalizeConnectionStatus,
 } from '@/lib/dashboard/connectionStatus';
@@ -154,7 +155,11 @@ export async function loadActivityRecap(
         // `created_at`. Selecting a nonexistent column makes PostgREST reject the whole
         // query, which previously collapsed the entire recap to zeros.
         .select('id, created, created_utc, source, status, expiry_state')
-        .contains('user_ids', [userId]),
+        .contains('user_ids', [userId])
+        // Exclude explicit archived/removed rows in Postgres before transferring them to the
+        // Worker. Legacy status-null rows still pass through and are normalized below exactly
+        // as before, preserving the recap's lifecycle semantics.
+        .or(ACTIVE_CONNECTIONS_DB_OR_FILTER),
     ]);
 
     if (connectionResult.error) {

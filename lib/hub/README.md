@@ -1,8 +1,12 @@
 # Community Hub library (`lib/hub`)
 
-Place-scoped chat spaces with thin API routes for create/nearby/messages/media/leave. Standalone hubs use a geofence; event hubs use active event check-in (or host status) and expire after their configured event window. Hubs are **not** E2EE connection chats.
+Place-scoped chat spaces with API routes and a web Hubs tab. Standalone hubs use a geofence; event hubs use the authoritative RSVP/check-in/host policy and expire after their configured event window. Upgraded hubs use client-held E2EE v2 epoch keys. Legacy hub messages can remain server-readable.
 
 ---
+
+## Web experience
+
+`CommunityHubs` handles opt-in discovery and joining. `HubConversation` provides messages, encrypted attachments, replies, edits, deletion, reactions, local search, older history and permitted profiles. `HubAttachment` supports v2 and legacy mobile media, safe inline previews and delayed disposable-photo reveal. Keyset history uses `before` and `beforeId` while retaining the mobile millisecond `cursor` contract.
 
 ## Purpose
 
@@ -62,7 +66,8 @@ Auth: `requireBearerUser` from `chatGatekeeper` (JWT validation only; hub writes
 
 ## E2EE / API constraints
 
-- Hub messages are **not** connection-scoped E2EE; treat as server-readable venue chat at rest.
+- Hub encryption uses `/api/hub/devices` and `/api/hub/epochs` with the mobile wire format. The web client rotates on membership changes and fails closed when an upgraded hub cannot be unlocked.
+- Web attachment uploads require E2EE v2. Decrypted download URLs are revoked when the conversation unmounts.
 - Geofence coordinates are sent per request — server does not trust cached client location without fresh lat/lng.
 - New hub media uses the private `hub-media` bucket. Persist `media_path` and `media_bucket`, never signed URLs. Legacy `media_url` records remain readable during migration.
 - Event hubs are inaccessible after expiry or check-out. Event hosts must edit/delete the event rather than its linked hub.

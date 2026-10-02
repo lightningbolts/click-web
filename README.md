@@ -21,7 +21,7 @@ Click Web is the **Next.js** companion to the **Kotlin Multiplatform (KMP)** mob
 
 | Area | What it does |
 |------|----------------|
-| **Web-based VoIP** | In-browser calling via **LiveKit**: short-lived token from `/api/livekit/token`, `livekit-client` rooms, payloads aligned with mobile push shapes. |
+| **Web-based VoIP (dormant)** | Calling controls are removed from the web UI (as on iOS). The LiveKit token route, `livekit-client` integration, and push payload shapes remain in place for future work. |
 | **Real-time chat** | Chat UI syncs with Supabase-backed data; API routes under `app/api/chat/` support messages, reactions, and related flows. |
 | **Home recap** | `GET /api/me/recap?window=day\|week` returns a zeroed 200 payload when the caller has no active handshake records in the window (archived / hidden connections and missing columns do not 500). |
 | **Map beacons** | `GET/POST /api/beacons`, plus `POST /api/beacons/image` for unencrypted beacon photos (max 2 MB; **optional**, as on mobile). Pin/popup and card identity uses `lib/ui/generateCardVisual.ts` + `components/ui/CardVisualSurface.tsx` (mirrors mobile). |
@@ -184,7 +184,7 @@ click-web is the **browser companion** to the KMP mobile app (`click/`). Mobile 
 
 ### Can click-web deliver mobile user-facing features?
 
-**Yes** for most post-connection experiences: connections inbox, map, timeline, E2EE chat, LiveKit calls, QR identity, availability intents, stats, and collaboration hooks (`components/DashboardView.tsx`).
+**Yes** for most post-connection experiences: connections inbox, map, timeline, E2EE chat (pins, mutes, plans, scheduled messages), event chat, QR identity, availability intents, stats, and collaboration hooks (`components/DashboardView.tsx`).
 
 **No** for hardware-native flows: BLE + ultrasonic + progressive GPS orchestration, Multi-Tap initiation in a physical room, sensor capture at handshake time, CallKit/PushKit/FCM wake, App Clip, and device calendar integration. Web can **display** Memory Capsule data captured on mobile but cannot produce the same sensor readings.
 
@@ -212,8 +212,9 @@ Mobile is the primary **data producer** for B2B insights (connections, encounter
 | Availability intents | Yes | Partial (UI yes; match pushes mobile-first) |
 | Memory Capsules | Capture + display | Display only |
 | Prior Connections | On-device contact hashing + skippable onboarding | Discover / request / respond APIs + profile badge |
-| Community Hubs | Mobile-first UI | API-only — `lib/hub/README.md` |
-| Home connection insights | `ReconnectHelper` | Gap (not on web dashboard) |
+| Community Hubs | Mobile UI | Hubs tab: discovery, create/join/leave, text and encrypted attachments — `lib/hub/README.md` |
+| Home connection insights | `ReconnectHelper` | Insights, reconnect suggestions and archive warning |
+| Home recap and saved events | Day/week recap + bookmarks | Day/week recap and saved-event links |
 | B2B Click Insights | `widget-vibe` consumer | Web-only — `lib/insights/README.md` |
 
 Detailed matrices live in colocated module READMEs: `lib/dashboard/README.md`, `lib/connections/README.md`, `lib/insights/README.md`. Mobile companion context: `click/README.md` § Monorepo note.

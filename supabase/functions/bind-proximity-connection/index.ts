@@ -395,6 +395,23 @@ Deno.serve(async (req) => {
     return rows.find((r) => sameMemberSet(r.user_ids, memberUserIds)) ?? null;
   }
 
+  /**
+   * Mirrors click-web `lib/server/connections/insightsOptIn.ts` (Deno cannot import lib/):
+   * true only when every member has users.location_include_in_insights_enabled = true.
+   * Fails closed on read errors.
+   */
+  async function allMembersOptedIntoInsights(memberUserIds: string[]): Promise<boolean> {
+    const unique = [...new Set(memberUserIds)];
+    if (unique.length === 0) return false;
+    const { data, error } = await admin
+      .from('users')
+      .select('id, location_include_in_insights_enabled')
+      .in('id', unique);
+    if (error || !data) return false;
+    const rows = data as { id: string; location_include_in_insights_enabled?: boolean | null }[];
+    return rows.length === unique.length && rows.every((r) => r.location_include_in_insights_enabled === true);
+  }
+
   async function ensureConnectionForMemberSet(
     memberUserIds: string[],
   ): Promise<{ connectionId: string; isNewConnection: boolean; isGroup: boolean } | null> {
@@ -407,6 +424,7 @@ Deno.serve(async (req) => {
     const expiryMs = nowMs + 30 * 24 * 60 * 60 * 1000;
     const hasGps = encLat != null && encLon != null;
     const proximityConfidence = hasGps ? 65 : 50;
+    const includeInBusinessInsights = await allMembersOptedIntoInsights(members);
     const proximitySignals = {
       connection_method: 'proximity',
       gps_available: hasGps,
@@ -420,7 +438,7 @@ Deno.serve(async (req) => {
       has_begun: false,
       expiry_state: members.length > 2 ? 'active' : 'pending',
       status: members.length > 2 ? 'active' : 'pending',
-      include_in_business_insights: true,
+      include_in_business_insights: includeInBusinessInsights,
       initiator_id: uid,
       responder_id: uid,
       connection_method: 'proximity',

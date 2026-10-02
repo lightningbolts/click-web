@@ -62,15 +62,22 @@ export async function GET(
     return Math.min(Math.max(raw, 1), 500);
   })();
 
+  // Paging for the shared-media grid: attachments older than `before` (time_created, ms).
+  const beforeRaw = req.nextUrl.searchParams.get('before');
+  const before = beforeRaw != null && /^\d+$/.test(beforeRaw) ? parseInt(beforeRaw, 10) : null;
+
+  let attachmentsQuery = supabase
+    .schema('public')
+    .from('messages')
+    .select('*')
+    .eq('chat_id', chatId)
+    .in('message_type', ['image', 'audio', 'file'])
+    .order('time_created', { ascending: false })
+    .limit(limit);
+  if (before != null) attachmentsQuery = attachmentsQuery.lt('time_created', before);
+
   const [attachmentsRes, beaconsRes] = await Promise.all([
-    supabase
-      .schema('public')
-      .from('messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .in('message_type', ['image', 'audio', 'file'])
-      .order('time_created', { ascending: false })
-      .limit(limit),
+    attachmentsQuery,
     supabase
       .schema('public')
       .from('messages')
@@ -108,5 +115,6 @@ export async function GET(
     media,
     files,
     beacons: mergedBeacons,
+    hasMore: attachments.length >= limit,
   });
 }

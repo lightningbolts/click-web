@@ -145,3 +145,18 @@ export const priorConnectionRespondBodySchema = z.preprocess(
     action: z.enum(['accept', 'decline']),
   }),
 );
+
+/** POST /api/hangouts — log a hangout for the other person to confirm. */
+export const hangoutLogBodySchema = z.object({
+  connection_id: z.string().trim().min(1),
+  occurred_at: z.string().datetime({ offset: true }).optional(),
+  lat: z.number().finite().optional(),
+  lon: z.number().finite().optional(),
+  location_name: z.string().trim().max(120).optional().nullable(),
+});
+
+/** POST /api/me/presence — opt-in hangout detection ping. */
+export const presencePingBodySchema = z.object({
+  lat: z.number().finite(),
+  lon: z.number().finite(),
+});

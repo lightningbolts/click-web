@@ -20,8 +20,8 @@ export async function resolveInsightsVenueId(
   }
 
   const { data, error } = await supabase
-    .from("venue_managers")
-    .select("venue_id")
+    .from("place_managers")
+    .select("place_id")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -32,5 +32,5 @@ export async function resolveInsightsVenueId(
     return null;
   }
 
-  return data?.venue_id ?? null;
+  return data?.place_id ?? null;
 }

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 import { normalizeContextTagsArray } from '@/lib/server/connectionEncounterContextTag';
 import {
   AT_EVENT_CONTEXT_TAG,
@@ -20,7 +21,6 @@ import {
 } from '@/lib/server/proximity/matching';
 import type { ProximitySensorPayloadJson } from '@/types/supabase-json';
 import {
-  DISPLAY_LOCATION_FALLBACK,
   nonEmptyPayloadString,
   pendingRowToHandshakeLite,
   sensorPayloadFromRow,
@@ -110,7 +110,6 @@ export async function buildEncounterRowForMember(
   );
 
   const memberRelativeAltitudeM: number | null = null;
-  const memberDisplayLocation = DISPLAY_LOCATION_FALLBACK;
   const memberSpecificLocationName: string | null = null;
   const memberSemanticLocation: Record<string, unknown> | null = null;
 
@@ -118,7 +117,6 @@ export async function buildEncounterRowForMember(
     connection_id: connectionId,
     encountered_at: encounteredAtIso,
     context_tags: memberContextTags,
-    display_location: memberDisplayLocation,
     reporting_user_id: memberId,
   };
   const locationName = values.manualLocationName ?? memberSpecificLocationName;
@@ -174,14 +172,16 @@ export async function insertOrDebounceEncounter(
         return null;
       })
     : null;
-  void emitProximityAtEventOutcome(admin, {
-    attachment: liveEventAttachment,
-    latitude: encounterLat,
-    longitude: encounterLon,
-    participantIds: reportingForEvent ? [reportingForEvent] : [],
-    peerCount: participantUserIds.length,
-    isGroup: participantUserIds.length > 2,
-  });
+  runAfterResponse('proximity at-event telemetry', () =>
+    emitProximityAtEventOutcome(admin, {
+      attachment: liveEventAttachment,
+      latitude: encounterLat,
+      longitude: encounterLon,
+      participantIds: reportingForEvent ? [reportingForEvent] : [],
+      peerCount: participantUserIds.length,
+      isGroup: participantUserIds.length > 2,
+    }),
+  );
   insertRow = applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment);
 
   const encounteredAtIso = String(insertRow.encountered_at ?? '');

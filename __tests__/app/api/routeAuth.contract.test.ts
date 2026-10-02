@@ -28,9 +28,15 @@ const AUTH_MARKERS = [
   'auth.getUser',
   'exchangeCodeForSession',
   'CRON_SECRET',
+  'authorizeCronRequest',
   'STRIPE_WEBHOOK_SECRET',
   'constructEvent',
   'publicRoute',
+  // lib/server/eventDrops.ts: getSupabaseFromRouteRequest + the event_drops flag.
+  'authorizeEventDropRequest',
+  // lib/server/places/routeContext.ts: getSupabaseFromRouteRequest + the click_places flag.
+  'requirePlacesUser',
+  'requirePlaceManagerContext',
 ];
 
 /** Intentionally unauthenticated or secret-gated via non-JWT means. */

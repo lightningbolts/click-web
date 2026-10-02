@@ -115,7 +115,9 @@ export default async function ConnectionProfilePage({
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3.5 bg-white text-black rounded-xl font-medium hover:bg-zinc-200 transition-colors"
             >
-              Download on the App Store
+              {APP_CONFIG.ios_store_url === APP_CONFIG.ios_testflight_url
+                ? 'Get the iOS beta (TestFlight)'
+                : 'Download on the App Store'}
             </a>
 
             <a
@@ -124,7 +126,9 @@ export default async function ConnectionProfilePage({
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3.5 bg-zinc-800 text-white rounded-xl font-medium hover:bg-zinc-700 transition-colors"
             >
-              Get it on Google Play
+              {APP_CONFIG.android_store_url === '#waitlist'
+                ? 'Android coming soon'
+                : 'Get it on Google Play'}
             </a>
           </div>
 

@@ -94,8 +94,8 @@ export const hubInteractionBodySchema = z.preprocess((raw) => {
   };
 }, z.object({
   hubId: nonEmptyString,
-  userLat: z.number(),
-  userLong: z.number(),
+  userLat: z.number().optional(),
+  userLong: z.number().optional(),
   body: z.string().trim().min(1).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).passthrough());
@@ -114,8 +114,8 @@ export const hubReactionBodySchema = z.preprocess((raw) => {
   hubId: nonEmptyString,
   messageId: nonEmptyString,
   reactionType: z.string().trim().min(1).max(32),
-  userLat: z.number(),
-  userLong: z.number(),
+  userLat: z.number().optional(),
+  userLong: z.number().optional(),
 }).passthrough());
 
 export const hubJoinBodySchema = z.preprocess((raw) => {
@@ -175,4 +175,16 @@ export const guestListBodySchema = z.object({
 
 export const nudgeSnoozeBodySchema = z.object({
   days: z.union([z.literal(7), z.literal(30)]).optional(),
+});
+
+/** POST /api/beacons/{id}/confirm — Still here / Cleared on an alert. Coordinates are checked, never stored. */
+export const alertConfirmBodySchema = z.object({
+  status: z.enum(['still_here', 'cleared']),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+});
+
+/** POST /api/beacons/{id}/report — a quiet report to moderation (not a downvote). */
+export const beaconReportBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
 });

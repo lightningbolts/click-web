@@ -17,13 +17,13 @@ export default async function VibeRadarPage() {
       let venueId = typeof meta === "string" ? meta.trim() : "";
       if (!venueId) {
         const { data: row } = await supabase
-          .from("venue_managers")
-          .select("venue_id")
+          .from("place_managers")
+          .select("place_id")
           .eq("user_id", user.id)
           .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle();
-        venueId = row?.venue_id ?? "";
+        venueId = row?.place_id ?? "";
       }
 
       if (venueId) {

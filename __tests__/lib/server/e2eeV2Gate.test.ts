@@ -295,3 +295,50 @@ describe('E2EE v2 message write gate', () => {
     expect(rejected.ok).toBe(false);
   });
 });
+
+describe('E2EE v2 message write gate: overlapping reads', () => {
+  const request = { chatId: CHAT_ID, userId: USER_ID, content: envelope(), epoch: 7, senderDeviceId: SENDER, clientMessageId: CLIENT_MESSAGE_ID };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  it('issues the coverage and sender-device reads before the epoch read resolves', async () => {
+    const admin = adminFor(7, { id: 'row-a', user_id: USER_ID });
+    let releaseEpoch!: (value: unknown) => void;
+    const from = admin.from;
+    admin.from = jest.fn((table: string) => {
+      const chain = from(table);
+      if (table === 'chat_key_epochs') chain.maybeSingle = jest.fn(() => new Promise((resolve) => { releaseEpoch = resolve; }));
+      return chain;
+    });
+
+    const pending = assertE2eeV2MessageWrite(admin, request);
+    await flush();
+    const tables = admin.from.mock.calls.map(([table]: [string]) => table);
+    expect(tables).toEqual(expect.arrayContaining(['chat_key_epochs', 'chat_recipient_key_envelopes', 'chat_devices']));
+    expect(admin.rpc).toHaveBeenCalled();
+
+    releaseEpoch({ data: { epoch: 7 }, error: null });
+    await expect(pending).resolves.toMatchObject({ ok: true, currentEpoch: 7 });
+  });
+
+  it('never lets a failed later read outrank an earlier rejection', async () => {
+    const admin = adminFor(7, null);
+    admin.rpc = jest.fn().mockResolvedValue({ data: null, error: new Error('rpc down') });
+    const result = await assertE2eeV2MessageWrite(admin, { ...request, content: envelope({ chatId: '44444444-4444-4444-8444-444444444444' }) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.response.status).toBe(400);
+  });
+
+  it('still surfaces a read failure once its check is reached', async () => {
+    const admin = adminFor(7, { id: 'row-a', user_id: USER_ID });
+    admin.rpc = jest.fn().mockResolvedValue({ data: null, error: new Error('rpc down') });
+    await expect(assertE2eeV2MessageWrite(admin, request)).rejects.toThrow('rpc down');
+  });
+
+  it('reports an uncovered device set before looking at the sender device', async () => {
+    const admin = adminFor(7, { id: 'row-a', user_id: USER_ID }, { recipientDeviceIds: [] });
+    const result = await assertE2eeV2MessageWrite(admin, request);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.response.status).toBe(409);
+  });
+});
+

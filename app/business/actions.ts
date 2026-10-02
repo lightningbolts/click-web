@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { getAppBaseUrl, getStripe } from '@/lib/server/stripe';
 
 export type ActionResult<T> =
@@ -22,8 +23,9 @@ function createSupabaseWithAccessToken(accessToken: string) {
 }
 
 /**
- * Creates a venue in `inactive` state and adds the current user as owner (RLS).
- * Pass the browser session `access_token` so the server can authorize the user.
+ * Creates a Place in `inactive` state and adds the current user as owner.
+ * Pass the browser session `access_token` so the server can authorize the user; the writes use
+ * the service role because clients have no direct INSERT on `places` / `place_managers`.
  */
 export async function createVenueForCheckout(
   accessToken: string,
@@ -49,8 +51,9 @@ export async function createVenueForCheckout(
     return { ok: false, error: 'You must be signed in to continue.' };
   }
 
-  const { data: venue, error: venueError } = await supabase
-    .from('venues')
+  const admin = createAdminSupabaseClient();
+  const { data: venue, error: venueError } = await admin
+    .from('places')
     .insert({
       name: trimmedName,
       location: trimmedLocation || null,
@@ -63,13 +66,14 @@ export async function createVenueForCheckout(
     return { ok: false, error: venueError?.message ?? 'Could not create venue.' };
   }
 
-  const { error: managerError } = await supabase.from('venue_managers').insert({
+  const { error: managerError } = await admin.from('place_managers').insert({
     user_id: user.id,
-    venue_id: venue.id,
+    place_id: venue.id,
     role: 'owner',
   });
 
   if (managerError) {
+    await admin.from('places').delete().eq('id', venue.id);
     return { ok: false, error: managerError.message };
   }
 
@@ -99,9 +103,9 @@ export async function createStripeCheckoutSession(
   }
 
   const { data: membership, error: vmError } = await supabase
-    .from('venue_managers')
+    .from('place_managers')
     .select('id, role')
-    .eq('venue_id', venueId)
+    .eq('place_id', venueId)
     .eq('user_id', user.id)
     .maybeSingle();
 

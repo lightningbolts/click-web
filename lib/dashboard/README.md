@@ -90,22 +90,24 @@ This module **is** the consumer web dashboard. Most post-connection mobile featu
 | Connection table / inbox | `ConnectionsScreen` | `ConnectionTable` | Full parity |
 | Connection map | `MapViewModel` | `ConnectionMap` | Full parity; beacons layer |
 | Timeline / Time Capsule | Home + profile | `TimeCapsule`, `/api/profile/timeline` | Display parity |
-| E2EE chat entry | `ChatView` | `ChatView` slide-over | Byte-compatible crypto |
-| Voice/video calls | LiveKit native | `CallOverlay` + LiveKit JS | Push payload must match mobile |
+| E2EE chat entry | `ChatView` | Two-pane inbox + `ChatView` with details column | Byte-compatible crypto |
+| Pins, mutes, plans, scheduled, hangouts | `ConversationModel`, `MuteMenu`, `PlanViews` | `ConversationDetailsPanel`, `useConversationExtras`, `PlanCard` | Same routes and wire format (`metadata.plan`, ✅/❌ RSVP) |
+| Event chat | `HubChatView` | `EventChatPanel` on `/e/{id}` | Hub E2EE v2 scope; reactions read-only on web (no fake coordinates) |
+| Voice/video calls | Removed on iOS | Frontend removed; `/api/livekit/token`, `CallOverlay`, `useDashboardCalls` kept dormant | Backend/API/schema intact for future work |
 | QR identity card | `QrCodeView` | `QRIdentityCard` | Web issues token via `/api/qr` |
 | Availability intents | Home + settings | `MyAvailabilityIntentsCard` | UI parity; match alerts push to mobile |
 | Post-connection vibe | Connection sheets | `PostConnectionVibePrompt` | Same `venue-vibe` API |
 | Stats / achievements | `HomeScreen` stats | `StatsOverview`, `AchievementBadge` | Partial — see gap below |
-| Home connection insights | `HomeViewModel` + `ReconnectHelper` | **Not implemented** | P0 roadmap item |
+| Home connection insights | `HomeViewModel` + `ReconnectHelper` | `HomeConnectionInsights` | Mobile 7/14/30-day activity thresholds |
 | 48h archive | Archive tab | Archive tab in dashboard | Full parity |
 | Global search | Unified search sheet | Dashboard search input | Full parity |
 | Collaboration / disposable rolls | Native camera UI | Chat collab after bump | Backend parity; camera UX differs |
-| Community Hubs | Primary map entry | **No dashboard nav** | APIs exist in `lib/hub/`; mobile-first |
+| Community Hubs | Primary map entry | Hubs navigation + event chat entry | Discovery, create/join/leave, message actions, local search and encrypted media |
 | Ghost mode | Full settings toggle | Client proximity pending only | Partial |
 | Deep links | `click://`, App Clip | `/c/[userId]`, `/connect/[userId]` | Web universal links |
 | B2B insights | N/A (consumer) | Separate `/insights/*` app | Not part of this module |
 
-**Gaps to close (see `lib/insights/README.md` § Roadmap):** consumer connection insights panel, Community Hubs web UI entry.
+Home also includes the native Swift app's prioritized `HomeSocialFeed`, `HomeExplore`, `HomeActivityRecap`, paginated `HomeSavedEvents`, contextual encrypted icebreakers, connections grouped by place, and the most urgent archive warning. Social actions include wave replies, hangout confirmation/decline, dismissal and direct/group chat routing. See `docs/ios-web-parity.md` for the mobile references and verification limits.
 
 Connections are **created** on mobile (Tri-Factor) or via web/mobile QR; see `lib/connections/README.md` for handshake paths.
 
@@ -143,7 +145,7 @@ Connections are **created** on mobile (Tri-Factor) or via web/mobile QR; see `li
 - **QR identity card** — **QRIdentityCard** component.
 - **Availability intents** — CurrentAvailabilitySection + intents card.
 - **Match alerts** — Push (opens app to dashboard).
-- **Community Hubs** — Separate entry (mobile-first).
+- **Community Hubs** — Hubs tab and event chat entry.
 - **Map beacons** — Layer toggles on ConnectionMap.
 - **Global search** — Dashboard search input filters table.
 - **Core connections** — Pin/highlight in table.

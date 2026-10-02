@@ -20,18 +20,16 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const supabaseUserId = session.metadata?.supabase_user_id;
 
   if (!venueId || !supabaseUserId) {
-    console.error(
-      'Stripe webhook: checkout.session.completed missing venue_id or supabase_user_id',
-    );
+    console.error('Stripe webhook: checkout.session.completed missing venue_id or supabase_user_id');
     return;
   }
 
   let subscriptionId: string | null =
     typeof session.subscription === 'string'
       ? session.subscription
-      : (session.subscription?.id ?? null);
+      : session.subscription?.id ?? null;
   let customerId: string | null =
-    typeof session.customer === 'string' ? session.customer : (session.customer?.id ?? null);
+    typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null;
 
   if (!subscriptionId || !customerId) {
     const full = await stripe.checkout.sessions.retrieve(session.id, {
@@ -52,10 +50,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   }
 
   if (!subscriptionId || !customerId) {
-    console.error(
-      'Stripe webhook: could not resolve subscription/customer for session',
-      session.id,
-    );
+    console.error('Stripe webhook: could not resolve subscription/customer for session', session.id);
     return;
   }
 
@@ -65,7 +60,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const admin = createSupabaseServiceRoleClient();
 
   const { error: venueError } = await admin
-    .from('venues')
+    .from('places')
     .update({
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
@@ -78,9 +73,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  const { error: insertError } = await admin.from('venue_managers').insert({
+  const { error: insertError } = await admin.from('place_managers').insert({
     user_id: supabaseUserId,
-    venue_id: venueId,
+    place_id: venueId,
     role: 'owner',
   });
 
@@ -96,7 +91,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   if (venueIdFromMeta) {
     const { error } = await admin
-      .from('venues')
+      .from('places')
       .update({ subscription_status: status })
       .eq('id', venueIdFromMeta);
     if (error) {
@@ -106,15 +101,12 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   const { error } = await admin
-    .from('venues')
+    .from('places')
     .update({ subscription_status: status })
     .eq('stripe_subscription_id', subscription.id);
 
   if (error) {
-    console.error(
-      'Stripe webhook: subscription venue update by stripe_subscription_id failed',
-      error,
-    );
+    console.error('Stripe webhook: subscription venue update by stripe_subscription_id failed', error);
   }
 }
 
@@ -179,8 +171,9 @@ export async function POST(request: Request) {
         e instanceof TicketingAttentionError ? 'needs_attention' : 'retryable_failure',
         message,
       );
-      if (e instanceof TicketingAttentionError)
+      if (e instanceof TicketingAttentionError) {
         return NextResponse.json({ received: true, needs_attention: true });
+      }
       return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
     }
     return NextResponse.json({ received: true });

@@ -390,6 +390,37 @@ export function mergeSoundtrackMetadataOnRelocate(
   return out;
 }
 
+/** Apple's preview/artwork CDNs: the only hosts accepted for client-supplied media URLs. */
+function isAppleMediaUrl(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const u = new URL(value.trim());
+    const host = u.hostname.toLowerCase();
+    return u.protocol === "https:" && (host.endsWith(".apple.com") || host.endsWith(".mzstatic.com"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clients may send the song they resolved on-device (track/artist/preview/art) so a server
+ * iTunes miss still yields a playable soundtrack. Media URLs must point at Apple's CDN and
+ * text fields are length-capped; anything else is dropped.
+ */
+export function sanitizeClientSoundtrackFields(meta: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...meta };
+  for (const key of ["preview_url", "album_art_url"] as const) {
+    if (key in out && !isAppleMediaUrl(out[key])) delete out[key];
+  }
+  for (const key of ["track_name", "artist_name", "title"] as const) {
+    const v = out[key];
+    if (v === undefined) continue;
+    if (typeof v !== "string" || !v.trim()) delete out[key];
+    else out[key] = v.trim().slice(0, 200);
+  }
+  return out;
+}
+
 /**
  * Merges client metadata with iTunes preview fields when [originalUrl] is a soundtrack link.
  */

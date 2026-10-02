@@ -13,7 +13,17 @@ type ConnectionRow = {
   id: string;
   user_ids: string[] | null;
   status: string | null;
+  source: string | null;
 };
+
+/**
+ * A 1:1 edge counts for verified groups when it is visible as a connection: active/kept, or a
+ * fresh in-person Click still in its `pending` say-hi window. An unanswered "met before"
+ * request (`source = 'prior'`) does not. Mirrors SQL `public.is_verified_pair`.
+ */
+export function isVerifiedPairConnection(row: { status: string | null; source: string | null }): boolean {
+  return row.status === 'active' || row.status === 'kept' || (row.status === 'pending' && row.source !== 'prior');
+}
 
 export async function findActivePairwiseConnectionId(
   supabase: SupabaseClient,
@@ -23,14 +33,15 @@ export async function findActivePairwiseConnectionId(
   if (!userA || !userB || userA === userB) return null;
   const { data, error } = await supabase
     .from('connections')
-    .select('id, user_ids, status')
+    .select('id, user_ids, status, source')
     .contains('user_ids', [userA, userB])
-    .in('status', ['active', 'kept']);
+    .in('status', ['active', 'kept', 'pending']);
 
   if (error || !data?.length) return null;
 
   const match = (data as ConnectionRow[]).find(
     (r) =>
+      isVerifiedPairConnection(r) &&
       Array.isArray(r.user_ids) &&
       r.user_ids.length === 2 &&
       r.user_ids.includes(userA) &&

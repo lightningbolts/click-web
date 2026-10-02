@@ -27,6 +27,7 @@ function mockAdmin(handlers: Record<string, Handler>) {
       const chain: {
         select: (...args: unknown[]) => typeof chain;
         contains: (...args: unknown[]) => typeof chain;
+        or: (expr: string) => typeof chain;
         eq: (col: string, val: unknown) => typeof chain;
         in: (col: string, val: unknown) => typeof chain;
         neq: (col: string, val: unknown) => typeof chain;
@@ -41,6 +42,10 @@ function mockAdmin(handlers: Record<string, Handler>) {
           return chain;
         },
         contains: () => chain,
+        or: (expr) => {
+          filters.or = expr;
+          return chain;
+        },
         eq: (col, val) => {
           filters[col] = val;
           return chain;
@@ -105,6 +110,7 @@ describe('loadActivityRecap', () => {
       connections: (filters) => {
         expect(filters.select).toBe('id, created, created_utc, source, status, expiry_state');
         expect(String(filters.select)).not.toContain('created_at');
+        expect(filters.or).toBe('status.is.null,status.eq.pending,status.eq.active,status.eq.kept');
         return {
           data: [
             {

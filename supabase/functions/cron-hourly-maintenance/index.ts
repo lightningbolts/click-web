@@ -3,13 +3,19 @@
  *   1. Click Drops reveal pushes after collaboration_ttl
  *   2. Event beacon day-of + 30-minutes-before reminders and Seed-a-Room teasers (via click-web /api/cron/event-reminders)
  *   2b. Encounter reconnect / shared-event nudges (via click-web /api/cron/nudges-reconnect)
+ *   2c. Gated Click Drops: batched "ready to develop" pushes (via click-web /api/cron/drops)
+ *   2d. Click Places: daily stats rollup + check-in / Pulse retention (via click-web /api/cron/places)
+ *   5. Delete lapsed "Listening now" heartbeats (beacon_presence older than an hour)
  *   3. failed_conversion rows in system_friction_logs for expired availability intents
  *   4. Delete expired pending_handshakes (expires_at < now())
  *
- * Deploy:
- *   supabase functions deploy cron-hourly-maintenance --no-verify-jwt
+ * Deploy (the gateway requires at least the project's anon key):
+ *   supabase functions deploy cron-hourly-maintenance
  *
- * Schedule via pg_cron — see migration 20260607120000_pg_cron_hourly_maintenance.sql
+ * Triggered hourly by pg_cron with the public anon key (see 20260926090000_relationship_moments
+ * .sql). Any caller that passes the gateway is fine: `claim_cron_run` lets at most one run start
+ * per 50 minutes, and every job below is idempotent. click-web is called with the service role
+ * key Supabase injects here.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -40,6 +46,8 @@ async function hasRevealedDisposableMessage(
     .eq('chat_id', session.chat_id)
     .eq('metadata->>disposable_roll', 'true')
     .eq('metadata->>encounter_id', session.id)
+    // Gated drops (drops_develop) get the batched ready push from /api/cron/drops instead.
+    .is('metadata->>drop_gated', null)
     .lte('metadata->>collaboration_ttl', nowIso)
     .limit(1);
 
@@ -58,18 +66,23 @@ type ExpiredIntentRow = {
   anonymized_cell_id: string | null;
 };
 
-function authorize(req: Request): boolean {
-  const auth = req.headers.get('authorization') ?? '';
-  if (CRON_SECRET && auth === `Bearer ${CRON_SECRET}`) return true;
-  if (SERVICE_ROLE_KEY && auth === `Bearer ${SERVICE_ROLE_KEY}`) return true;
-  return false;
-}
-
 async function runDisposableReveal(
   admin: ReturnType<typeof createClient>,
 ): Promise<{ sessions: number; pushAttempts: number }> {
   const nowIso = new Date().toISOString();
   const pushUrl = `${SUPABASE_URL}/functions/v1/send-push-notification`;
+
+  // Sessions that revealed more than a day ago are closed out silently: a "revealed!" push for
+  // an old Drop is noise (this matters when the sweep first runs or resumes after downtime).
+  const staleIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { error: staleError } = await admin
+    .from('collaboration_sessions')
+    .update({ notification_sent: true })
+    .lt('collaboration_ttl', staleIso)
+    .eq('notification_sent', false);
+  if (staleError) {
+    throw new Error(`disposable-reveal stale: ${staleError.message}`);
+  }
 
   const { data: sessions, error: fetchError } = await admin
     .from('collaboration_sessions')
@@ -241,9 +254,9 @@ async function runClickWebCron(path: string, label: string): Promise<Record<stri
     Deno.env.get('CLICK_WEB_BASE_URL') ??
     'https://joinclick.co'
   ).replace(/\/$/, '');
-  const secret = CRON_SECRET;
+  const secret = SERVICE_ROLE_KEY || CRON_SECRET;
   if (!secret) {
-    throw new Error(`${label}: missing CRON_SECRET`);
+    throw new Error(`${label}: missing SUPABASE_SERVICE_ROLE_KEY`);
   }
   const response = await fetch(`${base}${path}`, {
     headers: { Authorization: `Bearer ${secret}` },
@@ -288,6 +301,16 @@ async function runPendingHandshakesCleanup(
   return { deleted: data?.length ?? 0 };
 }
 
+async function runBeaconPresenceCleanup(
+  admin: ReturnType<typeof createClient>,
+): Promise<{ deleted: number }> {
+  // Heartbeats lapse after minutes; anything an hour old is dead weight.
+  const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { data, error } = await admin.from('beacon_presence').delete().lt('last_seen_at', cutoff).select('user_id');
+  if (error) throw new Error(`beacon-presence-cleanup: ${error.message}`);
+  return { deleted: data?.length ?? 0 };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -295,13 +318,6 @@ Deno.serve(async (req: Request) => {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'authorization, content-type',
       },
-    });
-  }
-
-  if (!authorize(req)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
     });
   }
 
@@ -316,6 +332,23 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  const { data: claimed, error: claimError } = await admin.rpc('claim_cron_run', {
+    p_name: 'hourly-maintenance',
+    p_min_interval: '50 minutes',
+  });
+  if (claimError) {
+    return new Response(JSON.stringify({ ok: false, error: claimError.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (claimed !== true) {
+    return new Response(JSON.stringify({ ok: true, skipped: 'ran within the last 50 minutes' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const disposable = await runDisposableReveal(admin);
     const events = await runEventRemindersViaWeb();
@@ -323,7 +356,15 @@ Deno.serve(async (req: Request) => {
     const friction = await runFrictionIntentExpirations(admin);
     const pendingHandshakes = await runPendingHandshakesCleanup(admin);
     const nudges = await runClickWebCron('/api/cron/nudges-reconnect', 'nudges-reconnect');
-    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges };
+    // Isolated: a drops failure must not stop the maintenance jobs above from reporting.
+    const drops = await runClickWebCron('/api/cron/drops', 'drops').catch((e) => ({
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    const places = await runClickWebCron('/api/cron/places', 'places').catch((e) => ({ error: String(e) }));
+    const presence = await runBeaconPresenceCleanup(admin).catch((e) => ({
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges, drops, places, presence };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,

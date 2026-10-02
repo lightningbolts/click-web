@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { readSessionCache, writeSessionCache } from '@/lib/dashboard/sessionCache';
 
 /**
  * Dashboard onboarding gates: the interest-tagging overlay (a missing
@@ -22,7 +23,10 @@ export function useOnboardingGates({
 }) {
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
   /** OAuth / incomplete `public.users.birthday` — blocks dashboard until saved (see UserProfileModal). */
-  const [birthdayProfileGateResolved, setBirthdayProfileGateResolved] = useState(false);
+  // A birthday already confirmed this tab session does not block a remount on the network.
+  const [birthdayProfileGateResolved, setBirthdayProfileGateResolved] = useState(
+    () => readSessionCache<boolean>(user?.id, 'birthdayPresent') === true,
+  );
   const [birthdayProfileGateOpen, setBirthdayProfileGateOpen] = useState(false);
 
   useEffect(() => {
@@ -31,7 +35,9 @@ export function useOnboardingGates({
       setBirthdayProfileGateOpen(false);
       return;
     }
-    setBirthdayProfileGateResolved(false);
+    if (readSessionCache<boolean>(user.id, 'birthdayPresent') !== true) {
+      setBirthdayProfileGateResolved(false);
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -51,6 +57,7 @@ export function useOnboardingGates({
         } else {
           setBirthdayProfileGateOpen(false);
         }
+        writeSessionCache(user.id, 'birthdayPresent', !missing);
       } catch {
         if (!cancelled) {
           setBirthdayProfileGateOpen(false);

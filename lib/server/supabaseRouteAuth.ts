@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient, type User } from '@supabase/supabase
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { requireRuntimeEnv } from '@/lib/server/runtimeEnv';
+import { verifyBearerLocally } from '@/lib/server/verifyBearerJwt';
 
 type RouteAuthResult = {
   supabase: SupabaseClient;
@@ -27,6 +28,15 @@ export async function getSupabaseFromRouteRequest(
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${bearer}` } },
     });
+    // Local signature check first (no network); Supabase Auth only when it can't decide.
+    const local = await verifyBearerLocally(url, bearer);
+    if (local !== undefined) {
+      return {
+        supabase,
+        user: local,
+        authError: local ? null : new Error('Invalid or expired access token'),
+      };
+    }
     const {
       data: { user },
       error,

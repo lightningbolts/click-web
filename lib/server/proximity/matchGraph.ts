@@ -29,16 +29,11 @@ export async function loadMatchGraph(
     evidenceTokens: string[];
     lat: number | null;
     lon: number | null;
+    matchedSinceIso: string;
   },
 ): Promise<MatchGraph> {
-  const { nowIso, callerUserId, evidenceTokens, lat, lon } = opts;
-  const scoped = await fetchScopedPendingCandidates(admin, {
-    nowIso,
-    callerUserId,
-    evidenceTokens,
-    lat,
-    lon,
-  });
+  const { callerUserId } = opts;
+  const scoped = await fetchScopedPendingCandidates(admin, opts);
   if (scoped.error) {
     return {
       rows: [],

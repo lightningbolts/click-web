@@ -5,6 +5,7 @@ import {
   MessageCircle,
   QrCode,
   Settings,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export const DASHBOARD_TABS = [
   'events',
   'map',
   'chat',
+  'hubs',
   'identity',
   'settings',
 ] as const;
@@ -36,6 +38,7 @@ const NAV: { id: DashboardTab; label: string; icon: LucideIcon }[] = [
   { id: 'events', label: 'Events', icon: CalendarDays },
   { id: 'map', label: 'Map', icon: MapPin },
   { id: 'chat', label: 'Chat', icon: MessageCircle },
+  { id: 'hubs', label: 'Hubs', icon: Users },
   { id: 'identity', label: 'QR Identity', icon: QrCode },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];

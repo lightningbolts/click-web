@@ -89,6 +89,9 @@ jobs:
   supabase-database-verification:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      # Match supabase/setup-cli for our pinned CLI; ECR throttles shared runners.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
 
     steps:
       - name: Checkout

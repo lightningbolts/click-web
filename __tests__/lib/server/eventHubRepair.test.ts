@@ -14,7 +14,7 @@ const HUB = {
   name: 'Machine Learning',
   creator_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   event_beacon_id: '11111111-1111-4111-8111-111111111111',
-  expires_at: '2026-10-02T00:00:00.000Z',
+  expires_at: '2099-10-02T00:00:00.000Z',
 };
 
 function admin() {
@@ -37,9 +37,9 @@ const INPUT = {
   metadata: {
     title: HUB.name,
     event_start_at: '2026-09-20T00:00:00.000Z',
-    event_end_at: '2026-10-01T00:00:00.000Z',
+    event_end_at: '2099-10-01T00:00:00.000Z',
   },
-  expiresAt: '2026-10-01T00:00:00.000Z',
+  expiresAt: '2099-10-01T00:00:00.000Z',
 };
 
 describe('ensureEventHubForBeacon', () => {

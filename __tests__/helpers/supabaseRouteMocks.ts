@@ -30,6 +30,7 @@ const BUILDER_METHODS = [
   'lte',
   'or',
   'in',
+  'is',
   'contains',
   'filter',
   'match',

@@ -136,6 +136,6 @@ export const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
   ],
 };
 
-export const DEMO_QR_URL = 'https://click.app/c/demo-ck-1842';
+export const DEMO_QR_URL = 'https://joinclick.co/c/demo-ck-1842';
 export const DEMO_CLICK_ID = 'CK-1842';
 export const DEMO_USER_NAME = 'Alex Rivera';

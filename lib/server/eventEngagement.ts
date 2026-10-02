@@ -230,7 +230,7 @@ export function isEventLiveForCheckIn(
   return true;
 }
 
-function parseBeaconLatLng(row: Record<string, unknown>): {
+export function parseBeaconLatLng(row: Record<string, unknown>): {
   lat: number | null;
   lng: number | null;
 } {

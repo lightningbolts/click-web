@@ -21,7 +21,7 @@ describe("public event pages share EventPageShell", () => {
     const shell = read("components/events/EventPageShell.tsx");
     expect(shell).toContain("PAGE_COLUMN_CLASS");
     expect(shell).toContain("event-page-shell");
-    expect(shell).toContain("EventPageEnter");
+    expect(shell).not.toContain("opacity: 0");
     const column = read("lib/shell/pageColumn.ts");
     expect(column).toContain("max-w-6xl");
     expect(column).toContain("px-4 md:px-10");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/server/cronAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 
-const CRON_SECRET = process.env.CRON_SECRET;
 
 type ExpiredIntentRow = {
   id: string;
@@ -16,8 +16,7 @@ type ExpiredIntentRow = {
  * during their window → `failed_conversion` friction logs (aggregated, no user_id).
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

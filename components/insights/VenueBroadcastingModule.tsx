@@ -52,7 +52,7 @@ export default function VenueBroadcastingModule({ venueId }: Props) {
     <GlassPanel className="p-5" hover={false} glow="blue">
       <div className="flex items-start gap-3">
         <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/25 shrink-0">
-          <Music2 className="w-5 h-5 text-cyan-300" />
+          <Music2 className="w-5 h-5 text-cyan-600 dark:text-cyan-300" />
         </div>
         <div className="min-w-0 flex-1 space-y-3">
           <div>

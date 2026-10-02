@@ -14,6 +14,12 @@ jest.mock('@/lib/server/chatGatekeeper', () => ({
   assertChatWritable: (...args: unknown[]) => mockAssertChatWritable(...args),
 }));
 
+const mockRequireFeature = jest.fn();
+jest.mock('@/lib/server/featureFlags', () => ({
+  requireFeature: (...args: unknown[]) => mockRequireFeature(...args),
+}));
+jest.mock('server-only', () => ({}));
+
 jest.mock('@/lib/server/e2eeV2Gate', () => ({
   assertE2eeV2MediaUpload: (...args: unknown[]) => mockAssertE2eeV2MediaUpload(...args),
   messageBodyV2Field: (
@@ -50,6 +56,31 @@ describe('/api/chat/media', () => {
     createSignedUrl.mockReset().mockResolvedValue({ data: { signedUrl: 'https://signed.example/media' }, error: null });
     getPublicUrl.mockReset();
     storageFrom.mockReset().mockReturnValue({ upload, createSignedUrl, getPublicUrl });
+  });
+
+  it('stores a Click Drop original in the gated bucket and never signs it', async () => {
+    mockRequireFeature.mockResolvedValue({ ok: true, config: {} });
+    const response = await POST(
+      request({ chat_id: CHAT_ID, mime_type: 'image/jpeg', file_b64: 'YQ==', drop_original: true }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      url: null,
+      path: expect.stringMatching(new RegExp(`^chat/${CHAT_ID}/${USER_ID}/\\d+-[0-9a-f]{8}-original\\.jpg$`)),
+      ttl_seconds: null,
+    });
+    expect(storageFrom).toHaveBeenCalledWith('click-drops');
+    expect(createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('hides Click Drop originals from users outside the drops_develop cohort', async () => {
+    mockRequireFeature.mockResolvedValue({ ok: false, response: NextResponse.json({ error: 'Not found' }, { status: 404 }) });
+    const response = await POST(
+      request({ chat_id: CHAT_ID, mime_type: 'image/jpeg', file_b64: 'YQ==', drop_original: true }),
+    );
+    expect(response.status).toBe(404);
+    expect(upload).not.toHaveBeenCalled();
   });
 
   it('allows legacy uploads before an epoch and returns only a private signed URL', async () => {

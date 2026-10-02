@@ -8,28 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { createCollaborationSessionForConnection } from '@/lib/collaboration/createCollaborationSession';
-import { buildEncounterInsertFromSensor } from '@/lib/connections/encounterSensorPayload';
-import { scheduleEventEnrichment } from '@/lib/enrichment/scheduleEventEnrichment';
-import { fireEncounterGeoEnrichment } from '@/lib/server/proximity/encounterEnrichment';
-import {
-  applyLiveEventBeaconToEncounterRow,
-  resolveLiveEventBeaconForReportingUser,
-} from '@/lib/server/resolveLiveEventBeaconAt';
 import { parseBody } from '@/lib/api/parseBody';
+import { recordEncounter } from '@/lib/connections/recordEncounter';
 import { encounterBodySchema } from '@/lib/api/schemas/connections';
 
 function isUuidLike(v: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-}
-
-function isEncounterRateLimitError(err: { message?: string; details?: string; hint?: string } | null): boolean {
-  if (!err) return false;
-  const combined = [
-    err.message ?? '',
-    err.details ?? '',
-    err.hint ?? '',
-  ].join(' ');
-  return combined.includes('encounter_rate_limit_3h');
 }
 
 type ConnectionRow = { id: string; user_ids?: string[] | null };
@@ -151,34 +135,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No pairwise connection found for this pair' }, { status: 404 });
     }
 
-    const insertRow: Record<string, unknown> = {
-      ...buildEncounterInsertFromSensor(connectionId, sensorData),
-      reporting_user_id: userId,
-    };
-
-    const gpsLatPre = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
-    const gpsLonPre = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
-    // Skip admin client when there is no GPS — live-event attachment cannot resolve without coords.
-    const liveEventAttachment =
-      gpsLatPre != null && gpsLonPre != null
-        ? await resolveLiveEventBeaconForReportingUser(
-            createAdminClient(),
-            gpsLatPre,
-            gpsLonPre,
-            userId,
-          )
-        : null;
-    Object.assign(insertRow, applyLiveEventBeaconToEncounterRow(insertRow, liveEventAttachment));
-
-    const { data: inserted, error: insErr } = await supabase
-      .from('connection_encounters')
-      .insert(insertRow)
-      .select('id')
-      .maybeSingle();
-
-    if (insErr) {
-      const msg = insErr.message ?? '';
-      if (isEncounterRateLimitError(insErr)) {
+    const recorded = await recordEncounter(supabase, { connectionId, reportingUserId: userId, sensorData });
+    if (!recorded.ok) {
+      if (recorded.rateLimited) {
         return NextResponse.json(
           {
             success: false,
@@ -189,41 +148,9 @@ export async function POST(request: NextRequest) {
           { status: 429 },
         );
       }
-      console.error('connections/encounter insert:', msg);
-      return NextResponse.json({ error: 'Failed to record encounter' }, { status: 500 });
+      return NextResponse.json({ error: recorded.error }, { status: 500 });
     }
-
-    const encounterId = inserted?.id != null ? String(inserted.id) : null;
-    const gpsLat = typeof insertRow.gps_lat === 'number' ? insertRow.gps_lat : null;
-    const gpsLon = typeof insertRow.gps_lon === 'number' ? insertRow.gps_lon : null;
-    if (encounterId && gpsLat != null && gpsLon != null) {
-      scheduleEventEnrichment({
-        encounter_id: encounterId,
-        lat: gpsLat,
-        lon: gpsLon,
-        timestamp:
-          typeof insertRow.encountered_at === 'string'
-            ? insertRow.encountered_at
-            : new Date().toISOString(),
-      });
-      const baro =
-        typeof insertRow.exact_barometric_elevation_m === 'number'
-          ? insertRow.exact_barometric_elevation_m
-          : null;
-      const locName = typeof insertRow.location_name === 'string' ? insertRow.location_name : null;
-      const weather =
-        typeof insertRow.weather_snapshot === 'string' ? insertRow.weather_snapshot : null;
-      fireEncounterGeoEnrichment(
-        createAdminClient(),
-        connectionId,
-        userId,
-        gpsLat,
-        gpsLon,
-        baro,
-        locName,
-        weather,
-      );
-    }
+    const encounterId = recorded.encounterId;
 
     return NextResponse.json({
       success: true,

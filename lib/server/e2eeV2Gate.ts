@@ -69,6 +69,17 @@ function isStrictSha256Base64(value: unknown): value is string {
   return true;
 }
 
+/**
+ * Starts a read now (Supabase queries are lazy until awaited) so independent reads overlap.
+ * A read is only awaited where the sequential gate used to issue it, so responses and error
+ * precedence are unchanged; one that is never reached cannot surface as an unhandled rejection.
+ */
+function startRead<T>(read: PromiseLike<T>): Promise<T> {
+  const started = Promise.resolve(read);
+  started.catch(() => {});
+  return started;
+}
+
 async function currentEpoch(admin: SupabaseClient, chatId: string): Promise<number | null> {
   const { data, error } = await admin
     .from('chat_key_epochs')
@@ -91,6 +102,10 @@ async function currentEpochCoversActiveChatDevices(
   chatId: string,
   epoch: number,
 ): Promise<boolean> {
+  // The epoch's envelopes don't depend on membership: read them alongside it.
+  const envelopesRead = startRead(
+    admin.from('chat_recipient_key_envelopes').select('recipient_device_id').eq('chat_id', chatId).eq('epoch', epoch),
+  );
   const { data: memberData, error: memberError } = await admin.rpc('_e2ee_v2_chat_participants', {
     p_chat_id: chatId,
   });
@@ -122,11 +137,7 @@ async function currentEpochCoversActiveChatDevices(
   );
   if (memberIds.some((memberId) => !readyMemberIds.has(memberId))) return false;
 
-  const { data: envelopes, error: envelopeError } = await admin
-    .from('chat_recipient_key_envelopes')
-    .select('recipient_device_id')
-    .eq('chat_id', chatId)
-    .eq('epoch', epoch);
+  const { data: envelopes, error: envelopeError } = await envelopesRead;
   if (envelopeError) throw envelopeError;
   const wrappedDeviceIds = [...new Set(
     (envelopes ?? [])
@@ -135,6 +146,22 @@ async function currentEpochCoversActiveChatDevices(
   )].sort();
   return activeDeviceIds.length === wrappedDeviceIds.length &&
     activeDeviceIds.every((deviceId, index) => deviceId === wrappedDeviceIds[index]);
+}
+
+function activeSenderDevice(admin: SupabaseClient, userId: string, deviceId: string, columns: string) {
+  return admin
+    .from('chat_devices')
+    .select(columns)
+    .eq('user_id', userId)
+    .eq('device_id', deviceId)
+    .eq('key_algorithm', 'X25519')
+    .eq('crypto_version', 2)
+    .is('revoked_at', null)
+    .maybeSingle();
+}
+
+function claimedEpoch(value: unknown): number | null {
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : null;
 }
 
 /**
@@ -149,7 +176,18 @@ export async function assertE2eeV2MessageWrite(
   const chatId = request.chatId.trim();
   const requestedChatId = request.requestedChatId?.trim();
   const contentIsV2 = isV2Content(request.content);
-  const epoch = await currentEpoch(admin, chatId);
+  const epochRead = startRead(currentEpoch(admin, chatId));
+  // For v2 content, the later checks' reads start now too, keyed by what the request claims.
+  // They are consulted only once the envelope matches those claims (see `startRead`).
+  const requestEpoch = claimedEpoch(request.epoch);
+  const requestDeviceId = readStrictIdentifier(request.senderDeviceId);
+  const coverageRead = contentIsV2 && requestEpoch !== null
+    ? startRead(currentEpochCoversActiveChatDevices(admin, chatId, requestEpoch))
+    : null;
+  const deviceRead = contentIsV2 && requestDeviceId
+    ? startRead(activeSenderDevice(admin, request.userId, requestDeviceId, 'id, user_id, device_id, key_algorithm, crypto_version, revoked_at'))
+    : null;
+  const epoch = await epochRead;
 
   if (!contentIsV2) {
     // Once an epoch exists, every client-authored message must use v2. The
@@ -192,19 +230,13 @@ export async function assertE2eeV2MessageWrite(
     return invalid('E2EE v2 authenticated metadata does not match the request');
   }
 
-  if (!(await currentEpochCoversActiveChatDevices(admin, chatId, epoch))) {
+  // Here request.epoch === epoch and senderDeviceId === requestDeviceId, so the early reads apply.
+  if (!(await (coverageRead ?? currentEpochCoversActiveChatDevices(admin, chatId, epoch)))) {
     return { ok: false, response: e2eeV2RequiredResponse() };
   }
 
-  const { data: device, error: deviceError } = await admin
-    .from('chat_devices')
-    .select('id, user_id, device_id, key_algorithm, crypto_version, revoked_at')
-    .eq('user_id', request.userId)
-    .eq('device_id', senderDeviceId)
-    .eq('key_algorithm', 'X25519')
-    .eq('crypto_version', 2)
-    .is('revoked_at', null)
-    .maybeSingle();
+  const { data: device, error: deviceError } = await (deviceRead ??
+    activeSenderDevice(admin, request.userId, senderDeviceId, 'id, user_id, device_id, key_algorithm, crypto_version, revoked_at'));
   if (deviceError) throw deviceError;
   if (!device) return invalid('E2EE v2 sender device is not active for this user');
 
@@ -228,8 +260,21 @@ export async function assertE2eeV2MediaUpload(
   request: MediaGateRequest,
 ): Promise<E2eeV2MediaGateResult | GateFailure | { ok: true; currentEpoch: null; envelope?: undefined }> {
   const chatId = request.chatId.trim();
-  const epoch = await currentEpoch(admin, chatId);
   const content = typeof request.content === 'string' ? request.content : '';
+  const epochRead = startRead(currentEpoch(admin, chatId));
+  // As in the message gate: start the later reads from what the envelope claims.
+  let claimed: { epoch: number; senderDeviceId: string } | null = null;
+  if (content.startsWith(E2EE_V2_PREFIX)) {
+    try {
+      const parsed = parseE2eeV2Envelope(content);
+      if (parsed.type === 'media') claimed = { epoch: parsed.epoch, senderDeviceId: parsed.senderDeviceId };
+    } catch {
+      // Rejected below, in order.
+    }
+  }
+  const coverageRead = claimed ? startRead(currentEpochCoversActiveChatDevices(admin, chatId, claimed.epoch)) : null;
+  const deviceRead = claimed ? startRead(activeSenderDevice(admin, request.userId, claimed.senderDeviceId, 'id')) : null;
+  const epoch = await epochRead;
   if (!content.startsWith(E2EE_V2_PREFIX)) {
     if (epoch !== null) return { ok: false, response: e2eeV2RequiredResponse() };
     return { ok: true, currentEpoch: null };
@@ -254,19 +299,13 @@ export async function assertE2eeV2MediaUpload(
     return invalid('E2EE v2 media authorization metadata does not match the request');
   }
 
-  if (!(await currentEpochCoversActiveChatDevices(admin, chatId, epoch))) {
+  // Here envelope.epoch === epoch, and the envelope is the one the early reads were keyed by.
+  if (!(await (coverageRead ?? currentEpochCoversActiveChatDevices(admin, chatId, epoch)))) {
     return { ok: false, response: e2eeV2RequiredResponse() };
   }
 
-  const { data: device, error: deviceError } = await admin
-    .from('chat_devices')
-    .select('id')
-    .eq('user_id', request.userId)
-    .eq('device_id', envelope.senderDeviceId)
-    .eq('key_algorithm', 'X25519')
-    .eq('crypto_version', 2)
-    .is('revoked_at', null)
-    .maybeSingle();
+  const { data: device, error: deviceError } = await (deviceRead ??
+    activeSenderDevice(admin, request.userId, envelope.senderDeviceId, 'id'));
   if (deviceError) throw deviceError;
   if (!device) return invalid('E2EE v2 sender device is not active for this user');
   return { ok: true, currentEpoch: epoch, envelope };

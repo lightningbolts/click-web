@@ -1,5 +1,7 @@
 import { ENVELOPE_PREFIX, E2EE_V2_ATTACHMENT_PREFIX } from '@/lib/chat/attachmentCrypto';
 import type { Message, MessageMediaMetadata, MessageType } from '@/lib/chat/types';
+import { isKlipyMediaUrl } from '@/lib/chat/gif';
+import { isEncryptedWireContent } from '@/lib/chat/crypto';
 
 /** Public URL for image/audio from `metadata.media_url` (camelCase fallback for older rows). */
 export function mediaUrlFromMetadata(metadata: MessageMediaMetadata | undefined | null): string | null {
@@ -13,6 +15,33 @@ export function mediaPathFromMetadata(metadata: MessageMediaMetadata | undefined
   if (!metadata || typeof metadata !== 'object') return null;
   const raw = metadata.media_path ?? (metadata as { mediaPath?: unknown }).mediaPath;
   return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+}
+
+const CHAT_ATTACHMENTS_SIGN_MARKER = '/object/sign/chat-attachments/';
+
+/**
+ * Object path inside the private `chat-attachments` bucket from a stored signed URL
+ * (`…/storage/v1/object/sign/chat-attachments/<path>?token=…`). Those URLs expire after an
+ * hour, so rows that persisted only the signed URL (iOS v1 media) are re-signed from this path.
+ */
+export function chatAttachmentPathFromSignedUrl(url: string | null | undefined): string | null {
+  if (typeof url !== 'string' || !url.trim()) return null;
+  let pathname: string;
+  try {
+    pathname = new URL(url.trim()).pathname;
+  } catch {
+    return null;
+  }
+  const index = pathname.indexOf(CHAT_ATTACHMENTS_SIGN_MARKER);
+  if (index < 0) return null;
+  let path: string;
+  try {
+    path = decodeURIComponent(pathname.slice(index + CHAT_ATTACHMENTS_SIGN_MARKER.length));
+  } catch {
+    return null;
+  }
+  if (!path || path.startsWith('/') || path.split('/').includes('..')) return null;
+  return path;
 }
 
 export function durationSecondsFromMetadata(metadata: MessageMediaMetadata | undefined | null): number | undefined {
@@ -48,10 +77,13 @@ export function originalMimeTypeFromMetadata(
 export function previewLabelForMessage(
   message: Pick<Message, 'message_type' | 'content'> & { metadata?: Message['metadata'] },
 ): string {
-  const cap = message.content.replace(/\n/g, ' ').trim();
+  // Ciphertext that could not be decrypted is never a label: fall back to the type.
+  const encrypted = isEncryptedWireContent(message.content);
+  const cap = encrypted ? '' : message.content.replace(/\n/g, ' ').trim();
   const t = message.message_type as MessageType;
   if (t === 'image') return cap || 'Photo';
   if (t === 'audio') return cap || 'Voice message';
+  if (t === 'file') return cap && !cap.startsWith(ENVELOPE_PREFIX) && !cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX) ? cap : 'File';
   if (t === 'call_log') return 'Call';
   if (t === 'beacon') {
     const meta = message.metadata && typeof message.metadata === 'object' ? message.metadata : null;
@@ -73,5 +105,8 @@ export function previewLabelForMessage(
   // the chat list / reply banner as raw JSON. Render a neutral "📎 Attachment"
   // placeholder — the full preview is only materialised after client-side decryption.
   if (cap.startsWith(ENVELOPE_PREFIX) || cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX)) return '📎 Attachment';
+  // GIF messages carry only the KLIPY URL as their body.
+  if (isKlipyMediaUrl(cap)) return 'GIF';
+  if (encrypted) return 'Encrypted message';
   return message.content;
 }

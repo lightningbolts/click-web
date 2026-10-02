@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight } from 'lucide-react';
+import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight, Pin, PinOff } from 'lucide-react';
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import { isClientOptimisticMessageId } from '@/lib/chat/clientOptimistic';
 import ReactionPicker from './ReactionPicker';
@@ -22,6 +22,7 @@ import {
   durationSecondsFromMetadata,
   isEncryptedMediaFromMetadata,
   mediaPathFromMetadata,
+  chatAttachmentPathFromSignedUrl,
   mediaUrlFromMetadata,
   originalMimeTypeFromMetadata,
 } from '@/lib/chat/mediaMetadata';
@@ -32,6 +33,9 @@ import {
   type AttachmentV2Descriptor,
 } from '@/lib/chat/attachmentCrypto';
 import { isBeaconChatMessage } from '@/lib/chat/messages';
+import { chatGifFromMessage } from '@/lib/chat/gif';
+import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION, parsePlan } from '@/lib/chat/plans';
+import { PlanCard } from './PlanCard';
 import AttachmentBubble from './AttachmentBubble';
 import BeaconChatCard from './BeaconChatCard';
 import { useSecureMedia } from '@/lib/chat/useSecureMedia';
@@ -70,6 +74,13 @@ interface MessageBubbleProps {
   getE2eeV2Session?: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
   /** Transient search deep-link highlight. */
   highlighted?: boolean;
+  /** Pinned in this conversation (shows a pin marker by the time). */
+  pinned?: boolean;
+  onTogglePin?: (message: Message) => void;
+  /** Going / can't make it on a plan card. */
+  onPlanRsvp?: (message: Message, going: boolean) => void;
+  /** On-device quote text for a reply target (replies no longer carry a plaintext excerpt). */
+  resolveReplySnippet?: (messageId: string) => string | null;
 }
 
 function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
@@ -175,6 +186,10 @@ export default function MessageBubble({
   getAuthHeaders,
   getE2eeV2Session,
   highlighted = false,
+  pinned = false,
+  onTogglePin,
+  onPlanRsvp,
+  resolveReplySnippet,
 }: MessageBubbleProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showActions, setShowActions] = useState(false);
@@ -225,7 +240,8 @@ export default function MessageBubble({
   }, [showPicker, cancelHide]);
 
   const mediaUrl = mediaUrlFromMetadata(message.metadata);
-  const mediaPath = mediaPathFromMetadata(message.metadata);
+  const mediaPath =
+    mediaPathFromMetadata(message.metadata) ?? chatAttachmentPathFromSignedUrl(mediaUrl);
   const isEncryptedMedia = isEncryptedMediaFromMetadata(message.metadata);
   const originalMimeType = originalMimeTypeFromMetadata(message.metadata);
   const v2MediaMetadata = useMemo(() => {
@@ -259,6 +275,7 @@ export default function MessageBubble({
     mimeType: originalMimeType,
     isEncryptedMedia,
     getE2eeV2Session,
+    getAuthHeaders,
     v2Metadata: v2MediaMetadata,
   });
 
@@ -370,9 +387,13 @@ export default function MessageBubble({
     );
   }
 
+  // RSVPs on a plan are counted on its card, not repeated as reaction chips.
+  const isPlanMessage = message.message_type === 'text' && parsePlan(message.metadata) != null;
   const flatReactions: { emoji: string; count: number; iMine: boolean }[] = Object.entries(
     message.reactions ?? {}
-  ).map(([emoji, users]) => ({
+  )
+    .filter(([emoji]) => !isPlanMessage || (emoji !== PLAN_GOING_REACTION && emoji !== PLAN_DECLINED_REACTION))
+    .map(([emoji, users]) => ({
     emoji,
     count: (users as MessageReaction[]).length,
     iMine: (users as MessageReaction[]).some((r) => r.user_id === currentUserId),
@@ -404,6 +425,10 @@ export default function MessageBubble({
 
   const timeLabel = formatMessageTimeLabel(message.time_created);
   const replyMeta = getReplyFromMetadata(message.metadata);
+  const replySnippet = replyMeta
+    ? replyMeta.snippet || resolveReplySnippet?.(replyMeta.id) || 'Message'
+    : '';
+  const plan = message.message_type === 'text' ? parsePlan(message.metadata) : null;
   const resolvedMediaUrl = secureMedia.src;
   const audioDuration = durationSecondsFromMetadata(message.metadata);
   const linkVariant = isMine ? 'mine' : 'theirs';
@@ -421,6 +446,9 @@ export default function MessageBubble({
     message.message_type === 'file' ? tryDecodeV2AttachmentDescriptor(captionText) : null;
   const isAttachment = attachmentEnvelope !== null || attachmentV2Descriptor !== null;
   const isBeacon = isBeaconChatMessage(message);
+  const gif = chatGifFromMessage(message);
+  // Largest box within 16rem × 18rem that keeps the GIF's aspect ratio.
+  const gifDisplayWidth = gif ? Math.min(256, Math.round((288 * gif.width) / gif.height)) : 0;
   const textBubbleClass = isMine
     ? 'bg-primary text-on-primary rounded-br-sm'
     : 'border border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
@@ -496,7 +524,7 @@ export default function MessageBubble({
                   <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
                   Reply
                 </span>
-                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
               </div>
             )}
             <BeaconChatCard message={message} />
@@ -518,7 +546,7 @@ export default function MessageBubble({
                   <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
                   Reply
                 </span>
-                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
               </div>
             )}
             <AttachmentBubble
@@ -532,6 +560,50 @@ export default function MessageBubble({
               messageMetadata={v2MediaMetadata}
               getE2eeV2Session={getE2eeV2Session}
             />
+          </div>
+        ) : plan ? (
+          <div ref={bubbleRef} className={`relative flex w-full flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+            <PlanCard
+              plan={plan}
+              message={message}
+              currentUserId={currentUserId}
+              isMine={isMine}
+              onRsvp={onPlanRsvp}
+            />
+          </div>
+        ) : gif ? (
+          <div
+            ref={bubbleRef}
+            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
+          >
+            {replyMeta && (
+              <div
+                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
+                  isMine
+                    ? 'border-white/20 bg-black/15 text-on-primary'
+                    : 'border-border-hard bg-surface text-on-surface-variant'
+                }`}
+              >
+                <span className="flex items-center gap-1 font-medium opacity-90">
+                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
+                  Reply
+                </span>
+                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
+              </div>
+            )}
+            <div
+              className="max-w-full overflow-hidden rounded-2xl border border-border-hard bg-surface-container"
+              style={{ width: gifDisplayWidth, aspectRatio: `${gif.width} / ${gif.height}` }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- KLIPY media must load from the URL the API returned */}
+              <img
+                src={gif.url}
+                alt="GIF"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="block h-full w-full object-cover"
+              />
+            </div>
           </div>
         ) : isImage || isAudio ? (
           <div
@@ -550,7 +622,7 @@ export default function MessageBubble({
                   <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
                   Reply
                 </span>
-                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
               </div>
             )}
 
@@ -645,7 +717,7 @@ export default function MessageBubble({
                   <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
                   Reply
                 </span>
-                <p className="mt-0.5 line-clamp-3">{replyMeta.snippet || 'Message'}</p>
+                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
               </div>
             )}
             {message.message_type === 'text' && isAnyE2eeWireContent(message.content) ? (
@@ -682,7 +754,7 @@ export default function MessageBubble({
                 initial={{ opacity: 0, scale: 0.92 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'spring', stiffness: 520, damping: 32 }}
-                className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap glass rounded-full px-1.5 py-1 shadow-xl max-w-full [scrollbar-width:thin]"
+                className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full border border-border-hard bg-surface px-1.5 py-1 shadow-xl max-w-full [scrollbar-width:thin]"
                 style={{ transformOrigin: 'center center' }}
               >
               <button
@@ -706,7 +778,7 @@ export default function MessageBubble({
                   Reply
                 </button>
               )}
-              {isMine && message.message_type === 'text' && (
+              {isMine && message.message_type === 'text' && !gif && (
                 <button
                   type="button"
                   onClick={() => onEdit(message.id, message.content)}
@@ -716,11 +788,25 @@ export default function MessageBubble({
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
               )}
+              {onTogglePin && !isClientOptimisticMessageId(message.id) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTogglePin(message);
+                    setShowActions(false);
+                  }}
+                  className="shrink-0 p-1 rounded-full hover:bg-primary/20 text-on-surface-variant hover:text-primary transition-colors"
+                  title={pinned ? 'Unpin' : 'Pin'}
+                  aria-label={pinned ? 'Unpin message' : 'Pin message'}
+                >
+                  {pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                </button>
+              )}
               {isMine && (
                 <button
                   type="button"
                   onClick={() => onDelete(message.id)}
-                  className="shrink-0 p-1 rounded-full hover:bg-red-500/20 text-on-surface-variant hover:text-red-400 transition-colors"
+                  className="shrink-0 p-1 rounded-full hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors"
                   title="Delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -754,6 +840,7 @@ export default function MessageBubble({
 
         {/* Timestamp & delivery ticks (outgoing) */}
         <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
+          {pinned ? <Pin className="h-3 w-3 text-primary" aria-label="Pinned" /> : null}
           <span className="text-[10px] text-on-surface-variant">
             {timeLabel}
             {message.time_edited ? (

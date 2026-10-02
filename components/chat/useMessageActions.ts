@@ -15,9 +15,13 @@ import {
   encryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
-import { encryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { encryptWebE2eeV2Message, invalidateWebE2eeV2Session, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
+import { gifMessageMetadata, isKlipyMediaUrl } from '@/lib/chat/gif';
+import { klipySendRendition, triggerKlipyShare, type KlipyGifItem } from '@/lib/chat/klipy';
+import { PLAN_GOING_REACTION, planSummary, planWire, type HangoutPlan } from '@/lib/chat/plans';
+import { createScheduled, type ScheduledRow } from '@/lib/chat/conversationApi';
 
 /**
  * Send / edit / delete / react / typing-broadcast actions for one chat.
@@ -50,6 +54,7 @@ export function useMessageActions({
   getAuthHeaders,
   appendReplyToMetadata,
   snapThreadViewportToBottom,
+  gifCustomerId,
 }: {
   connection: ConnectionRecord;
   currentUserId: string;
@@ -57,7 +62,11 @@ export function useMessageActions({
   chatId: string | null;
   e2eKeys: DerivedKeys | null;
   groupMasterKey: ArrayBuffer | null;
-  getE2eeV2Session: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
+  getE2eeV2Session: (
+    allowUpgrade?: boolean,
+    forceRefresh?: boolean,
+    staleWhileRevalidate?: boolean,
+  ) => Promise<E2eeV2Session | null>;
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   inputText: string;
@@ -77,22 +86,62 @@ export function useMessageActions({
   getAuthHeaders: () => Promise<HeadersInit>;
   appendReplyToMetadata: (meta: Record<string, unknown>) => Promise<Record<string, unknown>>;
   snapThreadViewportToBottom: () => void;
+  gifCustomerId: string | null;
 }) {
-  const sendMessage = useCallback(async () => {
-    const content = inputText.trim();
-    if (!content || !chatId || mediaBusy || isRecording) return;
+  /**
+   * Encrypts a text body with the conversation's current scheme (v2 epoch, v1 group, v1
+   * pairwise) and returns the `POST /api/chat/messages` body. Scheduling reuses it so a
+   * scheduled message is stored exactly as if it had been sent then.
+   */
+  const buildTextPost = useCallback(
+    async (content: string, extraMetadata: Record<string, unknown> | null, sentAt: number, staleOk = false) => {
+      if (!chatId) throw new Error('Chat is not ready');
+      const v2Session = await getE2eeV2Session(true, true, staleOk);
+      const encryptedV2 = v2Session ? await encryptWebE2eeV2Message(v2Session, chatId, content) : null;
+      const wireContent = encryptedV2
+        ? encryptedV2.wireContent
+        : isGroupClique && groupMasterKey
+          ? await encryptGroupMessageContent(content, groupMasterKey)
+          : e2eKeys
+            ? await encryptContent(content, e2eKeys)
+            : content;
+      const replyMetadata =
+        replyingTo && replyingTo.message_type !== 'call_log' ? await appendReplyToMetadata({}) : undefined;
+      const metadata = {
+        ...(extraMetadata ?? {}),
+        ...(replyMetadata ?? {}),
+        ...(encryptedV2?.metadata ?? {}),
+      };
+      return {
+        chatId,
+        ...(!isGroupClique ? { connectionId: connection.id } : {}),
+        content: wireContent,
+        local_sent_at: sentAt,
+        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+      } as Record<string, unknown>;
+    },
+    [chatId, getE2eeV2Session, isGroupClique, groupMasterKey, e2eKeys, replyingTo, appendReplyToMetadata, connection.id],
+  );
 
+  /**
+   * Optimistic insert, encrypt, and POST for a text-type row (plain text, GIFs, plans). The
+   * optimistic row is removed on failure and `onFailure` runs. Resolves to the server id.
+   */
+  const sendTextPayload = useCallback(async (
+    content: string,
+    extraMetadata: Record<string, unknown> | null,
+    onFailure: () => void,
+  ): Promise<string | null> => {
+    if (!chatId) return null;
     const optimisticId = `${CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX}${crypto.randomUUID()}`;
     const optimisticMeta: Message['metadata'] = {
+      ...(extraMetadata ?? {}),
       _bubbleKey: optimisticId,
     };
     if (replyingTo && replyingTo.message_type !== 'call_log') {
-      const replyLabel =
-        replyingTo.message_type === 'image' || replyingTo.message_type === 'audio'
-          ? previewLabelForMessage(replyingTo)
-          : replyingTo.content;
+      // Local only (never sent): lets the optimistic bubble show its quote immediately.
       optimisticMeta.reply_to_id = replyingTo.id;
-      optimisticMeta.reply_to_content = replySnippetForSend(replyLabel, 140);
+      optimisticMeta.reply_to_content = replySnippetForSend(previewLabelForMessage(replyingTo), 140);
     }
 
     const sentAt = Date.now();
@@ -112,8 +161,6 @@ export function useMessageActions({
       reactions: {},
     };
 
-    setInputText('');
-    inputRef.current?.focus();
     setMessages((prev) => [...prev, optimisticMsg]);
     requestAnimationFrame(() => {
       snapThreadViewportToBottom();
@@ -121,38 +168,27 @@ export function useMessageActions({
     });
 
     try {
-      const v2Session = await getE2eeV2Session(true, true);
-      const encryptedV2 = v2Session
-        ? await encryptWebE2eeV2Message(v2Session, chatId, content)
-        : null;
-      const wireContent = encryptedV2
-        ? encryptedV2.wireContent
-        : isGroupClique && groupMasterKey
-          ? await encryptGroupMessageContent(content, groupMasterKey)
-          : e2eKeys
-            ? await encryptContent(content, e2eKeys)
-            : content;
       const headers = await getAuthHeaders();
-      const replyMetadata =
-        replyingTo && replyingTo.message_type !== 'call_log'
-          ? await appendReplyToMetadata({})
-          : undefined;
-      const metadata = encryptedV2
-        ? { ...(replyMetadata ?? {}), ...encryptedV2.metadata }
-        : replyMetadata;
-      const res = await fetch('/api/chat/messages', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          chatId,
-          ...(!isGroupClique ? { connectionId: connection.id } : {}),
-          content: wireContent,
-          local_sent_at: sentAt,
-          ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {}),
-        }),
-      });
+      const post = async (staleOk: boolean) =>
+        fetch('/api/chat/messages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(await buildTextPost(content, extraMetadata, sentAt, staleOk)),
+        });
+      // Send with the keys at hand (no re-check round trips first); the server validates the
+      // epoch, so if they went stale, re-read them and send once more.
+      let res = await post(true);
+      if (!res.ok && (res.status === 400 || res.status === 409)) {
+        const { code } = (await res.json().catch(() => ({}))) as { code?: unknown };
+        if (code === 'E2EE_V2_INVALID' || code === 'E2EE_V2_REQUIRED') {
+          invalidateWebE2eeV2Session(chatId);
+          res = await post(false);
+        }
+      }
       if (!res.ok) throw new Error('Send failed');
-      await res.json().catch(() => ({}));
+      const payload = (await res.json().catch(() => ({}))) as { id?: unknown; message?: { id?: unknown } };
+      const serverId =
+        typeof payload.message?.id === 'string' ? payload.message.id : typeof payload.id === 'string' ? payload.id : null;
       setMessages((prev) =>
         prev.map((m) => {
           const meta =
@@ -169,28 +205,88 @@ export function useMessageActions({
         }),
       );
       setReplyingTo(null);
+      return serverId;
     } catch (err) {
       console.error('Send error:', err);
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-      setInputText(content);
+      onFailure();
+      return null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    inputText,
     chatId,
-    mediaBusy,
-    isRecording,
-    e2eKeys,
-    groupMasterKey,
-    isGroupClique,
     replyingTo,
-    connection.id,
     currentUserId,
     getAuthHeaders,
-    appendReplyToMetadata,
+    buildTextPost,
     snapThreadViewportToBottom,
-    getE2eeV2Session,
   ]);
+
+  /** Sends a hangout plan; whoever proposes it is going (iOS `ConversationModel.sendPlan`). */
+  const sendPlan = useCallback(
+    async (plan: HangoutPlan): Promise<boolean> => {
+      if (!chatId) return false;
+      let failed = false;
+      const serverId = await sendTextPayload(planSummary(plan), { plan: planWire(plan) }, () => {
+        failed = true;
+      });
+      if (failed || !serverId) return !failed;
+      try {
+        const headers = await getAuthHeaders();
+        await fetch('/api/chat/reactions', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messageId: serverId, reactionType: PLAN_GOING_REACTION }),
+        });
+      } catch {
+        /* The plan is sent; the RSVP can be set from the card. */
+      }
+      return true;
+    },
+    [chatId, getAuthHeaders, sendTextPayload],
+  );
+
+  /** Schedules the composer text for `sendAt` (ms). Clears the composer on success. */
+  const scheduleMessage = useCallback(
+    async (sendAt: number): Promise<ScheduledRow | null> => {
+      const content = inputText.trim();
+      if (!content || !chatId) return null;
+      const body = await buildTextPost(content, null, Date.now());
+      delete body.local_sent_at;
+      const row = await createScheduled({ ...body, send_at: Math.trunc(sendAt) });
+      setInputText((current) => (current.trim() === content ? '' : current));
+      setReplyingTo(null);
+      return row;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inputText, chatId, buildTextPost],
+  );
+
+  const sendMessage = useCallback(async () => {
+    const content = inputText.trim();
+    if (!content || !chatId || mediaBusy || isRecording) return;
+    setInputText('');
+    inputRef.current?.focus();
+    await sendTextPayload(content, null, () => setInputText(content));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputText, chatId, mediaBusy, isRecording, sendTextPayload]);
+
+  /** Sends a KLIPY GIF: its media URL as the encrypted body plus `metadata.gif` layout hints. */
+  const sendGif = useCallback(
+    async (item: KlipyGifItem, query: string) => {
+      const rendition = klipySendRendition(item);
+      if (!rendition || !isKlipyMediaUrl(rendition.url) || !chatId || isRecording) return;
+      if (gifCustomerId) triggerKlipyShare(item.slug, gifCustomerId, query);
+      inputRef.current?.focus();
+      await sendTextPayload(
+        rendition.url,
+        gifMessageMetadata({ provider: 'klipy', width: rendition.width, height: rendition.height }),
+        () => {},
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chatId, isRecording, gifCustomerId, sendTextPayload],
+  );
 
   // Broadcast typing indicator
   const broadcastTyping = useCallback(() => {
@@ -338,6 +434,9 @@ export function useMessageActions({
 
   return {
     sendMessage,
+    sendGif,
+    sendPlan,
+    scheduleMessage,
     broadcastTyping,
     startEdit,
     submitEdit,

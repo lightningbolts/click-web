@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
-import { reconnectNudgeCopy, sharedEventNudgeCopy } from '@/lib/cron/nudgesReconnect';
+import { NUDGE_TYPES, nudgeCopy } from '@/lib/nudges/moments';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -9,20 +9,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function serializeNudge(row: Record<string, unknown>) {
   const payload = isRecord(row.payload) ? row.payload : {};
-  const peerFirstName =
-    typeof payload.peer_first_name === 'string' ? payload.peer_first_name : 'a connection';
-  const type = row.nudge_type === 'shared_upcoming_event' ? 'shared_upcoming_event' : 'reconnect_lull';
-  const copy =
-    type === 'shared_upcoming_event'
-      ? sharedEventNudgeCopy({
-          peerFirstName,
-          eventTitle: typeof payload.event_title === 'string' ? payload.event_title : 'an upcoming event',
-        })
-      : reconnectNudgeCopy({
-          peerFirstName,
-          daysSinceEncounter:
-            typeof payload.days_since_encounter === 'number' ? payload.days_since_encounter : 21,
-        });
+  const type = NUDGE_TYPES.find((t) => t === row.nudge_type) ?? 'reconnect_lull';
+  const copy = nudgeCopy(type, payload);
   return {
     id: row.id,
     nudge_type: type,
@@ -36,7 +24,7 @@ function serializeNudge(row: Record<string, unknown>) {
 }
 
 /**
- * GET /api/me/nudges — undismissed nudges for the current user.
+ * GET /api/me/nudges — undismissed nudges for the current user (every relationship moment kind).
  */
 export async function GET(request: NextRequest) {
   try {

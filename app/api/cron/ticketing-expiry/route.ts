@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCronRequest } from '@/lib/server/cronAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
 import { recoverReservation, recoverRefund } from '@/lib/server/ticketing/recovery';
 export async function GET(request: NextRequest) {
   const gate = requireTicketingEnabled();
   if (gate) return gate;
-  if (
-    !process.env.CRON_SECRET ||
-    request.headers.get('authorization') !== 'Bearer ' + process.env.CRON_SECRET
-  )
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from('ticket_orders')

@@ -166,10 +166,13 @@ export function BusinessSignupFlow() {
         >
           Go to Click Insights
         </Link>
+        <Link href="/business/places" className="text-sm font-semibold text-primary hover:underline">
+          Manage your Place
+        </Link>
         <button
           type="button"
           onClick={() => router.replace('/business/signup')}
-          className="text-sm text-zinc-500 hover:text-zinc-300 underline"
+          className="text-sm text-on-surface-variant hover:text-on-surface underline"
         >
           Back to signup
         </button>
@@ -185,7 +188,7 @@ export function BusinessSignupFlow() {
         <button
           type="button"
           onClick={() => router.replace('/business/signup')}
-          className="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-on-surface hover:bg-white/15"
+          className="rounded-xl bg-surface-container px-5 py-2.5 text-sm text-on-surface hover:bg-surface-container-high"
         >
           Continue setup
         </button>
@@ -204,7 +207,7 @@ export function BusinessSignupFlow() {
           </p>
         </div>
 
-        <div className="flex gap-2 justify-center text-xs text-zinc-500">
+        <div className="flex gap-2 justify-center text-xs text-on-surface-variant">
           <span className={step === 'account' ? 'text-primary' : ''}>1. Account</span>
           <span>→</span>
           <span className={step === 'venue' ? 'text-primary' : ''}>2. Venue &amp; pay</span>
@@ -233,7 +236,7 @@ export function BusinessSignupFlow() {
               </button>
             </div>
             <div>
-              <label htmlFor="b-email" className="block text-xs text-zinc-500 mb-1">
+              <label htmlFor="b-email" className="block text-xs text-on-surface-variant mb-1">
                 Email
               </label>
               <input
@@ -248,7 +251,7 @@ export function BusinessSignupFlow() {
               />
             </div>
             <div>
-              <label htmlFor="b-password" className="block text-xs text-zinc-500 mb-1">
+              <label htmlFor="b-password" className="block text-xs text-on-surface-variant mb-1">
                 Password
               </label>
               <input
@@ -263,7 +266,7 @@ export function BusinessSignupFlow() {
             </div>
             {isSignupMode && (
               <div>
-                <label htmlFor="b-confirm" className="block text-xs text-zinc-500 mb-1">
+                <label htmlFor="b-confirm" className="block text-xs text-on-surface-variant mb-1">
                   Confirm password
                 </label>
                 <input
@@ -291,7 +294,7 @@ export function BusinessSignupFlow() {
         {step === 'venue' && (
           <form onSubmit={onVenueSubmit} className="space-y-4">
             <div>
-              <label htmlFor="v-name" className="block text-xs text-zinc-500 mb-1">
+              <label htmlFor="v-name" className="block text-xs text-on-surface-variant mb-1">
                 Venue name
               </label>
               <input
@@ -305,7 +308,7 @@ export function BusinessSignupFlow() {
               />
             </div>
             <div>
-              <label htmlFor="v-loc" className="block text-xs text-zinc-500 mb-1">
+              <label htmlFor="v-loc" className="block text-xs text-on-surface-variant mb-1">
                 Location
               </label>
               <textarea
@@ -318,7 +321,7 @@ export function BusinessSignupFlow() {
               />
             </div>
             {error && <p className="text-sm text-red-700 dark:text-red-400">{error}</p>}
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-on-surface-variant">
               Next, you&apos;ll complete payment on Stripe. Your subscription activates Click Insights for
               this venue.
             </p>
@@ -326,7 +329,7 @@ export function BusinessSignupFlow() {
               <button
                 type="button"
                 onClick={() => setStep('account')}
-                className="flex-1 rounded-xl border border-white/15 py-3 text-sm text-zinc-300 hover:bg-surface"
+                className="flex-1 rounded-xl border border-border-hard py-3 text-sm text-on-surface hover:bg-surface"
               >
                 Back
               </button>

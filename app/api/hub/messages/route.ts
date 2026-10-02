@@ -16,6 +16,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assertHubGeofenceFromCoords, assertHubReadable } from '@/lib/server/hubGatekeeper';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
+import { placeHubDisabledResponse } from '@/lib/server/places/placeHub';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubMessagesBodySchema } from '@/lib/api/schemas/beacons';
 import {
@@ -67,6 +70,24 @@ export async function GET(request: NextRequest) {
 
   const hubId = (request.nextUrl.searchParams.get('hubId') ?? '').trim();
   const aroundMessageId = (request.nextUrl.searchParams.get('aroundMessageId') ?? '').trim();
+  // Older history (`cursor`, ms: rows created before it) and delta sync (`since`, ms: rows
+  // created after it). Both are additive; clients that send neither get the latest window.
+  const parseMillis = (raw: string | null): string | null => {
+    if (raw == null || !/^\d+$/.test(raw)) return null;
+    const date = new Date(parseInt(raw, 10));
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  };
+  // Web keyset pagination preserves sub-millisecond precision and same-timestamp rows.
+  // Keep the mobile millisecond cursor contract intact.
+  const before = request.nextUrl.searchParams.get('before');
+  const beforeId = request.nextUrl.searchParams.get('beforeId');
+  if ((before || beforeId) && (!before || !beforeId ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(before) ||
+    !Number.isFinite(Date.parse(before)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(beforeId))) {
+    return NextResponse.json({ error: 'Invalid history cursor' }, { status: 400 });
+  }
+  const cursorIso = parseMillis(request.nextUrl.searchParams.get('cursor'));
+  const sinceIso = parseMillis(request.nextUrl.searchParams.get('since'));
   const limitRaw = parseInt(request.nextUrl.searchParams.get('limit') ?? String(HUB_THREAD_LIMIT), 10);
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), HUB_THREAD_LIMIT) : HUB_THREAD_LIMIT;
 
@@ -104,12 +125,19 @@ export async function GET(request: NextRequest) {
   const senderProfilesVisible = true;
   const { data: hubVenue, error: venueErr } = await admin
     .from('hub_venues')
-    .select('event_beacon_id')
+    .select('event_beacon_id, place_id')
     .eq('id', hubId)
     .maybeSingle();
   if (venueErr) {
     console.error('[hub/messages GET] event venue:', venueErr.message);
     return NextResponse.json({ error: 'Failed to load hub' }, { status: 500 });
+  }
+  if (
+    (hubVenue as { place_id?: unknown } | null)?.place_id &&
+    !aroundMessageId && !before && !beforeId && !cursorIso && !sinceIso
+  ) {
+    const viewerId = auth.user.id;
+    runAfterResponse('place_hub_opened', () => emitProductEvent(admin, viewerId, 'place_hub_opened'));
   }
   const eventBeaconId =
     hubVenue != null && typeof (hubVenue as { event_beacon_id?: unknown }).event_beacon_id === 'string'
@@ -172,13 +200,32 @@ export async function GET(request: NextRequest) {
       newer: (newer ?? []).map((row) => normalizeHubMessageRow(row as Record<string, unknown>)).filter((row): row is HubThreadMessage => row != null),
       target,
     });
-  } else {
+  } else if (sinceIso) {
     const { data, error } = await admin
       .from('hub_messages')
       .select('*')
       .eq('hub_id', hubId)
-      .order('created_at', { ascending: false })
+      .gt('created_at', sinceIso)
+      .order('created_at', { ascending: true })
       .limit(limit);
+    if (error) {
+      console.error('[hub/messages GET] since:', error.message);
+      return NextResponse.json({ error: 'Failed to load hub messages' }, { status: 500 });
+    }
+    messages = (data ?? [])
+      .map((row) => normalizeHubMessageRow(row as Record<string, unknown>))
+      .filter((row): row is HubThreadMessage => row != null);
+  } else {
+    let query = admin
+      .from('hub_messages')
+      .select('*')
+      .eq('hub_id', hubId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit);
+    if (before && beforeId) query = query.or(`created_at.lt.${before},and(created_at.eq.${before},id.lt.${beforeId})`);
+    else if (cursorIso) query = query.lt('created_at', cursorIso);
+    const { data, error } = await query;
     if (error) {
       console.error('[hub/messages GET] messages:', error.message);
       return NextResponse.json({ error: 'Failed to load hub messages' }, { status: 500 });
@@ -254,6 +301,8 @@ export async function POST(request: NextRequest) {
     auth.user.id,
   );
   if (denied) return denied;
+  const disabled = await placeHubDisabledResponse(admin, hubId);
+  if (disabled) return disabled;
 
   // Geofence passed — make sure the sender is registered as a participant so
   // participant-scoped hub_messages RLS lets them read replies and realtime rows.

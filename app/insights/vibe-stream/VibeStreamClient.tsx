@@ -149,7 +149,7 @@ export default function VibeStreamPage() {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center gap-3 mb-2">
         <div className="p-2.5 bg-[#FFD93D]/20 rounded-xl border border-[#FFD93D]/30">
-          <MessageSquare className="w-5 h-5 text-[#FFD93D]" />
+          <MessageSquare className="w-5 h-5 text-amber-600 dark:text-[#FFD93D]" />
         </div>
         <div>
           <h2 className="text-xl font-bold text-on-surface">Vibe Stream</h2>

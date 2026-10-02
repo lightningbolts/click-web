@@ -51,7 +51,7 @@ function setupSupabase(
   } = {},
 ) {
   const mock = makeSupabaseMock({
-    tables: { venue_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }) },
+    tables: { place_managers: overrides.venueManagers ?? ok({ id: 'vm-1' }) },
     rpc: overrides.rpc ?? ((fn) => (fn === 'insights_vibe_radar_data' ? ok(RADAR_PAYLOAD) : ok(null))),
   });
 
@@ -123,8 +123,8 @@ describe('GET /api/insights/intents contract', () => {
 
       await callRoute();
 
-      const managers = mock.builder('venue_managers');
-      expectFilter(managers, 'venue_id', MOCK_VENUE_ID);
+      const managers = mock.builder('place_managers');
+      expectFilter(managers, 'place_id', MOCK_VENUE_ID);
       expectFilter(managers, 'user_id', MOCK_USER_ID);
       expectRpcCalledWith(mock.rpc, 'insights_vibe_radar_data', {
         venue_id_param: MOCK_VENUE_ID,

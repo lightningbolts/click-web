@@ -1,4 +1,4 @@
-import { dueReminderKinds } from '@/lib/cron/eventReminders';
+import { dueReminderKinds, RECAP_WINDOW_MS } from '@/lib/cron/eventReminders';
 
 describe('dueReminderKinds', () => {
   const startMs = Date.parse('2026-08-12T14:30:00.000Z');
@@ -68,5 +68,15 @@ describe('dueReminderKinds', () => {
         metadata: { event_timezone: 'America/Los_Angeles' },
       }),
     ).not.toContain('day_of');
+  });
+});
+
+describe('recap window', () => {
+  it('never recaps an event that ended more than two days ago', () => {
+    const endMs = Date.UTC(2026, 0, 1, 20);
+    const startMs = endMs - 2 * 60 * 60 * 1000;
+    const nowMs = endMs + RECAP_WINDOW_MS + 1;
+    expect(dueReminderKinds({ nowMs, startMs, endMs, metadata: {} })).toEqual([]);
+    expect(dueReminderKinds({ nowMs: endMs + 60_000, startMs, endMs, metadata: {} })).toEqual(['recap_ready']);
   });
 });

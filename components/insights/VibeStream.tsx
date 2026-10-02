@@ -108,7 +108,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-[#FFD93D]/20 rounded-lg">
-            <MessageSquare className="w-4 h-4 text-[#FFD93D]" />
+            <MessageSquare className="w-4 h-4 text-amber-600 dark:text-[#FFD93D]" />
           </div>
           <span className="text-sm font-medium text-on-surface-variant">Vibe Stream</span>
         </div>

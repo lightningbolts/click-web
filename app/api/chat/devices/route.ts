@@ -7,6 +7,8 @@ import {
   createChatGatekeeperAdmin,
   requireBearerUser,
 } from '@/lib/server/chatGatekeeper';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { requestHistoryApprovalForNewDevice } from '@/lib/server/deviceHistory';
 
 // Rollout-gated E2EE v2 device registry/discovery surface. Message writes and key transfer
 // remain out of this route until the v2 rollout gate is enabled.
@@ -186,11 +188,29 @@ export async function POST(request: NextRequest) {
 
     if (error || !data) {
       if (error?.code === '23505') {
+        // Devices registered before email-approved history existed never got the email: offer it
+        // now (one request per device; repeats are no-ops).
+        runAfterResponse('chat/devices history approval (existing)', async () => {
+          const { data: existing } = await admin
+            .from('chat_devices')
+            .select('id, created_at')
+            .eq('user_id', auth.user.id)
+            .eq('device_id', deviceId)
+            .is('revoked_at', null)
+            .maybeSingle();
+          if (existing) await requestHistoryApprovalForNewDevice(admin, auth.user, existing as { id: string; created_at: string });
+        });
         return NextResponse.json({ error: 'Device already registered' }, { status: 409 });
       }
       if (error) console.error('[chat/devices] registration failed:', error.message);
       return errorResponse();
     }
+
+    // An additional device on this account: email a magic link asking to share chat history.
+    const registered = data as DeviceRow;
+    runAfterResponse('chat/devices history approval', () =>
+      requestHistoryApprovalForNewDevice(admin, auth.user, { id: registered.id, created_at: registered.created_at }),
+    );
 
     return NextResponse.json({ device: postProjection(data as DeviceRow) });
   } catch (error) {

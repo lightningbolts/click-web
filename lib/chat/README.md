@@ -102,6 +102,18 @@ Keys derived from 32-byte group master (from `encrypted_group_key` unwrap)
 
 ---
 
+## GIF messages (KLIPY)
+
+`gif.ts` (contract) and `klipy.ts` (API client) — mirrored by iOS `ChatGif.swift` / `KlipyClient.swift`.
+
+- Row: `message_type: 'text'`; the **encrypted** content is the KLIPY media URL (`https://static*.klipy.com/…`), so the server never sees which GIF was sent and clients without GIF support show a link.
+- `metadata.gif = { provider: 'klipy', width, height }` — layout hints only (no URL, no slug). A bubble renders as a GIF only when this marker **and** a KLIPY-host body are both present.
+- KLIPY integration terms: API calls and media loads come from the client (no server proxy, no re-hosting into chat storage), results keep KLIPY's order, and the search placeholder reads "Search KLIPY".
+- Enabled by `NEXT_PUBLIC_KLIPY_APP_KEY` (web) / `KLIPY_APP_KEY` xcconfig (iOS); the GIF button is hidden when unset. `customer_id` is a SHA-256 hash of the user ID.
+- Uploaded `.gif` photos are separate: they go through the normal encrypted media pipeline (`image/gif`).
+
+---
+
 ## Disposable roll metadata
 
 When a user sends a **Click Drop** (disposable photo):

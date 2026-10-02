@@ -3,7 +3,8 @@
  */
 
 import { NextRequest } from 'next/server';
-import { POST as proximityPost } from '@/app/api/connections/proximity/route';
+import { GET as proximityGet, POST as proximityPost } from '@/app/api/connections/proximity/route';
+import { POST as proximityConfirm } from '@/app/api/connections/proximity/confirm/route';
 import type { PendingHandshakeRow } from '@/types/supabase-json';
 import { PENDING_HANDSHAKE_TTL_MS } from '@/types/supabase-json';
 
@@ -27,7 +28,7 @@ type PendingInsert = Omit<PendingHandshakeRow, 'id' | 'created_at' | 'matched_at
 function createInMemoryAdmin(extraUserIds: string[] = []) {
   const pending: PendingHandshakeRow[] = [];
   let connectionSeq = 0;
-  const connections: { id: string; user_ids: string[]; created_utc: string }[] = [];
+  const connections: { id: string; user_ids: string[]; created_utc: string; is_group?: boolean }[] = [];
   const chats: { connection_id: string }[] = [];
   const encounters: Record<string, unknown>[] = [];
   const users = new Map<string, Record<string, unknown>>([
@@ -129,9 +130,12 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
         })),
         select: jest.fn(() => {
           type Filters = {
+            id?: string;
+            matchedAt?: string;
             userId?: string;
             expiresAfter?: string;
             unmatchedOnly?: boolean;
+            matchedSince?: string;
             myTokensIn?: string[];
             minLat?: number;
             maxLat?: number;
@@ -142,9 +146,14 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
           const state: Filters = {};
           const resolveRows = () => {
             let rows = [...pending];
+            if (state.id) rows = rows.filter((r) => r.id === state.id);
+            if (state.matchedAt) rows = rows.filter((r) => r.matched_at === state.matchedAt);
             if (state.userId) rows = rows.filter((r) => r.user_id === state.userId);
             if (state.expiresAfter) rows = rows.filter((r) => r.expires_at > state.expiresAfter!);
             if (state.unmatchedOnly) rows = rows.filter((r) => r.matched_at == null);
+            if (state.matchedSince) {
+              rows = rows.filter((r) => r.matched_at != null && r.matched_at >= state.matchedSince!);
+            }
             if (state.myTokensIn?.length) {
               rows = rows.filter((r) => state.myTokensIn!.includes(r.my_token));
             }
@@ -159,8 +168,11 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
           const wrap = () => chain;
           chain.eq = (col: string, val: string) => {
             if (col === 'user_id') state.userId = val;
+            if (col === 'id') state.id = val;
+            if (col === 'matched_at') state.matchedAt = val;
             return wrap();
           };
+          chain.maybeSingle = async () => ({ data: resolveRows().data[0] ?? null, error: null });
           chain.gt = (col: string, val: string) => {
             if (col === 'expires_at') state.expiresAfter = val;
             return wrap();
@@ -173,9 +185,10 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             if (col === 'my_token') state.myTokensIn = vals;
             return wrap();
           };
-          chain.gte = (col: string, val: number) => {
-            if (col === 'lat') state.minLat = val;
-            if (col === 'lon') state.minLon = val;
+          chain.gte = (col: string, val: number | string) => {
+            if (col === 'matched_at') state.matchedSince = String(val);
+            if (col === 'lat' && typeof val === 'number') state.minLat = val;
+            if (col === 'lon' && typeof val === 'number') state.minLon = val;
             return wrap();
           };
           chain.lte = (col: string, val: number) => {
@@ -192,15 +205,21 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             Promise.resolve(resolveRows()).then(resolve);
           return chain;
         }),
-        update: jest.fn((patch: { matched_at: string }) => ({
+        update: jest.fn((patch: Partial<PendingHandshakeRow>) => ({
           in: (col: string, ids: string[]) => ({
             is: (_col2: string, val2: null) => {
               for (const row of pending) {
                 if (col === 'user_id' && ids.includes(row.user_id) && row.matched_at === val2) {
-                  row.matched_at = patch.matched_at;
+                  Object.assign(row, patch);
                 }
               }
               return Promise.resolve({ error: null });
+            },
+            then: (resolve: (v: { error: null }) => void) => {
+              for (const row of pending) {
+                if (col === 'id' && ids.includes(row.id)) Object.assign(row, patch);
+              }
+              return Promise.resolve({ error: null }).then(resolve);
             },
           }),
         })),
@@ -212,16 +231,20 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
       const connectionLookup: {
         contains: jest.Mock;
         gte: jest.Mock;
+        eq: (col: string, id: string) => { maybeSingle: () => Promise<{ data: ConnectionRow | null; error: null }> };
         then: (resolve: (v: { data: ConnectionRow[]; error: null }) => void) => void;
       } = {
         contains: jest.fn(),
         gte: jest.fn().mockResolvedValue({ data: [], error: null }),
+        eq: (_col, id) => ({
+          maybeSingle: async () => ({ data: connections.find((c) => c.id === id) ?? null, error: null }),
+        }),
         then: (resolve) => resolve({ data: connections, error: null }),
       };
       connectionLookup.contains.mockReturnValue(connectionLookup);
       return {
         select: jest.fn(() => connectionLookup),
-        insert: jest.fn((row: { user_ids: string[]; created_utc: string }) => ({
+        insert: jest.fn((row: { user_ids: string[]; created_utc: string; is_group?: boolean }) => ({
           select: () => ({
             single: async () => {
               connectionSeq += 1;
@@ -229,6 +252,7 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
                 id: `conn-${connectionSeq}`,
                 user_ids: row.user_ids,
                 created_utc: row.created_utc,
+                is_group: row.is_group,
               };
               connections.push(conn);
               return { data: { id: conn.id }, error: null };
@@ -296,6 +320,10 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
             }),
         })),
       };
+    }
+
+    if (table === 'connection_flow_events') {
+      return { insert: jest.fn(() => Promise.resolve({ error: null })) };
     }
 
     if (table === 'collaboration_sessions') {
@@ -604,6 +632,87 @@ describe('POST /api/connections/proximity contract', () => {
     expect(adminStore._connections).toHaveLength(0);
 
     dateSpy.mockRestore();
+  });
+
+  describe('late group joiner (peers already paired before the third tap posts)', () => {
+    async function pairAThenB() {
+      const resA = await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: ['2222', '3333'] }));
+      const resB = await proximityPost(makeRequest(userB, { my_token: '2222', heard_tokens: ['1111', '3333'] }));
+      expect(resB.status).toBe(200);
+      expect(adminStore._connections.map((c) => c.user_ids.sort())).toEqual([[userA, userB].sort()]);
+      const tapA = ((await resA.json()) as { pending_handshake_id: string }).pending_handshake_id;
+      const tapB = ((await resB.json()) as { pending_handshake_id?: string }).pending_handshake_id;
+      expect(tapB).toBeTruthy();
+      return { tapA, tapB: tapB! };
+    }
+
+    function authed(userId: string) {
+      mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({ supabase: {}, user: { id: userId }, authError: null });
+    }
+
+    async function recover(userId: string, pendingId: string) {
+      authed(userId);
+      const res = await proximityGet(
+        new NextRequest(`http://localhost/api/connections/proximity?pending_handshake_id=${pendingId}`),
+      );
+      expect(res.status).toBe(200);
+      return (await res.json()) as { is_group?: boolean; connection_id?: string; matches: { id: string }[] };
+    }
+    const postC = () => proximityPost(makeRequest(userC, { my_token: '3333', heard_tokens: ['1111', '2222'] }));
+
+    it('joins the already-matched pair and offers host selection', async () => {
+      await pairAThenB();
+      const resC = await postC();
+      expect(resC.status).toBe(200);
+      const body = (await resC.json()) as {
+        awaiting_selection?: boolean;
+        matches: { id: string }[];
+        group_clique_candidate?: { member_user_ids: string[] };
+      };
+      expect(body.awaiting_selection).toBe(true);
+      expect(body.matches.map((m) => m.id).sort()).toEqual([userA, userB].sort());
+      expect(body.group_clique_candidate?.member_user_ids.sort()).toEqual([userA, userB, userC].sort());
+    });
+
+    it('reports the group to phones that already showed the 1:1 result', async () => {
+      const { tapA, tapB } = await pairAThenB();
+      expect((await recover(userA, tapA)).is_group).toBe(false);
+
+      const { pending_handshake_id: tapC } = (await (await postC()).json()) as { pending_handshake_id: string };
+      authed(userC);
+      const confirmRes = await proximityConfirm(
+        new NextRequest('http://localhost/api/connections/proximity/confirm', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pending_handshake_id: tapC, selected_member_ids: [userA, userB] }),
+        }),
+      );
+      expect(confirmRes.status).toBe(200);
+      const group = (await confirmRes.json()) as { connection_id: string; is_group: boolean; pending_handshake_id: string };
+      expect(group.is_group).toBe(true);
+      expect(group.pending_handshake_id).toBe(tapC);
+
+      for (const [userId, tap, peers] of [
+        [userA, tapA, [userB, userC]],
+        [userB, tapB, [userA, userC]],
+        [userC, tapC, [userA, userB]],
+      ] as const) {
+        const seen = await recover(userId, tap);
+        expect(seen.is_group).toBe(true);
+        expect(seen.connection_id).toBe(group.connection_id);
+        expect(seen.matches.map((m) => m.id).sort()).toEqual([...peers].sort());
+      }
+    });
+
+    it('does not pull in peers matched before the late-join window', async () => {
+      await pairAThenB();
+      const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 16_000);
+      try {
+        expect((await postC()).status).toBe(202);
+      } finally {
+        dateSpy.mockRestore();
+      }
+    });
   });
 
   it('keeps GPS/time fallback peers in a partial-token three-phone match', async () => {

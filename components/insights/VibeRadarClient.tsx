@@ -210,7 +210,7 @@ export default function VibeRadarClient({
                   className="flex justify-between text-sm border-b border-border-hard pb-2 last:border-0"
                 >
                   <span className="text-on-surface capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
-                  <span className="text-cyan-400/90 tabular-nums font-medium">{t.count}</span>
+                  <span className="text-cyan-700 dark:text-cyan-400/90 tabular-nums font-medium">{t.count}</span>
                 </li>
               ))}
             </ul>

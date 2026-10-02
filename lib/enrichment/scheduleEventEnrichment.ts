@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { runEncounterEnrichment } from '@/lib/enrichment/runEncounterEnrichment';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 
 export type ScheduleEventEnrichmentInput = {
   encounter_id: string;
@@ -23,7 +24,7 @@ export function scheduleEventEnrichment(input: ScheduleEventEnrichmentInput): vo
     return;
   }
 
-  void (async () => {
+  runAfterResponse('enrichment', async () => {
     try {
       const supabase = createAdminSupabaseClient();
       await runEncounterEnrichment(supabase, input);
@@ -31,5 +32,5 @@ export function scheduleEventEnrichment(input: ScheduleEventEnrichmentInput): vo
       const msg = err instanceof Error ? err.message : String(err);
       console.warn('[enrichment] schedule failed:', msg);
     }
-  })();
+  });
 }

@@ -37,6 +37,8 @@ import {
   enrichEncounterWeather,
   type MemoryCapsulePayload,
 } from '@/lib/server/connections/encounterEnrichment';
+import { finiteBatteryPct } from '@/lib/server/proximity/matching';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 import {
   BUNDLE_PARAM,
   DASHBOARD_ENCOUNTERS_PER_CONNECTION,
@@ -74,11 +76,23 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const insights = isInsightsScope(searchParams);
+    const singleConnectionId = searchParams.get('connectionId')?.trim();
+    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
 
-    const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
-    if (!sweep.ok) {
-      console.error('[connections GET] sweep_stale_connections_for_user failed:', sweep.message);
-      return NextResponse.json({ error: sweep.message }, { status: 400 });
+    // Sweeping only affects active/archive membership. Skip the RPC for read shapes whose
+    // response is independent of the archive junction: insights history, a direct row refresh,
+    // and the memory map. The next active/archive/dashboard read still performs the sweep.
+    const needsLifecycleSweep =
+      !insights &&
+      !singleConnectionId &&
+      scope !== 'map';
+
+    if (needsLifecycleSweep) {
+      const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
+      if (!sweep.ok) {
+        console.error('[connections GET] sweep_stale_connections_for_user failed:', sweep.message);
+        return NextResponse.json({ error: sweep.message }, { status: 400 });
+      }
     }
 
     // Insights: full history — no junction filtering (avoids hiding rows from analytics views).
@@ -102,7 +116,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Single connection patch (Realtime row refresh without full dashboard bundle).
-    const singleConnectionId = searchParams.get('connectionId')?.trim();
     if (singleConnectionId) {
       const { data: connection, error } = await supabase
         .from('connections')
@@ -171,8 +184,6 @@ export async function GET(request: NextRequest) {
         core: coreForUser,
       });
     }
-
-    const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
 
     const [archivedForUser, hiddenForUser] = await Promise.all([
       fetchJunctionConnectionIds(supabase, 'connection_archives', user.id),
@@ -716,13 +727,30 @@ export async function POST(request: NextRequest) {
       ]),
     ];
 
+    const clientWeatherSnapshot =
+      typeof body.weather_snapshot === 'string' && body.weather_snapshot.trim().length > 0
+        ? body.weather_snapshot.trim()
+        : null;
     const encounterInsert: Record<string, unknown> = {
       connection_id: connection.id,
       encountered_at: new Date(now).toISOString(),
-      display_location: displayLocation,
       context_tags: encounterContextTags,
-      weather_snapshot: memoryCapsule.weatherSnapshot,
+      weather_snapshot: clientWeatherSnapshot ?? memoryCapsule.weatherSnapshot,
+      // The caller's device captured this context (same attribution as proximity rows).
+      reporting_user_id: user.id,
     };
+    if (displayLocation !== DISPLAY_LOCATION_FALLBACK) {
+      encounterInsert.display_location = displayLocation;
+    }
+    // Connect-time hardware snapshot (light proxy, motion, heading, battery).
+    const luxLevel = finiteNumber(body.lux_level);
+    const motionVariance = finiteNumber(body.motion_variance);
+    const compassAzimuth = finiteNumber(body.compass_azimuth);
+    const batteryLevel = finiteBatteryPct(body.battery_level);
+    if (luxLevel != null) encounterInsert.lux_level = luxLevel;
+    if (motionVariance != null) encounterInsert.motion_variance = motionVariance;
+    if (compassAzimuth != null) encounterInsert.compass_azimuth = compassAzimuth;
+    if (batteryLevel != null) encounterInsert.battery_level = batteryLevel;
     if (resolvedNoiseForEncounter != null) {
       encounterInsert.noise_level = resolvedNoiseForEncounter;
     }
@@ -798,13 +826,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    void enrichEncounterWeather(
-      adminClient,
-      connection.id,
-      geoLocation.lat,
-      geoLocation.lon,
-      memoryCapsule
-    );
+    if (clientWeatherSnapshot == null) {
+      runAfterResponse('connections weather enrichment', () =>
+        enrichEncounterWeather(
+          adminClient,
+          connection.id,
+          geoLocation.lat,
+          geoLocation.lon,
+          memoryCapsule,
+        ),
+      );
+    }
 
     if (
       encElev != null &&
@@ -812,12 +844,14 @@ export async function POST(request: NextRequest) {
       Number.isFinite(geoLocation.lon) &&
       !(geoLocation.lat === 0 && geoLocation.lon === 0)
     ) {
-      void enrichEncounterRelativeAltitude(
-        adminClient,
-        connection.id,
-        encElev,
-        geoLocation.lat,
-        geoLocation.lon,
+      runAfterResponse('connections altitude enrichment', () =>
+        enrichEncounterRelativeAltitude(
+          adminClient,
+          connection.id,
+          encElev,
+          geoLocation.lat,
+          geoLocation.lon,
+        ),
       );
     }
 

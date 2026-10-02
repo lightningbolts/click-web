@@ -36,9 +36,9 @@ export async function GET(
     }
 
     const { data: membership, error: membershipError } = await supabase
-      .from("venue_managers")
+      .from("place_managers")
       .select("id")
-      .eq("venue_id", venueId)
+      .eq("place_id", venueId)
       .eq("user_id", user.id)
       .maybeSingle();
 

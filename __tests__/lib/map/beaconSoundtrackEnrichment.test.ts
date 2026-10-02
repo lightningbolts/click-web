@@ -202,3 +202,21 @@ describe("fetchItunesFirstSong + enrichSoundtrackMetadata", () => {
     expect(meta.artist_name).toBe("Carly Rae Jepsen");
   });
 });
+
+describe("sanitizeClientSoundtrackFields", () => {
+  it("keeps Apple CDN media and trims text; drops other hosts", async () => {
+    const { sanitizeClientSoundtrackFields } = await import("@/lib/map/beaconSoundtrackEnrichment");
+    const out = sanitizeClientSoundtrackFields({
+      music_url: "https://youtu.be/x",
+      preview_url: "https://audio-ssl.itunes.apple.com/a.m4a",
+      album_art_url: "https://evil.example.com/pixel.png",
+      track_name: "  Song  ",
+      artist_name: "",
+    });
+    expect(out.preview_url).toBe("https://audio-ssl.itunes.apple.com/a.m4a");
+    expect(out.album_art_url).toBeUndefined();
+    expect(out.track_name).toBe("Song");
+    expect(out.artist_name).toBeUndefined();
+    expect(out.music_url).toBe("https://youtu.be/x");
+  });
+});
