@@ -166,6 +166,9 @@ export function BusinessSignupFlow() {
         >
           Go to Click Insights
         </Link>
+        <Link href="/business/places" className="text-sm font-semibold text-primary hover:underline">
+          Manage your Place
+        </Link>
         <button
           type="button"
           onClick={() => router.replace('/business/signup')}

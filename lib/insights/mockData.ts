@@ -504,3 +504,27 @@ export const mockEventEngagement = {
     p90_minutes: 95,
   },
 };
+
+/** Demo data for `/insights/place` (Click Places manager stats, detail=full). */
+export const mockPlaceStats = (() => {
+  const byHour = (peak: number, scale: number) =>
+    Array.from({ length: 24 }, (_, h) => (h >= 7 && h <= 22 ? Math.max(0, Math.round(scale * (4 - Math.abs(h - peak) / 3))) : 0));
+  const grid = [byHour(9, 1), byHour(10, 1), byHour(12, 1.2), byHour(18, 1.5), byHour(20, 2.4), byHour(21, 2.8), byHour(14, 1.6)];
+  const daily = Array.from({ length: 90 }, (_, i) => {
+    const day = new Date(Date.now() - (89 - i) * 86_400_000).toISOString().slice(0, 10);
+    const checkIns = 4 + ((i * 7) % 9);
+    return { day, check_ins: checkIns, unique_visitors: checkIns - (i % 3), pulses: Math.round(checkIns / 2), avg_energy: 2 + ((i * 5) % 17) / 10 };
+  });
+  return {
+    range_days: 90,
+    totals: { check_ins: 712, unique_visitors: 431, repeat_visitor_rate: 0.31, pulses: 296, events_hosted: 11, new_connections: 58, repeat_connections: 21 },
+    check_ins_by_dow_hour: grid,
+    energy_distribution: [42, 120, 98, 36],
+    talkable: { yes: 150, no: 31 },
+    would_return: { yes: 96, no: 12 },
+    daily,
+    median_dwell_minutes: 52,
+    event_vs_regular: { event_check_ins: 204, regular_check_ins: 508 },
+    pulse_by_daypart: { morning: [20, 40, 8, 1], afternoon: [14, 46, 30, 6], evening: [6, 24, 44, 17], night: [2, 10, 16, 12] },
+  };
+})();

@@ -17,4 +17,6 @@ export const APP_CONFIG = {
     android_store_url: process.env.NEXT_PUBLIC_ANDROID_STORE_URL || '#waitlist',
     app_launched: process.env.NEXT_PUBLIC_APP_LAUNCHED === 'true',
     ios_app_id: iosAppIdFromStoreUrl(process.env.NEXT_PUBLIC_IOS_STORE_URL ?? ''),
+    /** Click for Business / Click Places pilot contact. */
+    business_contact_email: process.env.NEXT_PUBLIC_BUSINESS_CONTACT_EMAIL || 'mepsht@uw.edu',
 } as const;
