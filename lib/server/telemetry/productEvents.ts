@@ -18,6 +18,11 @@ export const PRODUCT_EVENTS = [
   'recap_opened',
   'nudge_shown',
   'nudge_acted',
+  'place_viewed',
+  'place_check_in',
+  'place_check_in_rejected',
+  'place_pulse',
+  'place_hub_opened',
 ] as const;
 export type ProductEvent = (typeof PRODUCT_EVENTS)[number];
 
@@ -36,6 +41,11 @@ const ALLOWED_PROPS: Record<ProductEvent, readonly string[]> = {
   recap_opened: ['access'],
   nudge_shown: ['kind'],
   nudge_acted: ['kind'],
+  place_viewed: ['source'],
+  place_check_in: ['proof'],
+  place_check_in_rejected: ['reason'],
+  place_pulse: ['has_energy', 'has_followup'],
+  place_hub_opened: [],
 };
 
 export function sanitizeProductProps(event: ProductEvent, raw: unknown): Record<string, string | number | boolean> {
