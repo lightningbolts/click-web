@@ -17,6 +17,7 @@ export const FEATURE_KEYS = [
   'shared_drops',
   'reconnect_nearby',
   'pilot_analytics',
+  'click_places',
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
