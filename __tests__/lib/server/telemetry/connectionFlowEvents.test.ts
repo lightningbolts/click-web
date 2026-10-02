@@ -6,7 +6,6 @@ import {
   CONNECTION_FLOW_ALLOWED_EVENTS,
   emitConnectionFlowEvent,
   proximityAtEventSkipReason,
-  sanitizeCaptureQuality,
 } from '@/lib/server/telemetry/connectionFlowEvents';
 
 describe('connectionFlowEvents', () => {
@@ -48,42 +47,5 @@ describe('connectionFlowEvents', () => {
         peer_count: 2,
       }),
     );
-  });
-
-  it('keeps only allowlisted aggregate capture-quality metrics', () => {
-    expect(
-      sanitizeCaptureQuality({
-        location_accuracy_m: 4.837,
-        location_accuracy_bucket: 'excellent',
-        location_full_accuracy: true,
-        ble_rssi_median_dbm: -56,
-        ultrasonic_snr_db: 17.2,
-        latitude: 47.61,
-        token: '1234',
-        user_id: 'abc',
-        sensor_failure: 'something else',
-        motion_sample_count: -3,
-      }),
-    ).toEqual({
-      location_accuracy_m: 4.84,
-      location_accuracy_bucket: 'excellent',
-      location_full_accuracy: true,
-      ble_rssi_median_dbm: -56,
-      ultrasonic_snr_db: 17.2,
-    });
-    expect(sanitizeCaptureQuality({ latitude: 1 })).toBeNull();
-    expect(sanitizeCaptureQuality('x')).toBeNull();
-  });
-
-  it('stores capture quality only when present', async () => {
-    const insert = jest.fn().mockResolvedValue({ error: null });
-    const admin = { from: jest.fn().mockReturnValue({ insert }) };
-    await emitConnectionFlowEvent(admin as never, { event: 'proximity_handshake_matched' });
-    expect(insert.mock.calls[0][0]).not.toHaveProperty('capture_quality');
-    await emitConnectionFlowEvent(admin as never, {
-      event: 'proximity_handshake_matched',
-      captureQuality: { location_accuracy_m: 5 },
-    });
-    expect(insert.mock.calls[1][0]).toMatchObject({ capture_quality: { location_accuracy_m: 5 } });
   });
 });

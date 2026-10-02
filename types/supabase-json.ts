@@ -33,14 +33,6 @@ export interface ProximityHandshakeRequest {
   barometric_precision_m?: unknown;
   barometric_relative_altitude_m?: unknown;
   barometric_pressure_kpa?: unknown;
-  gps_speed_mps?: unknown;
-  gps_speed_accuracy_mps?: unknown;
-  gps_course_deg?: unknown;
-  gps_course_accuracy_deg?: unknown;
-  gps_simulated?: unknown;
-  gps_external_accessory?: unknown;
-  /** Versioned raw sensor observation (lib/server/encounterObservation.ts). */
-  sensor_observation?: unknown;
   noise_level?: unknown;
   exact_noise_level_db?: unknown;
   context_tags?: unknown;
@@ -81,13 +73,6 @@ export interface ProximitySensorPayloadJson extends Record<string, Json | undefi
   barometric_precision_m?: number;
   barometric_relative_altitude_m?: number;
   barometric_pressure_kpa?: number;
-  gps_speed_mps?: number;
-  gps_speed_accuracy_mps?: number;
-  gps_course_deg?: number;
-  gps_course_accuracy_deg?: number;
-  gps_simulated?: boolean;
-  gps_external_accessory?: boolean;
-  sensor_observation?: { [key: string]: Json | undefined };
 }
 
 export interface PendingHandshakeRow {
