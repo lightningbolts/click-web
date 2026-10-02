@@ -55,6 +55,9 @@ export default async function AdminRouteLayout({
             <Link href="/admin#system-health" className="block rounded-lg px-3 py-2 text-on-surface hover:bg-zinc-800">
               System Health
             </Link>
+            <Link href="/admin/places" className="block rounded-lg px-3 py-2 text-on-surface hover:bg-zinc-800">
+              Click Places
+            </Link>
           </nav>
 
           <div className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 text-xs text-zinc-300">

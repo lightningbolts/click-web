@@ -17,6 +17,7 @@ import {
   CalendarDays,
   Sparkles,
   LayoutGrid,
+  Store,
 } from "lucide-react";
 import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
 import VenueBroadcastingModule from "@/components/insights/VenueBroadcastingModule";
@@ -25,6 +26,7 @@ import { displayNameFromUserMetadata } from "@/lib/userDisplayName";
 
 const NAV_ITEMS = [
   { id: "overview", href: "/insights", label: "Overview", icon: LayoutDashboard, exact: true },
+  { id: "place", href: "/insights/place", label: "Place", icon: Store, exact: false },
   {
     id: "social-activity",
     href: "/insights/social-activity",
@@ -135,7 +137,10 @@ export default function BusinessInsightsShell({
       }))}
       title="Click Insights"
       subtitle={`${venueName} · ${isLive ? "Live" : "Offline"} dashboard`}
-      extraNav={[{ href: "/", label: "Dashboard", icon: LayoutGrid }]}
+      extraNav={[
+        { href: "/business/places", label: "Manage Place", icon: Store },
+        { href: "/", label: "Dashboard", icon: LayoutGrid },
+      ]}
       userLabel={userLabel}
       userAvatarUrl={profileImageUrl}
       onSignOut={handleSignOut}
