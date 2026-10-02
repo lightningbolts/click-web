@@ -15,6 +15,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  *   GET /api/cron/availability-matches
  *   GET /api/cron/pending-handshakes-cleanup
  *   GET /api/cron/nudges-reconnect
+ *   GET /api/cron/places (Click Places rollup + retention; isolated, never fails this run)
  *
  * Auth: Authorization: Bearer $CRON_SECRET
  */
@@ -36,6 +37,10 @@ export async function GET(request: NextRequest) {
     fetch(`${origin}/api/cron/nudges-reconnect`, { headers, cache: 'no-store' }),
   ]);
 
+  // Isolated like the edge function: a Places failure must not fail the other jobs.
+  const places = await fetch(`${origin}/api/cron/places`, { headers, cache: 'no-store' })
+    .then((res) => res.json().catch(() => ({ error: 'invalid json', status: res.status })))
+    .catch((e) => ({ error: String(e) }));
   const disposable = await disposableRes.json().catch(() => ({ error: 'invalid json' }));
   const friction = await frictionRes.json().catch(() => ({ error: 'invalid json' }));
   const events = await eventRes.json().catch(() => ({ error: 'invalid json' }));
@@ -73,5 +78,6 @@ export async function GET(request: NextRequest) {
     availability,
     pendingHandshakes,
     nudges,
+    places,
   });
 }
