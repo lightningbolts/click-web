@@ -1,0 +1,512 @@
+{
+  "places": [
+    {
+      "id": "cafe-live-lively",
+      "slug": "cafe-live-lively",
+      "name": "cafe live lively",
+      "category": "cafe",
+      "photo_url": null,
+      "latitude": 47.6588,
+      "longitude": -122.3131,
+      "radius_meters": 75,
+      "distance_meters": 100,
+      "address_line": null,
+      "city": "Seattle",
+      "open_now": true,
+      "pulse": {
+        "state": "live",
+        "label": "lively",
+        "energy_score": 3,
+        "report_count": 1,
+        "newest_at": "2026-10-01T19:00:00.000Z",
+        "confidence": "low",
+        "distribution": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "talkable": {
+          "yes": 0,
+          "no": 0
+        },
+        "category": null,
+        "window_minutes": 90
+      },
+      "here_now_count": 1,
+      "events_today_count": 0,
+      "next_event": null,
+      "hub_id": null,
+      "viewer": {
+        "checked_in": false,
+        "has_history": true,
+        "connections_been_here_count": 0
+      }
+    },
+    {
+      "id": "bar-live-packed",
+      "slug": "bar-live-packed",
+      "name": "bar live packed",
+      "category": "bar",
+      "photo_url": null,
+      "latitude": 47.6588,
+      "longitude": -122.3131,
+      "radius_meters": 75,
+      "distance_meters": 100,
+      "address_line": null,
+      "city": "Seattle",
+      "open_now": false,
+      "pulse": {
+        "state": "live",
+        "label": "packed",
+        "energy_score": 3.8,
+        "report_count": 6,
+        "newest_at": "2026-10-01T19:00:00.000Z",
+        "confidence": "medium",
+        "distribution": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "talkable": {
+          "yes": 0,
+          "no": 0
+        },
+        "category": null,
+        "window_minutes": 90
+      },
+      "here_now_count": 0,
+      "events_today_count": 1,
+      "next_event": {
+        "beacon_id": "e1",
+        "title": "Trivia",
+        "starts_at": "2026-10-02T03:00:00.000Z",
+        "ends_at": "2026-10-02T05:00:00.000Z",
+        "is_live": false
+      },
+      "hub_id": "place-bar",
+      "viewer": {
+        "checked_in": false,
+        "has_history": false,
+        "connections_been_here_count": 2
+      }
+    },
+    {
+      "id": "gym-stale",
+      "slug": "gym-stale",
+      "name": "gym stale",
+      "category": "gym",
+      "photo_url": null,
+      "latitude": 47.6588,
+      "longitude": -122.3131,
+      "radius_meters": 75,
+      "distance_meters": 100,
+      "address_line": null,
+      "city": "Seattle",
+      "open_now": true,
+      "pulse": {
+        "state": "stale",
+        "label": "chill",
+        "energy_score": null,
+        "report_count": 0,
+        "newest_at": "2026-10-01T19:00:00.000Z",
+        "confidence": null,
+        "distribution": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "talkable": {
+          "yes": 0,
+          "no": 0
+        },
+        "category": null,
+        "window_minutes": 90
+      },
+      "here_now_count": 0,
+      "events_today_count": 0,
+      "next_event": null,
+      "hub_id": null,
+      "viewer": {
+        "checked_in": false,
+        "has_history": false,
+        "connections_been_here_count": 0
+      }
+    },
+    {
+      "id": "study-none",
+      "slug": "study-none",
+      "name": "study none",
+      "category": "study_space",
+      "photo_url": null,
+      "latitude": 47.6588,
+      "longitude": -122.3131,
+      "radius_meters": 75,
+      "distance_meters": 100,
+      "address_line": null,
+      "city": "Seattle",
+      "open_now": null,
+      "pulse": {
+        "state": "none",
+        "label": null,
+        "energy_score": null,
+        "report_count": 0,
+        "newest_at": null,
+        "confidence": null,
+        "distribution": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "talkable": {
+          "yes": 0,
+          "no": 0
+        },
+        "category": null,
+        "window_minutes": 90
+      },
+      "here_now_count": 3,
+      "events_today_count": 0,
+      "next_event": {
+        "beacon_id": "e2",
+        "title": "Study jam",
+        "starts_at": "2026-10-01T18:00:00.000Z",
+        "ends_at": "2026-10-01T21:00:00.000Z",
+        "is_live": true
+      },
+      "hub_id": null,
+      "viewer": null
+    },
+    {
+      "id": "cafe-live-chill",
+      "slug": "cafe-live-chill",
+      "name": "cafe live chill",
+      "category": "cafe",
+      "photo_url": null,
+      "latitude": 47.6588,
+      "longitude": -122.3131,
+      "radius_meters": 75,
+      "distance_meters": 100,
+      "address_line": null,
+      "city": "Seattle",
+      "open_now": true,
+      "pulse": {
+        "state": "live",
+        "label": "chill",
+        "energy_score": 1.2,
+        "report_count": 10,
+        "newest_at": "2026-10-01T19:00:00.000Z",
+        "confidence": "high",
+        "distribution": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "talkable": {
+          "yes": 0,
+          "no": 0
+        },
+        "category": null,
+        "window_minutes": 90
+      },
+      "here_now_count": 0,
+      "events_today_count": 0,
+      "next_event": null,
+      "hub_id": "place-cafe2",
+      "viewer": {
+        "checked_in": true,
+        "has_history": true,
+        "connections_been_here_count": 1
+      }
+    }
+  ],
+  "cases": [
+    {
+      "name": "no filters shows every Place in input order",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-lively",
+        "bar-live-packed",
+        "gym-stale",
+        "study-none",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "category OR",
+      "filters": {
+        "categories": [
+          "bar",
+          "gym"
+        ],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "bar-live-packed",
+        "gym-stale"
+      ]
+    },
+    {
+      "name": "pulse now excludes stale and none",
+      "filters": {
+        "categories": [],
+        "pulseNow": true,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-lively",
+        "bar-live-packed",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "min reports counts only live Pulses",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 5,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "bar-live-packed",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "energies OR, live only",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [
+          "lively",
+          "packed"
+        ],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-lively",
+        "bar-live-packed"
+      ]
+    },
+    {
+      "name": "quiet energies ignore a stale chill",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [
+          "chill",
+          "steady"
+        ],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "events today includes a live next event",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": true,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "bar-live-packed",
+        "study-none"
+      ]
+    },
+    {
+      "name": "open now excludes unknown hours",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": true,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-lively",
+        "gym-stale",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "been here needs viewer history",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": true,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-lively",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "clicks been here",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": true,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "bar-live-packed",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "has hub",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": true,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "bar-live-packed",
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "here now",
+      "filters": {
+        "categories": [],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": true
+      },
+      "expected_ids": [
+        "cafe-live-lively",
+        "study-none"
+      ]
+    },
+    {
+      "name": "AND across fields",
+      "filters": {
+        "categories": [
+          "cafe"
+        ],
+        "pulseNow": false,
+        "minReports": 2,
+        "energies": [],
+        "eventsToday": false,
+        "openNow": true,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-chill"
+      ]
+    },
+    {
+      "name": "a single report still matches (no thresholds)",
+      "filters": {
+        "categories": [
+          "cafe"
+        ],
+        "pulseNow": false,
+        "minReports": 0,
+        "energies": [
+          "lively"
+        ],
+        "eventsToday": false,
+        "openNow": false,
+        "beenHere": false,
+        "clicksBeenHere": false,
+        "hasHub": false,
+        "hereNow": false
+      },
+      "expected_ids": [
+        "cafe-live-lively"
+      ]
+    }
+  ]
+}
