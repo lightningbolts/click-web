@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 import { insertHub } from '@/lib/server/hubCreate';
+import { placeHubConflict } from '@/lib/server/places/placeHub';
 import { parseBody } from '@/lib/api/parseBody';
 import { hubCreateBodySchema } from '@/lib/api/schemas/beacons';
 
@@ -62,6 +63,15 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createChatGatekeeperAdmin();
+
+  // Inside a listed Place with its own hub: use the Place Hub instead of a duplicate.
+  const conflict = await placeHubConflict(admin, location.lat, location.lng);
+  if (conflict) {
+    return NextResponse.json(
+      { error: 'This Place already has a hub', code: 'place_hub_exists', ...conflict },
+      { status: 409 },
+    );
+  }
 
   const created = await insertHub(admin, {
     name,

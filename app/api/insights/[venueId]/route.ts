@@ -3,6 +3,8 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
 import { parseMicroCommunitiesRpc } from '@/lib/insights/microCommunities';
 import { buildInsightsVenueAugmentation } from '@/lib/server/insightsVenueAugmentation';
+import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
+import { countConnectionsViaPlaceEncounters } from '@/lib/server/places/placeRefs';
 
 /**
  * Insights API — returns anonymized, aggregated analytics for a venue.
@@ -140,6 +142,15 @@ export async function GET(
             rows,
         );
 
+        // Click Places: handshakes attributed to this Place through encounters (count only; the
+        // manager is already verified above, so the service role reads across members' encounters).
+        let connectionsViaPlaceEncounters: number | null = null;
+        try {
+            connectionsViaPlaceEncounters = await countConnectionsViaPlaceEncounters(createAdminSupabaseClient(), venueId);
+        } catch (e) {
+            console.warn('insights connections_via_place_encounters:', e instanceof Error ? e.message : e);
+        }
+
         return NextResponse.json({
             venueName,
             venueLatitude: typeof venueRow.latitude === 'number' ? venueRow.latitude : null,
@@ -160,6 +171,7 @@ export async function GET(
             stickyScore: augmentation.stickyScore,
             connectionEncounterCoordinates: augmentation.connectionEncounterCoordinates,
             verifiedConnectionNodes: augmentation.verifiedConnectionNodes,
+            connections_via_place_encounters: connectionsViaPlaceEncounters,
             status: 'success',
         });
     } catch (error) {
