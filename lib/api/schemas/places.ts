@@ -69,7 +69,8 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable().opti
 
 /**
  * `PATCH /api/places/[placeId]` (managers). Only these fields; name, slug, category,
- * coordinates, radius, verification and listing are admin-only in v1 (strict → 400 otherwise).
+ * coordinates, radius and verification are admin-only (strict → 400 otherwise). Owners may list
+ * or unlist a Place once Click has verified it.
  */
 export const placeManagerPatchBodySchema = z
   .object({
@@ -77,6 +78,7 @@ export const placeManagerPatchBodySchema = z
     hours: z.unknown().optional(),
     website_url: optionalText(500),
     hub_enabled: z.boolean().optional(),
+    listed: z.boolean().optional(),
     address_line: optionalText(200),
     city: optionalText(100),
     region: optionalText(100),
@@ -84,3 +86,19 @@ export const placeManagerPatchBodySchema = z
   })
   .strict();
 export type PlaceManagerPatchBody = z.infer<typeof placeManagerPatchBodySchema>;
+
+/** `POST /api/places` — a business submits its own Place for review (self-serve setup). */
+export const placeCreateBodySchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  category: z.string(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  radius_meters: z.number().int().min(25).max(750).optional(),
+  timezone: z.string().max(64),
+  address_line: z.string().trim().max(200).optional(),
+  city: z.string().trim().min(1).max(100),
+  region: z.string().trim().max(100).optional(),
+  postal_code: z.string().trim().max(20).optional(),
+  country_code: z.string().trim().length(2).optional(),
+  website_url: z.string().trim().url().max(500).startsWith('https://').optional(),
+});

@@ -48,8 +48,8 @@ export async function GET(request: NextRequest): Promise<Response> {
 }
 
 /**
- * POST /api/me/shared-drops — share one drop with all or core connections; it develops 24 hours
- * later. 409 `cap_reached` past the daily cap; the same `client_drop_id` returns the same drop.
+ * POST /api/me/shared-drops — share one drop with all or core connections; it develops an hour
+ * later (`develop_hours`), like a story. 409 `cap_reached` past the daily cap; the same `client_drop_id` returns the same drop.
  */
 export async function POST(request: NextRequest): Promise<Response> {
   try {

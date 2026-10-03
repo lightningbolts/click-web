@@ -15,6 +15,8 @@ export type PlaceCategory =
   | 'entertainment'
   | 'bookstore'
   | 'campus_space'
+  | 'event_space'
+  | 'office'
   | 'other';
 
 export type EnergyLabel = 'chill' | 'steady' | 'lively' | 'packed';

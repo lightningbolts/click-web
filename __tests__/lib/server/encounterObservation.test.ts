@@ -141,11 +141,13 @@ describe('parseSensorObservation', () => {
     bluetooth: { peers: [{ token: '1234', rssi_samples_dbm: [-57, -59, -58] }] },
   };
 
-  it('round-trips a versioned observation', () => {
+  const received = { ...observation, server_received_at: new Date(NOW).toISOString() };
+
+  it('round-trips a versioned observation, stamped with the server receipt time', () => {
     expect(parseSensorObservation(observation)).toEqual(observation);
-    expect(parseEncounterObservation({ sensor_observation: observation }, NOW)).toEqual({
-      sensor_observation: observation,
-    });
+    expect(parseEncounterObservation({ sensor_observation: observation }, NOW)).toEqual({ sensor_observation: received });
+    // An already-stamped (stored) payload keeps its original receipt time.
+    expect(parseEncounterObservation({ sensor_observation: received }, NOW + 60_000)).toEqual({ sensor_observation: received });
   });
 
   it('rejects unversioned, non-object and oversized observations', () => {
@@ -163,6 +165,6 @@ describe('parseSensorObservation', () => {
         hasOwnCoordinate: false,
         hasBarometricAltitude: false,
       }),
-    ).toEqual({ sensor_observation: observation });
+    ).toEqual({ sensor_observation: received });
   });
 });

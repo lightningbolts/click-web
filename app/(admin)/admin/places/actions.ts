@@ -5,15 +5,15 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { isPlaceCategory } from '@/lib/places/categories';
-import { slugCandidates, slugifyPlaceName } from '@/lib/places/slug';
 import type { PlaceManagerRole } from '@/lib/places/types';
 import { isAdminUser } from '@/lib/server/adminRole';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { PLACE_COLUMNS, type PlaceRow } from '@/lib/server/places/loadPlace';
+import { createPlace, ensureCheckInAnchor, isValidTimezone } from '@/lib/server/places/create';
 import { ensurePlaceHub } from '@/lib/server/places/placeHub';
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
 
-/** Admin-only Click Places management (§5.10). v1 Places are created and verified by Click admins. */
+/** Admin-only Click Places management (§5.10). Admins create verified Places and review the ones businesses submit. */
 
 type ActionType = 'notice' | 'error';
 
@@ -49,15 +49,6 @@ function numberField(formData: FormData, key: string): number | null {
   if (!raw) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : Number.NaN;
-}
-
-function validTimezone(tz: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function httpsUrl(raw: string | null): string | null | false {
@@ -99,45 +90,30 @@ export async function createPlaceAction(formData: FormData): Promise<void> {
     redirectWithStatus('error', 'Latitude and longitude are required.');
   }
   if (!Number.isFinite(radius) || radius < 25 || radius > 750) redirectWithStatus('error', 'Radius must be 25–750 m.');
-  if (!validTimezone(timezone)) redirectWithStatus('error', 'Unknown timezone.');
+  if (!isValidTimezone(timezone)) redirectWithStatus('error', 'Unknown timezone.');
   if (website === false) redirectWithStatus('error', 'Website must be an https:// link.');
 
-  const admin = createAdminSupabaseClient();
-  const base = slugifyPlaceName(name, city);
-  if (base.length < 3) redirectWithStatus('error', 'Name is too short to make a link.');
-  const candidates = slugCandidates(base.slice(0, 76));
-  const { data: taken } = await admin.from('places').select('slug').in('slug', candidates);
-  const takenSet = new Set(((taken ?? []) as Array<{ slug: string }>).map((r) => r.slug));
-  const slug = candidates.find((c) => !takenSet.has(c));
-  if (!slug) redirectWithStatus('error', 'Too many Places share this name and city. Edit the name.');
-
-  const now = new Date().toISOString();
-  const { data, error } = await admin
-    .from('places')
-    .insert({
+  const result = await createPlace(
+    createAdminSupabaseClient(),
+    {
       name,
-      slug,
       category,
-      latitude,
-      longitude,
-      radius_meters: Math.round(radius),
+      latitude: latitude!,
+      longitude: longitude!,
+      radiusMeters: radius,
       timezone,
-      address_line: optionalText(formData, 'address_line', 200),
+      addressLine: optionalText(formData, 'address_line', 200),
       city,
       region: optionalText(formData, 'region', 100),
-      postal_code: optionalText(formData, 'postal_code', 20),
-      country_code: optionalText(formData, 'country_code', 2)?.toUpperCase() ?? null,
-      website_url: website,
-      verification_status: 'verified',
-      verified_at: now,
-      verified_by: adminId,
-      listed: false,
-      subscription_status: 'inactive',
-    })
-    .select('id')
-    .single();
-  if (error || !data) redirectWithStatus('error', `Create failed: ${error?.message ?? 'unknown error'}`);
-  done(`Created ${name} (${slug}). It is verified but not listed yet.`, (data as { id: string }).id);
+      postalCode: optionalText(formData, 'postal_code', 20),
+      countryCode: optionalText(formData, 'country_code', 2),
+      websiteUrl: website,
+    },
+    { verifiedBy: adminId },
+  );
+  if ('error' in result) redirectWithStatus('error', `Create failed: ${result.error}`);
+  await ensureCheckInAnchor(createAdminSupabaseClient(), result.id);
+  done(`Created ${name} (${result.slug}). It is verified but not listed yet.`, result.id);
 }
 
 export async function updatePlaceAction(formData: FormData): Promise<void> {
@@ -163,7 +139,7 @@ export async function updatePlaceAction(formData: FormData): Promise<void> {
   }
   const timezone = text(formData, 'timezone');
   if (timezone) {
-    if (!validTimezone(timezone)) redirectWithStatus('error', 'Unknown timezone.', place.id);
+    if (!isValidTimezone(timezone)) redirectWithStatus('error', 'Unknown timezone.', place.id);
     patch.timezone = timezone;
   }
   for (const [key, max] of [['address_line', 200], ['city', 100], ['region', 100], ['postal_code', 20], ['description', 500]] as const) {
@@ -230,6 +206,7 @@ export async function setVerificationAction(formData: FormData): Promise<void> {
   const admin = createAdminSupabaseClient();
   const { error } = await admin.from('places').update(patch).eq('id', place.id);
   if (error) redirectWithStatus('error', `Update failed: ${error.message}`, place.id);
+  if (status === 'verified') await ensureCheckInAnchor(admin, place.id);
   done(status === 'verified' ? `${place.name} verified.` : `${place.name} suspended and unlisted.`, place.id);
 }
 

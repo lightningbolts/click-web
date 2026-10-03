@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { FcButton, FcCard, FcChip, FcField, FcInput, FcPageShell, FcTextarea } from "@/components/fc";
+import PlaceHoursEditor from "@/components/places/PlaceHoursEditor";
 import PlaceStatsView from "@/components/places/PlaceStatsView";
 import { useAuth } from "@/lib/AuthContext";
 import { categoryLabel } from "@/lib/places/categories";
 import { placeApi, placeStatusLabel, type ManagerPlace } from "@/lib/places/managerClient";
+import type { PlaceHours } from "@/lib/places/types";
 import type { PlaceStats } from "@/lib/server/places/stats";
 
 type Tab = "profile" | "stats" | "poster";
@@ -38,10 +40,105 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/** What's left before the Place is live, in the order a business does it. */
+function SetupChecklist({ place, onSaved, onOpenPoster }: { place: ManagerPlace; onSaved: (p: ManagerPlace) => void; onOpenPoster: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const verified = place.verification_status === "verified";
+  const steps: Array<{ done: boolean; title: string; detail: string; action?: React.ReactNode }> = [
+    {
+      done: verified,
+      title: verified ? "Verified by Click" : "Click is reviewing your Place",
+      detail: verified
+        ? "Your Place is confirmed as a real, physical business."
+        : "We check every Place before it goes on the map, usually within one business day. You can finish your profile meanwhile.",
+    },
+    { done: Boolean(place.photo_url), title: "Add a cover photo", detail: "It's the first thing people see on your Place page." },
+    { done: Boolean(place.description), title: "Describe your Place", detail: "A line or two about what it's like to be there." },
+    { done: Boolean(place.hours && Object.keys(place.hours).length > 0), title: "Set your hours", detail: "So people know when to come by." },
+    {
+      done: false,
+      title: "Print your check-in QR poster",
+      detail: verified ? "Put it by the counter or door. Guests scan it to check in." : "Your poster is ready as soon as Click verifies your Place.",
+      action: verified ? (
+        <button type="button" onClick={onOpenPoster} className="text-sm font-semibold text-primary hover:underline">
+          Open poster
+        </button>
+      ) : undefined,
+    },
+    {
+      done: place.listed,
+      title: place.listed ? "Live on the Click map" : "Go live on the Click map",
+      detail: place.listed
+        ? "People nearby can find your Place, check in, see events you host and join your Place Hub."
+        : "Show your pin, Place page, events and Pulse to people nearby.",
+      action:
+        place.role === "owner" && verified ? (
+          <FcButton
+            type="button"
+            variant={place.listed ? "secondary" : "primary"}
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const { place: updated } = await placeApi<{ place: ManagerPlace }>(`/api/places/${place.id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ listed: !place.listed }),
+                });
+                onSaved(updated);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {place.listed ? "Take off the map" : "Go live"}
+          </FcButton>
+        ) : undefined,
+    },
+  ];
+  const remaining = steps.filter((step) => !step.done).length;
+  return (
+    <FcCard className="space-y-4 p-6">
+      <div>
+        <p className="text-lg font-bold text-on-surface">{place.listed ? "Your Place is live" : "Get your Place ready"}</p>
+        <p className="text-sm text-on-surface-variant">
+          {place.listed ? "Keep your profile fresh; people see changes right away." : `${remaining} step${remaining === 1 ? "" : "s"} left.`}
+        </p>
+      </div>
+      <ol className="space-y-3">
+        {steps.map((step) => (
+          <li key={step.title} className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+                step.done ? "border-primary bg-primary text-on-primary" : "border-border-hard text-on-surface-variant"
+              }`}
+            >
+              {step.done ? "✓" : ""}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-on-surface">
+                {step.title}
+                <span className="sr-only">{step.done ? " (done)" : " (to do)"}</span>
+              </p>
+              <p className="text-sm text-on-surface-variant">{step.detail}</p>
+            </div>
+            {step.action ?? null}
+          </li>
+        ))}
+      </ol>
+      {error ? <p className="text-sm font-semibold text-red-600" role="alert">{error}</p> : null}
+    </FcCard>
+  );
+}
+
 function ProfileTab({ place, onSaved }: { place: ManagerPlace; onSaved: (p: ManagerPlace) => void }) {
   const canEdit = place.role !== "viewer";
   const [description, setDescription] = useState(place.description ?? "");
-  const [hours, setHours] = useState(place.hours ? JSON.stringify(place.hours) : "");
+  const [hours, setHours] = useState<PlaceHours>(place.hours ?? {});
   const [website, setWebsite] = useState(place.website_url ?? "");
   const [addressLine, setAddressLine] = useState(place.address_line ?? "");
   const [city, setCity] = useState(place.city ?? "");
@@ -67,18 +164,9 @@ function ProfileTab({ place, onSaved }: { place: ManagerPlace; onSaved: (p: Mana
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    let parsedHours: unknown = null;
-    if (hours.trim()) {
-      try {
-        parsedHours = JSON.parse(hours);
-      } catch {
-        setStatus('Hours must be JSON like {"mon":[["07:00","15:00"]]}.');
-        return;
-      }
-    }
     void save({
       description: description.trim() || null,
-      hours: parsedHours,
+      hours: Object.keys(hours).length > 0 ? hours : null,
       website_url: website.trim() || null,
       address_line: addressLine.trim() || null,
       city: city.trim() || null,
@@ -90,11 +178,12 @@ function ProfileTab({ place, onSaved }: { place: ManagerPlace; onSaved: (p: Mana
     setBusy(true);
     setStatus(null);
     try {
-      await placeApi(`/api/places/${place.id}/photo`, {
+      const { photo_url } = await placeApi<{ photo_url: string | null }>(`/api/places/${place.id}/photo`, {
         method: "POST",
         body: JSON.stringify({ file_b64: await fileToBase64(file), mime_type: file.type }),
       });
       setStatus("Photo updated.");
+      onSaved({ ...place, photo_url });
     } catch (e) {
       setStatus((e as Error).message);
     } finally {
@@ -109,8 +198,8 @@ function ProfileTab({ place, onSaved }: { place: ManagerPlace; onSaved: (p: Mana
           <FcField label="Description (500 characters)">
             <FcTextarea maxLength={500} rows={4} value={description} disabled={!canEdit} onChange={(e) => setDescription(e.target.value)} />
           </FcField>
-          <FcField label='Hours (JSON, e.g. {"mon":[["07:00","15:00"]]})'>
-            <FcTextarea rows={3} value={hours} disabled={!canEdit} onChange={(e) => setHours(e.target.value)} />
+          <FcField label="Hours">
+            <PlaceHoursEditor value={hours} onChange={setHours} disabled={!canEdit} />
           </FcField>
           <FcField label="Website (https://)">
             <FcInput type="url" value={website} disabled={!canEdit} onChange={(e) => setWebsite(e.target.value)} />
@@ -196,7 +285,7 @@ function PosterTab({ place }: { place: ManagerPlace }) {
   if (error) return <p className="text-sm font-semibold text-red-600">{error}</p>;
   if (!anchors) return <p className="text-sm text-on-surface-variant">Loading…</p>;
   if (anchors.length === 0) {
-    return <p className="text-sm text-on-surface-variant">No check-in code yet. Click creates one when your Place is set up.</p>;
+    return <p className="text-sm text-on-surface-variant">Your check-in poster appears here as soon as Click verifies your Place.</p>;
   }
   return (
     <div className="space-y-4">
@@ -278,7 +367,12 @@ export default function BusinessPlacePage({ params }: { params: Promise<{ id: st
                 </button>
               ))}
             </div>
-            {tab === "profile" ? <ProfileTab place={place} onSaved={setPlace} /> : null}
+            {tab === "profile" ? (
+              <div className="space-y-6">
+                <SetupChecklist place={place} onSaved={setPlace} onOpenPoster={() => setTab("poster")} />
+                <ProfileTab place={place} onSaved={setPlace} />
+              </div>
+            ) : null}
             {tab === "stats" ? <StatsTab placeId={place.id} /> : null}
             {tab === "poster" ? <PosterTab place={place} /> : null}
           </>

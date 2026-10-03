@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FcCard, FcChip, FcPageShell, FcSectionHeader } from "@/components/fc";
+import { FcButton, FcCard, FcChip, FcPageShell, FcSectionHeader } from "@/components/fc";
 import { useAuth } from "@/lib/AuthContext";
 import { APP_CONFIG } from "@/lib/config";
 import { categoryLabel } from "@/lib/places/categories";
@@ -34,18 +34,33 @@ export default function BusinessPlacesPage() {
         {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
         {places == null && !error ? <p className="text-sm text-on-surface-variant">Loading…</p> : null}
         {places && places.length === 0 ? (
-          <FcCard className="p-6">
-            <p className="text-sm text-on-surface">
-              You don&apos;t manage a Place yet. Click Places is invite-only during the pilot.{" "}
+          <FcCard className="space-y-4 p-6">
+            <p className="text-lg font-bold text-on-surface">Put your business on Click</p>
+            <p className="text-sm text-on-surface-variant">
+              Restaurants, cafés, bars, event spaces, gyms, offices and campus spaces get a pin on the Click map, a Place page, check-ins,
+              a live Pulse, a Place Hub chat and a home for the events they host. Setup takes about two minutes.
+            </p>
+            <Link href="/business/places/new" className="inline-block">
+              <FcButton>Set up your Place</FcButton>
+            </Link>
+            <p className="text-xs text-on-surface-variant">
+              Questions?{" "}
               <a
                 className="font-semibold text-primary hover:underline"
-                href={`mailto:${APP_CONFIG.business_contact_email}?subject=${encodeURIComponent("Click Places pilot")}`}
+                href={`mailto:${APP_CONFIG.business_contact_email}?subject=${encodeURIComponent("Click Places")}`}
               >
                 Contact us
               </a>
               .
             </p>
           </FcCard>
+        ) : null}
+        {places && places.length > 0 ? (
+          <div className="mb-4 flex justify-end">
+            <Link href="/business/places/new">
+              <FcButton variant="secondary">+ Add a Place</FcButton>
+            </Link>
+          </div>
         ) : null}
         {places && places.length > 0 ? (
           <ul className="grid gap-4 sm:grid-cols-2">

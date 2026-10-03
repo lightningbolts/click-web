@@ -217,6 +217,11 @@ export function parseEncounterObservation(
   nowMs: number = Date.now(),
 ): EncounterObservationColumns {
   const sensorObservation = parseSensorObservation(source.sensor_observation);
+  // The server's receipt time beside the phone's `clock.sent_at` measures that phone's clock skew,
+  // so both sides of an encounter can be aligned. Kept if already stamped (a stored payload).
+  if (sensorObservation != null && sensorObservation.server_received_at === undefined) {
+    sensorObservation.server_received_at = new Date(nowMs).toISOString();
+  }
   return {
     ...parseLocationObservation(source, nowMs),
     ...parseBarometricObservation(source),

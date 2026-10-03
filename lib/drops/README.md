@@ -49,7 +49,7 @@ cohort; events with drops skip the older end-of-event recap push so nobody gets 
 
 ## Shared drops (F3, flag `shared_drops`)
 
-One drop to all your connections or only core ones, developing `develop_hours` (24) after posting.
+One drop to all your connections or only core ones, developing `develop_hours` (1, like a story) after posting.
 Multi-recipient, so **not end-to-end encrypted** like chat drops: media sits in `click-drops`
 (`shared/{user}/…`) behind server access checks, originals signed only after reveal. The audience
 is resolved on every read (`lib/drops/sharedAudience.ts`): both people must have each other as an
@@ -59,7 +59,7 @@ the poster's core mark — so archiving, un-coring or blocking applies immediate
 
 | Route | Role |
 |-------|------|
-| `GET /api/me/shared-drops` | The bounded Home strip (`strip_days`, `strip_limit`): yours and your connections', newest first, with your `developed_at`. Pending ones show as pixelated teasers when `teaser` is `pixelated` |
+| `GET /api/me/shared-drops` | The bounded Home strip (`strip_days`, `strip_limit`): yours and your connections', newest first, with your `developed_at`; drops you've developed also carry `original_url` (signed) and `reactions` (as `GET /api/reactions/shared_drop/{id}`), so the strip needs no follow-up calls. Pending ones show as pixelated teasers when `teaser` is `pixelated` |
 | `POST /api/me/shared-drops` | `{ client_drop_id, audience: all\|core, mime_type, original_b64, preview_b64, width?, height? }`; 409 `cap_reached` |
 | `DELETE /api/me/shared-drops/{id}` | Poster only, any time (not flag-gated) |
 

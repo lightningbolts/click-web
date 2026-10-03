@@ -3,12 +3,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveFeature } from '@/lib/server/featureFlags';
 import { loadVisibleBeacon } from '@/lib/map/beaconVisibility';
 import { resolveSharedDrops } from '@/lib/server/sharedDrops';
-import { loadViewerPeers } from '@/lib/server/connections/viewerPeers';
-import { displayNameFromUser, type UserProfileRow } from '@/lib/events/attendeeDirectory';
+import { loadReactionsBatch, type ReactionKind, type ReactionsPayload } from '@/lib/server/reactionLists';
 
 /** The small, fixed palette (tap once to react; tap again to take it back). */
 export const REACTION_EMOJI = ['❤️', '🔥', '😂', '😍', '👏', '😮'] as const;
-export type ReactionKind = 'soundtrack' | 'shared_drop';
+export { loadReactionsBatch, type ReactionKind, type ReactionsPayload };
 
 /**
  * The target, if this viewer may see its reactions: a live soundtrack they can see, or a shared
@@ -37,13 +36,6 @@ export async function resolveReactionTarget(
   return ownerId === viewerId || drop.revealAtMs <= Date.now() ? { ownerId } : null;
 }
 
-export type ReactionsPayload = {
-  mine: string | null;
-  /** Owner: everyone. Others: their connections (never strangers). Newest first. */
-  reactions: Array<{ user_id: string; name: string; avatar_url: string | null; emoji: string }>;
-  is_owner: boolean;
-};
-
 export async function loadReactions(
   admin: SupabaseClient,
   kind: ReactionKind,
@@ -51,31 +43,5 @@ export async function loadReactions(
   viewerId: string,
   ownerId: string,
 ): Promise<ReactionsPayload> {
-  const { data, error } = await admin
-    .from('reactions')
-    .select('user_id, emoji')
-    .eq('target_kind', kind)
-    .eq('target_id', id)
-    .order('created_at', { ascending: false })
-    .limit(500);
-  if (error) throw new Error(`reactions read: ${error.message}`);
-  const rows = (data ?? []) as Array<{ user_id: string; emoji: string }>;
-  const isOwner = ownerId === viewerId;
-  const others = rows.filter((r) => r.user_id !== viewerId);
-  const peers = isOwner || others.length === 0 ? null : new Set((await loadViewerPeers(admin, viewerId)).keys());
-  const shown = others.filter((r) => isOwner || peers?.has(r.user_id));
-  const { data: users } = shown.length
-    ? await admin.from('users').select('id, name, image, first_name, last_name').in('id', shown.map((r) => r.user_id))
-    : { data: [] };
-  const byId = new Map(((users ?? []) as UserProfileRow[]).map((u) => [u.id, u]));
-  return {
-    mine: rows.find((r) => r.user_id === viewerId)?.emoji ?? null,
-    is_owner: isOwner,
-    reactions: shown.map((r) => ({
-      user_id: r.user_id,
-      name: displayNameFromUser(byId.get(r.user_id) ?? null, 'Someone'),
-      avatar_url: byId.get(r.user_id)?.image ?? null,
-      emoji: r.emoji,
-    })),
-  };
+  return (await loadReactionsBatch(admin, kind, [{ id, ownerId }], viewerId)).get(id)!;
 }

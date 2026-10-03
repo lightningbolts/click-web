@@ -5,6 +5,7 @@ import { loadViewerPeers } from '@/lib/server/connections/viewerPeers';
 import { dropObjectPrefix, removeDropObjects, signDropObjects, uploadDropRenditions } from '@/lib/server/drops/storage';
 import type { ResolvedDrop } from '@/lib/server/drops/develop';
 import { displayNameFromUser, type UserProfileRow } from '@/lib/events/attendeeDirectory';
+import { loadReactionsBatch } from '@/lib/server/reactionLists';
 import {
   canSeeSharedDrop,
   selectStrip,
@@ -20,7 +21,7 @@ export type SharedDropsConfig = StripConfig & { dailyCap: number; developHours: 
 export function sharedDropsConfigFrom(config: Record<string, unknown>): SharedDropsConfig {
   return {
     dailyCap: configNumber(config, 'daily_cap', 3, { min: 1, max: 20 }),
-    developHours: configNumber(config, 'develop_hours', 24, { min: 1, max: 72 }),
+    developHours: configNumber(config, 'develop_hours', 1, { min: 1, max: 72 }),
     teaser: config.teaser === 'none' ? 'none' : 'pixelated',
     stripDays: configNumber(config, 'strip_days', 7, { min: 1, max: 30 }),
     stripLimit: configNumber(config, 'strip_limit', 12, { min: 1, max: 50 }),
@@ -131,13 +132,19 @@ export async function serializeSharedDrops(
   views: Map<string, { connectionId: string }>,
 ) {
   if (rows.length === 0) return [];
-  const [{ data: users }, previews, { data: developed }] = await Promise.all([
+  const [{ data: users }, { data: developed }] = await Promise.all([
     admin.from('users').select('id, name, image, first_name, last_name').in('id', [...new Set(rows.map((r) => r.user_id))]),
-    signDropObjects(admin, rows.map((r) => r.preview_path)),
     admin.from('drop_views').select('drop_id, developed_at').eq('viewer_id', viewerId).eq('drop_kind', 'shared').in('drop_id', rows.map((r) => r.id)),
   ]);
   const byId = new Map(((users ?? []) as UserProfileRow[]).map((u) => [u.id, u]));
   const developedAt = new Map(((developed ?? []) as Array<{ drop_id: string; developed_at: string }>).map((r) => [r.drop_id, r.developed_at]));
+  // Drops this viewer already developed ship their original and reactions inline, so the strip
+  // and viewer paint in one round trip (no develop call, no per-drop reactions request).
+  const opened = rows.filter((r) => developedAt.has(r.id));
+  const [signed, reactions] = await Promise.all([
+    signDropObjects(admin, [...rows.map((r) => r.preview_path), ...opened.map((r) => r.original_path)]),
+    loadReactionsBatch(admin, 'shared_drop', opened.map((r) => ({ id: r.id, ownerId: r.user_id })), viewerId),
+  ]);
   return rows.map((r) => {
     const mine = r.user_id === viewerId;
     const poster = byId.get(r.user_id) ?? null;
@@ -153,7 +160,9 @@ export async function serializeSharedDrops(
       developed_at: developedAt.get(r.id) ?? null,
       width: r.width,
       height: r.height,
-      preview_url: previews.get(r.preview_path) ?? null,
+      preview_url: signed.get(r.preview_path) ?? null,
+      original_url: developedAt.has(r.id) ? signed.get(r.original_path) ?? null : null,
+      reactions: reactions.get(r.id) ?? null,
       caption: visibleCaption(r, viewerId),
     };
   });

@@ -4,12 +4,13 @@ jest.mock('server-only', () => ({}));
 const mockPeers = jest.fn();
 jest.mock('@/lib/server/connections/viewerPeers', () => ({ loadViewerPeers: (...a: unknown[]) => mockPeers(...a) }));
 
-import { loadReactions } from '@/lib/server/reactions';
+import { loadReactions, loadReactionsBatch } from '@/lib/server/reactions';
 
 const rows = [
-  { user_id: 'friend', emoji: '🔥' },
-  { user_id: 'stranger', emoji: '😂' },
-  { user_id: 'me', emoji: '❤️' },
+  { target_id: 'd', user_id: 'friend', emoji: '🔥' },
+  { target_id: 'd', user_id: 'stranger', emoji: '😂' },
+  { target_id: 'd', user_id: 'me', emoji: '❤️' },
+  { target_id: 'e', user_id: 'friend', emoji: '😮' },
 ];
 const admin = {
   from: (table: string) => {
@@ -34,5 +35,13 @@ describe('loadReactions', () => {
     const out = await loadReactions(admin as never, 'shared_drop', 'd', 'poster', 'poster');
     expect(out.is_owner).toBe(true);
     expect(out.reactions.map((r) => r.user_id)).toEqual(['friend', 'stranger', 'me']);
+  });
+
+  it('loads several targets at once, each with only its own reactions', async () => {
+    const out = await loadReactionsBatch(admin as never, 'shared_drop', [{ id: 'd', ownerId: 'poster' }, { id: 'e', ownerId: 'me' }, { id: 'f', ownerId: 'poster' }], 'me');
+    expect(out.get('d')?.reactions.map((r) => r.user_id)).toEqual(['friend']);
+    expect(out.get('e')).toMatchObject({ is_owner: true, mine: null });
+    expect(out.get('e')?.reactions.map((r) => r.emoji)).toEqual(['😮']);
+    expect(out.get('f')).toEqual({ mine: null, is_owner: false, reactions: [] });
   });
 });
