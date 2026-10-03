@@ -1,14 +1,14 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
-import { publicOrigin } from '@/lib/events/eventUrls';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
 
 /**
  * Email-approved chat history for a user's newer E2EE v2 devices.
  *
  * Registering an additional device creates a pending `chat_device_history_requests` row and
- * emails the account a Supabase magic link that lands on `/devices/approve/<id>`. Approving from
- * that emailed session lets the user's older devices upload wrapped historical epoch keys
- * (enforced in `approve_chat_key_transfer`). Epoch keys never reach the server.
+ * pushes the account's devices, which approve it in the app (`lib/server/deviceApproval.ts`).
+ * If none does within a few minutes, the account is emailed a Supabase magic link that lands on
+ * `/devices/approve/<id>`. Once approved, the user's other devices upload wrapped historical
+ * epoch keys (enforced in `approve_chat_key_transfer`). Epoch keys never reach the server.
  */
 
 /** How recently the approving session must have been created from the emailed link. */
@@ -64,14 +64,17 @@ export const sendApprovalMagicLink: SendMagicLink = async (email, redirectTo) =>
 /**
  * Called when [device] registers for [user] (first time, or again for devices registered before
  * this feature). When the user has an older active device, records a pending history request and
- * emails the approval link once per device. The account's oldest device has no history to receive.
+ * tells the account's devices ([notify], a push) so one of them can approve it in the app. The
+ * emailed magic link is the fallback, sent later by `sendDeferredApprovalEmails` if no device
+ * decides. The account's oldest device has no history to receive.
  */
 export async function requestHistoryApprovalForNewDevice(
   admin: SupabaseClient,
-  user: Pick<User, 'id' | 'email'>,
-  device: { id: string; created_at: string },
-  send: SendMagicLink = sendApprovalMagicLink,
-): Promise<'requested' | 'first-device' | 'no-email' | 'exists'> {
+  user: Pick<User, 'id'>,
+  device: { id: string; created_at: string; device_label?: string | null },
+  notify: (requestId: string, label: string | null) => Promise<unknown>,
+  options: { reopen?: boolean } = {},
+): Promise<'requested' | 'first-device' | 'exists'> {
   const deviceRowId = device.id;
   // Only a device with an OLDER active sibling has history to receive.
   const { data: others, error: othersError } = await admin
@@ -85,22 +88,45 @@ export async function requestHistoryApprovalForNewDevice(
   if (othersError) throw new Error(`device lookup failed: ${othersError.message}`);
   if (!others || others.length === 0) return 'first-device';
 
-  const email = user.email?.trim();
-  if (!email) return 'no-email';
-
   const { data: request, error: insertError } = await admin
     .from('chat_device_history_requests')
-    .insert({ user_id: user.id, recipient_device_id: deviceRowId })
+    .insert({ user_id: user.id, recipient_device_id: deviceRowId, email_deferred: true })
     .select('id')
     .single();
   if (insertError) {
-    if (insertError.code === '23505') return 'exists';
-    throw new Error(`history request insert failed: ${insertError.message}`);
+    if (insertError.code !== '23505') throw new Error(`history request insert failed: ${insertError.message}`);
+    // One request per device: an expired one is asked again, a denied one only when the device
+    // explicitly asks again ([reopen]); a pending or approved one stands.
+    const { data: existing } = await admin
+      .from('chat_device_history_requests')
+      .select('id, status, expires_at')
+      .eq('recipient_device_id', deviceRowId)
+      .maybeSingle();
+    const row = existing as { id: string; status: string; expires_at: string } | null;
+    const expired = row?.status === 'pending' && Date.parse(row.expires_at) <= Date.now();
+    if (!row || !(expired || (row.status === 'denied' && options.reopen))) return 'exists';
+    const now = Date.now();
+    const { data: reopened } = await admin
+      .from('chat_device_history_requests')
+      .update({
+        status: 'pending',
+        created_at: new Date(now).toISOString(),
+        expires_at: new Date(now + 24 * 3_600_000).toISOString(),
+        decided_at: null,
+        decided_via: null,
+        decided_by_device_id: null,
+        email_deferred: true,
+        email_sent_at: null,
+      })
+      .eq('id', row.id)
+      .eq('status', row.status)
+      .select('id')
+      .maybeSingle();
+    if (!reopened) return 'exists';
+    await notify(row.id, device.device_label ?? null);
+    return 'requested';
   }
-
-  const redirectTo = `${publicOrigin()}${deviceApprovalPath(request.id as string)}`;
-  const { error: sendError } = await send(email, redirectTo);
-  if (sendError) throw new Error(`approval email failed: ${sendError.message}`);
+  await notify(request.id as string, device.device_label ?? null);
   return 'requested';
 }
 

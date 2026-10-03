@@ -9,6 +9,7 @@ import {
 } from '@/lib/server/chatGatekeeper';
 import { runAfterResponse } from '@/lib/server/afterResponse';
 import { requestHistoryApprovalForNewDevice } from '@/lib/server/deviceHistory';
+import { notifyDevicesOfNewSignIn } from '@/lib/server/deviceApproval';
 
 // Rollout-gated E2EE v2 device registry/discovery surface. Message writes and key transfer
 // remain out of this route until the v2 rollout gate is enabled.
@@ -77,7 +78,10 @@ const deviceRegistrationSchema = z.unknown().transform((value, context) => {
     context.addIssue({ code: 'custom', message: 'Invalid device registration' });
     return z.NEVER;
   }
-  return { device_id: deviceId, identity_public_key: publicKey };
+  // What kind of device this is ("iPhone"), shown when another device is asked to approve it.
+  const rawLabel = typeof body?.device_label === 'string' ? body.device_label.trim() : '';
+  const deviceLabel = rawLabel.length > 0 && rawLabel.length <= 64 ? rawLabel : null;
+  return { device_id: deviceId, identity_public_key: publicKey, device_label: deviceLabel };
 });
 
 function postProjection(row: DeviceRow) {
@@ -168,7 +172,7 @@ export async function POST(request: NextRequest) {
 
   const parsedBody = await parseBody(request, deviceRegistrationSchema);
   if (!parsedBody.ok) return parsedBody.response;
-  const { device_id: deviceId, identity_public_key: publicKey } = parsedBody.data;
+  const { device_id: deviceId, identity_public_key: publicKey, device_label: deviceLabel } = parsedBody.data;
 
   try {
     const admin = createChatGatekeeperAdmin();
@@ -182,34 +186,35 @@ export async function POST(request: NextRequest) {
         key_algorithm: 'X25519',
         crypto_version: 2,
         last_seen_at: lastSeenAt,
+        ...(deviceLabel ? { device_label: deviceLabel } : {}),
       })
       .select(POST_DEVICE_COLUMNS)
       .single();
 
     if (error || !data) {
       if (error?.code === '23505') {
-        // Devices registered before email-approved history existed never got the email: offer it
-        // now (one request per device; repeats are no-ops).
-        runAfterResponse('chat/devices history approval (existing)', async () => {
-          const { data: existing } = await admin
-            .from('chat_devices')
-            .select('id, created_at')
-            .eq('user_id', auth.user.id)
-            .eq('device_id', deviceId)
-            .is('revoked_at', null)
-            .maybeSingle();
-          if (existing) await requestHistoryApprovalForNewDevice(admin, auth.user, existing as { id: string; created_at: string });
-        });
+        // Registering again never asks for history (that would alert every multi-device account
+        // after an update): a device missing keys asks itself (POST /api/chat/devices/history-requests).
+        // Newer builds also record what kind of device this is.
+        if (deviceLabel) {
+          runAfterResponse('chat/devices label', async () => {
+            await admin.from('chat_devices').update({ device_label: deviceLabel })
+              .eq('user_id', auth.user.id).eq('device_id', deviceId).is('device_label', null);
+          });
+        }
         return NextResponse.json({ error: 'Device already registered' }, { status: 409 });
       }
       if (error) console.error('[chat/devices] registration failed:', error.message);
       return errorResponse();
     }
 
-    // An additional device on this account: email a magic link asking to share chat history.
+    // An additional device on this account: ask the account's devices to approve sharing history.
     const registered = data as DeviceRow;
     runAfterResponse('chat/devices history approval', () =>
-      requestHistoryApprovalForNewDevice(admin, auth.user, { id: registered.id, created_at: registered.created_at }),
+      requestHistoryApprovalForNewDevice(
+        admin, auth.user, { id: registered.id, created_at: registered.created_at, device_label: deviceLabel },
+        (requestId, label) => notifyDevicesOfNewSignIn(auth.user.id, requestId, label),
+      ),
     );
 
     return NextResponse.json({ device: postProjection(data as DeviceRow) });
