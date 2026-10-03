@@ -5,6 +5,8 @@ import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { parseBody } from '@/lib/api/parseBody';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
 import { isReactionEmoji, loadReactions, resolveReactionTarget, type ReactionKind } from '@/lib/server/reactions';
+import { recordReactionActivity } from '@/lib/server/activity';
+import { runAfterResponse } from '@/lib/server/afterResponse';
 
 type Params = { params: Promise<{ kind: string; id: string }> };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -50,6 +52,12 @@ export async function PUT(request: NextRequest, { params }: Params): Promise<Res
       ? await auth.admin.from('reactions').upsert({ ...key, emoji: parsed.data.emoji, created_at: new Date().toISOString() })
       : await auth.admin.from('reactions').delete().match(key);
     if (error) throw new Error(error.message);
+    const emoji = parsed.data.emoji;
+    if (emoji) {
+      runAfterResponse('reaction activity', () =>
+        recordReactionActivity(auth.admin, { kind: auth.kind, targetId: auth.id, ownerId: auth.ownerId, actorId: auth.userId, emoji }),
+      );
+    }
     return NextResponse.json(await loadReactions(auth.admin, auth.kind, auth.id, auth.userId, auth.ownerId));
   } catch (e) {
     console.error('PUT /api/reactions:', e);

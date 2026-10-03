@@ -10,6 +10,7 @@ import {
 import { parseBody } from "@/lib/api/parseBody";
 import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 import { maybeCreateSharedEventNudges } from "@/lib/events/sharedEventNudges";
+import { cronPushBearer, pushFunctionUrl } from "@/lib/server/cronAuth";
 
 /**
  * GET — whether the current user bookmarked this event.
@@ -108,12 +109,7 @@ export async function PUT(
         app_version: telemetry.app_version,
         minutes_before_start: mins,
       });
-      void maybeCreateSharedEventNudges(admin, user.id, beaconId, {
-        pushUrl: process.env.NEXT_PUBLIC_SUPABASE_URL
-          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
-          : null,
-        authBearer: process.env.CRON_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? null,
-      }).catch((err) => console.warn("shared-event nudge after bookmark:", err));
+      void maybeCreateSharedEventNudges(admin, user.id, beaconId, { pushUrl: pushFunctionUrl(), authBearer: cronPushBearer() }).catch((err) => console.warn("shared-event nudge after bookmark:", err));
     } else {
       const { error } = await admin
         .from("event_bookmarks")

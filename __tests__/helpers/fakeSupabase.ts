@@ -3,7 +3,7 @@
  * write the same table several times in one request (Click Places check-in, Pulse, stats).
  *
  * Supports the PostgREST subset those routes use: select (column projection, `count`/`head`),
- * insert/update/upsert/delete (with `.select()` returning rows), eq/neq/in/is/gt/gte/lt/lte/
+ * insert/update/upsert/delete (with `.select()` returning rows), eq/neq/or(eq)/in/is/gt/gte/lt/lte/
  * contains/not(col,'is',null), order, limit, single, maybeSingle; plus `rpc` handlers and
  * per-table unique constraints that raise 23505 like Postgres.
  */
@@ -161,6 +161,16 @@ class FakeQuery implements PromiseLike<Result> {
   }
   eq(col: string, value: unknown) {
     this.filters.push((r) => r[col] === value);
+    return this;
+  }
+  /** `or('a.eq.x,b.eq.y')`: eq clauses only. */
+  or(expression: string) {
+    const clauses = expression.split(',').map((c) => {
+      const [col, op, ...rest] = c.split('.');
+      if (op !== 'eq') throw new Error(`FakeDb or(): unsupported operator ${op}`);
+      return { col, value: rest.join('.') };
+    });
+    this.filters.push((r) => clauses.some(({ col, value }) => String(r[col]) === value));
     return this;
   }
   neq(col: string, value: unknown) {

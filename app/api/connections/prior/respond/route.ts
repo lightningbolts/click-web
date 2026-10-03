@@ -5,6 +5,10 @@ import { apiError } from '@/lib/api/errors';
 import { priorConnectionRespondBodySchema } from '@/lib/api/schemas/connections';
 import { createAdminClient, isJunctionTableOptionalError } from '@/lib/server/connectionWriteAuth';
 import { isPriorTarget } from '@/lib/connections/priorConnections';
+import { runAfterResponse } from '@/lib/server/afterResponse';
+import { cronPushBearer, pushFunctionUrl } from '@/lib/server/cronAuth';
+import { sendPush } from '@/lib/nudges/moments';
+import { displayNameFromUser, type UserProfileRow } from '@/lib/events/attendeeDirectory';
 
 /**
  * POST /api/connections/prior/respond
@@ -102,6 +106,23 @@ export async function POST(request: NextRequest) {
     if (chatErr) {
       console.warn('[prior/respond] chat:', chatErr.message);
     }
+  }
+
+  // The person who asked hears back (push + their activity inbox).
+  const initiatorId = typeof row.initiator_id === 'string' ? row.initiator_id.trim() : '';
+  const pushUrl = pushFunctionUrl();
+  const bearer = cronPushBearer();
+  if (initiatorId && initiatorId !== auth.user.id && pushUrl && bearer) {
+    const responderId = auth.user.id;
+    runAfterResponse('prior accepted push', async () => {
+      const { data: me } = await admin.from('users').select('id, name, image, first_name, last_name').eq('id', responderId).maybeSingle();
+      const name = displayNameFromUser(me as UserProfileRow | null, 'Someone');
+      await sendPush(pushUrl, bearer, initiatorId, { title: `${name} accepted your request`, body: "You're connected now. Say hi." }, {
+        type: 'prior_connection_accepted',
+        connection_id: row.id,
+        peer_user_id: responderId,
+      });
+    });
   }
 
   return NextResponse.json({
