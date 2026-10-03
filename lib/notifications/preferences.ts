@@ -8,6 +8,7 @@ export interface NotificationPreferences {
   hubMessagePushEnabled: boolean;
   eventTeaserPushEnabled: boolean;
   reconnectNudgePushEnabled: boolean;
+  dropReleasePushEnabled: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -18,6 +19,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   hubMessagePushEnabled: true,
   eventTeaserPushEnabled: true,
   reconnectNudgePushEnabled: true,
+  dropReleasePushEnabled: true,
 };
 
 function storageKey(userId: string) {
@@ -39,6 +41,7 @@ function coercePreferences(parsed: Partial<NotificationPreferences>): Notificati
     hubMessagePushEnabled: parsed.hubMessagePushEnabled ?? true,
     eventTeaserPushEnabled: parsed.eventTeaserPushEnabled ?? true,
     reconnectNudgePushEnabled: parsed.reconnectNudgePushEnabled ?? true,
+    dropReleasePushEnabled: parsed.dropReleasePushEnabled ?? true,
   };
 }
 
@@ -78,7 +81,7 @@ export async function loadNotificationPreferences(
     const { data, error } = await supabase
       .from('notification_preferences')
       .select(
-        'message_push_enabled, call_push_enabled, event_reminder_push_enabled, availability_match_push_enabled, hub_message_push_enabled, event_teaser_push_enabled, reconnect_nudge_push_enabled',
+        'message_push_enabled, call_push_enabled, event_reminder_push_enabled, availability_match_push_enabled, hub_message_push_enabled, event_teaser_push_enabled, reconnect_nudge_push_enabled, drop_release_push_enabled',
       )
       .eq('user_id', userId)
       .maybeSingle();
@@ -95,6 +98,7 @@ export async function loadNotificationPreferences(
       hubMessagePushEnabled: data?.hub_message_push_enabled ?? true,
       eventTeaserPushEnabled: data?.event_teaser_push_enabled ?? true,
       reconnectNudgePushEnabled: data?.reconnect_nudge_push_enabled ?? true,
+      dropReleasePushEnabled: data?.drop_release_push_enabled ?? true,
     });
 
     writeLocalNotificationPreferences(userId, preferences);
@@ -130,6 +134,7 @@ export async function saveNotificationPreferences(
         hub_message_push_enabled: preferences.hubMessagePushEnabled,
         event_teaser_push_enabled: preferences.eventTeaserPushEnabled,
         reconnect_nudge_push_enabled: preferences.reconnectNudgePushEnabled,
+        drop_release_push_enabled: preferences.dropReleasePushEnabled,
         updated_at: Date.now(),
       }, { onConflict: 'user_id' });
 

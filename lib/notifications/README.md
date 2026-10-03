@@ -149,3 +149,7 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 - **Seed a Room teasers** — **event_teaser** push (pref `event_teaser_push_enabled`).
 - **Reconnect nudges** — **reconnect_nudge** / **shared_upcoming_event** (pref `reconnect_nudge_push_enabled`).
 - **Achievements & stats** — Optional future pushes.
+
+## Shared drop releases
+
+`drop_release_push_enabled` (default on): "{Name}'s drop just developed" when a connection's shared Click Drop develops. Sent within a minute by `runSharedDropsReleased` on the per-minute `/api/cron/scheduled-messages` tick (hourly `/api/cron/drops` is a backstop). Payload `type: shared_drop_released`, `drop_id`, `poster_id`, `drop_count`; one batched push per viewer per run; audience resolved per viewer like the Home strip.

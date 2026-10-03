@@ -21,6 +21,7 @@ export const preferencesBodySchema = z.object({
   hub_message_push_enabled: z.boolean().optional(),
   event_teaser_push_enabled: z.boolean().optional(),
   reconnect_nudge_push_enabled: z.boolean().optional(),
+  drop_release_push_enabled: z.boolean().optional(),
 }).passthrough();
 
 export const availabilityBodySchema = z.object({

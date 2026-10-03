@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assertChatWritable, createChatGatekeeperAdmin } from '@/lib/server/chatGatekeeper';
 import { insertChatMessage } from '@/lib/server/chatMessageWrite';
 import type { MessageType } from '@/lib/chat/types';
-import { authorizeCronRequest, cronPushBearer } from '@/lib/server/cronAuth';
+import { authorizeCronRequest, cronPushBearer, pushFunctionUrl } from '@/lib/server/cronAuth';
+import { runSharedDropsReleased } from '@/lib/cron/sharedDropsReleased';
 
 type ScheduledRow = {
   id: string;
@@ -17,6 +18,9 @@ type ScheduledRow = {
  * Per-minute delivery of due scheduled messages (pg_cron → cron-scheduled-messages edge
  * function → here). Each row is claimed by deleting it first, so overlapping
  * runs never deliver twice; a sender who lost access to the chat is skipped.
+ *
+ * The same per-minute tick sends "just developed" pushes for shared Click Drops, so they arrive
+ * within a minute of release (a failure there never affects message delivery).
  */
 export async function GET(request: NextRequest) {
   if (!authorizeCronRequest(request)) {
@@ -63,5 +67,11 @@ export async function GET(request: NextRequest) {
     if ('error' in result) skipped += 1;
     else delivered += 1;
   }
-  return NextResponse.json({ ok: true, delivered, skipped });
+  let dropsReleased = { released: 0, pushed: 0 };
+  try {
+    dropsReleased = await runSharedDropsReleased(admin, pushFunctionUrl(), cronPushBearer());
+  } catch (e) {
+    console.error('[cron/scheduled-messages] drops released:', e instanceof Error ? e.message : e);
+  }
+  return NextResponse.json({ ok: true, delivered, skipped, drops_released: dropsReleased });
 }
