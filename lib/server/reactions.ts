@@ -5,8 +5,20 @@ import { loadVisibleBeacon } from '@/lib/map/beaconVisibility';
 import { resolveSharedDrops } from '@/lib/server/sharedDrops';
 import { loadReactionsBatch, type ReactionKind, type ReactionsPayload } from '@/lib/server/reactionLists';
 
-/** The small, fixed palette (tap once to react; tap again to take it back). */
+/** The quick palette clients show first; any single emoji is accepted (`isReactionEmoji`). */
 export const REACTION_EMOJI = ['❤️', '🔥', '😂', '😍', '👏', '😮'] as const;
+
+const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' });
+
+/**
+ * Exactly one emoji (one grapheme that is pictographic or a flag, skin tones and ZWJ sequences
+ * included) that fits the column's 16 code points. Never text, never two emoji.
+ */
+export function isReactionEmoji(value: string): boolean {
+  if (!value || [...value].length > 16) return false;
+  const parts = [...graphemes.segment(value)];
+  return parts.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(value) && !/[\p{L}\p{N}\s]/u.test(value);
+}
 export { loadReactionsBatch, type ReactionKind, type ReactionsPayload };
 
 /**
