@@ -301,6 +301,13 @@ async function runPendingHandshakesCleanup(
   return { deleted: data?.length ?? 0 };
 }
 
+/** Events picking up near people, into their activity inbox (see record_trending_event_activity). */
+async function runTrendingEventActivity(admin: ReturnType<typeof createClient>): Promise<{ recorded: number }> {
+  const { data, error } = await admin.rpc('record_trending_event_activity');
+  if (error) throw new Error(`trending-event-activity: ${error.message}`);
+  return { recorded: typeof data === 'number' ? data : 0 };
+}
+
 async function runBeaconPresenceCleanup(
   admin: ReturnType<typeof createClient>,
 ): Promise<{ deleted: number }> {
@@ -364,7 +371,10 @@ Deno.serve(async (req: Request) => {
     const presence = await runBeaconPresenceCleanup(admin).catch((e) => ({
       error: e instanceof Error ? e.message : String(e),
     }));
-    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges, drops, places, presence };
+    const trending = await runTrendingEventActivity(admin).catch((e) => ({
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    const body = { ok: true, disposable, events, availability, friction, pendingHandshakes, nudges, drops, places, presence, trending };
     console.log('[cron-hourly-maintenance]', JSON.stringify(body));
     return new Response(JSON.stringify(body), {
       status: 200,
