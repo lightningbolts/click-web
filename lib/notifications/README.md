@@ -153,3 +153,14 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 ## Shared drop releases
 
 `drop_release_push_enabled` (default on): "{Name}'s drop just developed" when a connection's shared Click Drop develops. Sent within a minute by `runSharedDropsReleased` on the per-minute `/api/cron/scheduled-messages` tick (hourly `/api/cron/drops` is a backstop). Payload `type: shared_drop_released`, `drop_id`, `poster_id`, `drop_count`; one batched push per viewer per run; audience resolved per viewer like the Home strip.
+
+## Activity inbox
+
+Every alert also lands in `activity_items` (migration `20261016000000_activity_inbox.sql`), the in-app inbox opened from the Home bell, so people who turned push off still see it.
+
+- **Alert pushes:** `send-push-notification` records the types in its `ACTIVITY_TYPES` set, for service callers only, before the mute, preference and token checks. Messages, calls, device approvals and pending prior requests are excluded, because each has its own surface (pending requests are shown live from the Clicks inbox).
+- **In-app only:** `lib/server/activity.ts` records reactions (`reaction`, one row per drop or soundtrack) and event RSVPs (`event_rsvp` and `event_rsvp_request`, one row per event). These go to the host.
+- **Write path:** `record_activity(...)`, a service-role-only RPC, does every write. When rows share a `group_key`, it updates the existing row and moves it to the top instead of adding another. It also prunes rows older than 90 days.
+- **Read path:** `GET /api/activity?before=` returns `{ items, seen_at, next_before }`. Each item's `data` is the push payload (string values), so clients route a tap with the same code they use for a push tap. Items about blocked people are left out.
+- **Seen:** `POST /api/activity/seen { seen_at }` moves the "new" mark forward and drives the badge.
+- **Accepted requests:** when a prior-connection request is accepted, the person who asked gets a `prior_connection_accepted` push (`connection_id`, `peer_user_id`).

@@ -14,6 +14,7 @@ import {
 import { parseBody } from "@/lib/api/parseBody";
 import { engagementTelemetryBodySchema } from "@/lib/api/schemas/beacons";
 import { maybeCreateSharedEventNudges } from "@/lib/events/sharedEventNudges";
+import { cronPushBearer, pushFunctionUrl } from "@/lib/server/cronAuth";
 import {
   decideMemberRsvp,
   listingOptionsFromBeacon,
@@ -23,6 +24,7 @@ import {
 import { rsvpEnabledFromMetadata } from "@/lib/events/eventMetadata";
 import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 import { countEventRsvps } from "@/lib/events/publicEvent";
+import { recordRsvpActivity } from "@/lib/server/activity";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -236,6 +238,12 @@ export async function POST(
         console.error("POST rsvp request:", err);
         return NextResponse.json({ error: "Could not save request" }, { status: 400 });
       }
+      if (decision.kind === "pending" && beacon.creator_id) {
+        const hostId = beacon.creator_id;
+        runAfterResponse("rsvp activity", () =>
+          recordRsvpActivity(admin, { beaconId, hostId, actorId: user.id, metadata: beacon.metadata, requested: true }),
+        );
+      }
       return NextResponse.json({
         ok: true,
         request_status: decision.kind,
@@ -305,13 +313,14 @@ export async function POST(
 
     const profile = (await loadAttendeeProfiles(admin, [user.id])).get(user.id) ?? null;
     runAfterResponse("product events", () => emitProductEvent(admin, user.id, "beacon_joined", { type: "event" }));
+    if (existingGoing == null && beacon.creator_id) {
+      const hostId = beacon.creator_id;
+      runAfterResponse("rsvp activity", () =>
+        recordRsvpActivity(admin, { beaconId, hostId, actorId: user.id, metadata: beacon.metadata, requested: false }),
+      );
+    }
 
-    void maybeCreateSharedEventNudges(admin, user.id, beaconId, {
-      pushUrl: process.env.NEXT_PUBLIC_SUPABASE_URL
-        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-push-notification`
-        : null,
-      authBearer: process.env.CRON_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? null,
-    }).catch((err) => console.warn('shared-event nudge after rsvp:', err));
+    void maybeCreateSharedEventNudges(admin, user.id, beaconId, { pushUrl: pushFunctionUrl(), authBearer: cronPushBearer() }).catch((err) => console.warn('shared-event nudge after rsvp:', err));
 
     return NextResponse.json({
       ok: true,

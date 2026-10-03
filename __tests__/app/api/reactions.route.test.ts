@@ -11,6 +11,7 @@ const mockResolve = jest.fn();
 const mockLoad = jest.fn();
 const mockUpsert = jest.fn();
 const mockDelete = jest.fn();
+const mockRecordActivity = jest.fn();
 
 jest.mock('@/lib/server/supabaseRouteAuth', () => ({
   getSupabaseFromRouteRequest: (...args: unknown[]) => mockGetUser(...args),
@@ -24,6 +25,10 @@ jest.mock('@/lib/server/reactions', () => ({
   ...jest.requireActual('@/lib/server/reactions'),
   resolveReactionTarget: (...a: unknown[]) => mockResolve(...a),
   loadReactions: (...a: unknown[]) => mockLoad(...a),
+}));
+
+jest.mock('@/lib/server/activity', () => ({
+  recordReactionActivity: (...a: unknown[]) => mockRecordActivity(...a),
 }));
 
 import { PUT } from '@/app/api/reactions/[kind]/[id]/route';
@@ -46,6 +51,7 @@ describe('PUT /api/reactions/{kind}/{id}', () => {
     mockResolve.mockResolvedValue({ ownerId: 'poster' });
     mockUpsert.mockResolvedValue({ error: null });
     mockDelete.mockResolvedValue({ error: null });
+    mockRecordActivity.mockResolvedValue(undefined);
     mockLoad.mockResolvedValue({ mine: '🔥', reactions: [], is_owner: false });
   });
 
@@ -55,8 +61,16 @@ describe('PUT /api/reactions/{kind}/{id}', () => {
     expect(mockUpsert).toHaveBeenCalledWith(expect.objectContaining({ target_kind: 'shared_drop', target_id: ID, user_id: 'me', emoji: '🔥' }));
   });
 
+  it('tells the owner in their activity inbox', async () => {
+    await put('shared_drop', { emoji: '🔥' });
+    expect(mockRecordActivity).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'shared_drop', targetId: ID, ownerId: 'poster', actorId: 'me', emoji: '🔥',
+    });
+  });
+
   it('takes a reaction back with null', async () => {
     await put('soundtrack', { emoji: null });
+    expect(mockRecordActivity).not.toHaveBeenCalled();
     expect(mockDelete).toHaveBeenCalledWith({ target_kind: 'soundtrack', target_id: ID, user_id: 'me' });
   });
 

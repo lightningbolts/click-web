@@ -12,6 +12,15 @@ import { formatSplitConnectionMetrics, isHandshakeSource, isPriorSource } from '
 const mockRequireUser = jest.fn();
 const mockCreateAdminClient = jest.fn();
 const mockNotify = jest.fn();
+const mockSendPush = jest.fn();
+
+jest.mock('@/lib/server/cronAuth', () => ({
+  pushFunctionUrl: () => 'https://push.example',
+  cronPushBearer: () => 'service',
+}));
+jest.mock('@/lib/nudges/moments', () => ({
+  sendPush: (...args: unknown[]) => mockSendPush(...args),
+}));
 
 jest.mock('@/lib/server/withAuth', () => ({
   requireUser: (...args: unknown[]) => mockRequireUser(...args),
@@ -251,9 +260,18 @@ describe('POST /api/connections/prior/respond', () => {
         (b.insert as jest.Mock).mockResolvedValue({ data: { id: 'chat-1' }, error: null });
         return b;
       }
+      if (table === 'users') {
+        const b = chain({ data: null, error: null });
+        (b.maybeSingle as jest.Mock).mockResolvedValue({
+          data: { id: userB, name: null, image: null, first_name: 'Maya', last_name: 'Chen' },
+          error: null,
+        });
+        return b;
+      }
       throw new Error(table);
     });
     mockCreateAdminClient.mockReturnValue({ from });
+    mockSendPush.mockResolvedValue(true);
 
     const res = await respondPost(
       jsonRequest('http://localhost/api/connections/prior/respond', {
@@ -265,6 +283,15 @@ describe('POST /api/connections/prior/respond', () => {
     const json = await res.json();
     expect(json.status).toBe('active');
     expect(from).not.toHaveBeenCalledWith('connection_encounters');
+    await new Promise((resolve) => setImmediate(resolve));
+    // The person who asked hears back.
+    expect(mockSendPush).toHaveBeenCalledWith(
+      'https://push.example',
+      'service',
+      userA,
+      { title: 'Maya Chen accepted your request', body: "You're connected now. Say hi." },
+      { type: 'prior_connection_accepted', connection_id: 'prior-1', peer_user_id: userB },
+    );
   });
 
   it('forbids the initiator from accepting their own request', async () => {
