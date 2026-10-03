@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (denied) return denied;
   const { data: hub, error } = await admin
     .from('hub_venues')
-    .select('id, name, category, creator_id, event_beacon_id, expires_at, radius_meters')
+    .select('id, name, category, creator_id, event_beacon_id, expires_at, radius_meters, place_id')
     .eq('id', trimmedId)
     .maybeSingle();
 
@@ -63,7 +63,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Hub not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ hub });
+  // A Place Hub links back to its listed Place, so members can open the Place page from the hub.
+  const { place_id: placeId, ...fields } = hub as typeof hub & { place_id?: string | null };
+  let place: { id: string; slug: string; name: string } | null = null;
+  if (placeId) {
+    const { data } = await admin
+      .from('places')
+      .select('id, slug, name')
+      .eq('id', placeId)
+      .eq('listed', true)
+      .eq('verification_status', 'verified')
+      .maybeSingle();
+    place = (data as typeof place) ?? null;
+  }
+
+  return NextResponse.json({ hub: { ...fields, place } });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {

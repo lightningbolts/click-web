@@ -39,8 +39,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 /**
  * PATCH /api/places/[placeId] — owners and managers edit the consumer profile (§5.7). Not gated
- * by the user feature flag. Name, slug, category, coordinates, radius, verification and listing
- * stay admin-only.
+ * by the user feature flag. Name, slug, category, coordinates, radius and verification stay
+ * admin-only; owners go live (list) or come off the map once Click has verified the Place.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ placeId: string }> }) {
   try {
@@ -50,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { admin, user, place, role } = ctx;
 
     const parsed = await parseBody(request, placeManagerPatchBodySchema);
-    if (!parsed.ok) return apiError('Only description, hours, website, hub and address can be edited', 400, 'invalid_fields');
+    if (!parsed.ok) return apiError('Only description, hours, website, hub, address and listing can be edited', 400, 'invalid_fields');
     const body = parsed.data;
 
     const patch: Record<string, unknown> = {};
@@ -79,6 +79,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (body[key] !== undefined) patch[key] = body[key] || null;
     }
     if (body.hub_enabled !== undefined) patch.hub_enabled = body.hub_enabled;
+    if (body.listed !== undefined) {
+      if (role !== 'owner') return apiError('Only an owner can put the Place on the map', 403, 'owner_only');
+      if (body.listed && place.verification_status !== 'verified') {
+        return apiError('Your Place goes on the map once Click has verified it', 409, 'not_verified');
+      }
+      patch.listed = body.listed;
+    }
 
     if (body.hub_enabled === true && !place.hub_enabled) {
       const hub = await ensurePlaceHub(admin, place, user.id);

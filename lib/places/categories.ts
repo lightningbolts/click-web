@@ -13,6 +13,8 @@ export const PLACE_CATEGORIES: readonly PlaceCategory[] = [
   'entertainment',
   'bookstore',
   'campus_space',
+  'event_space',
+  'office',
   'other',
 ] as const;
 
@@ -28,6 +30,8 @@ const LABELS: Record<PlaceCategory, string> = {
   entertainment: 'Entertainment',
   bookstore: 'Bookstore',
   campus_space: 'Campus space',
+  event_space: 'Event space',
+  office: 'Company office',
   other: 'Place',
 };
 
@@ -43,6 +47,8 @@ const QUESTIONS: Record<PlaceCategory, CategoryQuestionKey | null> = {
   entertainment: 'line',
   bookstore: null,
   campus_space: 'seats',
+  event_space: 'line',
+  office: null,
   other: null,
 };
 

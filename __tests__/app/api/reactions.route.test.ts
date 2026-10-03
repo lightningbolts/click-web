@@ -60,8 +60,12 @@ describe('PUT /api/reactions/{kind}/{id}', () => {
     expect(mockDelete).toHaveBeenCalledWith({ target_kind: 'soundtrack', target_id: ID, user_id: 'me' });
   });
 
-  it('rejects emoji outside the palette, unknown kinds, unseen targets, and your own', async () => {
-    expect((await put('shared_drop', { emoji: '💩' })).status).toBe(400);
+  it('accepts any single emoji, including skin tones, ZWJ sequences and flags', async () => {
+    for (const emoji of ['💩', '👍🏽', '👩‍💻', '🇯🇵', '❤️‍🔥']) expect((await put('shared_drop', { emoji })).status).toBe(200);
+  });
+
+  it('rejects text, several emoji, unknown kinds, unseen targets, and your own', async () => {
+    for (const emoji of ['hi', '🔥🔥', 'a🔥', ' ', '']) expect((await put('shared_drop', { emoji })).status).toBe(400);
     expect((await put('message', { emoji: '🔥' })).status).toBe(404);
     mockResolve.mockResolvedValueOnce(null);
     expect((await put('shared_drop', { emoji: '🔥' })).status).toBe(404);

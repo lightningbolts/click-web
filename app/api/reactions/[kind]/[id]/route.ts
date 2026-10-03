@@ -4,11 +4,11 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { parseBody } from '@/lib/api/parseBody';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
-import { REACTION_EMOJI, loadReactions, resolveReactionTarget, type ReactionKind } from '@/lib/server/reactions';
+import { isReactionEmoji, loadReactions, resolveReactionTarget, type ReactionKind } from '@/lib/server/reactions';
 
 type Params = { params: Promise<{ kind: string; id: string }> };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const bodySchema = z.object({ emoji: z.enum(REACTION_EMOJI).nullable() });
+const bodySchema = z.object({ emoji: z.string().refine(isReactionEmoji, 'One emoji').nullable() });
 
 async function authorize(request: NextRequest, params: Params['params']) {
   const { kind, id } = await params;

@@ -173,6 +173,7 @@ Admins (web):
 | D8 | Place pages are public on the web at `/p/[slug]`. Check-in and Pulse are iOS-only in v1. | SEO and sharing; physical presence stays on the phone (`PRODUCT.md`). |
 | D9 | Raw check-ins are kept 90 days. Pulse `user_id` is nulled after 30 days. Daily rollups keep long-term trends. | Data minimization with useful history. |
 | D10 | "Here now" names are shown only for connections who opted in *for that check-in*. "Been here" names only for connections who enabled the global setting. | Explicit consent per visibility type. |
+| D11 | (2026-10-02, supersedes D5 and the self-serve part of rule 8) Businesses set up their own Place at `/business/places/new` (`POST /api/places`). It starts `pending` and unlisted with the submitter as owner; a Click admin verifies it (which creates its check-in QR code), then the owner chooses when to go live (`PATCH listed`). Categories add `event_space` and `office`. | Intuitive setup for restaurants, event spaces and companies while keeping verification. |
 
 ---
 
