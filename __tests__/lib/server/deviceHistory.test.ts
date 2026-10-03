@@ -8,6 +8,7 @@ import {
   requestHistoryApprovalForNewDevice,
   sessionProvesEmailAccess,
 } from '@/lib/server/deviceHistory';
+import { FakeDb } from '../../helpers/fakeSupabase';
 
 function jwt(payload: Record<string, unknown>): string {
   const b64 = (value: unknown) => Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
@@ -44,55 +45,59 @@ describe('groupBackfillRows', () => {
   });
 });
 
-function adminMock(options: { others: unknown[]; insertError?: { code?: string; message: string } }) {
-  const insert = jest.fn(() => ({
-    select: () => ({
-      single: async () =>
-        options.insertError ? { data: null, error: options.insertError } : { data: { id: 'req-1' }, error: null },
-    }),
-  }));
-  const from = jest.fn((table: string) => {
-    if (table === 'chat_devices') {
-      const chain = {
-        select: () => chain,
-        eq: () => chain,
-        is: () => chain,
-        neq: () => chain,
-        lt: () => chain,
-        limit: async () => ({ data: options.others, error: null }),
-      };
-      return chain;
-    }
-    return { insert };
+function world(extra: Record<string, Array<Record<string, unknown>>> = {}) {
+  return new FakeDb({
+    tables: {
+      chat_devices: [
+        { id: 'row-old', user_id: 'user-1', created_at: '2026-09-01T00:00:00Z', revoked_at: null },
+        { id: 'row-new', user_id: 'user-1', created_at: '2026-09-27T00:00:00Z', revoked_at: null },
+      ],
+      chat_device_history_requests: [],
+      ...extra,
+    },
+    unique: { chat_device_history_requests: [{ columns: ['recipient_device_id'] }] },
   });
-  return { admin: { from } as never, insert };
 }
 
 describe('requestHistoryApprovalForNewDevice', () => {
-  const NEW_DEVICE = { id: 'row-new', created_at: '2026-09-27T00:00:00Z' };
-  const user = { id: 'user-1', email: 'me@example.com' };
+  const NEW_DEVICE = { id: 'row-new', created_at: '2026-09-27T00:00:00Z', device_label: 'iPhone' };
+  const user = { id: 'user-1' };
 
   it('does nothing for the oldest device on an account', async () => {
-    const { admin, insert } = adminMock({ others: [] });
-    const send = jest.fn();
-    await expect(requestHistoryApprovalForNewDevice(admin, user, NEW_DEVICE, send)).resolves.toBe('first-device');
-    expect(insert).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
+    const db = world();
+    const notify = jest.fn();
+    await expect(requestHistoryApprovalForNewDevice(db.client as never, user, { id: 'row-old', created_at: '2026-09-01T00:00:00Z' }, notify)).resolves.toBe('first-device');
+    expect(db.rows('chat_device_history_requests')).toHaveLength(0);
+    expect(notify).not.toHaveBeenCalled();
   });
 
-  it('records a pending request and emails a magic link to the approval page', async () => {
-    const { admin, insert } = adminMock({ others: [{ id: 'row-old' }] });
-    const send = jest.fn(async () => ({ error: null }));
-    await expect(requestHistoryApprovalForNewDevice(admin, user, NEW_DEVICE, send)).resolves.toBe('requested');
-    expect(insert).toHaveBeenCalledWith({ user_id: 'user-1', recipient_device_id: 'row-new' });
-    expect(send).toHaveBeenCalledWith('me@example.com', expect.stringMatching(/\/devices\/approve\/req-1$/));
+  it('records a pending request with the email deferred, and notifies the account', async () => {
+    const db = world();
+    const notify = jest.fn(async () => true);
+    await expect(requestHistoryApprovalForNewDevice(db.client as never, user, NEW_DEVICE, notify)).resolves.toBe('requested');
+    const [row] = db.rows('chat_device_history_requests');
+    expect(row).toMatchObject({ user_id: 'user-1', recipient_device_id: 'row-new', email_deferred: true });
+    expect(notify).toHaveBeenCalledWith(row.id, 'iPhone');
     expect(deviceApprovalPath('req-1')).toBe('/devices/approve/req-1');
   });
 
-  it('does not email twice for the same device', async () => {
-    const { admin } = adminMock({ others: [{ id: 'row-old' }], insertError: { code: '23505', message: 'dup' } });
-    const send = jest.fn();
-    await expect(requestHistoryApprovalForNewDevice(admin, user, NEW_DEVICE, send)).resolves.toBe('exists');
-    expect(send).not.toHaveBeenCalled();
+  it('never asks twice while a request stands', async () => {
+    const db = world({ chat_device_history_requests: [{ id: 'req-1', recipient_device_id: 'row-new', status: 'pending', expires_at: '2999-01-01T00:00:00Z' }] });
+    const notify = jest.fn();
+    await expect(requestHistoryApprovalForNewDevice(db.client as never, user, NEW_DEVICE, notify)).resolves.toBe('exists');
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('asks again once expired, and after a denial only when the device asks again', async () => {
+    const expired = world({ chat_device_history_requests: [{ id: 'req-1', recipient_device_id: 'row-new', status: 'pending', expires_at: '2020-01-01T00:00:00Z' }] });
+    const notify = jest.fn(async () => true);
+    await expect(requestHistoryApprovalForNewDevice(expired.client as never, user, NEW_DEVICE, notify)).resolves.toBe('requested');
+    expect(expired.rows('chat_device_history_requests')[0]).toMatchObject({ status: 'pending', email_sent_at: null, email_deferred: true });
+    expect(Date.parse(expired.rows('chat_device_history_requests')[0].expires_at as string)).toBeGreaterThan(Date.now());
+
+    const denied = world({ chat_device_history_requests: [{ id: 'req-1', recipient_device_id: 'row-new', status: 'denied', expires_at: '2999-01-01T00:00:00Z' }] });
+    await expect(requestHistoryApprovalForNewDevice(denied.client as never, user, NEW_DEVICE, notify)).resolves.toBe('exists');
+    await expect(requestHistoryApprovalForNewDevice(denied.client as never, user, NEW_DEVICE, notify, { reopen: true })).resolves.toBe('requested');
+    expect(denied.rows('chat_device_history_requests')[0].status).toBe('pending');
   });
 });

@@ -4,6 +4,7 @@ import { insertChatMessage } from '@/lib/server/chatMessageWrite';
 import type { MessageType } from '@/lib/chat/types';
 import { authorizeCronRequest, cronPushBearer, pushFunctionUrl } from '@/lib/server/cronAuth';
 import { runSharedDropsReleased } from '@/lib/cron/sharedDropsReleased';
+import { sendDeferredApprovalEmails } from '@/lib/server/deviceApproval';
 
 type ScheduledRow = {
   id: string;
@@ -20,7 +21,8 @@ type ScheduledRow = {
  * runs never deliver twice; a sender who lost access to the chat is skipped.
  *
  * The same per-minute tick sends "just developed" pushes for shared Click Drops, so they arrive
- * within a minute of release (a failure there never affects message delivery).
+ * within a minute of release, and the email fallback for new-device approvals no device decided
+ * (failures there never affect message delivery).
  */
 export async function GET(request: NextRequest) {
   if (!authorizeCronRequest(request)) {
@@ -73,5 +75,11 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     console.error('[cron/scheduled-messages] drops released:', e instanceof Error ? e.message : e);
   }
-  return NextResponse.json({ ok: true, delivered, skipped, drops_released: dropsReleased });
+  let approvalEmails = 0;
+  try {
+    approvalEmails = await sendDeferredApprovalEmails(admin);
+  } catch (e) {
+    console.error('[cron/scheduled-messages] approval emails:', e instanceof Error ? e.message : e);
+  }
+  return NextResponse.json({ ok: true, delivered, skipped, drops_released: dropsReleased, approval_emails: approvalEmails });
 }

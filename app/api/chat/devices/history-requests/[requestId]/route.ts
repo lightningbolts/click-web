@@ -4,12 +4,21 @@ import { apiError } from '@/lib/api/errors';
 import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 import { sessionProvesEmailAccess } from '@/lib/server/deviceHistory';
+import { consumeApprovalProof } from '@/lib/server/deviceApproval';
 
-// Approve or deny sharing chat history with one of the caller's newer devices. Only a session
-// created from the emailed magic link (recent `otp` / `magiclink` amr) may decide.
+// Approve or deny sharing chat history with one of the caller's newer devices. Decided by another
+// device on the account that proves it holds its identity key (a challenge from .../challenge), or
+// by a session created from the emailed magic link (recent `otp` / `magiclink` amr).
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const decisionSchema = z.object({ decision: z.enum(['approve', 'deny']) }).strict();
+const decisionSchema = z
+  .object({
+    decision: z.enum(['approve', 'deny']),
+    approving_device_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
+    challenge_id: z.string().regex(UUID_PATTERN).optional(),
+    proof: z.string().max(128).optional(),
+  })
+  .strict();
 
 type RequestRow = {
   id: string;
@@ -86,7 +95,10 @@ export async function POST(
   const parsed = await parseBody(request, decisionSchema);
   if (!parsed.ok) return parsed.response;
 
-  if (!sessionProvesEmailAccess(auth.bearer)) {
+  const { approving_device_id: approvingDeviceId, challenge_id: challengeId, proof } = parsed.data;
+  const deviceProof = approvingDeviceId && challengeId && proof ? { approvingDeviceId, challengeId, proof } : null;
+  const viaDevice = deviceProof != null;
+  if (!deviceProof && !sessionProvesEmailAccess(auth.bearer)) {
     return apiError('Open the link from your email to approve this device', 403, 'EMAIL_PROOF_REQUIRED');
   }
 
@@ -103,10 +115,21 @@ export async function POST(
       return apiError('That device is no longer active', 410, 'HISTORY_REQUEST_DEVICE_GONE');
     }
 
+    let decidedBy: string | null = null;
+    if (deviceProof) {
+      decidedBy = await consumeApprovalProof(admin, { userId: auth.user.id, requestId, ...deviceProof });
+      if (!decidedBy) return apiError('This device couldn’t be verified. Try again.', 403, 'DEVICE_PROOF_INVALID');
+    }
+
     const status = parsed.data.decision === 'approve' ? 'approved' : 'denied';
     const { data, error } = await admin
       .from('chat_device_history_requests')
-      .update({ status, decided_at: new Date().toISOString() })
+      .update({
+        status,
+        decided_at: new Date().toISOString(),
+        decided_via: viaDevice ? 'device' : 'email',
+        decided_by_device_id: decidedBy,
+      })
       .eq('id', requestId)
       .eq('status', 'pending')
       .select('id, user_id, status, created_at, expires_at, decided_at, device:chat_devices(created_at, revoked_at)')
