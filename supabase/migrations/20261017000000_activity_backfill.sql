@@ -3,11 +3,13 @@
 -- first open. Idempotent: grouped rows skip a key already present (live rows win); prior
 -- requests skip one already recorded for that connection.
 
+-- first_name/last_name are read through jsonb: production has them, a clean migration chain
+-- doesn't, and a missing key is just null.
 CREATE TEMP TABLE activity_names ON COMMIT DROP AS
-SELECT id,
-       coalesce(nullif(trim(first_name), ''), split_part(nullif(trim(name), ''), ' ', 1), 'Someone') AS first,
-       coalesce(nullif(trim(name), ''), nullif(trim(concat_ws(' ', first_name, last_name)), ''), 'Someone') AS full_name
-FROM public.users;
+SELECT u.id,
+       coalesce(nullif(trim(j ->> 'first_name'), ''), split_part(nullif(trim(u.name), ''), ' ', 1), 'Someone') AS first,
+       coalesce(nullif(trim(u.name), ''), nullif(trim(concat_ws(' ', j ->> 'first_name', j ->> 'last_name')), ''), 'Someone') AS full_name
+FROM public.users u, to_jsonb(u) AS j;
 
 -- Reactions on your drops: one row per drop, newest reactor on top.
 INSERT INTO public.activity_items (user_id, type, title, body, data, actor_id, group_key, created_at)
@@ -79,12 +81,12 @@ ON CONFLICT (user_id, group_key) WHERE group_key IS NOT NULL DO NOTHING;
 INSERT INTO public.activity_items (user_id, type, title, body, data, actor_id, created_at)
 SELECT c.responder_id::uuid, 'prior_connection_request', 'Prior connection request',
        n.full_name || ' says they already know you',
-       jsonb_build_object('type', 'prior_connection_request', 'connection_id', c.id::text, 'sender_user_id', c.initiator_id),
+       jsonb_build_object('type', 'prior_connection_request', 'connection_id', c.id::text, 'sender_user_id', c.initiator_id::text),
        c.initiator_id::uuid, coalesce(c.created_utc, to_timestamp(c.created / 1000.0))
 FROM public.connections c
-JOIN activity_names n ON n.id::text = c.initiator_id
+JOIN activity_names n ON n.id::text = c.initiator_id::text
 WHERE c.source::text = 'prior' AND c.status = 'pending'
-  AND c.responder_id IN (SELECT id::text FROM public.users)
+  AND c.responder_id::text IN (SELECT id::text FROM public.users)
   AND coalesce(c.created_utc, to_timestamp(c.created / 1000.0)) > now() - INTERVAL '90 days'
   AND NOT EXISTS (
       SELECT 1 FROM public.activity_items i
@@ -96,12 +98,12 @@ WHERE c.source::text = 'prior' AND c.status = 'pending'
 INSERT INTO public.activity_items (user_id, type, title, body, data, actor_id, created_at)
 SELECT c.initiator_id::uuid, 'prior_connection_accepted', n.full_name || ' accepted your request',
        'You''re connected now. Say hi.',
-       jsonb_build_object('type', 'prior_connection_accepted', 'connection_id', c.id::text, 'peer_user_id', c.responder_id),
+       jsonb_build_object('type', 'prior_connection_accepted', 'connection_id', c.id::text, 'peer_user_id', c.responder_id::text),
        c.responder_id::uuid, coalesce(c.created_utc, to_timestamp(c.created / 1000.0))
 FROM public.connections c
-JOIN activity_names n ON n.id::text = c.responder_id
+JOIN activity_names n ON n.id::text = c.responder_id::text
 WHERE c.source::text = 'prior' AND c.status = 'active'
-  AND c.initiator_id IN (SELECT id::text FROM public.users)
+  AND c.initiator_id::text IN (SELECT id::text FROM public.users)
   AND coalesce(c.created_utc, to_timestamp(c.created / 1000.0)) > now() - INTERVAL '90 days'
   AND NOT EXISTS (
       SELECT 1 FROM public.activity_items i
