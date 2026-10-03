@@ -11,6 +11,7 @@ type PreferencesBody = {
   hub_message_push_enabled?: unknown;
   event_teaser_push_enabled?: unknown;
   reconnect_nudge_push_enabled?: unknown;
+  drop_release_push_enabled?: unknown;
 };
 
 const PREF_KEYS = [
@@ -21,6 +22,7 @@ const PREF_KEYS = [
   'hub_message_push_enabled',
   'event_teaser_push_enabled',
   'reconnect_nudge_push_enabled',
+  'drop_release_push_enabled',
 ] as const;
 
 /**

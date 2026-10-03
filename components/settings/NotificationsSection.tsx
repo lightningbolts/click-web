@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import * as Switch from '@radix-ui/react-switch';
-import { RefreshCw, Bell, MessageCircle, Calendar, Users, Radio, Sparkles, HeartHandshake } from 'lucide-react';
+import { RefreshCw, Bell, MessageCircle, Calendar, Users, Radio, Sparkles, HeartHandshake, Camera } from 'lucide-react';
 import type { NotificationPreferences } from '@/lib/notifications/preferences';
 
 export default function NotificationsSection({
@@ -181,6 +181,15 @@ export default function NotificationsSection({
           checked={notificationPreferences.reconnectNudgePushEnabled}
           disabled={notificationLoading}
           onChange={(checked) => { void handleNotificationToggle('reconnectNudgePushEnabled', checked); }}
+        />
+
+        <NotificationToggleRow
+          icon={<Camera className="w-4 h-4 text-primary" />}
+          title="Click Drops"
+          description="When a connection's shared drop develops."
+          checked={notificationPreferences.dropReleasePushEnabled}
+          disabled={notificationLoading}
+          onChange={(checked) => { void handleNotificationToggle('dropReleasePushEnabled', checked); }}
         />
       </div>
 
