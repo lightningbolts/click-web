@@ -21,9 +21,10 @@ export type DiscoverProfileCard = {
  * POST /api/contacts/discover
  *
  * Match SHA-256 phone/email hashes (computed on-device) against registered
- * users. Never accepts or returns plaintext contacts. `already_connected` counts
- * contacts on Click you're already connected with (left out of `matches`), so the
- * app can say so instead of "none of your contacts are on Click".
+ * users. Never accepts or returns plaintext contacts. Contacts you already have a
+ * connection with are left out of `matches` and counted instead (`already_connected`
+ * for established ones, `pending` for requests either way), so the app can say so
+ * instead of "none of your contacts are on Click".
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser(request);
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
   );
 
   if (candidateIds.length === 0) {
-    return NextResponse.json({ matches: [] as DiscoverProfileCard[], already_connected: 0 });
+    return NextResponse.json({ matches: [] as DiscoverProfileCard[], already_connected: 0, pending: 0 });
   }
 
   const { data: existingPairs, error: pairErr } = await admin
@@ -77,20 +78,27 @@ export async function POST(request: NextRequest) {
   }
 
   const alreadyConnected = new Set<string>();
+  const pendingWith = new Set<string>();
   for (const row of existingPairs ?? []) {
     const ids = Array.isArray(row.user_ids) ? row.user_ids : [];
     const status = typeof row.status === 'string' ? row.status : '';
     if (status === 'removed') continue;
+    const target = status === 'pending' ? pendingWith : alreadyConnected;
     for (const id of ids) {
-      if (typeof id === 'string' && id !== auth.user.id) alreadyConnected.add(id);
+      if (typeof id === 'string' && id !== auth.user.id) target.add(id);
     }
   }
 
   const visibleIds: string[] = [];
   let alreadyConnectedCount = 0;
+  let pendingCount = 0;
   for (const id of candidateIds) {
     if (alreadyConnected.has(id)) {
       alreadyConnectedCount += 1;
+      continue;
+    }
+    if (pendingWith.has(id)) {
+      pendingCount += 1;
       continue;
     }
     if (await isPairBlocked(admin, auth.user.id, id)) continue;
@@ -101,6 +109,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       matches: [] as DiscoverProfileCard[],
       already_connected: alreadyConnectedCount,
+      pending: pendingCount,
     });
   }
 
@@ -152,5 +161,5 @@ export async function POST(request: NextRequest) {
     })
     .filter((card) => card.id.length > 0);
 
-  return NextResponse.json({ matches, already_connected: alreadyConnectedCount });
+  return NextResponse.json({ matches, already_connected: alreadyConnectedCount, pending: pendingCount });
 }

@@ -17,7 +17,9 @@ export async function POST(request: NextRequest) {
   const parsed = await parseBody(request, myPhoneBodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const phone = normalizePhoneE164(parsed.data.phone);
+  // Only digits, spaces and phone punctuation: "ext 12" / "x12" / ";12" would be folded into
+  // the digits and produce a number no contact card ever matches.
+  const phone = /^[+\d\s().-]+$/.test(parsed.data.phone) ? normalizePhoneE164(parsed.data.phone) : null;
   if (!phone || phone.length > 16) {
     return apiError('Enter a valid phone number', 400, 'invalid_phone');
   }

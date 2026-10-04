@@ -38,7 +38,9 @@ export async function PUT(request: NextRequest) {
   const parsed = await parseBody(request, myPhoneBodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const phone = normalizePhoneE164(parsed.data.phone);
+  // Only digits, spaces and phone punctuation: "ext 12" / "x12" / ";12" would be folded into
+  // the digits and produce a number no contact card ever matches.
+  const phone = /^[+\d\s().-]+$/.test(parsed.data.phone) ? normalizePhoneE164(parsed.data.phone) : null;
   if (!phone || phone.length > 16) {
     return apiError('Enter a valid phone number', 400, 'invalid_phone');
   }
@@ -68,6 +70,10 @@ export async function PUT(request: NextRequest) {
   }
 
   const { error } = await admin.from('users').update({ phone_e164: phone }).eq('id', auth.user.id);
+  // 23505: another account saved this number between the check above and now.
+  if (error?.code === '23505') {
+    return apiError('That number is already on another Click account', 409, 'phone_taken');
+  }
   if (error) return apiError('Failed to save phone', 500, 'phone_failed');
   const { error: logErr } = await admin.from('user_phone_changes').insert({ user_id: auth.user.id });
   if (logErr) console.warn('[me/phone] change log:', logErr.message);
