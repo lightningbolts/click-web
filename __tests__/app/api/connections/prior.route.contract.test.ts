@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { POST as discoverPost } from '@/app/api/contacts/discover/route';
 import { POST as requestPost } from '@/app/api/connections/prior/request/route';
 import { POST as respondPost } from '@/app/api/connections/prior/respond/route';
+import { PUT as phonePut } from '@/app/api/me/phone/route';
 import { sha256HexUtf8, normalizeEmail, normalizePhoneE164 } from '@/lib/connections/priorConnections';
 import { formatSplitConnectionMetrics, isHandshakeSource, isPriorSource } from '@/lib/insights/analytics';
 
@@ -154,7 +155,73 @@ describe('POST /api/contacts/discover', () => {
     expect(json.matches).toEqual([
       { id: userB, name: 'Bee', avatar_url: null, tags: ['music'] },
     ]);
+    expect(json.already_connected).toBe(0);
     expect(from).not.toHaveBeenCalledWith('connection_encounters');
+  });
+
+  it('counts contacts you are already connected with instead of returning them', async () => {
+    mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
+    const hash = sha256HexUtf8('friend@example.com');
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: [{ hash, user_id: userB }], error: null });
+      if (table === 'connections') {
+        return chain({ data: [{ id: 'c1', user_ids: [userA, userB], status: 'active' }], error: null });
+      }
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+
+    const res = await discoverPost(
+      jsonRequest('http://localhost/api/contacts/discover', { hashed_contacts: [hash] }),
+    );
+    expect(await res.json()).toEqual({ matches: [], already_connected: 1 });
+  });
+});
+
+describe('PUT /api/me/phone', () => {
+  beforeEach(() => {
+    mockRequireUser.mockReset();
+    mockCreateAdminClient.mockReset();
+    mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
+  });
+
+  function phoneRequest(phone: string) {
+    return new NextRequest('http://localhost/api/me/phone', {
+      method: 'PUT',
+      headers: { authorization: 'Bearer fake.jwt.token', 'content-type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  it('rejects numbers that are too short', async () => {
+    mockCreateAdminClient.mockReturnValue({ from: jest.fn() });
+    const res = await phonePut(phoneRequest('555-0100'));
+    expect(res.status).toBe(400);
+  });
+
+  it('refuses a number another account already has', async () => {
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: { user_id: userB }, error: null });
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phonePut(phoneRequest('(206) 555-0100'));
+    expect(res.status).toBe(409);
+    expect(from).not.toHaveBeenCalledWith('users');
+  });
+
+  it('saves the normalized number', async () => {
+    const users = chain({ data: null, error: null });
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: null, error: null });
+      if (table === 'users') return users;
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phonePut(phoneRequest('(206) 555-0100'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ phone: '+12065550100' });
+    expect(users.update).toHaveBeenCalledWith({ phone_e164: '+12065550100' });
   });
 });
 

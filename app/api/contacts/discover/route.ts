@@ -21,7 +21,9 @@ export type DiscoverProfileCard = {
  * POST /api/contacts/discover
  *
  * Match SHA-256 phone/email hashes (computed on-device) against registered
- * users. Never accepts or returns plaintext contacts.
+ * users. Never accepts or returns plaintext contacts. `already_connected` counts
+ * contacts on Click you're already connected with (left out of `matches`), so the
+ * app can say so instead of "none of your contacts are on Click".
  */
 export async function POST(request: NextRequest) {
   const auth = await requireUser(request);
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
   );
 
   if (candidateIds.length === 0) {
-    return NextResponse.json({ matches: [] as DiscoverProfileCard[] });
+    return NextResponse.json({ matches: [] as DiscoverProfileCard[], already_connected: 0 });
   }
 
   const { data: existingPairs, error: pairErr } = await admin
@@ -85,14 +87,21 @@ export async function POST(request: NextRequest) {
   }
 
   const visibleIds: string[] = [];
+  let alreadyConnectedCount = 0;
   for (const id of candidateIds) {
-    if (alreadyConnected.has(id)) continue;
+    if (alreadyConnected.has(id)) {
+      alreadyConnectedCount += 1;
+      continue;
+    }
     if (await isPairBlocked(admin, auth.user.id, id)) continue;
     visibleIds.push(id);
   }
 
   if (visibleIds.length === 0) {
-    return NextResponse.json({ matches: [] as DiscoverProfileCard[] });
+    return NextResponse.json({
+      matches: [] as DiscoverProfileCard[],
+      already_connected: alreadyConnectedCount,
+    });
   }
 
   const { data: users, error: usersErr } = await admin
@@ -143,5 +152,5 @@ export async function POST(request: NextRequest) {
     })
     .filter((card) => card.id.length > 0);
 
-  return NextResponse.json({ matches });
+  return NextResponse.json({ matches, already_connected: alreadyConnectedCount });
 }
