@@ -59,7 +59,8 @@ the poster's core mark — so archiving, un-coring or blocking applies immediate
 
 | Route | Role |
 |-------|------|
-| `GET /api/me/shared-drops` | The bounded Home strip (`strip_days`, `strip_limit`): yours and your connections', newest first, with your `developed_at`; drops you've developed also carry `original_url` (signed) and `reactions` (as `GET /api/reactions/shared_drop/{id}`), so the strip needs no follow-up calls. Pending ones show as pixelated teasers when `teaser` is `pixelated` |
+| `GET /api/me/shared-drops` | The Home strip: every drop from the last `strip_window_hours` (24) when there are more than `strip_min` (25), otherwise the newest `strip_min` whatever their age (bounded by `strip_max`, 150). Yours and your connections', newest first, with your `developed_at`; drops you've developed also carry `original_url` (signed) and `reactions` (as `GET /api/reactions/shared_drop/{id}`), so the strip needs no follow-up calls. Pending ones show as pixelated teasers when `teaser` is `pixelated` |
+| `GET /api/me/shared-drops/archive?before=&limit=` | Every drop you can see (the archive behind Home's "View all"), newest first, 30 a page (max 60), same drop shape as the strip. `next_before` is the next page's cursor, null at the end |
 | `POST /api/me/shared-drops` | `{ client_drop_id, audience: all\|core, mime_type, original_b64, preview_b64, width?, height? }`; 409 `cap_reached` |
 | `DELETE /api/me/shared-drops/{id}` | Poster only, any time (not flag-gated) |
 

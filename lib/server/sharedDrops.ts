@@ -8,6 +8,7 @@ import { displayNameFromUser, type UserProfileRow } from '@/lib/events/attendeeD
 import { loadReactionsBatch } from '@/lib/server/reactionLists';
 import {
   canSeeSharedDrop,
+  isListable,
   selectStrip,
   type PosterView,
   type SharedAudience,
@@ -23,8 +24,9 @@ export function sharedDropsConfigFrom(config: Record<string, unknown>): SharedDr
     dailyCap: configNumber(config, 'daily_cap', 3, { min: 1, max: 20 }),
     developHours: configNumber(config, 'develop_hours', 1, { min: 1, max: 72 }),
     teaser: config.teaser === 'none' ? 'none' : 'pixelated',
-    stripDays: configNumber(config, 'strip_days', 7, { min: 1, max: 30 }),
-    stripLimit: configNumber(config, 'strip_limit', 12, { min: 1, max: 50 }),
+    stripWindowHours: configNumber(config, 'strip_window_hours', 24, { min: 1, max: 168 }),
+    stripMin: configNumber(config, 'strip_min', 25, { min: 1, max: 100 }),
+    stripMax: configNumber(config, 'strip_max', 150, { min: 25, max: 200 }),
   };
 }
 
@@ -88,38 +90,75 @@ export async function loadPosterViews(
   return out;
 }
 
-/** Your own recent drops plus your connections' drops you may see, bounded for the Home strip. */
+type DropPage = { rows: SharedDropRow[]; views: Map<string, PosterView & { connectionId: string }> };
+
+/**
+ * Your drops and the connections' drops you may see, newest first, older than `before` when given.
+ * Reads `fetch` rows per batch of authors; returns them with their poster views, audience applied.
+ * `cutoff`: when a batch filled up, the oldest time every batch is complete to (rows past it are
+ * dropped, the next page starts there); null when everything was read.
+ */
+async function readVisibleDrops(
+  admin: SupabaseClient,
+  viewerId: string,
+  fetch: number,
+  before: string | null,
+): Promise<DropPage & { cutoff: string | null }> {
+  const peers = await loadViewerPeers(admin, viewerId, { includeArchived: true });
+  const authors = [viewerId, ...peers.keys()];
+  let rows: SharedDropRow[] = [];
+  let cutoff: string | null = null;
+  for (let i = 0; i < authors.length; i += 200) {
+    let query = admin
+      .from('shared_drops')
+      .select(DROP_COLUMNS)
+      .in('user_id', authors.slice(i, i + 200))
+      .is('deleted_at', null);
+    if (before) query = query.lt('created_at', before);
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(fetch);
+    if (error) throw new Error(`shared drops read: ${error.message}`);
+    const batch = (data ?? []) as SharedDropRow[];
+    const last = batch[batch.length - 1];
+    if (batch.length === fetch && last && (!cutoff || Date.parse(last.created_at) > Date.parse(cutoff))) cutoff = last.created_at;
+    rows.push(...batch);
+  }
+  if (cutoff) rows = rows.filter((r) => Date.parse(r.created_at) >= Date.parse(cutoff!));
+  rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const views = await loadPosterViews(admin, viewerId, [...new Set(rows.map((r) => r.user_id))].filter((id) => id !== viewerId));
+  const visible = rows.filter((r) => r.user_id === viewerId || canSeeSharedDrop(r.audience, views.get(r.user_id)));
+  return { rows: visible, views, cutoff };
+}
+
+const candidate = (r: SharedDropRow) => ({ ...r, userId: r.user_id, createdAtMs: Date.parse(r.created_at), revealAtMs: Date.parse(r.reveal_at) });
+
+/** The Home strip: the last day's drops, or the newest `stripMin` when the day was quieter. */
 export async function listSharedDropStrip(
   admin: SupabaseClient,
   viewerId: string,
   config: SharedDropsConfig,
   nowMs: number = Date.now(),
-): Promise<{ rows: SharedDropRow[]; views: Map<string, PosterView & { connectionId: string }> }> {
-  const peers = await loadViewerPeers(admin, viewerId, { includeArchived: true });
-  const since = new Date(nowMs - config.stripDays * 86_400_000).toISOString();
-  const authors = [viewerId, ...peers.keys()];
-  const rows: SharedDropRow[] = [];
-  for (let i = 0; i < authors.length; i += 200) {
-    const { data, error } = await admin
-      .from('shared_drops')
-      .select(DROP_COLUMNS)
-      .in('user_id', authors.slice(i, i + 200))
-      .is('deleted_at', null)
-      .gt('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (error) throw new Error(`shared drops read: ${error.message}`);
-    rows.push(...((data ?? []) as SharedDropRow[]));
-  }
-  const views = await loadPosterViews(admin, viewerId, [...new Set(rows.map((r) => r.user_id))].filter((id) => id !== viewerId));
-  const visible = rows.filter((r) => r.user_id === viewerId || canSeeSharedDrop(r.audience, views.get(r.user_id)));
-  const strip = selectStrip(
-    visible.map((r) => ({ ...r, userId: r.user_id, createdAtMs: Date.parse(r.created_at), revealAtMs: Date.parse(r.reveal_at) })),
-    viewerId,
-    nowMs,
-    config,
-  );
-  return { rows: strip, views };
+): Promise<DropPage> {
+  const { rows, views } = await readVisibleDrops(admin, viewerId, config.stripMax, null);
+  return { rows: selectStrip(rows.map(candidate), viewerId, nowMs, config), views };
+}
+
+/**
+ * One page of every drop you can see (the archive behind "View all"), newest first. `nextBefore`
+ * is the cursor for the next page, null at the end.
+ */
+export async function listSharedDropArchive(
+  admin: SupabaseClient,
+  viewerId: string,
+  config: SharedDropsConfig,
+  args: { before: string | null; limit: number },
+  nowMs: number = Date.now(),
+): Promise<DropPage & { nextBefore: string | null }> {
+  const { rows, views, cutoff } = await readVisibleDrops(admin, viewerId, args.limit, args.before);
+  const page = rows.filter((r) => isListable(candidate(r), viewerId, nowMs, config.teaser)).slice(0, args.limit);
+  // A full page continues after its last drop; a short one after what was read, so drops this
+  // viewer can't see never stall paging.
+  const nextBefore = page.length === args.limit ? page[page.length - 1].created_at : cutoff;
+  return { rows: page, views, nextBefore };
 }
 
 export async function serializeSharedDrops(
