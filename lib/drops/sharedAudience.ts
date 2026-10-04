@@ -21,19 +21,28 @@ export function canSeeSharedDrop(audience: SharedAudience, view: PosterView | un
   return audience === 'all' || view.posterMarkedCore;
 }
 
-export type StripConfig = { teaser: 'pixelated' | 'none'; stripDays: number; stripLimit: number };
+export type StripConfig = { teaser: 'pixelated' | 'none'; stripWindowHours: number; stripMin: number; stripMax: number };
 
 export type StripCandidate = { id: string; userId: string; createdAtMs: number; revealAtMs: number };
 
 /**
- * The bounded Home strip: recent drops only (never an infinite feed), newest first. Before reveal a
- * drop shows as a teaser only when teasers are on — except your own, which you always see.
+ * Whether a viewer sees this drop at all right now: before reveal a drop shows as a teaser only
+ * when teasers are on — except your own, which you always see.
+ */
+export function isListable(drop: StripCandidate, viewerId: string, nowMs: number, teaser: StripConfig['teaser']): boolean {
+  return drop.userId === viewerId || drop.revealAtMs <= nowMs || teaser === 'pixelated';
+}
+
+/**
+ * The Home strip, newest first: every drop from the last day (`stripWindowHours`) when there are
+ * more than `stripMin` of them, otherwise the newest `stripMin` whatever their age. `stripMax`
+ * bounds a very busy day. Everything else lives in the archive.
  */
 export function selectStrip<T extends StripCandidate>(drops: T[], viewerId: string, nowMs: number, config: StripConfig): T[] {
-  const since = nowMs - config.stripDays * 86_400_000;
-  return drops
-    .filter((d) => d.createdAtMs > since)
-    .filter((d) => d.userId === viewerId || d.revealAtMs <= nowMs || config.teaser === 'pixelated')
-    .sort((a, b) => b.createdAtMs - a.createdAtMs)
-    .slice(0, config.stripLimit);
+  const since = nowMs - config.stripWindowHours * 3_600_000;
+  const sorted = drops
+    .filter((d) => isListable(d, viewerId, nowMs, config.teaser))
+    .sort((a, b) => b.createdAtMs - a.createdAtMs);
+  const recent = sorted.filter((d) => d.createdAtMs > since).length;
+  return sorted.slice(0, Math.min(config.stripMax, Math.max(config.stripMin, recent)));
 }

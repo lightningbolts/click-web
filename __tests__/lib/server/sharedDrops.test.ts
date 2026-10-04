@@ -7,13 +7,13 @@ jest.mock('@/lib/server/connections/viewerPeers', () => ({
   loadViewerPeers: (...args: unknown[]) => mockPeers(...args),
 }));
 
-import { loadPosterViews, resolveSharedDrops } from '@/lib/server/sharedDrops';
+import { listSharedDropArchive, loadPosterViews, resolveSharedDrops, sharedDropsConfigFrom } from '@/lib/server/sharedDrops';
 
 function admin(tables: Record<string, unknown[]>) {
   return {
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
-      for (const m of ['select', 'eq', 'in', 'is', 'gt', 'order', 'limit']) chain[m] = () => chain;
+      for (const m of ['select', 'eq', 'in', 'is', 'gt', 'lt', 'order', 'limit']) chain[m] = () => chain;
       chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(resolve({ data: tables[table] ?? [], error: null }));
       return chain;
     },
@@ -79,6 +79,31 @@ describe('shared drop audience resolution', () => {
       ['ana-core', 'cal-core', 'ben-all', 'cal-all', 'stranger-all', 'mine'],
     );
     expect([...resolved.keys()].sort()).toEqual(['ana-core', 'cal-all', 'mine']);
+  });
+});
+
+describe('shared drop archive', () => {
+  beforeEach(() => {
+    mockPeers.mockResolvedValue(new Map([['ana', { userId: 'ana', connectionId: 'c-ana', isCore: false }]]));
+  });
+  const at = (row: ReturnType<typeof drop>, created: string) => ({ ...row, created_at: created, reveal_at: created });
+  const config = sharedDropsConfigFrom({});
+
+  it('pages newest first through the drops the audience admits', async () => {
+    const tables = {
+      shared_drops: [
+        at(drop('a3', 'ana', 'all'), '2026-10-05T12:00:00Z'),
+        at(drop('m2', 'me', 'core'), '2026-10-05T11:00:00Z'),
+        at(drop('a-core', 'ana', 'core'), '2026-10-05T10:00:00Z'),
+        at(drop('a1', 'ana', 'all'), '2026-10-05T09:00:00Z'),
+      ],
+    };
+    const full = await listSharedDropArchive(admin(tables) as never, 'me', config, { before: null, limit: 2 });
+    expect(full.rows.map((r) => r.id)).toEqual(['a3', 'm2']);
+    expect(full.nextBefore).toBe('2026-10-05T11:00:00Z');
+    const short = await listSharedDropArchive(admin(tables) as never, 'me', config, { before: null, limit: 10 });
+    expect(short.rows.map((r) => r.id)).toEqual(['a3', 'm2', 'a1']);
+    expect(short.nextBefore).toBeNull();
   });
 });
 
