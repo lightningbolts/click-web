@@ -3,7 +3,9 @@
  * (it's hashed into `user_contact_hashes` by a trigger and never returned to anyone else).
  *
  * GET    /api/me/phone            → { phone: "+12065550100" | null }
- * PUT    /api/me/phone { phone }  → normalizes to E.164 and saves; 409 if another account has it.
+ * PUT    /api/me/phone { phone }  → normalizes to E.164 and saves; 409 if another account has it,
+ *                                   429 after 3 changes in 24h (numbers aren't SMS-verified, so
+ *                                   this keeps anyone from cycling through numbers).
  * DELETE /api/me/phone            → removes it (friends can no longer find you by number).
  */
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,6 +15,9 @@ import { apiError } from '@/lib/api/errors';
 import { myPhoneBodySchema } from '@/lib/api/schemas/connections';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { normalizePhoneE164, sha256HexUtf8 } from '@/lib/connections/priorConnections';
+
+const PHONE_CHANGES_PER_DAY = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   const auth = await requireUser(request);
@@ -49,9 +54,23 @@ export async function PUT(request: NextRequest) {
   if (owner?.user_id && owner.user_id !== auth.user.id) {
     return apiError('That number is already on another Click account', 409, 'phone_taken');
   }
+  // Already yours: nothing changes, so it doesn't count toward the daily limit.
+  if (owner?.user_id === auth.user.id) return NextResponse.json({ phone });
+
+  const { count, error: countErr } = await admin
+    .from('user_phone_changes')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', auth.user.id)
+    .gte('created_at', new Date(Date.now() - DAY_MS).toISOString());
+  if (countErr) return apiError('Failed to save phone', 500, 'phone_failed');
+  if ((count ?? 0) >= PHONE_CHANGES_PER_DAY) {
+    return apiError('You can change your number again tomorrow', 429, 'phone_rate_limited');
+  }
 
   const { error } = await admin.from('users').update({ phone_e164: phone }).eq('id', auth.user.id);
   if (error) return apiError('Failed to save phone', 500, 'phone_failed');
+  const { error: logErr } = await admin.from('user_phone_changes').insert({ user_id: auth.user.id });
+  if (logErr) console.warn('[me/phone] change log:', logErr.message);
   return NextResponse.json({ phone });
 }
 
