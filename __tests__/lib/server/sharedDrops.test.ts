@@ -44,18 +44,20 @@ describe('shared drop audience resolution', () => {
     );
   });
 
-  it("reads the poster's side: archived/hidden connections and core marks", async () => {
+  it("reads the poster's side: hidden connections and core marks, not archived chats", async () => {
     const views = await loadPosterViews(
       admin({
-        connection_archives: [{ user_id: 'ben', connection_id: 'c-ben' }],
-        connection_hidden: [],
+        connection_archives: [{ user_id: 'cal', connection_id: 'c-cal' }],
+        connection_hidden: [{ user_id: 'ben', connection_id: 'c-ben' }],
         connection_core: [{ user_id: 'ana', connection_id: 'c-ana' }],
       }) as never,
       'me',
-      ['ana', 'ben', 'stranger'],
+      ['ana', 'ben', 'cal', 'stranger'],
     );
+    expect(mockPeers).toHaveBeenCalledWith(expect.anything(), 'me', { includeArchived: true });
     expect(views.get('ana')).toMatchObject({ posterKeepsConnection: true, posterMarkedCore: true });
     expect(views.get('ben')).toMatchObject({ posterKeepsConnection: false });
+    expect(views.get('cal')).toMatchObject({ posterKeepsConnection: true });
     expect(views.has('stranger')).toBe(false);
   });
 
@@ -70,8 +72,7 @@ describe('shared drop audience resolution', () => {
           drop('stranger-all', 'stranger', 'all'),
           drop('mine', 'me', 'core'),
         ],
-        connection_archives: [{ user_id: 'ben', connection_id: 'c-ben' }],
-        connection_hidden: [],
+        connection_hidden: [{ user_id: 'ben', connection_id: 'c-ben' }],
         connection_core: [{ user_id: 'ana', connection_id: 'c-ana' }],
       }) as never,
       'me',
