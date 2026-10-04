@@ -33,10 +33,20 @@ export async function loadBlockedUserIds(admin: SupabaseClient, viewerId: string
   return new Set([...blockedByViewer, ...blockedViewer]);
 }
 
-export async function loadViewerPeers(admin: SupabaseClient, viewerId: string): Promise<Map<string, ViewerPeer>> {
+/**
+ * `includeArchived`: archiving only tidies the chat list (and the nightly sweep archives every chat
+ * idle for a week), so surfaces about the connection itself, like shared drops, keep archived peers.
+ */
+export async function loadViewerPeers(
+  admin: SupabaseClient,
+  viewerId: string,
+  { includeArchived = false }: { includeArchived?: boolean } = {},
+): Promise<Map<string, ViewerPeer>> {
   const [connections, archived, hidden, core, blocked] = await Promise.all([
     admin.from('connections').select('id, user_ids, status, expiry_state').contains('user_ids', [viewerId]),
-    ids(admin.from('connection_archives').select('connection_id').eq('user_id', viewerId), 'connection_id', 'archives'),
+    includeArchived
+      ? new Set<string>()
+      : ids(admin.from('connection_archives').select('connection_id').eq('user_id', viewerId), 'connection_id', 'archives'),
     ids(admin.from('connection_hidden').select('connection_id').eq('user_id', viewerId), 'connection_id', 'hidden'),
     ids(admin.from('connection_core').select('connection_id').eq('user_id', viewerId), 'connection_id', 'core'),
     loadBlockedUserIds(admin, viewerId),

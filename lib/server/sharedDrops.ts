@@ -52,7 +52,8 @@ export function visibleCaption(row: Pick<SharedDropRow, 'user_id' | 'reveal_at' 
 
 /**
  * For each poster, how the viewer and that poster stand right now: connected on the viewer's
- * side (active, not archived/hidden, not blocked either way), kept on the poster's side, and core.
+ * side (active, not hidden, not blocked either way), kept on the poster's side, and core. Archived
+ * chats still count: archiving tidies the inbox (and happens automatically after a quiet week).
  */
 export async function loadPosterViews(
   admin: SupabaseClient,
@@ -61,7 +62,7 @@ export async function loadPosterViews(
 ): Promise<Map<string, PosterView & { connectionId: string }>> {
   const out = new Map<string, PosterView & { connectionId: string }>();
   if (posterIds.length === 0) return out;
-  const peers = await loadViewerPeers(admin, viewerId);
+  const peers = await loadViewerPeers(admin, viewerId, { includeArchived: true });
   const connected = posterIds.filter((id) => peers.has(id));
   if (connected.length === 0) return out;
   const connectionIds = connected.map((id) => peers.get(id)!.connectionId);
@@ -74,17 +75,13 @@ export async function loadPosterViews(
     if (error) throw new Error(`shared audience ${table}: ${error.message}`);
     return new Set(((data ?? []) as Array<{ user_id: string; connection_id: string }>).map((r) => `${r.user_id}:${r.connection_id}`));
   };
-  const [archived, hidden, core] = await Promise.all([
-    pairs('connection_archives'),
-    pairs('connection_hidden'),
-    pairs('connection_core'),
-  ]);
+  const [hidden, core] = await Promise.all([pairs('connection_hidden'), pairs('connection_core')]);
   for (const posterId of connected) {
     const key = `${posterId}:${peers.get(posterId)!.connectionId}`;
     out.set(posterId, {
       connectionId: peers.get(posterId)!.connectionId,
       viewerConnected: true,
-      posterKeepsConnection: !archived.has(key) && !hidden.has(key),
+      posterKeepsConnection: !hidden.has(key),
       posterMarkedCore: core.has(key),
     });
   }
@@ -98,7 +95,7 @@ export async function listSharedDropStrip(
   config: SharedDropsConfig,
   nowMs: number = Date.now(),
 ): Promise<{ rows: SharedDropRow[]; views: Map<string, PosterView & { connectionId: string }> }> {
-  const peers = await loadViewerPeers(admin, viewerId);
+  const peers = await loadViewerPeers(admin, viewerId, { includeArchived: true });
   const since = new Date(nowMs - config.stripDays * 86_400_000).toISOString();
   const authors = [viewerId, ...peers.keys()];
   const rows: SharedDropRow[] = [];

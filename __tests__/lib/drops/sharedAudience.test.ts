@@ -14,8 +14,8 @@ describe('shared drop audience', () => {
     expect(canSeeSharedDrop('core', { ...connected, posterMarkedCore: true })).toBe(true);
   });
 
-  it('hides drops once either side archives, hides or blocks', () => {
-    expect(canSeeSharedDrop('all', undefined)).toBe(false); // blocked, removed, or viewer archived/hid
+  it('hides drops once either side hides or blocks', () => {
+    expect(canSeeSharedDrop('all', undefined)).toBe(false); // blocked, removed, or viewer hid
     expect(canSeeSharedDrop('all', { ...connected, viewerConnected: false })).toBe(false);
     expect(canSeeSharedDrop('all', { ...connected, posterKeepsConnection: false })).toBe(false);
     expect(canSeeSharedDrop('core', { ...connected, posterMarkedCore: true, posterKeepsConnection: false })).toBe(false);

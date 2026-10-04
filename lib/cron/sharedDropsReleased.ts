@@ -36,7 +36,7 @@ export async function releasedDropsByViewer(
 ): Promise<Map<string, ReleasedDrop[]>> {
   const candidates = new Set<string>();
   for (const poster of new Set(drops.map((d) => d.user_id))) {
-    for (const peer of (await loadViewerPeers(admin, poster)).keys()) candidates.add(peer);
+    for (const peer of (await loadViewerPeers(admin, poster, { includeArchived: true })).keys()) candidates.add(peer);
   }
   const out = new Map<string, ReleasedDrop[]>();
   const ids = drops.map((d) => d.id);

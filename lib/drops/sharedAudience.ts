@@ -1,7 +1,7 @@
 /**
  * F3 — who may see a shared drop, from both people's current connection state. Pure: the server
  * gathers the facts, this decides. A viewer sees a poster's drop only when each has the other as
- * an active connection (not archived, hidden or blocked on either side), and for a core-only drop,
+ * an active connection (not hidden or blocked on either side; archived chats still count), and for a core-only drop,
  * only when the poster marked that connection core.
  */
 
@@ -10,7 +10,7 @@ export type SharedAudience = 'all' | 'core';
 export type PosterView = {
   /** The poster is among the viewer's active connections (viewer's side). */
   viewerConnected: boolean;
-  /** The poster hasn't archived or hidden the connection (poster's side). */
+  /** The poster hasn't hidden the connection (poster's side). */
   posterKeepsConnection: boolean;
   /** The poster marked the connection core. */
   posterMarkedCore: boolean;
