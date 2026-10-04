@@ -7,7 +7,7 @@ export default function TermsOfService() {
           <h1 id="terms-heading" data-testid="terms-heading" className="mkt-page-title text-5xl md:text-6xl font-bold mb-6">
             Terms of <span className="text-primary">Service</span>
           </h1>
-          <p className="text-on-surface-variant mb-12">Last updated: April 2026</p>
+          <p className="text-on-surface-variant mb-12">Last updated: October 2026</p>
 
           <div className="space-y-8 text-on-surface leading-relaxed">
             <section>
@@ -51,16 +51,23 @@ export default function TermsOfService() {
 
             <section>
               <h2 className="text-2xl font-bold text-on-surface mb-4">Community Guidelines</h2>
-              <p className="mb-4">Click is about real connections. We don't tolerate:</p>
+              <p className="mb-4">
+                Click is about real connections. We have zero tolerance for objectionable content or
+                abusive users. That includes:
+              </p>
               <ul className="space-y-3 list-disc list-inside">
                 <li>Harassment, bullying, or hate speech</li>
                 <li>Spam, scams, or misleading content</li>
                 <li>Impersonation or identity theft</li>
-                <li>Sharing explicit content without consent</li>
+                <li>Sexually explicit, violent, or graphic content</li>
+                <li>Threats, or encouraging self-harm or violence</li>
                 <li>Attempting to circumvent connection expiry features</li>
               </ul>
               <p className="mt-4">
-                Violations may result in account suspension or termination.
+                You can report any person, message, photo, or event from inside the app, and block
+                anyone so they can no longer reach you. We review reports within 24 hours, remove
+                content that breaks these guidelines, and suspend or permanently remove the accounts
+                responsible.
               </p>
             </section>
 
