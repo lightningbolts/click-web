@@ -6,6 +6,8 @@ import { NextRequest } from 'next/server';
 import { POST as discoverPost } from '@/app/api/contacts/discover/route';
 import { POST as requestPost } from '@/app/api/connections/prior/request/route';
 import { POST as respondPost } from '@/app/api/connections/prior/respond/route';
+import { PUT as phonePut } from '@/app/api/me/phone/route';
+import { POST as phoneReportPost } from '@/app/api/me/phone/report/route';
 import { sha256HexUtf8, normalizeEmail, normalizePhoneE164 } from '@/lib/connections/priorConnections';
 import { formatSplitConnectionMetrics, isHandshakeSource, isPriorSource } from '@/lib/insights/analytics';
 
@@ -154,7 +156,160 @@ describe('POST /api/contacts/discover', () => {
     expect(json.matches).toEqual([
       { id: userB, name: 'Bee', avatar_url: null, tags: ['music'] },
     ]);
+    expect(json.already_connected).toBe(0);
+    expect(json.pending).toBe(0);
     expect(from).not.toHaveBeenCalledWith('connection_encounters');
+  });
+
+  it('counts contacts you are already connected with instead of returning them', async () => {
+    mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
+    const hash = sha256HexUtf8('friend@example.com');
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: [{ hash, user_id: userB }], error: null });
+      if (table === 'connections') {
+        return chain({ data: [{ id: 'c1', user_ids: [userA, userB], status: 'active' }], error: null });
+      }
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+
+    const res = await discoverPost(
+      jsonRequest('http://localhost/api/contacts/discover', { hashed_contacts: [hash] }),
+    );
+    expect(await res.json()).toEqual({ matches: [], already_connected: 1, pending: 0 });
+  });
+
+  it('counts pending requests separately from established connections', async () => {
+    mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
+    const hash = sha256HexUtf8('friend@example.com');
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: [{ hash, user_id: userB }], error: null });
+      if (table === 'connections') {
+        return chain({ data: [{ id: 'c1', user_ids: [userA, userB], status: 'pending' }], error: null });
+      }
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+
+    const res = await discoverPost(
+      jsonRequest('http://localhost/api/contacts/discover', { hashed_contacts: [hash] }),
+    );
+    expect(await res.json()).toEqual({ matches: [], already_connected: 0, pending: 1 });
+  });
+});
+
+describe('PUT /api/me/phone', () => {
+  beforeEach(() => {
+    mockRequireUser.mockReset();
+    mockCreateAdminClient.mockReset();
+    mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
+  });
+
+  function phoneRequest(phone: string, path = 'me/phone', method = 'PUT') {
+    return new NextRequest(`http://localhost/api/${path}`, {
+      method,
+      headers: { authorization: 'Bearer fake.jwt.token', 'content-type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  it('rejects numbers that are too short', async () => {
+    mockCreateAdminClient.mockReturnValue({ from: jest.fn() });
+    const res = await phonePut(phoneRequest('555-0100'));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects extensions instead of folding them into the number', async () => {
+    mockCreateAdminClient.mockReturnValue({ from: jest.fn() });
+    expect((await phonePut(phoneRequest('206-555-0100 ext 12'))).status).toBe(400);
+    expect((await phonePut(phoneRequest('2065550100x12'))).status).toBe(400);
+  });
+
+  it('turns a concurrent claim of the same number into 409', async () => {
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: null, error: null });
+      if (table === 'user_phone_changes') return chain({ data: null, error: null, count: 0 });
+      if (table === 'users') return chain({ data: null, error: { code: '23505', message: 'dup' } });
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    expect((await phonePut(phoneRequest('(206) 555-0100'))).status).toBe(409);
+  });
+
+  it('refuses a number another account already has', async () => {
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: { user_id: userB }, error: null });
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phonePut(phoneRequest('(206) 555-0100'));
+    expect(res.status).toBe(409);
+    expect(from).not.toHaveBeenCalledWith('users');
+  });
+
+  it('saves the normalized number and logs the change', async () => {
+    const users = chain({ data: null, error: null });
+    const changes = chain({ data: null, error: null, count: 1 });
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: null, error: null });
+      if (table === 'user_phone_changes') return changes;
+      if (table === 'users') return users;
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phonePut(phoneRequest('(206) 555-0100'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ phone: '+12065550100' });
+    expect(users.update).toHaveBeenCalledWith({ phone_e164: '+12065550100' });
+    expect(changes.insert).toHaveBeenCalledWith({ user_id: userA });
+  });
+
+  it('allows 3 changes a day', async () => {
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: null, error: null });
+      if (table === 'user_phone_changes') return chain({ data: null, error: null, count: 3 });
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phonePut(phoneRequest('(206) 555-0100'));
+    expect(res.status).toBe(429);
+    expect(from).not.toHaveBeenCalledWith('users');
+  });
+
+  it('re-saving your own number is a no-op that does not count', async () => {
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: { user_id: userA }, error: null });
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phonePut(phoneRequest('(206) 555-0100'));
+    expect(res.status).toBe(200);
+  });
+
+  it('reports a number another account holds, by hash only', async () => {
+    const reports = chain({ data: null, error: null });
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: { user_id: userB }, error: null });
+      if (table === 'phone_claim_reports') return reports;
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phoneReportPost(phoneRequest('(206) 555-0100', 'me/phone/report', 'POST'));
+    expect(res.status).toBe(201);
+    expect(reports.upsert).toHaveBeenCalledWith(
+      { phone_hash: sha256HexUtf8('+12065550100'), holder_id: userB, reporter_id: userA },
+      { onConflict: 'phone_hash,reporter_id', ignoreDuplicates: true },
+    );
+  });
+
+  it('will not report a number nobody else holds', async () => {
+    const from = jest.fn((table: string) => {
+      if (table === 'user_contact_hashes') return chain({ data: null, error: null });
+      throw new Error(table);
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+    const res = await phoneReportPost(phoneRequest('(206) 555-0100', 'me/phone/report', 'POST'));
+    expect(res.status).toBe(404);
   });
 });
 

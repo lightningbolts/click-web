@@ -126,6 +126,10 @@ export const contactsDiscoverBodySchema = z.object({
   hashed_contacts: z.array(sha256Hex).max(1000),
 });
 
+export const myPhoneBodySchema = z.object({
+  phone: nonEmptyString,
+});
+
 export const priorConnectionRequestBodySchema = z.preprocess(
   withDualId('target_user_id', 'targetUserId'),
   z.object({
