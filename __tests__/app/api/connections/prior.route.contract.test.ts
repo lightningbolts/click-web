@@ -43,6 +43,7 @@ jest.mock('@/lib/connections/priorConnections', () => {
 
 const userA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const userB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const bee = { id: userB, name: 'Bee', first_name: 'Bee', last_name: null, full_name: null, image: null };
 
 function jsonRequest(url: string, body: unknown) {
   return new NextRequest(url, {
@@ -156,12 +157,13 @@ describe('POST /api/contacts/discover', () => {
     expect(json.matches).toEqual([
       { id: userB, name: 'Bee', avatar_url: null, tags: ['music'] },
     ]);
+    expect(json.known).toEqual([]);
     expect(json.already_connected).toBe(0);
     expect(json.pending).toBe(0);
     expect(from).not.toHaveBeenCalledWith('connection_encounters');
   });
 
-  it('counts contacts you are already connected with instead of returning them', async () => {
+  it('lists contacts you are already connected with apart from new matches', async () => {
     mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
     const hash = sha256HexUtf8('friend@example.com');
     const from = jest.fn((table: string) => {
@@ -169,6 +171,8 @@ describe('POST /api/contacts/discover', () => {
       if (table === 'connections') {
         return chain({ data: [{ id: 'c1', user_ids: [userA, userB], status: 'active' }], error: null });
       }
+      if (table === 'users') return chain({ data: [bee], error: null });
+      if (table === 'user_interests') return chain({ data: [], error: null });
       throw new Error(table);
     });
     mockCreateAdminClient.mockReturnValue({ from });
@@ -176,10 +180,15 @@ describe('POST /api/contacts/discover', () => {
     const res = await discoverPost(
       jsonRequest('http://localhost/api/contacts/discover', { hashed_contacts: [hash] }),
     );
-    expect(await res.json()).toEqual({ matches: [], already_connected: 1, pending: 0 });
+    expect(await res.json()).toEqual({
+      matches: [],
+      known: [{ id: userB, name: 'Bee', avatar_url: null, tags: [], status: 'connected' }],
+      already_connected: 1,
+      pending: 0,
+    });
   });
 
-  it('counts pending requests separately from established connections', async () => {
+  it('marks pending requests apart from established connections', async () => {
     mockRequireUser.mockResolvedValue({ ok: true, user: { id: userA }, supabase: {} });
     const hash = sha256HexUtf8('friend@example.com');
     const from = jest.fn((table: string) => {
@@ -187,6 +196,8 @@ describe('POST /api/contacts/discover', () => {
       if (table === 'connections') {
         return chain({ data: [{ id: 'c1', user_ids: [userA, userB], status: 'pending' }], error: null });
       }
+      if (table === 'users') return chain({ data: [bee], error: null });
+      if (table === 'user_interests') return chain({ data: [], error: null });
       throw new Error(table);
     });
     mockCreateAdminClient.mockReturnValue({ from });
@@ -194,7 +205,12 @@ describe('POST /api/contacts/discover', () => {
     const res = await discoverPost(
       jsonRequest('http://localhost/api/contacts/discover', { hashed_contacts: [hash] }),
     );
-    expect(await res.json()).toEqual({ matches: [], already_connected: 0, pending: 1 });
+    expect(await res.json()).toEqual({
+      matches: [],
+      known: [{ id: userB, name: 'Bee', avatar_url: null, tags: [], status: 'pending' }],
+      already_connected: 0,
+      pending: 1,
+    });
   });
 });
 
