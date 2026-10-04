@@ -124,6 +124,7 @@ class FakeQuery implements PromiseLike<Result> {
   private headOnly = false;
   private orders: Array<{ col: string; ascending: boolean }> = [];
   private limitN: number | null = null;
+  private offsetN = 0;
   private singleMode: 'single' | 'maybe' | null = null;
   private upsertOptions: { onConflict?: string; ignoreDuplicates?: boolean } = {};
 
@@ -218,6 +219,12 @@ class FakeQuery implements PromiseLike<Result> {
     this.limitN = n;
     return this;
   }
+  /** Inclusive, like PostgREST. */
+  range(from: number, to: number) {
+    this.offsetN = from;
+    this.limitN = to - from + 1;
+    return this;
+  }
   single() {
     this.singleMode = 'single';
     return this;
@@ -245,7 +252,7 @@ class FakeQuery implements PromiseLike<Result> {
     for (const o of [...this.orders].reverse()) {
       out = [...out].sort((a, b) => (o.ascending ? cmp(a[o.col], b[o.col]) : cmp(b[o.col], a[o.col])));
     }
-    if (this.limitN != null) out = out.slice(0, this.limitN);
+    if (this.limitN != null) out = out.slice(this.offsetN, this.offsetN + this.limitN);
     const projected = out.map((r) => project(r, this.columns));
     const count = this.countMode ? rows.length : null;
     if (this.headOnly) return { data: null, error: null, count };
