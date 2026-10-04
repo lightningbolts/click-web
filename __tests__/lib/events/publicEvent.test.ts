@@ -1,4 +1,5 @@
 import { countEventRsvpsByBeaconIds, loadPublicEventPayload, loadPublicPastEvents, loadPublicUpcomingEvents } from "@/lib/events/publicEvent";
+import { FakeDb } from "../../helpers/fakeSupabase";
 
 function thenableChain(result: { data: unknown; error: null }) {
   const chain: Record<string, unknown> = {};
@@ -8,6 +9,7 @@ function thenableChain(result: { data: unknown; error: null }) {
   chain.in = self;
   chain.order = self;
   chain.limit = self;
+  chain.range = self;
   chain.maybeSingle = () => Promise.resolve(result);
   chain.then = (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject);
@@ -37,6 +39,20 @@ describe("countEventRsvpsByBeaconIds", () => {
     const counts = await countEventRsvpsByBeaconIds(admin as never, ["a", "b", "a"]);
     expect(counts.get("a")).toBe(2);
     expect(counts.get("b")).toBe(2);
+  });
+
+  it("counts past PostgREST's 1,000-row page and across id chunks", async () => {
+    const ids = Array.from({ length: 150 }, (_, i) => `evt-${i}`);
+    const db = new FakeDb({
+      tables: {
+        beacon_attendees: Array.from({ length: 2500 }, (_, i) => ({ beacon_id: "evt-0", user_id: `u-${i}` })),
+        event_guest_rsvps: [{ id: "g-1", beacon_id: "evt-149" }],
+      },
+    });
+    const counts = await countEventRsvpsByBeaconIds(db.client as never, ids);
+    expect(counts.get("evt-0")).toBe(2500);
+    expect(counts.get("evt-149")).toBe(1);
+    expect(counts.get("evt-1")).toBe(0);
   });
 });
 

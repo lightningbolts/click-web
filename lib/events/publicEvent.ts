@@ -93,22 +93,34 @@ export async function countEventRsvpsByBeaconIds(
   for (const id of unique) counts.set(id, 0);
   if (unique.length === 0) return counts;
 
-  const [{ data: clickRows }, { data: guestRows }] = await Promise.all([
-    admin.from("beacon_attendees").select("beacon_id").in("beacon_id", unique),
-    admin.from("event_guest_rsvps").select("beacon_id").in("beacon_id", unique),
-  ]);
-
-  const bump = (rows: unknown) => {
-    if (!Array.isArray(rows)) return;
-    for (const row of rows) {
-      if (!isRecord(row) || typeof row.beacon_id !== "string") continue;
-      counts.set(row.beacon_id, (counts.get(row.beacon_id) ?? 0) + 1);
+  // Ids go in chunks (the `in` list rides in the URL) and rows in pages (PostgREST caps a
+  // response at 1,000 rows), so a page of popular events is never undercounted. Rows are
+  // ordered by each table's key, so pages neither skip nor repeat one.
+  const bump = async (table: "beacon_attendees" | "event_guest_rsvps", key: "user_id" | "id", ids: string[]) => {
+    for (let from = 0; ; from += RSVP_COUNT_PAGE) {
+      const { data, error } = await admin
+        .from(table)
+        .select("beacon_id")
+        .in("beacon_id", ids)
+        .order("beacon_id")
+        .order(key)
+        .range(from, from + RSVP_COUNT_PAGE - 1);
+      if (error || !Array.isArray(data)) return;
+      for (const row of data) {
+        if (!isRecord(row) || typeof row.beacon_id !== "string") continue;
+        counts.set(row.beacon_id, (counts.get(row.beacon_id) ?? 0) + 1);
+      }
+      if (data.length < RSVP_COUNT_PAGE) return;
     }
   };
-  bump(clickRows);
-  bump(guestRows);
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += RSVP_COUNT_ID_CHUNK) chunks.push(unique.slice(i, i + RSVP_COUNT_ID_CHUNK));
+  await Promise.all(chunks.flatMap((ids) => [bump("beacon_attendees", "user_id", ids), bump("event_guest_rsvps", "id", ids)]));
   return counts;
 }
+
+const RSVP_COUNT_PAGE = 1000;
+const RSVP_COUNT_ID_CHUNK = 100;
 
 function hostNameFromProfile(profile: Record<string, unknown>): string | null {
   const first = typeof profile.first_name === "string" ? profile.first_name.trim() : "";
