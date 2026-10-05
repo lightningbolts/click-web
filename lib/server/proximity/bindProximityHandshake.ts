@@ -330,10 +330,12 @@ export async function bindProximityHandshake(
   let handshakeCreatedNewConnection = false;
   let aggregateConnectionId: string | null = null;
 
-  // First-time multi-peer (≥3 members): defer durable create until host confirms selection.
+  // Multi-peer (≥3 members): always let people review who was in the tap (and remove anyone)
+  // before anything durable is written — for new and existing groups alike.
   if (memberIds.length > 2) {
     const existingGroup = await lookupConnectionForMemberSet(admin, memberIds);
-    if (!existingGroup?.id) {
+    const existingGroupId = existingGroup?.id ? String(existingGroup.id) : null;
+    {
       const { data: candidateUsers, error: candidateUsersErr } = await admin
         .from('users')
         .select(USER_PROFILE_SELECT)
@@ -353,9 +355,9 @@ export async function bindProximityHandshake(
             : typeof u.created_at === 'number'
               ? u.created_at
               : 0,
-        connection_id: null,
+        connection_id: existingGroupId,
         encounter_logged: false,
-        is_new_connection: true,
+        is_new_connection: !existingGroupId,
         encounter_persisted_on_bind: false,
       }));
       return {
@@ -369,7 +371,8 @@ export async function bindProximityHandshake(
           pending_handshake_id: insertedRow.id,
           expires_at: insertedRow.expires_at,
           is_group: true,
-          is_new_connection: true,
+          is_new_connection: !existingGroupId,
+          ...(existingGroupId ? { existing_connection_id: existingGroupId } : {}),
           group_clique_candidate: { member_user_ids: memberIds },
         },
       };

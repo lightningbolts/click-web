@@ -31,6 +31,7 @@ import {
 } from '@/lib/server/proximity/bindSupport';
 import { ensureConnectionForMemberSet } from '@/lib/server/proximity/connectionEnsure';
 import { loadMatchGraph } from '@/lib/server/proximity/matchGraph';
+import { applyMemberExclusions, excludedMemberIdsFromPayload } from '@/lib/server/proximity/selectionExclusions';
 import type {
   PendingHandshakeRow,
   ProximityBindOkResponse,
@@ -144,7 +145,17 @@ export async function confirmProximityHandshakeSelection(
     }
   }
 
-  const memberIds = selected;
+  // Honour everyone's removals, whichever phone confirms.
+  const exclusionsByMember = new Map<string, string[]>();
+  for (const memberId of selected) {
+    const payload = memberId === uid ? hostRow.sensor_payload : latestByUser.get(memberId)?.sensor_payload;
+    const excluded = excludedMemberIdsFromPayload(payload);
+    if (excluded.length > 0) exclusionsByMember.set(memberId, excluded);
+  }
+  const memberIds = applyMemberExclusions(uid, selected, exclusionsByMember);
+  if (memberIds.length < 2) {
+    return { kind: 'error', status: 409, body: { error: 'no_members_after_exclusions' } };
+  }
   const peerIds = memberIds.filter((id) => id !== uid);
 
   const clientTags = normalizeContextTagsArray(body.context_tags);

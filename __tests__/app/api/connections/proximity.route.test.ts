@@ -5,6 +5,7 @@
 import { NextRequest } from 'next/server';
 import { GET as proximityGet, POST as proximityPost } from '@/app/api/connections/proximity/route';
 import { POST as proximityConfirm } from '@/app/api/connections/proximity/confirm/route';
+import { POST as proximitySelection } from '@/app/api/connections/proximity/selection/route';
 import type { PendingHandshakeRow } from '@/types/supabase-json';
 import { PENDING_HANDSHAKE_TTL_MS } from '@/types/supabase-json';
 
@@ -208,6 +209,25 @@ function createInMemoryAdmin(extraUserIds: string[] = []) {
           return chain;
         }),
         update: jest.fn((patch: Partial<PendingHandshakeRow>) => ({
+          eq: (col: string, val: string) => {
+            const filters: Record<string, string> = { [col]: val };
+            const chain = {
+              eq: (col2: string, val2: string) => {
+                filters[col2] = val2;
+                return chain;
+              },
+              is: (_col3: string, val3: null) => {
+                for (const row of pending) {
+                  const rec = row as unknown as Record<string, unknown>;
+                  if (Object.entries(filters).every(([k, v]) => rec[k] === v) && row.matched_at === val3) {
+                    Object.assign(row, patch);
+                  }
+                }
+                return Promise.resolve({ error: null });
+              },
+            };
+            return chain;
+          },
           in: (col: string, ids: string[]) => ({
             is: (_col2: string, val2: null) => {
               for (const row of pending) {
@@ -987,6 +1007,43 @@ describe('POST /api/connections/proximity contract', () => {
     expect(rowFor(userB)).not.toHaveProperty('barometric_accuracy_m');
     expect(rowFor(userA)).toMatchObject({ gps_lat: null, gps_lon: null, exact_barometric_elevation_m: null });
     expect(rowFor(userA)).not.toHaveProperty('gps_horizontal_accuracy_m');
+    dateSpy.mockRestore();
+  });
+
+  it('honours a removal made on another phone when the group is confirmed', async () => {
+    const t0 = Date.now();
+    const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    const post = (userId: string, path: string, body: Record<string, unknown>) => {
+      mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({ supabase: {}, user: { id: userId }, authError: null });
+      return new NextRequest(`http://localhost/api/connections/proximity/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    };
+    const at = { gps_lat: sharedLat, gps_lon: sharedLon };
+    await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: ['2222'], ...at }));
+    const resB = await proximityPost(makeRequest(userB, { my_token: '2222', heard_tokens: ['3333'], ...at }));
+    const resC = await proximityPost(makeRequest(userC, { my_token: '3333', heard_tokens: ['2222', '1111'], ...at }));
+    const { pending_handshake_id: tapC, awaiting_selection } = (await resC.json()) as Record<string, unknown>;
+    expect(awaiting_selection).toBe(true);
+    const bTap = ((await resB.json()) as { pending_handshake_id?: string }).pending_handshake_id;
+    expect(bTap).toBeTruthy();
+
+    const selectionRes = await proximitySelection(
+      post(userB, 'selection', { pending_handshake_id: bTap, excluded_member_ids: [userC] }),
+    );
+    expect(selectionRes.status).toBe(200);
+
+    // C confirms everyone, but B removed C — so B is dropped and only A + C are joined.
+    const confirmRes = await proximityConfirm(
+      post(userC, 'confirm', { pending_handshake_id: tapC, selected_member_ids: [userA, userB] }),
+    );
+    expect(confirmRes.status).toBe(200);
+    const confirmed = (await confirmRes.json()) as { is_group: boolean; matches: { id: string }[] };
+    expect(confirmed.is_group).toBe(false);
+    expect(confirmed.matches.map((m) => m.id)).toEqual([userA]);
+    expect(adminStore._connections.some((c) => c.user_ids.includes(userB) && c.user_ids.includes(userC))).toBe(false);
     dateSpy.mockRestore();
   });
 

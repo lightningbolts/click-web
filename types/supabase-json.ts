@@ -87,6 +87,8 @@ export interface ProximitySensorPayloadJson extends Record<string, Json | undefi
   gps_course_accuracy_deg?: number;
   gps_simulated?: boolean;
   gps_external_accessory?: boolean;
+  /** People this user removed while reviewing a group tap; never joined with them on confirm. */
+  excluded_member_ids?: string[];
   sensor_observation?: { [key: string]: Json | undefined };
 }
 
@@ -135,8 +137,10 @@ export interface ProximityBindOkResponse {
   encounter_id?: string;
   collaboration_ttl?: string;
   simulator_mock?: boolean;
-  /** Multi-peer first-time bind: host must confirm selected members before create. */
+  /** Multi-peer bind: people review (and can remove) members before anything is written. */
   awaiting_selection?: boolean;
+  /** Set with awaiting_selection when this exact member set already has a group connection. */
+  existing_connection_id?: string;
   pending_handshake_id?: string;
   expires_at?: string;
 }
@@ -145,6 +149,11 @@ export interface ProximityConfirmSelectionRequest {
   pending_handshake_id: string;
   selected_member_ids: string[];
   context_tags?: unknown;
+}
+
+export interface ProximitySelectionExclusionsRequest {
+  pending_handshake_id: string;
+  excluded_member_ids: string[];
 }
 
 export interface ProximityBindPendingResponse {
