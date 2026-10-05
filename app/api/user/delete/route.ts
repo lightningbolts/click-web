@@ -1,43 +1,17 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { removeAllDropMediaForUser } from '@/lib/server/drops/storage';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 
-export async function DELETE(request: Request) {
+/**
+ * DELETE /api/user/delete — permanently deletes the signed-in account.
+ * Accepts `Authorization: Bearer` (iOS deletes in-app, App Store 5.1.1(v)) or the web cookie session.
+ */
+export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
-        },
-      }
-    );
-    
-    // Use getUser() instead of getSession() for secure server-side auth verification.
-    // getSession() only reads cookies without validating with the Supabase Auth server.
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { user, authError } = await getSupabaseFromRouteRequest(request);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
