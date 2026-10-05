@@ -67,6 +67,24 @@ export function deriveTerrainRelativeAltitude(input: {
   return out;
 }
 
+/**
+ * Columns to store for one encounter's terrain: the DEM elevation whenever it is known (it is a
+ * property of the coordinate, not of the barometer), plus the terrain-relative altitude and
+ * height band when the same device also reported a barometric altitude.
+ */
+export function terrainColumns(input: {
+  barometricAltitudeM: number | null | undefined;
+  barometricAccuracyM?: number | null;
+  terrainElevationM: number | null | undefined;
+}): Partial<TerrainRelativeAltitude> {
+  const derived = deriveTerrainRelativeAltitude(input);
+  if (derived != null) return derived;
+  const { terrainElevationM } = input;
+  return terrainElevationM != null && Number.isFinite(terrainElevationM)
+    ? { terrain_elevation_m: terrainElevationM }
+    : {};
+}
+
 export async function fetchTerrainElevationMeters(lat: number, lon: number): Promise<number | null> {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +

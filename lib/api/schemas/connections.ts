@@ -169,3 +169,13 @@ export const presencePingBodySchema = z.object({
   lat: z.number().finite(),
   lon: z.number().finite(),
 });
+
+/** POST /api/connections/encounter-altitude — late barometric altitude for this phone's rows. */
+export const encounterAltitudeBodySchema = z.object({
+  connection_ids: z.array(z.string().uuid()).min(1).max(20),
+  connection_moment: z.string().min(1).max(64),
+  observed_at: z.string().min(1).max(64),
+  exact_barometric_elevation_m: z.number().finite(),
+  barometric_accuracy_m: z.number().finite().nullish(),
+  barometric_precision_m: z.number().finite().nullish(),
+});

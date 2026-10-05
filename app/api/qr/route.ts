@@ -4,7 +4,7 @@ import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { runAfterResponse } from '@/lib/server/afterResponse';
-import { enrichEncounterRelativeAltitude } from '@/lib/server/connections/encounterEnrichment';
+import { enrichEncounterEnvironment } from '@/lib/server/connections/encounterEnrichment';
 import { encounterObservationColumns, parseEncounterObservation } from '@/lib/server/encounterObservation';
 import {
   normalizeContextTag,
@@ -35,7 +35,6 @@ import { qrScanBodySchema } from '@/lib/api/schemas/connections';
  */
 
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
-const OPEN_METEO_TIMEOUT_MS = 3_500;
 const NOMINATIM_USER_AGENT = 'ClickPlatformsApp/1.0 (contact@click.com)';
 const DISPLAY_LOCATION_FALLBACK = 'A new city';
 
@@ -109,75 +108,6 @@ function extractSpecificLocationName(semanticLocation: Record<string, unknown>):
     address?.residential,
     address?.road,
   ]);
-}
-
-function openMeteoCodeToLabel(code: number): string {
-  if (code === 0) return 'Clear';
-  if ([1, 2, 3].includes(code)) return 'Cloudy';
-  if ([45, 48].includes(code)) return 'Foggy';
-  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle';
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'Rain';
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'Snow';
-  if ([95, 96, 99].includes(code)) return 'Storm';
-  return 'Clear';
-}
-
-function openMeteoCodeToIcon(code: number): string {
-  if (code === 0) return 'clear';
-  if ([1, 2, 3].includes(code)) return 'cloudy';
-  if ([45, 48].includes(code)) return 'fog';
-  if ([51, 53, 55, 56, 57].includes(code)) return 'drizzle';
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain';
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow';
-  if ([95, 96, 99].includes(code)) return 'thunder';
-  return 'clear';
-}
-
-async function fetchOpenMeteoWeatherSnapshot(lat: number, lon: number): Promise<string | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPEN_METEO_TIMEOUT_MS);
-  try {
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl';
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) return null;
-    const raw = (await res.json()) as {
-      current?: {
-        temperature_2m?: number;
-        weather_code?: number;
-        wind_speed_10m?: number;
-        wind_direction_10m?: number;
-        pressure_msl?: number;
-      };
-    };
-    const cur = raw.current;
-    if (cur == null || typeof cur.temperature_2m !== 'number' || !Number.isFinite(cur.temperature_2m)) {
-      return null;
-    }
-    const code =
-      typeof cur.weather_code === 'number' && Number.isFinite(cur.weather_code) ? cur.weather_code : 0;
-    const payload = {
-      iconCode: openMeteoCodeToIcon(code),
-      condition: openMeteoCodeToLabel(code),
-      windSpeedKph:
-        typeof cur.wind_speed_10m === 'number' && Number.isFinite(cur.wind_speed_10m)
-          ? cur.wind_speed_10m
-          : null,
-      pressureMslHpa:
-        typeof cur.pressure_msl === 'number' && Number.isFinite(cur.pressure_msl) ? cur.pressure_msl : null,
-      temperatureCelsius: cur.temperature_2m,
-      windDirectionDegrees:
-        typeof cur.wind_direction_10m === 'number' && Number.isFinite(cur.wind_direction_10m)
-          ? Math.round(cur.wind_direction_10m)
-          : null,
-    };
-    return JSON.stringify(payload);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 async function fetchNominatimReverseGeocode(lat: number, lon: number): Promise<{
@@ -569,12 +499,10 @@ export async function POST(request: NextRequest) {
         if (compassAzimuth != null) encounterInsert.compass_azimuth = compassAzimuth;
         if (batteryLevel != null) encounterInsert.battery_level = batteryLevel;
 
-        let resolvedWeather = clientWeatherSnapshot;
-        if (resolvedWeather == null && gpsPair.lat != null && gpsPair.lon != null) {
-          resolvedWeather = await fetchOpenMeteoWeatherSnapshot(gpsPair.lat, gpsPair.lon);
-        }
-        if (resolvedWeather != null) {
-          encounterInsert.weather_snapshot = resolvedWeather;
+        // Without a client snapshot, weather is filled after the response (one forecast request
+        // with the terrain lookup), so the scan never waits on Open-Meteo.
+        if (clientWeatherSnapshot != null) {
+          encounterInsert.weather_snapshot = clientWeatherSnapshot;
         }
 
         if (resolvedNoiseForEncounter != null) {
@@ -669,11 +597,12 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (encElev != null && gpsPair.lat != null && gpsPair.lon != null) {
-          const [encLat, encLon] = [gpsPair.lat, gpsPair.lon];
-          runAfterResponse('qr altitude enrichment', () =>
-            enrichEncounterRelativeAltitude(adminClient, existingConnection.id, encElev, encLat, encLon, {
-              encounterId: insertedEncounter?.id != null ? String(insertedEncounter.id) : null,
+        if (insertedEncounter?.id != null && gpsPair.lat != null && gpsPair.lon != null) {
+          const [encounterId, encLat, encLon] = [String(insertedEncounter.id), gpsPair.lat, gpsPair.lon];
+          runAfterResponse('qr environment enrichment', () =>
+            enrichEncounterEnvironment(adminClient, encounterId, encLat, encLon, {
+              includeWeather: clientWeatherSnapshot == null,
+              barometricElevationM: encElev,
               barometricAccuracyM: observation.barometric_accuracy_m ?? null,
             }),
           );

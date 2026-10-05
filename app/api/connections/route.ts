@@ -33,8 +33,7 @@ import {
 } from '@/lib/server/connections/geo';
 import {
   buildUtcTimeOfDayLabel,
-  enrichEncounterRelativeAltitude,
-  enrichEncounterWeather,
+  enrichEncounterEnvironment,
   type MemoryCapsulePayload,
 } from '@/lib/server/connections/encounterEnrichment';
 import { finiteBatteryPct } from '@/lib/server/proximity/matching';
@@ -755,7 +754,7 @@ export async function POST(request: NextRequest) {
     if (resolvedNoiseForEncounter != null) {
       encounterInsert.noise_level = resolvedNoiseForEncounter;
     }
-    // elevation_category is set later from relative_altitude_m (AGL) via enrichEncounterRelativeAltitude.
+    // elevation_category is set later from relative_altitude_m (AGL) via enrichEncounterEnvironment.
     // Do not persist client AMSL-derived categories here.
     const resolvedLocationName = manualLocationName ?? specificLocationName ?? memoryCapsule.locationName;
     if (resolvedLocationName) {
@@ -834,36 +833,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (clientWeatherSnapshot == null) {
-      runAfterResponse('connections weather enrichment', () =>
-        enrichEncounterWeather(
-          adminClient,
-          connection.id,
-          geoLocation.lat,
-          geoLocation.lon,
-          memoryCapsule,
-        ),
-      );
-    }
-
-    if (
-      encElev != null &&
-      Number.isFinite(geoLocation.lat) &&
-      Number.isFinite(geoLocation.lon) &&
-      !(geoLocation.lat === 0 && geoLocation.lon === 0)
-    ) {
-      runAfterResponse('connections altitude enrichment', () =>
-        enrichEncounterRelativeAltitude(
-          adminClient,
-          connection.id,
-          encElev,
-          geoLocation.lat,
-          geoLocation.lon,
-          {
-            encounterId: insertedEnc?.id != null ? String(insertedEnc.id) : null,
-            barometricAccuracyM: encounterObservation.barometric_accuracy_m ?? null,
-          },
-        ),
+    // Weather (when the client sent none), DEM terrain and terrain-relative altitude, from one
+    // forecast request after the response — only for the row this request inserted.
+    if (insertedEnc?.id != null) {
+      const encounterId = String(insertedEnc.id);
+      runAfterResponse('connections environment enrichment', () =>
+        enrichEncounterEnvironment(adminClient, encounterId, geoLocation.lat, geoLocation.lon, {
+          includeWeather: clientWeatherSnapshot == null,
+          barometricElevationM: encElev,
+          barometricAccuracyM: encounterObservation.barometric_accuracy_m ?? null,
+        }),
       );
     }
 

@@ -98,6 +98,17 @@ describe('encounterObservationColumns', () => {
       gps_floor: 1,
     });
   });
+
+  it('keeps pressure and relative altitude without an absolute altitude', () => {
+    const barometer = parseEncounterObservation(
+      { barometric_accuracy_m: 2, barometric_pressure_kpa: 101.788, barometric_relative_altitude_m: 0 },
+      NOW,
+    );
+    expect(encounterObservationColumns(barometer, { hasOwnCoordinate: true, hasBarometricAltitude: false })).toEqual({
+      barometric_pressure_kpa: 101.788,
+      barometric_relative_altitude_m: 0,
+    });
+  });
 });
 
 describe('velocity and provenance', () => {
