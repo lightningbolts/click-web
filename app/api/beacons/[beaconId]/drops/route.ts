@@ -5,6 +5,7 @@ import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
 import { runAfterResponse } from '@/lib/server/afterResponse';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
 import { isEventDropWindowOpen } from '@/lib/events/eventDropSchedule';
+import { loadDevelopedAt } from '@/lib/server/drops/develop';
 import { DROP_MAX_ORIGINAL_BYTES, DROP_MAX_PREVIEW_BYTES, decodeDropUpload } from '@/lib/server/drops/storage';
 import {
   authorizeEventDropRequest,
@@ -26,7 +27,8 @@ type Params = { params: Promise<{ beaconId: string }> };
  * GET /api/beacons/{id}/drops — the event's Click Drops for this viewer (spec F1):
  * `{ state, opens_at, closes_at, reveal_at, access, can_post, remaining, show_to_absentees, drops }`.
  * `state`: before | open | developing | revealed. Previews are always pixelated; originals come
- * from /api/drops/develop (opening the recap develops them all).
+ * from /api/drops/develop (each drop is tapped to develop). Each drop carries this viewer's
+ * `developed_at` (null until they develop it), so drops already developed open developed.
  */
 export async function GET(request: NextRequest, { params }: Params): Promise<Response> {
   try {
@@ -41,11 +43,17 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
     ]);
     const { schedule } = event;
     const windowOpen = isEventDropWindowOpen(schedule, now);
+    const revealed = now >= schedule.revealAtMs;
     const mine = rows.filter((r) => r.user_id === userId).length;
+    const [drops, developedAt] = await Promise.all([
+      serializeEventDrops(admin, rows, userId),
+      // Nothing can be developed before the reveal.
+      revealed ? loadDevelopedAt(admin, userId, 'event', rows.map((r) => r.id)) : Promise.resolve({} as Record<string, string>),
+    ]);
     return NextResponse.json(
       {
         state:
-          now < schedule.opensAtMs ? 'before' : windowOpen ? 'open' : now < schedule.revealAtMs ? 'developing' : 'revealed',
+          now < schedule.opensAtMs ? 'before' : windowOpen ? 'open' : revealed ? 'revealed' : 'developing',
         opens_at: new Date(schedule.opensAtMs).toISOString(),
         closes_at: new Date(schedule.closesAtMs).toISOString(),
         reveal_at: new Date(schedule.revealAtMs).toISOString(),
@@ -54,7 +62,7 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
         can_post: windowOpen && role.checkedIn && mine < config.perUserCap,
         remaining: role.checkedIn ? Math.max(0, config.perUserCap - mine) : 0,
         show_to_absentees: showToAbsentees,
-        drops: await serializeEventDrops(admin, rows, userId),
+        drops: drops.map((d) => ({ ...d, developed_at: developedAt[d.id] ?? null })),
       },
       { headers: { 'Cache-Control': 'no-store' } },
     );

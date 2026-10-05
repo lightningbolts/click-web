@@ -44,6 +44,8 @@ export async function GET(
       current_user_signed_up: enriched.current_user_signed_up,
       current_user_checked_in: enriched.current_user_checked_in,
       mutuals_section_unlocked: enriched.mutuals_section_unlocked,
+      // Past events read as "who was there" rather than "who's going".
+      event_ended: loaded.expired,
     });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/attendees/directory:", e);
