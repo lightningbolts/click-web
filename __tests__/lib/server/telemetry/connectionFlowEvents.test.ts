@@ -15,6 +15,25 @@ describe('connectionFlowEvents', () => {
     expect(CONNECTION_FLOW_ALLOWED_EVENTS.has('proximity_at_event_skipped')).toBe(true);
   });
 
+  it('allowlists the QR / Click link funnel and its capture-quality tags', () => {
+    for (const event of [
+      'qr_connect_started',
+      'qr_connect_succeeded',
+      'qr_connect_failed',
+      'qr_connect_reconnect_rate_limited',
+    ]) {
+      expect(CONNECTION_FLOW_ALLOWED_EVENTS.has(event)).toBe(true);
+    }
+    expect(
+      sanitizeCaptureQuality({
+        connection_method: 'qr',
+        activity_available: true,
+        pedometer_available: false,
+      }),
+    ).toEqual({ connection_method: 'qr', activity_available: true, pedometer_available: false });
+    expect(sanitizeCaptureQuality({ connection_method: 'carrier_pigeon' })).toBeNull();
+  });
+
   it('classifies skip reasons without GPS or enough participants', () => {
     expect(proximityAtEventSkipReason(null, null, ['a', 'b'])).toBe('missing_gps');
     expect(proximityAtEventSkipReason(0, 0, ['a', 'b'])).toBe('missing_gps');

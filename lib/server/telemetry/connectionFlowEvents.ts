@@ -24,6 +24,11 @@ export const CONNECTION_FLOW_ALLOWED_EVENTS = new Set([
   'verified_clique_from_proximity_blocked',
   'proximity_at_event_attached',
   'proximity_at_event_skipped',
+  // QR scans and Click links (iOS); `capture_quality.connection_method` tells them apart.
+  'qr_connect_started',
+  'qr_connect_succeeded',
+  'qr_connect_failed',
+  'qr_connect_reconnect_rate_limited',
 ]);
 
 export type ConnectionFlowEventFields = {
@@ -69,10 +74,13 @@ const CAPTURE_QUALITY_BOOLEANS = [
   'heading_available',
   'uwb_available',
   'floor_available',
+  'activity_available',
+  'pedometer_available',
 ] as const;
 
 const CAPTURE_QUALITY_ENUMS = {
   location_accuracy_bucket: ['excellent', 'good', 'usable', 'coarse', 'unusable', 'none'],
+  connection_method: ['tap', 'qr', 'link'],
   sensor_failure: ['none', 'location_unavailable', 'location_denied', 'barometer_unavailable', 'motion_unavailable', 'bluetooth_no_peer', 'ultrasonic_no_peer'],
 } as const satisfies Record<string, readonly string[]>;
 
