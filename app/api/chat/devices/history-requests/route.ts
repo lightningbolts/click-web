@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     if (!me) return NextResponse.json({ incoming: [], own: null });
     const { data, error } = await admin
       .from('chat_device_history_requests')
-      .select(`${REQUEST_COLUMNS}, device:chat_devices(device_label, revoked_at)`)
+      .select(`${REQUEST_COLUMNS}, device:chat_devices!recipient_device_id(device_label, revoked_at)`)
       .eq('user_id', auth.user.id)
       .order('created_at', { ascending: false })
       .limit(20);
