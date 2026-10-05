@@ -44,7 +44,7 @@ async function loadOwnRequest(requestId: string, userId: string) {
   const admin = createChatGatekeeperAdmin();
   const { data, error } = await admin
     .from('chat_device_history_requests')
-    .select('id, user_id, status, created_at, expires_at, decided_at, device:chat_devices(created_at, revoked_at)')
+    .select('id, user_id, status, created_at, expires_at, decided_at, device:chat_devices!recipient_device_id(created_at, revoked_at)')
     .eq('id', requestId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -132,7 +132,7 @@ export async function POST(
       })
       .eq('id', requestId)
       .eq('status', 'pending')
-      .select('id, user_id, status, created_at, expires_at, decided_at, device:chat_devices(created_at, revoked_at)')
+      .select('id, user_id, status, created_at, expires_at, decided_at, device:chat_devices!recipient_device_id(created_at, revoked_at)')
       .maybeSingle();
     if (error) throw new Error(error.message);
     const decided = normalizeRow(data);

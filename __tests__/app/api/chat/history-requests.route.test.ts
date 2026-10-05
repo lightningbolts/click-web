@@ -47,9 +47,11 @@ function adminWith(row: Record<string, unknown> | null) {
     eq: () => selectChain,
     maybeSingle: async () => ({ data: row, error: null }),
   };
+  const select = jest.fn((_columns: string) => selectChain);
   return {
-    admin: { from: jest.fn(() => ({ select: () => selectChain, update })) },
+    admin: { from: jest.fn(() => ({ select, update })) },
     update,
+    select,
   };
 }
 
@@ -106,5 +108,16 @@ describe('/api/chat/devices/history-requests/[requestId]', () => {
     const response = await post('approve');
     expect(response.status).toBe(410);
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it('embeds the requesting device by recipient_device_id (two FKs point at chat_devices)', async () => {
+    mockRequireBearerUser.mockResolvedValue({ ok: true, user: { id: USER_ID }, bearer: jwt([{ method: 'otp', timestamp: Math.floor(Date.now() / 1000) }]) });
+    const { admin, select } = adminWith(pendingRow());
+    mockCreateAdmin.mockReturnValue(admin);
+    await post('approve');
+    expect(select).toHaveBeenCalled();
+    for (const [columns] of select.mock.calls) {
+      if (columns.includes('chat_devices')) expect(columns).toContain('chat_devices!recipient_device_id(');
+    }
   });
 });
