@@ -1,44 +1,30 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { removeAllDropMediaForUser } from '@/lib/server/drops/storage';
+import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
+import { isAppleUser, revokeAppleAuthorizationCode } from '@/lib/server/appleRevoke';
+import { parseBody } from '@/lib/api/parseBody';
+import { userDeleteBodySchema } from '@/lib/api/schemas/user';
 
-export async function DELETE(request: Request) {
+/**
+ * DELETE /api/user/delete — permanently deletes the signed-in account.
+ * Accepts `Authorization: Bearer` (iOS deletes in-app, App Store 5.1.1(v)) or the web cookie session.
+ * Apple sign-in accounts revoke their Apple tokens first when iOS sends an authorization code.
+ */
+export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {
-              // The `setAll` method was called from a Server Component.
-              // This can be ignored if you have middleware refreshing
-              // user sessions.
-            }
-          },
-        },
-      }
-    );
-    
-    // Use getUser() instead of getSession() for secure server-side auth verification.
-    // getSession() only reads cookies without validating with the Supabase Auth server.
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { user, authError } = await getSupabaseFromRouteRequest(request);
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // The web sends no body; iOS sends `{ apple_authorization_code }` for Apple accounts.
+    let appleCode: string | undefined;
+    if (request.body) {
+      const parsed = await parseBody(request, userDeleteBodySchema);
+      if (!parsed.ok) return parsed.response;
+      appleCode = parsed.data.apple_authorization_code;
     }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,6 +44,12 @@ export async function DELETE(request: Request) {
         persistSession: false,
       },
     });
+
+    // A fresh Sign in with Apple code from iOS: Apple's tokens are revoked with the account.
+    if (appleCode && isAppleUser(user.app_metadata)) {
+      const result = await revokeAppleAuthorizationCode(appleCode);
+      if (result !== 'revoked') console.error('Apple token revocation on account deletion:', result);
+    }
 
     await removeAllDropMediaForUser(adminAuthClient, user.id);
     // beacon_reports.reporter_id has no ON DELETE action, so the user's reports would block deletion.
