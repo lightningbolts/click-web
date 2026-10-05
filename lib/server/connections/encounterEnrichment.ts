@@ -26,16 +26,15 @@ export function buildUtcTimeOfDayLabel(isoTimestamp: string): string {
  * Post-insert environment enrichment for one encounter row, from a single Open-Meteo request:
  * the full weather snapshot (only when the client sent none), the DEM terrain elevation, and,
  * when the same device reported a barometric altitude, the terrain-relative altitude and height
- * band. Targets `encounterId` when known (otherwise the connection's newest row) and never
- * delays the response — call it through `runAfterResponse`.
+ * band. Only the row the caller inserted is updated. Never delays the response — call it
+ * through `runAfterResponse`.
  */
 export async function enrichEncounterEnvironment(
   adminClient: ReturnType<typeof createAdminClient>,
-  connectionId: string,
+  encounterId: string,
   lat: number,
   lon: number,
   opts: {
-    encounterId?: string | null;
     includeWeather: boolean;
     barometricElevationM?: number | null;
     barometricAccuracyM?: number | null;
@@ -56,23 +55,6 @@ export async function enrichEncounterEnvironment(
       updates.weather_snapshot = forecast.weatherSnapshot;
     }
     if (Object.keys(updates).length === 0) return;
-
-    let encounterId = opts.encounterId ?? null;
-    if (encounterId == null) {
-      const { data: latestEnc, error: encLookupErr } = await adminClient
-        .from('connection_encounters')
-        .select('id')
-        .eq('connection_id', connectionId)
-        .order('encountered_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (encLookupErr || !latestEnc?.id) {
-        if (encLookupErr) console.error('Encounter lookup for environment enrichment:', encLookupErr);
-        return;
-      }
-      encounterId = String(latestEnc.id);
-    }
 
     const { error } = await adminClient
       .from('connection_encounters')

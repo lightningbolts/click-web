@@ -6,17 +6,10 @@ import { enrichEncounterEnvironment } from '@/lib/server/connections/encounterEn
 
 type Update = { values: Record<string, unknown>; id: unknown };
 
-function fakeAdmin(latestId: string | null = 'latest-enc') {
+function fakeAdmin() {
   const updates: Update[] = [];
   const admin = {
     from: () => ({
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            limit: () => ({ maybeSingle: async () => ({ data: latestId ? { id: latestId } : null, error: null }) }),
-          }),
-        }),
-      }),
       update: (values: Record<string, unknown>) => ({
         eq: async (_column: string, id: unknown) => {
           updates.push({ values, id });
@@ -52,7 +45,7 @@ describe('enrichEncounterEnvironment', () => {
 
   it('stores the full weather snapshot and the DEM elevation on the inserted row', async () => {
     const { admin, updates } = fakeAdmin();
-    await enrichEncounterEnvironment(admin, 'conn', 47.66, -122.3, { encounterId: 'enc-1', includeWeather: true });
+    await enrichEncounterEnvironment(admin, 'enc-1', 47.66, -122.3, { includeWeather: true });
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(updates).toHaveLength(1);
@@ -71,8 +64,7 @@ describe('enrichEncounterEnvironment', () => {
 
   it('keeps the client weather and derives altitude from the barometer', async () => {
     const { admin, updates } = fakeAdmin();
-    await enrichEncounterEnvironment(admin, 'conn', 47.66, -122.3, {
-      encounterId: 'enc-1',
+    await enrichEncounterEnvironment(admin, 'enc-1', 47.66, -122.3, {
       includeWeather: false,
       barometricElevationM: 52,
       barometricAccuracyM: 3,
@@ -85,12 +77,10 @@ describe('enrichEncounterEnvironment', () => {
     });
   });
 
-  it('falls back to the newest row and skips the null island', async () => {
-    const { admin, updates } = fakeAdmin('newest');
-    await enrichEncounterEnvironment(admin, 'conn', 0, 0, { includeWeather: true });
+  it('skips the null island without a forecast request', async () => {
+    const { admin, updates } = fakeAdmin();
+    await enrichEncounterEnvironment(admin, 'enc-1', 0, 0, { includeWeather: true });
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
-
-    await enrichEncounterEnvironment(admin, 'conn', 47.66, -122.3, { includeWeather: true });
-    expect(updates[0].id).toBe('newest');
   });
 });

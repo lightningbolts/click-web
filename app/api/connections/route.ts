@@ -834,15 +834,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Weather (when the client sent none), DEM terrain and terrain-relative altitude, from one
-    // forecast request after the response.
-    runAfterResponse('connections environment enrichment', () =>
-      enrichEncounterEnvironment(adminClient, connection.id, geoLocation.lat, geoLocation.lon, {
-        encounterId: insertedEnc?.id != null ? String(insertedEnc.id) : null,
-        includeWeather: clientWeatherSnapshot == null,
-        barometricElevationM: encElev,
-        barometricAccuracyM: encounterObservation.barometric_accuracy_m ?? null,
-      }),
-    );
+    // forecast request after the response — only for the row this request inserted.
+    if (insertedEnc?.id != null) {
+      const encounterId = String(insertedEnc.id);
+      runAfterResponse('connections environment enrichment', () =>
+        enrichEncounterEnvironment(adminClient, encounterId, geoLocation.lat, geoLocation.lon, {
+          includeWeather: clientWeatherSnapshot == null,
+          barometricElevationM: encElev,
+          barometricAccuracyM: encounterObservation.barometric_accuracy_m ?? null,
+        }),
+      );
+    }
 
     const timezoneOffsetMinutes =
       typeof body.timezone_offset_minutes === 'number' && Number.isFinite(body.timezone_offset_minutes)
