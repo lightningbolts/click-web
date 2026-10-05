@@ -140,20 +140,29 @@ export type SerializedEventDrop = {
   filter_seed: number;
   width: number | null;
   height: number | null;
-  /** Always the pixelated rendition; the original only comes from /api/drops/develop. */
+  /** Always the pixelated rendition. */
   preview_url: string | null;
+  /**
+   * Once revealed (`revealedAtMs` passed to the serializer), the original, signed like a develop's,
+   * so the app has the photo in hand before the tap and the tap shows it at once. Never before the
+   * reveal; the tap still records the develop through /api/drops/develop.
+   */
+  original_url: string | null;
 };
 
 export async function serializeEventDrops(
   admin: SupabaseClient,
   rows: EventDropRow[],
   viewerId: string,
+  originalsAtMs?: number,
 ): Promise<SerializedEventDrop[]> {
   if (rows.length === 0) return [];
   const posterIds = [...new Set(rows.map((r) => r.user_id))];
-  const [{ data: users }, previews] = await Promise.all([
+  const revealed = (r: EventDropRow) => originalsAtMs != null && Date.parse(r.reveal_at) <= originalsAtMs;
+  const [{ data: users }, signed] = await Promise.all([
     admin.from('users').select('id, name, image, first_name, last_name').in('id', posterIds),
-    signDropObjects(admin, rows.map((r) => r.preview_path)),
+    // One signing call for previews and revealed originals alike.
+    signDropObjects(admin, rows.flatMap((r) => (revealed(r) ? [r.preview_path, r.original_path] : [r.preview_path]))),
   ]);
   const byId = new Map(((users ?? []) as UserProfileRow[]).map((u) => [u.id, u]));
   return rows.map((r) => {
@@ -167,7 +176,8 @@ export async function serializeEventDrops(
       filter_seed: r.filter_seed,
       width: r.width,
       height: r.height,
-      preview_url: previews.get(r.preview_path) ?? null,
+      preview_url: signed.get(r.preview_path) ?? null,
+      original_url: revealed(r) ? signed.get(r.original_path) ?? null : null,
     };
   });
 }

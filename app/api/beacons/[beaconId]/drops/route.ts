@@ -26,9 +26,10 @@ type Params = { params: Promise<{ beaconId: string }> };
 /**
  * GET /api/beacons/{id}/drops — the event's Click Drops for this viewer (spec F1):
  * `{ state, opens_at, closes_at, reveal_at, access, can_post, remaining, show_to_absentees, drops }`.
- * `state`: before | open | developing | revealed. Previews are always pixelated; originals come
- * from /api/drops/develop (each drop is tapped to develop). Each drop carries this viewer's
- * `developed_at` (null until they develop it), so drops already developed open developed.
+ * `state`: before | open | developing | revealed. Previews are always pixelated. Once revealed,
+ * each drop also carries its signed `original_url` (so a tap develops it at once; the tap records
+ * the develop through /api/drops/develop) and this viewer's `developed_at` (null until they tap),
+ * so drops already developed open developed on every device.
  */
 export async function GET(request: NextRequest, { params }: Params): Promise<Response> {
   try {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest, { params }: Params): Promise<Res
     const revealed = now >= schedule.revealAtMs;
     const mine = rows.filter((r) => r.user_id === userId).length;
     const [drops, developedAt] = await Promise.all([
-      serializeEventDrops(admin, rows, userId),
+      serializeEventDrops(admin, rows, userId, now),
       // Nothing can be developed before the reveal.
       revealed ? loadDevelopedAt(admin, userId, 'event', rows.map((r) => r.id)) : Promise.resolve({} as Record<string, string>),
     ]);
