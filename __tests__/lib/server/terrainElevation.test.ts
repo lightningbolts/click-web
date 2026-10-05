@@ -7,6 +7,7 @@ import {
   deriveHeightCategoryFromRelativeAltitudeM,
   deriveTerrainRelativeAltitude,
   fetchTerrainElevationMeters,
+  terrainColumns,
 } from '@/lib/server/terrainElevation';
 
 describe('deriveHeightCategoryFromRelativeAltitudeM', () => {
@@ -80,5 +81,25 @@ describe('deriveTerrainRelativeAltitude', () => {
   it('requires both inputs', () => {
     expect(deriveTerrainRelativeAltitude({ barometricAltitudeM: null, terrainElevationM: 31 })).toBeNull();
     expect(deriveTerrainRelativeAltitude({ barometricAltitudeM: 40, terrainElevationM: null })).toBeNull();
+  });
+});
+
+describe('terrainColumns', () => {
+  it('stores the DEM elevation even without a barometric altitude', () => {
+    expect(terrainColumns({ barometricAltitudeM: null, terrainElevationM: 31.5 })).toEqual({
+      terrain_elevation_m: 31.5,
+    });
+  });
+
+  it('adds the derived altitude when the barometer reported one', () => {
+    expect(terrainColumns({ barometricAltitudeM: 40, barometricAccuracyM: 2, terrainElevationM: 38 })).toEqual({
+      relative_altitude_m: 2,
+      terrain_elevation_m: 38,
+      elevation_category: 'GROUND_LEVEL',
+    });
+  });
+
+  it('stores nothing without a DEM elevation', () => {
+    expect(terrainColumns({ barometricAltitudeM: 40, terrainElevationM: null })).toEqual({});
   });
 });

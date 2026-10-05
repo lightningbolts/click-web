@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { deriveTerrainRelativeAltitude } from '@/lib/server/terrainElevation';
+import { terrainColumns } from '@/lib/server/terrainElevation';
 import {
   DISPLAY_LOCATION_FALLBACK,
   fetchNominatimReverseGeocode,
@@ -54,12 +54,14 @@ export async function scheduleEncounterGeoEnrichment(
     updates.weather_snapshot = forecast.weatherSnapshot;
   }
 
-  const terrainRelative = deriveTerrainRelativeAltitude({
-    barometricAltitudeM: memberExactBarometricElevationM,
-    barometricAccuracyM: memberBarometricAccuracyM,
-    terrainElevationM: forecast.elevationM,
-  });
-  if (terrainRelative != null) Object.assign(updates, terrainRelative);
+  Object.assign(
+    updates,
+    terrainColumns({
+      barometricAltitudeM: memberExactBarometricElevationM,
+      barometricAccuracyM: memberBarometricAccuracyM,
+      terrainElevationM: forecast.elevationM,
+    }),
+  );
 
   if (Object.keys(updates).length === 0) return;
 

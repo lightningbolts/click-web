@@ -4,7 +4,7 @@ import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { getAuthenticatedSupabase } from '@/lib/server/supabaseAuth';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
 import { runAfterResponse } from '@/lib/server/afterResponse';
-import { enrichEncounterRelativeAltitude } from '@/lib/server/connections/encounterEnrichment';
+import { enrichEncounterEnvironment } from '@/lib/server/connections/encounterEnrichment';
 import { encounterObservationColumns, parseEncounterObservation } from '@/lib/server/encounterObservation';
 import {
   normalizeContextTag,
@@ -669,11 +669,13 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (encElev != null && gpsPair.lat != null && gpsPair.lon != null) {
+        if (gpsPair.lat != null && gpsPair.lon != null) {
           const [encLat, encLon] = [gpsPair.lat, gpsPair.lon];
-          runAfterResponse('qr altitude enrichment', () =>
-            enrichEncounterRelativeAltitude(adminClient, existingConnection.id, encElev, encLat, encLon, {
+          runAfterResponse('qr environment enrichment', () =>
+            enrichEncounterEnvironment(adminClient, existingConnection.id, encLat, encLon, {
               encounterId: insertedEncounter?.id != null ? String(insertedEncounter.id) : null,
+              includeWeather: false,
+              barometricElevationM: encElev,
               barometricAccuracyM: observation.barometric_accuracy_m ?? null,
             }),
           );

@@ -124,7 +124,7 @@ export function parseLocationObservation(
   return out;
 }
 
-/** Altimeter quality that accompanies `exact_barometric_elevation_m` in the same body. */
+/** Altimeter readings: pressure and relative change, plus the quality of `exact_barometric_elevation_m`. */
 export function parseBarometricObservation(source: Record<string, unknown>): BarometricObservationColumns {
   const out: BarometricObservationColumns = {};
   const accuracy = inRange(source.barometric_accuracy_m, 0, MAX_ACCURACY_M);
@@ -161,6 +161,11 @@ export const BAROMETRIC_OBSERVATION_KEYS = [
   'barometric_pressure_kpa',
 ] as const satisfies readonly (keyof BarometricObservationColumns)[];
 
+const BAROMETRIC_ALTITUDE_QUALITY_KEYS: ReadonlySet<keyof BarometricObservationColumns> = new Set([
+  'barometric_accuracy_m',
+  'barometric_precision_m',
+]);
+
 /**
  * The versioned raw sensor observation: a plain object with an integer `schema_version`, no
  * larger than `MAX_SENSOR_OBSERVATION_BYTES`. Anything else is dropped (never truncated).
@@ -189,7 +194,7 @@ export function parseSensorObservation(value: unknown): SensorObservationJson | 
 
 /**
  * Columns for one reporting user's encounter row. Location quality is attached only when the
- * row carries that same device's coordinate; barometer quality only with its altitude. The
+ * row carries that same device's coordinate; barometer accuracy/precision only with its altitude. The
  * raw sensor observation always belongs to the reporting device and travels with its row.
  */
 export function encounterObservationColumns(
@@ -202,10 +207,12 @@ export function encounterObservationColumns(
       if (observation[key] !== undefined) (out as Record<string, unknown>)[key] = observation[key];
     }
   }
-  if (opts.hasBarometricAltitude) {
-    for (const key of BAROMETRIC_OBSERVATION_KEYS) {
-      if (observation[key] !== undefined) (out as Record<string, unknown>)[key] = observation[key];
-    }
+  // Pressure and the relative-altitude change are their own readings and are kept even when the
+  // altimeter had no absolute fix yet; accuracy and precision describe that absolute altitude.
+  for (const key of BAROMETRIC_OBSERVATION_KEYS) {
+    if (observation[key] === undefined) continue;
+    if (!opts.hasBarometricAltitude && BAROMETRIC_ALTITUDE_QUALITY_KEYS.has(key)) continue;
+    (out as Record<string, unknown>)[key] = observation[key];
   }
   if (observation.sensor_observation !== undefined) out.sensor_observation = observation.sensor_observation;
   return out;
