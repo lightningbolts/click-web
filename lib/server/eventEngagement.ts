@@ -279,7 +279,7 @@ export async function loadEventBeaconOrResponse(
   admin: SupabaseClient,
   beaconId: string,
   options: { allowExpired?: boolean } = {},
-): Promise<{ beacon: EventBeaconRow } | { response: NextResponse }> {
+): Promise<{ beacon: EventBeaconRow; expired: boolean } | { response: NextResponse }> {
   if (!EVENT_BEACON_UUID_RE.test(beaconId)) {
     return { response: NextResponse.json({ error: "Invalid beacon id" }, { status: 400 }) };
   }
@@ -322,6 +322,7 @@ export async function loadEventBeaconOrResponse(
   const { lat, lng } = parseBeaconLatLng(data as Record<string, unknown>);
 
   return {
+    expired,
     beacon: {
       id: data.id as string,
       beacon_type: data.beacon_type as string,
