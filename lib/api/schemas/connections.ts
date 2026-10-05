@@ -94,6 +94,11 @@ export const proximityConfirmBodySchema = z.object({
   context_tags: z.unknown().optional(),
 }).passthrough();
 
+export const proximitySelectionBodySchema = z.object({
+  pending_handshake_id: nonEmptyString,
+  excluded_member_ids: z.array(z.string()).max(32),
+}).passthrough();
+
 export const encounterBodySchema = z.object({
   connection_id: optionalNonEmptyString,
   user_id: optionalNonEmptyString,
