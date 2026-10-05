@@ -143,3 +143,8 @@ export const insightsVenueBeaconBodySchema = z.object({
 export const ghostModeBodySchema = z.object({
   enabled: z.boolean(),
 });
+
+/** DELETE /api/user/delete: iOS sends a fresh Sign in with Apple code to revoke; the web sends no body. */
+export const userDeleteBodySchema = z.object({
+  apple_authorization_code: z.string().min(1).max(1024).optional(),
+});
