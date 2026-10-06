@@ -498,8 +498,76 @@ a {
 }
 
 /* Horizontal scrollers fade at the edges that have more content (Tabs, strips). */
+/* Moving between sections (spec §4.5): the old page leaves fast, the new one arrives gently
+   from 6 px below, so the swap reads as one motion instead of a cut. The bars aren't part of
+   the page, so they stay put. */
+::view-transition-old(.page-exit) {
+  animation: page-out var(--d-fast) var(--ease) both;
+}
+::view-transition-new(.page-enter) {
+  animation: page-in var(--d-base) var(--ease) both;
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Fades only a side that has more to scroll to, so a strip that fits (or sits at its start)
+   never clips its first item. Driven by the strip's own scroll; without scroll timelines
+   (or when it doesn't scroll) there is no fade. */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
 .edge-fade-x {
-  mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent 100%
+  );
+}
+@supports (animation-timeline: scroll()) {
+  .edge-fade-x {
+    animation: edge-fade-x linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes edge-fade-x {
+  0% {
+    --fade-start: 0px;
+    --fade-end: 16px;
+  }
+  8%,
+  92% {
+    --fade-start: 16px;
+    --fade-end: 16px;
+  }
+  100% {
+    --fade-start: 16px;
+    --fade-end: 0px;
+  }
 }
 
 /* ── Skeleton shimmer (spec §5.6) ─────────────────────────────────────────── */

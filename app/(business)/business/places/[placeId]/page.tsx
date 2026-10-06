@@ -4,7 +4,7 @@ import { CalendarPlus, Users } from 'lucide-react';
 import { InsightsExplainer, InsightsSummaryCard } from '@/components/business/InsightsSummaryCard';
 import { RefreshRetryRow } from '@/components/business/RefreshRetryRow';
 import { SetupChecklist } from '@/components/business/SetupChecklist';
-import { placeBase } from '@/components/business/WorkspaceHeader';
+import { placeBase } from '@/lib/places/workspace';
 import { AvatarStack } from '@/components/ds/Avatar';
 import { Button } from '@/components/ds/Button';
 import { cardClassName } from '@/components/ds/Card';

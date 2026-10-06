@@ -11,7 +11,7 @@ describe('anonymous landing JS budget', () => {
     const chrome = read('components/app-shell/SiteChrome.tsx');
     const waitlist = read('components/app-shell/WaitlistButton.tsx');
     const layout = read('app/layout.tsx');
-    const page = read('app/page.tsx');
+    const page = read('app/(app)/page.tsx');
 
     expect(landing).not.toMatch(/import HomeAuthenticated from/);
     expect(landing).not.toMatch(/import LandingPlayground from/);

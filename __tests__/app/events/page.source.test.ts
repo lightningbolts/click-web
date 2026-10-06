@@ -7,7 +7,7 @@ function read(rel: string): string {
 
 describe("/events directory (spec §7.6.1)", () => {
   it("renders server-side from tagged caches in the content column", () => {
-    const list = read("app/events/page.tsx");
+    const list = read("app/(app)/events/page.tsx");
     expect(list).toContain("container-content");
     expect(list).toContain("tags: [PUBLIC_EVENTS_TAG]");
     expect(list).toContain("buildEventDirectory");

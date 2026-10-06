@@ -6,6 +6,7 @@ import { sendPush } from '@/lib/nudges/moments';
 import { cronPushBearer, pushFunctionUrl } from '@/lib/server/cronAuth';
 import { deviceApprovalPath, sendApprovalMagicLink } from '@/lib/server/deviceHistory';
 import { publicOrigin } from '@/lib/events/eventUrls';
+import { newSignInSubject } from '@/lib/chat/deviceLabel';
 
 /**
  * Approving a new device from a device already on the account (the primary path; the emailed
@@ -118,7 +119,7 @@ export async function notifyDevicesOfNewSignIn(userId: string, requestId: string
   const url = pushFunctionUrl();
   const bearer = cronPushBearer();
   if (!url || !bearer) return false;
-  const what = label ? `A new ${label}` : 'A new device';
+  const what = newSignInSubject(label);
   return sendPush(
     url,
     bearer,

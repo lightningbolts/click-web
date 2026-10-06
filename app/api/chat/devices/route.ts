@@ -195,13 +195,17 @@ export async function POST(request: NextRequest) {
       if (error?.code === '23505') {
         // Registering again never asks for history (that would alert every multi-device account
         // after an update): a device missing keys asks itself (POST /api/chat/devices/history-requests).
-        // Newer builds also record what kind of device this is.
-        if (deviceLabel) {
-          runAfterResponse('chat/devices label', async () => {
-            await admin.from('chat_devices').update({ device_label: deviceLabel })
+        // It marks the device active (Settings › Devices, "approve from …" copy), and newer builds
+        // also record what kind of device this is.
+        runAfterResponse('chat/devices seen', async () => {
+          const scope = () => admin.from('chat_devices');
+          await scope().update({ last_seen_at: lastSeenAt })
+            .eq('user_id', auth.user.id).eq('device_id', deviceId).is('revoked_at', null);
+          if (deviceLabel) {
+            await scope().update({ device_label: deviceLabel })
               .eq('user_id', auth.user.id).eq('device_id', deviceId).is('device_label', null);
-          });
-        }
+          }
+        });
         return NextResponse.json({ error: 'Device already registered' }, { status: 409 });
       }
       if (error) console.error('[chat/devices] registration failed:', error.message);

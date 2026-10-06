@@ -26,6 +26,8 @@ type FieldChrome = {
   hideLabel?: boolean;
   help?: ReactNode;
   error?: ReactNode;
+  /** Character count ("12/25"), right-aligned on the help line like iOS. */
+  count?: string;
   className?: string;
 };
 
@@ -43,6 +45,7 @@ function Chrome({
   hideLabel,
   help,
   error,
+  count,
   className,
   children,
 }: FieldChrome & {
@@ -66,23 +69,24 @@ function Chrome({
         </label>
       ) : null}
       {children}
-      {error ? (
-        <p
-          id={errorId}
-          className="type-meta mt-1.5 flex items-center gap-1 text-destructive"
-        >
-          <CircleAlert
-            size={14}
-            strokeWidth={2}
-            aria-hidden
-            className="shrink-0"
-          />
-          {error}
-        </p>
-      ) : help ? (
-        <p id={helpId} className="type-meta mt-1.5 text-fg-tertiary">
-          {help}
-        </p>
+      {error || help || count ? (
+        <div className="mt-1.5 flex items-start gap-3">
+          {error ? (
+            <p id={errorId} className="type-meta flex min-w-0 flex-1 items-center gap-1 text-destructive">
+              <CircleAlert size={14} strokeWidth={2} aria-hidden className="shrink-0" />
+              {error}
+            </p>
+          ) : (
+            <p id={helpId} className="type-meta min-w-0 flex-1 text-fg-tertiary">
+              {help}
+            </p>
+          )}
+          {count ? (
+            <span aria-hidden className="type-meta tabular shrink-0 text-fg-tertiary">
+              {count}
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -115,6 +119,7 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(
       hideLabel,
       help,
       error,
+      count,
       className,
       inputClassName,
       id,
@@ -145,6 +150,7 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(
         hideLabel={hideLabel}
         help={help}
         error={error}
+        count={count}
         className={className}
       >
         {trailing ? (
@@ -173,6 +179,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
       hideLabel,
       help,
       error,
+      count,
       className,
       inputClassName,
       id,
@@ -198,6 +205,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
         hideLabel={hideLabel}
         help={help}
         error={error}
+        count={count}
         className={className}
       >
         <textarea
@@ -230,7 +238,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 );
 
 type SelectProps = Omit<ComponentPropsWithoutRef<"select">, "className"> &
-  FieldChrome & { inputClassName?: string };
+  Omit<FieldChrome, "count"> & { inputClassName?: string };
 
 /** Native select styled as a field with a trailing chevron. */
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(

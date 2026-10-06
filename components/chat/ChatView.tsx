@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { notifyMessagesDelivered } from '@/lib/chat/messages';
-import { isAnyE2eeWireContent } from '@/lib/chat/crypto';
+import { isEncryptedWireContent } from '@/lib/chat/crypto';
 import MessageBubble, { type MessageSender } from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { useAuth } from '@/lib/AuthContext';
@@ -527,13 +527,37 @@ export default function ChatView({
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
       if (m.user_id !== currentUserId || m.message_type !== 'text') continue;
-      if (typeof m.content !== 'string' || isAnyE2eeWireContent(m.content)) return;
+      if (typeof m.content !== 'string' || isEncryptedWireContent(m.content)) return;
       startEdit(m.id, m.content);
       return;
     }
   }, [currentUserId, messages, startEdit]);
 
-  const e2eeNotice = useE2eeNotice({
+  // Messages this browser couldn't read stay ciphertext; once keys arrive they decrypt in place.
+  const hasLockedMessages = useMemo(() => messages.some((m) => m.content.startsWith('e2e2:')), [messages]);
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  });
+  const decryptLockedMessages = useCallback(async () => {
+    const locked = messagesRef.current.filter((m) => m.content.startsWith('e2e2:'));
+    if (locked.length === 0) return;
+    const decrypted = new Map<string, { from: string; to: string }>();
+    await Promise.all(
+      locked.map(async (m) => {
+        const plain = await decryptWireMessageContent(m.content, m.message_type).catch(() => m.content);
+        if (plain !== m.content) decrypted.set(m.id, { from: m.content, to: plain });
+      }),
+    );
+    if (decrypted.size === 0) return;
+    setMessages((prev) =>
+      prev.map((m) => {
+        const next = decrypted.get(m.id);
+        return next && m.content === next.from ? { ...m, content: next.to } : m;
+      }),
+    );
+  }, [decryptWireMessageContent, setMessages]);
+  const { notice: e2eeNotice, lockedText } = useE2eeNotice({
     chatId,
     isGroupClique,
     e2eKeys,
@@ -541,6 +565,8 @@ export default function ChatView({
     groupKeyError,
     getE2eeV2Session,
     getAuthHeaders,
+    hasLockedMessages,
+    onKeysChanged: () => void decryptLockedMessages(),
   });
 
   // "New messages" marks the first unread message from the other side, captured once per open
@@ -761,6 +787,7 @@ export default function ChatView({
                       resolveReplyAuthor={resolveReplyAuthor}
                       onJumpTo={jumpToMessage}
                       drop={dropStateFor(m)}
+                      lockedText={lockedText}
                     />
                   </Fragment>
                 );

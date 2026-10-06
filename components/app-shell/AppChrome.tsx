@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import * as React from 'react';
+import { useEffect, type ComponentType, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { AuthSeed } from '@/lib/AuthContext';
@@ -14,6 +15,7 @@ import { useShellHeader } from './ShellContext';
 import { GlobalShortcuts } from './GlobalShortcuts';
 import { MobileTabBar } from './MobileTabBar';
 import { OnboardingGates } from './OnboardingGates';
+import { DeviceApprovals } from './DeviceApprovals';
 import { TopBar } from './TopBar';
 
 function Bars({ initial }: { initial: SessionBootstrap }) {
@@ -45,12 +47,35 @@ function useTimeZoneCookie() {
   }, [router]);
 }
 
-/** Reserves room for the mobile tab bar only while it is showing. */
+type ViewTransitionProps = { children: ReactNode; enter?: string; exit?: string; default?: string };
+/**
+ * React's `<ViewTransition>` ships in the App Router's React build; the stable package (tests)
+ * doesn't have it, and there pages simply swap.
+ */
+const ViewTransition = (React as unknown as { ViewTransition?: ComponentType<ViewTransitionProps> }).ViewTransition;
+
+/**
+ * Reserves room for the mobile tab bar only while it is showing, and cross-fades the page when
+ * you move between sections (Home, Clicks, Map, Events, Me…). Moves inside a section (opening a
+ * thread, switching a tab's query) don't animate. The bars sit outside, so they never move.
+ */
 function Content({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const header = useShellHeader();
   const tabBar = !hidesTabBar(pathname) && !header?.hideTabBar;
-  return <div className={cn('flex flex-1 flex-col', tabBar && 'pb-[var(--tabbar-height)]')}>{children}</div>;
+  const section = pathname.split('/')[1] ?? '';
+  const page = <div className="flex flex-1 flex-col">{children}</div>;
+  return (
+    <div className={cn('flex flex-1 flex-col', tabBar && 'pb-[var(--tabbar-height)]')}>
+      {ViewTransition ? (
+        <ViewTransition key={section} enter="page-enter" exit="page-exit" default="none">
+          {page}
+        </ViewTransition>
+      ) : (
+        page
+      )}
+    </div>
+  );
 }
 
 /**
@@ -75,6 +100,7 @@ export function AppChrome({
         <Content>{children}</Content>
       </div>
       <OnboardingGates />
+      <DeviceApprovals />
     </AuthSeed>
   );
 }

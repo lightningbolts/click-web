@@ -16,7 +16,7 @@ import {
   mediaUrlFromMetadata,
   originalMimeTypeFromMetadata,
 } from '@/lib/chat/mediaMetadata';
-import { isAnyE2eeWireContent, type DerivedKeys } from '@/lib/chat/crypto';
+import { isEncryptedWireContent, type DerivedKeys } from '@/lib/chat/crypto';
 import { tryDecodeEnvelope, tryDecodeV2AttachmentDescriptor } from '@/lib/chat/attachmentCrypto';
 import { isBeaconChatMessage } from '@/lib/chat/messages';
 import { chatGifFromMessage } from '@/lib/chat/gif';
@@ -73,22 +73,32 @@ interface MessageBubbleProps {
   onJumpTo?: (messageId: string) => void;
   /** Click Drops only. */
   drop?: DropState;
+  /**
+   * Set when this browser is known not to hold the keys for some of the thread (not approved
+   * yet, or set up after those messages): ciphertext says this at once instead of shimmering.
+   */
+  lockedText?: string | null;
 }
 
-/** Ciphertext shimmers while keys load; after a grace period it says so instead of spinning forever. */
-function EncryptedText({ mine }: { mine: boolean }) {
+/**
+ * Ciphertext shimmers while keys load; after a grace period it says so instead of spinning
+ * forever. When the thread already knows this browser can't read it ([lockedText]), it says
+ * that right away.
+ */
+function EncryptedText({ mine, lockedText }: { mine: boolean; lockedText?: string | null }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
+    if (lockedText) return;
     const t = window.setTimeout(() => setFailed(true), DECRYPT_GRACE_MS);
     return () => window.clearTimeout(t);
-  }, []);
-  if (!failed) {
+  }, [lockedText]);
+  if (!failed && !lockedText) {
     return <span aria-busy aria-label="Decrypting message" className={cn('block h-4 w-40 max-w-full animate-pulse rounded-xs', mine ? 'bg-white/20' : 'bg-fill-strong')} />;
   }
   return (
     <span className={cn('inline-flex items-center gap-1.5 italic', mine ? 'text-white/80' : 'text-fg-secondary')}>
-      <Lock size={14} aria-hidden />
-      Couldn’t decrypt this message
+      <Lock size={14} aria-hidden className="shrink-0" />
+      {lockedText ?? 'Couldn’t decrypt this message'}
     </span>
   );
 }
@@ -151,6 +161,7 @@ export default function MessageBubble({
   resolveReplyAuthor,
   onJumpTo,
   drop,
+  lockedText = null,
 }: MessageBubbleProps) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -196,7 +207,7 @@ export default function MessageBubble({
     message.message_type === 'file' || caption.startsWith('ccx:v1:')
       ? (tryDecodeEnvelope(caption) ?? (message.message_type === 'file' ? tryDecodeV2AttachmentDescriptor(caption) : null))
       : null;
-  const ciphertext = isAnyE2eeWireContent(caption);
+  const ciphertext = isEncryptedWireContent(caption);
   const isText = !plan && !gif && !isImage && !isAudio && !isBeacon && !attachment;
 
   // RSVPs on a plan are counted on its card, not repeated as reaction chips.
@@ -354,7 +365,7 @@ export default function MessageBubble({
         )}
         {caption ? (
           <div className={cn('relative mt-0.5 max-w-full rounded-bubble px-3 py-2 type-body break-words pointer-coarse:text-[16px]', bubbleTone, tail)}>
-            {ciphertext ? <EncryptedText mine={isMine} /> : <LinkifiedText text={content} variant={variant} />}
+            {ciphertext ? <EncryptedText mine={isMine} lockedText={lockedText} /> : <LinkifiedText text={content} variant={variant} />}
             <InlineMeta message={message} mine={isMine} pinned={pinned} />
           </div>
         ) : isAudio ? (
@@ -366,7 +377,7 @@ export default function MessageBubble({
     body = (
       <div className={cn('relative max-w-full rounded-bubble px-3 py-2 type-body break-words whitespace-pre-wrap pointer-coarse:text-[16px]', bubbleTone, tail)}>
         {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble onClick={jumpToReply} /> : null}
-        {ciphertext ? <EncryptedText mine={isMine} /> : <LinkifiedText text={content} variant={variant} />}
+        {ciphertext ? <EncryptedText mine={isMine} lockedText={lockedText} /> : <LinkifiedText text={content} variant={variant} />}
         <InlineMeta message={message} mine={isMine} pinned={pinned} />
       </div>
     );

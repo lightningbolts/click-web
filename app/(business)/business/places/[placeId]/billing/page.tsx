@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Check, Lock } from 'lucide-react';
 import { BillingAction } from '@/components/business/BillingActions';
-import { INSIGHTS_FEATURES } from '@/components/business/InsightsSummaryCard';
+import { INSIGHTS_FEATURES } from '@/lib/places/workspace';
 import { cardClassName } from '@/components/ds/Card';
 import { EmptyState } from '@/components/ds/EmptyState';
 import { InlineNotice } from '@/components/ds/InlineNotice';

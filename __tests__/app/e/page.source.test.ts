@@ -4,7 +4,7 @@ import path from "node:path";
 const read = (p: string) => fs.readFileSync(path.join(__dirname, "../../../", p), "utf8");
 
 describe("event page source (spec §7.6.2)", () => {
-  const page = read("app/e/[beaconId]/page.tsx");
+  const page = read("app/(app)/e/[beaconId]/page.tsx");
   const src = read("components/events/EventPageView.tsx");
 
   it("uses the tagged public-event cache for both metadata and the page", () => {
@@ -38,7 +38,7 @@ describe("event page source (spec §7.6.2)", () => {
   });
 
   it("serves an .ics download", () => {
-    const ics = read("app/e/[beaconId]/calendar.ics/route.ts");
+    const ics = read("app/(app)/e/[beaconId]/calendar.ics/route.ts");
     expect(ics).toContain("text/calendar");
   });
 });

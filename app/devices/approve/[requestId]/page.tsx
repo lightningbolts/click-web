@@ -2,7 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle2, Loader2, ShieldQuestion, XCircle } from 'lucide-react';
+import { CheckCircle2, ShieldQuestion, XCircle } from 'lucide-react';
+import { Button } from '@/components/ds/Button';
+import { Spinner } from '@/components/ds/Spinner';
+import { cn } from '@/lib/cn';
 
 /**
  * Landing page for the "new device signed in" magic-link email. Supabase appends the new session
@@ -92,32 +95,38 @@ export default function ApproveDevicePage() {
   };
 
   const shell = (children: ReactNode) => (
-    <div className="min-h-[calc(100vh-1px)] relative flex items-center justify-center p-4 bg-[#121212] text-white overflow-hidden">
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_-25%,rgba(124,58,237,0.14),transparent)]"
-        aria-hidden
-      />
-      <div className="relative z-10 glass max-w-md w-full p-10 rounded-3xl border border-zinc-800 ring-1 ring-white/5 text-center">
+    <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-12 text-fg">
+      <div className="ds-anim-dialog w-full max-w-md rounded-xl bg-bg-elevated px-6 py-10 text-center shadow-overlay sm:px-10">
         {children}
       </div>
-    </div>
+    </main>
+  );
+  const badge = (Icon: typeof ShieldQuestion, tone: 'accent' | 'destructive' = 'accent') => (
+    <span
+      className={cn(
+        'mx-auto mb-5 flex size-16 items-center justify-center rounded-full',
+        tone === 'accent' ? 'bg-selection text-accent' : 'bg-destructive-fill text-destructive',
+      )}
+    >
+      <Icon size={28} strokeWidth={1.75} aria-hidden />
+    </span>
   );
 
   if (view.kind === 'loading') {
     return shell(
-      <>
-        <Loader2 className="w-8 h-8 text-[#8338EC] animate-spin mx-auto mb-4" aria-hidden />
-        <p className="text-zinc-400 text-sm">Checking your request…</p>
-      </>,
+      <div role="status" className="flex flex-col items-center gap-3">
+        <Spinner />
+        <p className="type-body text-fg-secondary">Checking your request…</p>
+      </div>,
     );
   }
 
   if (view.kind === 'error') {
     return shell(
       <>
-        <XCircle className="w-10 h-10 text-red-400 mx-auto mb-4" aria-hidden />
-        <h1 className="text-xl font-bold mb-2">Can&apos;t approve this device</h1>
-        <p className="text-zinc-400 text-sm">{view.message}</p>
+        {badge(XCircle, 'destructive')}
+        <h1 className="type-title-3 mb-2">Can’t approve this device</h1>
+        <p className="type-body text-fg-secondary">{view.message}</p>
       </>,
     );
   }
@@ -132,15 +141,15 @@ export default function ApproveDevicePage() {
           : 'This request has expired';
     const detail =
       request.status === 'approved'
-        ? 'Your other devices will send your chat history to the new device the next time they open Click.'
+        ? 'Your earlier messages appear on the new device as soon as Click is open on a device you already use.'
         : request.status === 'denied'
           ? 'Your chat history stays on your existing devices. The new device will only see new messages.'
           : 'Sign in on the new device again to get a fresh email.';
     return shell(
       <>
-        <CheckCircle2 className="w-10 h-10 text-[#8338EC] mx-auto mb-4" aria-hidden />
-        <h1 className="text-xl font-bold mb-2">{title}</h1>
-        <p className="text-zinc-400 text-sm">{detail}</p>
+        {badge(request.status === 'denied' ? XCircle : CheckCircle2, request.status === 'denied' ? 'destructive' : 'accent')}
+        <h1 className="type-title-3 mb-2">{title}</h1>
+        <p className="type-body text-fg-secondary">{detail}</p>
       </>,
     );
   }
@@ -148,32 +157,22 @@ export default function ApproveDevicePage() {
   const saving = view.kind === 'saving';
   return shell(
     <>
-      <ShieldQuestion className="w-10 h-10 text-[#8338EC] mx-auto mb-4" aria-hidden />
-      <h1 className="text-xl font-bold mb-2">A new device signed in to Click</h1>
-      <p className="text-zinc-400 text-sm mb-2">
+      {badge(ShieldQuestion)}
+      <h1 className="type-title-3 mb-2">A new device signed in to Click</h1>
+      <p className="type-body mb-2 text-fg-secondary">
         A device was added to your account on {formatWhen(view.request.device_registered_at)}.
       </p>
-      <p className="text-zinc-400 text-sm mb-8">
+      <p className="type-body mb-8 text-fg-secondary">
         Share your existing chat history with it? Only approve if this was you. Messages stay
-        end-to-end encrypted: your other devices send the keys directly, Click never sees them.
+        end-to-end encrypted: your other devices send the keys directly, and Click never sees them.
       </p>
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => decide('approve')}
-          className="w-full py-3 bg-[#8338EC] hover:bg-[#9d4eff] disabled:opacity-60 rounded-xl font-semibold transition-colors"
-        >
-          {saving ? 'Saving…' : 'Yes, share my history'}
-        </button>
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => decide('deny')}
-          className="w-full py-3 border border-zinc-700 hover:border-zinc-500 disabled:opacity-60 rounded-xl font-semibold transition-colors"
-        >
-          This wasn&apos;t me
-        </button>
+      <div className="flex flex-col gap-2">
+        <Button size="lg" fullWidth disabled={saving} loading={saving} onClick={() => decide('approve')}>
+          Yes, share my history
+        </Button>
+        <Button size="lg" variant="plain" fullWidth disabled={saving} className="text-destructive" onClick={() => decide('deny')}>
+          This wasn’t me
+        </Button>
       </div>
     </>,
   );

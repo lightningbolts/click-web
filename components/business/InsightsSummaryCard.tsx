@@ -9,19 +9,11 @@ import { Skeleton } from '@/components/ds/Skeleton';
 import { StatTile } from '@/components/ds/StatTile';
 import { authedJson } from '@/lib/api/authedJson';
 import type { WorkspacePlace } from './PlaceWorkspaceContext';
-import { placeBase } from './WorkspaceHeader';
+import { INSIGHTS_FEATURES, placeBase } from '@/lib/places/workspace';
 
 type Summary = { totalConnections: number; retentionRate: number; busiestDay: string | null; peakHour: number | null };
 
 /** What paid Insights adds; shown to free Places instead of fake or blurred data (spec §9.5). */
-export const INSIGHTS_FEATURES = [
-  '90-day and full stats',
-  'Event engagement',
-  'Network health',
-  'Vibe Radar',
-  'Crowd composition',
-] as const;
-
 export function InsightsExplainer({ place }: { place: Pick<WorkspacePlace, 'id' | 'role'> }) {
   return (
     <section aria-labelledby="insights-explainer" className={cardClassName({ className: 'flex flex-col gap-4' })}>

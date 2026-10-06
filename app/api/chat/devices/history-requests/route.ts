@@ -36,8 +36,9 @@ function projection(row: RequestRow, label: string | null, nowMs: number) {
 
 /**
  * GET /api/chat/devices/history-requests?device_id= — for this device: `incoming`, the account's
- * other devices waiting for approval (this device can approve them), and `own`, this device's
- * own request, if it has one.
+ * other devices waiting for approval (this device can approve them); `own`, this device's own
+ * request, if it has one; and `approvers`, the account's older active devices that could approve
+ * it (what kind each is and when it was last active), most recently active first.
  */
 export async function GET(request: NextRequest) {
   const auth = await requireBearerUser(request);
@@ -48,14 +49,31 @@ export async function GET(request: NextRequest) {
   try {
     const admin = createChatGatekeeperAdmin();
     const me = await loadOwnDevice(admin, auth.user.id, deviceId);
-    if (!me) return NextResponse.json({ incoming: [], own: null });
-    const { data, error } = await admin
-      .from('chat_device_history_requests')
-      .select(`${REQUEST_COLUMNS}, device:chat_devices!recipient_device_id(device_label, revoked_at)`)
-      .eq('user_id', auth.user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    if (!me) return NextResponse.json({ incoming: [], own: null, approvers: [] });
+    const [requests, older] = await Promise.all([
+      admin
+        .from('chat_device_history_requests')
+        .select(`${REQUEST_COLUMNS}, device:chat_devices!recipient_device_id(device_label, revoked_at)`)
+        .eq('user_id', auth.user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      admin
+        .from('chat_devices')
+        .select('device_label, last_seen_at')
+        .eq('user_id', auth.user.id)
+        .is('revoked_at', null)
+        .neq('id', me.id)
+        .lt('created_at', me.created_at)
+        .order('last_seen_at', { ascending: false })
+        .limit(10),
+    ]);
+    const { data, error } = requests;
     if (error) throw new Error(error.message);
+    if (older.error) throw new Error(older.error.message);
+    const approvers = ((older.data ?? []) as Array<{ device_label: string | null; last_seen_at: string | null }>).map((row) => ({
+      label: row.device_label,
+      last_seen_at: row.last_seen_at,
+    }));
     const nowMs = Date.now();
     const rows = (data ?? []) as Array<RequestRow & { device: { device_label: string | null; revoked_at: string | null } | Array<{ device_label: string | null; revoked_at: string | null }> | null }>;
     const deviceOf = (row: (typeof rows)[number]) => (Array.isArray(row.device) ? (row.device[0] ?? null) : row.device);
@@ -64,7 +82,7 @@ export async function GET(request: NextRequest) {
       .map((row) => projection(row, deviceOf(row)?.device_label ?? null, nowMs));
     const ownRow = rows.find((row) => row.recipient_device_id === me.id);
     return NextResponse.json(
-      { incoming, own: ownRow ? projection(ownRow, deviceOf(ownRow)?.device_label ?? null, nowMs) : null },
+      { incoming, own: ownRow ? projection(ownRow, deviceOf(ownRow)?.device_label ?? null, nowMs) : null, approvers },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e) {

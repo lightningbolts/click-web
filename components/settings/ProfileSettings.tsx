@@ -178,7 +178,8 @@ export function ProfileSettings({ userId, initial }: { userId: string; initial: 
           maxLength={PROFILE_BIO_MAX}
           rows={3}
           placeholder="A line about you"
-          help={`${draft.bio.length} / ${PROFILE_BIO_MAX} · Shown on your profile to your Clicks.`}
+          help="Shown on your profile to your Clicks."
+          count={`${draft.bio.length}/${PROFILE_BIO_MAX}`}
         />
         <TextField
           label="Birthday"

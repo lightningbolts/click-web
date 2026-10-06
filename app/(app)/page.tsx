@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { cookies } from 'next/headers';
-import { AppShell } from '@/components/app-shell/AppShell';
 import { HomeGreeting } from '@/components/home/HomeGreeting';
 import { HomeSkeleton, HomeView } from '@/components/home/HomeView';
 import LandingPage from '@/components/landing/LandingPage';
@@ -41,22 +40,20 @@ async function HomeContent() {
   return <HomeView data={data} />;
 }
 
-/** Signed-in Home (spec §7.1): greeting paints with the shell, modules stream in behind it. */
+/** Signed-in Home (spec §7.1), inside the `(app)` shell: greeting paints first, modules stream in. */
 async function SignedInHome() {
   const [bootstrap, jar] = await Promise.all([loadSessionBootstrap(), cookies()]);
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? 'UTC';
   const firstName = bootstrap?.viewer.name.split(' ')[0] ?? '';
   return (
-    <AppShell>
-      <div className="mx-auto w-full max-w-[1040px] px-[var(--gutter)] pb-16 pt-6 md:pt-10">
-        <div className="mb-8 lg:max-w-[680px]">
-          <HomeGreeting firstName={firstName} serverHour={currentHourIn(timeZone)} />
-        </div>
-        <Suspense fallback={<HomeSkeleton />}>
-          <HomeContent />
-        </Suspense>
+    <div className="mx-auto w-full max-w-[1040px] px-[var(--gutter)] pb-16 pt-6 md:pt-10">
+      <div className="mb-8 lg:max-w-[680px]">
+        <HomeGreeting firstName={firstName} serverHour={currentHourIn(timeZone)} />
       </div>
-    </AppShell>
+      <Suspense fallback={<HomeSkeleton />}>
+        <HomeContent />
+      </Suspense>
+    </div>
   );
 }
 

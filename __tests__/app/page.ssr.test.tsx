@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import Home from '@/app/page';
+import Home from '@/app/(app)/page';
 import { getServerUser } from '@/lib/server/getServerUser';
 import { loadSessionBootstrap } from '@/lib/server/session';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
@@ -17,9 +17,6 @@ jest.mock('@/lib/server/session', () => ({
   loadSessionBootstrap: jest.fn(),
 }));
 jest.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
-jest.mock('@/components/app-shell/AppShell', () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <div data-testid="app-shell">{children}</div>,
-}));
 jest.mock('@/components/home/HomeGreeting', () => ({
   HomeGreeting: ({ firstName }: { firstName: string }) => <h1>Hello, {firstName}</h1>,
 }));
@@ -72,14 +69,15 @@ describe('Home SSR', () => {
     expect(html).toContain('basemaps.cartocdn.com');
   });
 
-  it('renders the signed-in shell (not marketing) when the cookie session resolves', async () => {
+  it('renders signed-in Home (not marketing) when the cookie session resolves', async () => {
     (getServerUser as jest.Mock).mockResolvedValue({ id: 'u1' });
     (loadSessionBootstrap as jest.Mock).mockResolvedValue({ viewer: { id: 'u1', name: 'Ada Lovelace', email: null, avatarUrl: null } });
 
     const ui = (await Home()) as React.ReactElement;
     // Async server component: resolve one level and inspect the tree instead of client-rendering it.
-    const shell = await (ui.type as () => Promise<React.ReactElement<{ children: React.ReactNode }>>)();
-    const { container } = render(<div>{(shell.props.children as React.ReactElement<{ children: React.ReactNode[] }>).props.children[0]}</div>);
+    // The `(app)` layout supplies the shell; the page is the Home column itself.
+    const home = await (ui.type as () => Promise<React.ReactElement<{ children: React.ReactNode[] }>>)();
+    const { container } = render(<div>{home.props.children[0]}</div>);
 
     expect(screen.getByRole('heading', { name: 'Hello, Ada' })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/from handshake to friendship/);

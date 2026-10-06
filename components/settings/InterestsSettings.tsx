@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from '@/components/ds/Toast';
 import { InterestPicker, missingInterests } from '@/components/interests/InterestPicker';
@@ -16,6 +17,7 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
  * inside each, plus your own. "Pick N more" until the minimum is met.
  */
 export function InterestsSettings({ userId, initial }: { userId: string; initial: string[] }) {
+  const router = useRouter();
   const { user, refreshUser } = useAuth();
   const [saved, setSaved] = useState(initial);
   const [tags, setTags] = useState(initial);
@@ -33,6 +35,7 @@ export function InterestsSettings({ userId, initial }: { userId: string; initial
       });
       setSaved(tags);
       void refreshUser();
+      router.refresh();
       toast.success('Interests saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Couldn’t save your interests.');

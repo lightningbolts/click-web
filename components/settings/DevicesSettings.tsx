@@ -11,7 +11,10 @@ import { StatusPill } from '@/components/ds/StatusPill';
 import { toast } from '@/components/ds/Toast';
 import { authedJson } from '@/lib/api/authedJson';
 import { decideDeviceRequest } from '@/lib/chat/decideDeviceRequest';
-import { loadOrCreateWebE2eeV2Identity } from '@/lib/chat/e2eeV2Client';
+import { newSignInSubject } from '@/lib/chat/deviceLabel';
+import { loadOrCreateWebE2eeV2Identity, shareWebE2eeV2HistoryWithApprovedDevices } from '@/lib/chat/e2eeV2Client';
+import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
+import { useAuth } from '@/lib/AuthContext';
 import { formatRelativeShort } from '@/lib/home/format';
 
 type Device = { device_id: string; label: string | null; created_at: string; last_seen_at: string | null };
@@ -33,6 +36,7 @@ export function DevicesSettings() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [busy, setBusy] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
+  const userId = useAuth().user?.id ?? null;
   // eslint-disable-next-line react-hooks/purity -- relative labels only
   const nowMs = Date.now();
 
@@ -72,7 +76,11 @@ export function DevicesSettings() {
     setBusy(`${req.id}:${decision}`);
     try {
       await decideDeviceRequest(req.id, decision);
-      toast.success(decision === 'approve' ? 'Device approved' : 'Request declined');
+      toast.success(decision === 'approve' ? 'Approved. Your earlier messages are on their way.' : 'Request declined');
+      // Share right away, so the new device reads its history within seconds.
+      if (decision === 'approve' && userId) {
+        void shareWebE2eeV2HistoryWithApprovedDevices({ currentUserId: userId, getAuthHeaders: getFreshAuthHeaders }).catch(() => 0);
+      }
       setState((s) => (s.kind === 'ready' ? { ...s, incoming: s.incoming.filter((r) => r.id !== req.id) } : s));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Couldn’t save your decision.');
@@ -130,7 +138,7 @@ export function DevicesSettings() {
               <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3 shadow-[inset_0_1px_0_var(--hairline)] first:shadow-none">
                 <ShieldQuestion size={20} strokeWidth={1.75} aria-hidden className="w-7 text-accent" />
                 <span className="min-w-0 flex-1">
-                  <span className="type-body block text-fg">{req.device_label ?? 'A new device'} wants your chat history</span>
+                  <span className="type-body block text-fg">{newSignInSubject(req.device_label)} wants your chat history</span>
                   <span className="type-meta block text-fg-tertiary">Signed in {formatRelativeShort(req.created_at, nowMs)}. Only approve it if it’s you.</span>
                 </span>
                 <span className="flex gap-2">

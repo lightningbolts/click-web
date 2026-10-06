@@ -56,7 +56,7 @@ export function SiteChrome() {
         </>
       ) : null}
       {state.state === 'signed-out' ? (
-        <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu" padded={false}>
           <nav aria-label="Site" className="flex flex-col gap-1 px-2 pb-4">
             {DRAWER_LINKS.map((l) => (
               <Link

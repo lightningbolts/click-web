@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BarChart3, Map, MapPin } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
@@ -34,6 +35,7 @@ const LOCATION_ROWS: { key: keyof LocationPrefs; icon: typeof MapPin; title: str
 
 /** Privacy & location (spec §7.8): location toggles save at once; phone discovery is its own form. */
 export function PrivacySettings({ userId, initial, phone }: { userId: string; initial: LocationPrefs; phone: string | null }) {
+  const router = useRouter();
   const [prefs, setPrefs] = useState(initial);
   const [savedPhone, setSavedPhone] = useState(phone ?? '');
   const [phoneDraft, setPhoneDraft] = useState(phone ?? '');
@@ -64,6 +66,7 @@ export function PrivacySettings({ userId, initial, phone }: { userId: string; in
       });
       setSavedPhone(res.phone ?? '');
       setPhoneDraft(res.phone ?? '');
+      router.refresh();
       toast.success('Number saved');
     } catch (err) {
       setPhoneError(err instanceof Error ? err.message : 'Couldn’t save that number.');
@@ -86,6 +89,7 @@ export function PrivacySettings({ userId, initial, phone }: { userId: string; in
       await authedJson('/api/me/phone', { method: 'DELETE', fallback: 'Couldn’t remove your number.' });
       setSavedPhone('');
       setPhoneDraft('');
+      router.refresh();
       toast.success('Number removed');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Couldn’t remove your number.');

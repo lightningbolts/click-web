@@ -173,7 +173,7 @@ export function PlaceProfileForm({ place: initial }: { place: WorkspacePlace }) 
             maxLength={DESCRIPTION_MAX}
             rows={4}
             disabled={!writer}
-            help={`${draft.description.length} / ${DESCRIPTION_MAX}`}
+            count={`${draft.description.length}/${DESCRIPTION_MAX}`}
             error={error}
           />
           <fieldset disabled={!writer}>

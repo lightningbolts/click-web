@@ -17,7 +17,7 @@ describe("brand share images", () => {
     expect(layout).toContain("brandShareImage");
     expect(layout).toContain("openGraph");
     const event = fs.readFileSync(
-      path.join(__dirname, "../../../app/e/[beaconId]/page.tsx"),
+      path.join(__dirname, "../../../app/(app)/e/[beaconId]/page.tsx"),
       "utf8",
     );
     expect(event).toContain("brandShareImage");

@@ -138,7 +138,11 @@ describe('/api/chat/devices', () => {
     const insert = jest.fn(() => ({
       select: jest.fn(() => ({ single })),
     }));
-    const update = jest.fn();
+    // Registering again only marks an active row seen; it never touches revoked_at.
+    const activeOnly = jest.fn().mockResolvedValue({ error: null });
+    type Filters = { eq: jest.Mock; is: jest.Mock };
+    const filters: Filters = { eq: jest.fn((): Filters => filters), is: activeOnly };
+    const update = jest.fn(() => filters);
     const upsert = jest.fn();
     mockCreateAdmin.mockReturnValue({ from: jest.fn(() => ({ insert, update, upsert })) });
 
@@ -153,7 +157,10 @@ describe('/api/chat/devices', () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: 'Device already registered' });
     expect(insert).toHaveBeenCalledWith(expect.not.objectContaining({ revoked_at: expect.anything() }));
-    expect(update).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith({ last_seen_at: expect.any(String) });
+    expect(activeOnly).toHaveBeenCalledWith('revoked_at', null);
     expect(upsert).not.toHaveBeenCalled();
   });
 

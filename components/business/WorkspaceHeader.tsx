@@ -9,15 +9,12 @@ import { CardVisual } from '@/components/ds/CardVisual';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ds/Popover';
 import { StatusPill } from '@/components/ds/StatusPill';
 import { LinkTabs } from '@/components/ds/Tabs';
-import { canWrite, placeStatusPill } from '@/lib/places/workspace';
+import { canWrite, placeBase, placeStatusPill } from '@/lib/places/workspace';
 import { cn } from '@/lib/cn';
 import { usePlaceWorkspace, type WorkspacePlace } from './PlaceWorkspaceContext';
 
 const ROLE_LABEL: Record<WorkspacePlace['role'], string> = { owner: 'Owner', manager: 'Manager', viewer: 'Viewer' };
 
-export function placeBase(id: string): string {
-  return `/business/places/${id}`;
-}
 
 /** The tab path after `/business/places/{id}`, kept when switching Place (spec §9.4). */
 export function workspaceSuffix(pathname: string, placeId: string): string {

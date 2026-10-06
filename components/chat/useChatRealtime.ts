@@ -24,7 +24,7 @@ import {
   type DerivedKeys,
 } from '@/lib/chat/crypto';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
-import { decryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { decryptWebE2eeV2ForDisplay, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 /**
  * Supabase Realtime subscription for one chat: message INSERT/UPDATE/DELETE,
@@ -74,13 +74,8 @@ export function useChatRealtime({
 
     const decryptIfNeeded = async (content: string): Promise<string> => {
       if (content.startsWith('e2e2:')) {
-        const session = await getE2eeV2Session(false).catch(() => null);
-        if (!session) return 'Encrypted message';
-        try {
-          return await decryptWebE2eeV2Message(session, content);
-        } catch {
-          return 'Encrypted message';
-        }
+        // Unreadable stays ciphertext: the bubble says so, and it decrypts once keys arrive.
+        return (await decryptWebE2eeV2ForDisplay(chatId, content, () => getE2eeV2Session(false))) ?? content;
       }
       if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(content)) {
         return decryptGroupMessageContent(content, groupMasterKey);

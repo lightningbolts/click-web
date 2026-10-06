@@ -66,6 +66,10 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
   experimental: {
+    // Reuse a visited page for a minute when you come back to it (tabs, back links) instead of
+    // re-rendering it on the server and showing its loading state again. Mutations call
+    // router.refresh(), which drops this cache, so changes still show at once.
+    staleTimes: { dynamic: 60, static: 300 },
     optimizePackageImports: ["lucide-react", "framer-motion"],
     // Larger multipart bodies for chat/hub media when a proxy/middleware path buffers the request (see Next docs).
     proxyClientMaxBodySize: '32mb',
