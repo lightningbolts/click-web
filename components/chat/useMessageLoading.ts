@@ -24,7 +24,7 @@ import {
   decryptGroupMessageContent,
   type DerivedKeys,
 } from '@/lib/chat/crypto';
-import { decryptWebE2eeV2Message, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { decryptWebE2eeV2ForDisplay, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { writeSessionCache } from '@/lib/dashboard/sessionCache';
 
 const PAGE_SIZE = 40;
@@ -280,15 +280,11 @@ export function useMessageLoading({
       .reverse()
       .map(normalizeDbMessage);
 
-    const v2Session = await getE2eeV2Session(false).catch(() => null);
+    // Unreadable messages keep their ciphertext, so they decrypt in place once keys arrive.
     const v2Resolved = await Promise.all(raw.map(async (m) => {
       if (!m.content.startsWith('e2e2:')) return m;
-      if (!v2Session) return { ...m, content: 'Encrypted message' };
-      try {
-        return { ...m, content: await decryptWebE2eeV2Message(v2Session, m.content) };
-      } catch {
-        return { ...m, content: 'Encrypted message' };
-      }
+      const plain = await decryptWebE2eeV2ForDisplay(id, m.content, () => getE2eeV2Session(false));
+      return plain == null ? m : { ...m, content: plain };
     }));
 
     if (isGroupClique) {

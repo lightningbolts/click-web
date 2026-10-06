@@ -5,13 +5,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconButton } from '@/components/ds/IconButton';
 import { TextField } from '@/components/ds/TextField';
 import type { Message } from '@/lib/chat/types';
-import { isAnyE2eeWireContent } from '@/lib/chat/crypto';
+import { isEncryptedWireContent } from '@/lib/chat/crypto';
 
 function searchableText(m: Message): string {
   if (m.message_type !== 'text' && m.message_type !== 'image') return '';
   const content = typeof m.content === 'string' ? m.content : '';
   // Ciphertext that hasn't decrypted yet isn't searchable.
-  return isAnyE2eeWireContent(content) ? '' : content;
+  return isEncryptedWireContent(content) ? '' : content;
 }
 
 /**

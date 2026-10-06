@@ -13,6 +13,7 @@ import {
   wrapEpochKey,
   type DeviceIdentity,
 } from '@/lib/chat/e2eeV2';
+import { thisBrowserDeviceLabel } from '@/lib/chat/deviceLabel';
 
 type DeviceRow = {
   id: string;
@@ -162,18 +163,32 @@ async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestIni
   return payload as T;
 }
 
+/**
+ * Registers this browser (idempotent; "already registered" is success). The label says what
+ * kind of device it is ("Chrome on Mac") so the account's other devices know what they approve;
+ * registering again also marks the device as active.
+ */
 async function registerDevice(identity: DeviceIdentity & { deviceId: string }, headers: HeadersInit): Promise<void> {
   if (registeredDeviceIds.has(identity.deviceId)) return;
-  const response = await fetchJson<{ device?: DeviceRow }>('/api/chat/devices', headers, {
+  await fetchJson<{ device?: DeviceRow }>('/api/chat/devices', headers, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device_id: identity.deviceId, identity_public_key: identity.publicKeySpkiBase64 }),
+    body: JSON.stringify({
+      device_id: identity.deviceId,
+      identity_public_key: identity.publicKeySpkiBase64,
+      device_label: thisBrowserDeviceLabel(),
+    }),
   }).catch((error: unknown) => {
     if (error instanceof E2eeV2UnavailableError && /already registered/i.test(error.message)) return null;
     throw error;
   });
-  void response;
   registeredDeviceIds.add(identity.deviceId);
+}
+
+/** Registers this browser for the signed-in account, so chats started from now on include it. */
+export async function registerWebE2eeV2Device(getAuthHeaders: () => Promise<HeadersInit>): Promise<void> {
+  const identity = await loadOrCreateWebE2eeV2Identity();
+  await registerDevice(identity, await getAuthHeaders());
 }
 
 /**
@@ -578,6 +593,78 @@ export async function approveWebE2eeV2KeyTransfer(options: {
   });
 }
 
+type HistoryBackfillItem = {
+  request_id: string;
+  recipient_device_id: string;
+  recipient_public_key: string;
+  chat_id: string;
+  epochs: number[];
+};
+
+/** One share pass at a time per page: the shell, Settings and a fresh approval can all ask. */
+let historyShareInFlight: Promise<number> | null = null;
+
+/**
+ * On a device already in use: shares the chat history this browser can read with the account's
+ * newer devices whose request was approved (here, in the apps, or by the emailed link). For each
+ * chat it re-wraps the epoch keys it holds to the new device's public key and uploads them; the
+ * server only relays the envelopes and checks the approval (`approve_chat_key_transfer`).
+ * Returns how many chats were shared. iOS `shareHistoryWithApprovedDevices` parity.
+ */
+export function shareWebE2eeV2HistoryWithApprovedDevices(options: {
+  currentUserId: string;
+  getAuthHeaders: () => Promise<HeadersInit>;
+}): Promise<number> {
+  historyShareInFlight ??= shareHistoryOnce(options).finally(() => {
+    historyShareInFlight = null;
+  });
+  return historyShareInFlight;
+}
+
+async function shareHistoryOnce({
+  currentUserId,
+  getAuthHeaders,
+}: {
+  currentUserId: string;
+  getAuthHeaders: () => Promise<HeadersInit>;
+}): Promise<number> {
+  if (!currentUserId) return 0;
+  const identity = await loadOrCreateWebE2eeV2Identity();
+  const headers = await getAuthHeaders();
+  await registerDevice(identity, headers);
+  const { items = [] } = await fetchJson<{ items?: HistoryBackfillItem[] }>(
+    `/api/chat/devices/history-backfill?device_id=${encodeURIComponent(identity.deviceId)}`,
+    headers,
+  );
+  let shared = 0;
+  for (const item of items) {
+    if (item.recipient_device_id === identity.deviceId || item.epochs.length === 0) continue;
+    try {
+      // A fresh read, so every key this browser was given is available to share.
+      invalidateWebE2eeV2Session(item.chat_id);
+      const session = await resolveWebE2eeV2Session({
+        chatId: item.chat_id,
+        participantUserIds: [currentUserId],
+        getAuthHeaders,
+      });
+      if (!session) continue;
+      const epochs = item.epochs.filter((epoch) => session.epochKeys.has(epoch));
+      if (epochs.length === 0) continue;
+      await approveWebE2eeV2KeyTransfer({
+        chatId: item.chat_id,
+        session,
+        recipientDevice: { device_id: item.recipient_device_id, identity_public_key: item.recipient_public_key },
+        getAuthHeaders,
+        epochs,
+      });
+      shared += 1;
+    } catch {
+      // One chat this browser can't read (or a transient failure) never blocks the rest.
+    }
+  }
+  return shared;
+}
+
 export async function encryptWebE2eeV2Media(
   session: E2eeV2Session,
   metadata: { chatId: string; clientMessageId: string },
@@ -620,6 +707,32 @@ export async function decryptWebE2eeV2Message(session: E2eeV2Session, wireConten
   const epochKey = session.epochKeys.get(envelope.epoch);
   if (!epochKey) throw new E2eeV2UnavailableError('This device does not have the required E2EE v2 epoch key');
   return decryptMessage({ ...envelope, epochKey, envelope: wireContent });
+}
+
+/**
+ * A v2 message's plaintext for display, or null when this browser can't read it (callers keep
+ * the ciphertext, so it can be decrypted again once keys arrive). A message from an epoch newer
+ * than the cached session (someone rotated since) re-reads the chat's keys once.
+ */
+export async function decryptWebE2eeV2ForDisplay(
+  chatId: string,
+  wireContent: string,
+  getSession: () => Promise<E2eeV2Session | null>,
+): Promise<string | null> {
+  let epoch: number;
+  try {
+    epoch = parseE2eeV2Envelope(wireContent).epoch;
+  } catch {
+    return null;
+  }
+  let session = await getSession().catch(() => null);
+  if (session && !session.epochKeys.has(epoch) && epoch > session.currentEpoch) {
+    // Concurrent decrypts share one re-read: only the first to see this session drops it.
+    if (sessionCache.get(chatId) === session) invalidateWebE2eeV2Session(chatId);
+    session = await getSession().catch(() => null);
+  }
+  if (!session) return null;
+  return decryptWebE2eeV2Message(session, wireContent).catch(() => null);
 }
 
 export async function decryptWebE2eeV2Media(

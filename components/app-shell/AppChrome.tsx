@@ -14,6 +14,7 @@ import { useShellHeader } from './ShellContext';
 import { GlobalShortcuts } from './GlobalShortcuts';
 import { MobileTabBar } from './MobileTabBar';
 import { OnboardingGates } from './OnboardingGates';
+import { DeviceApprovals } from './DeviceApprovals';
 import { TopBar } from './TopBar';
 
 function Bars({ initial }: { initial: SessionBootstrap }) {
@@ -75,6 +76,7 @@ export function AppChrome({
         <Content>{children}</Content>
       </div>
       <OnboardingGates />
+      <DeviceApprovals />
     </AuthSeed>
   );
 }

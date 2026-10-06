@@ -18,6 +18,7 @@ import {
 import { unwrapGroupMasterKeyBytes } from '@/lib/chat/groupCliqueKey';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import {
+  decryptWebE2eeV2ForDisplay,
   decryptWebE2eeV2Message,
   resolveWebE2eeV2Session,
   type E2eeV2Session,
@@ -119,10 +120,8 @@ export function useChatEncryption({
   const decryptWireMessageContent = useCallback(
     async (content: string, messageType: string): Promise<string> => {
       if (shouldSkipChatDecrypt(messageType)) return content ?? '';
-      if (content?.startsWith('e2e2:')) {
-        const session = await getE2eeV2Session(false);
-        if (!session) return 'Encrypted message';
-        return decryptWebE2eeV2Message(session, content);
+      if (content?.startsWith('e2e2:') && chatId) {
+        return (await decryptWebE2eeV2ForDisplay(chatId, content, () => getE2eeV2Session(false))) ?? content;
       }
       if (isGroupClique && groupMasterKey && isGroupMessageEncrypted(content)) {
         return decryptGroupMessageContent(content, groupMasterKey);
@@ -132,7 +131,7 @@ export function useChatEncryption({
       }
       return content ?? '';
     },
-    [isGroupClique, groupMasterKey, e2eKeys, getE2eeV2Session],
+    [chatId, isGroupClique, groupMasterKey, e2eKeys, getE2eeV2Session],
   );
 
   /**
