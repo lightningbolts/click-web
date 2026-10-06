@@ -88,28 +88,28 @@ export default function ChatThemeAudioPlayer({
 
   const shell =
     variant === 'mine'
-      ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.06] border border-white/25 shadow-[0_4px_24px_rgba(124,58,237,0.25)]'
-      : 'bg-surface border border-border-hard';
+      ? 'bg-bubble-out text-white'
+      : 'bg-bubble-in text-fg';
 
   const timeClass =
-    variant === 'mine' ? 'text-white/75 tabular-nums' : 'text-on-surface-variant tabular-nums';
-  const barTrack = variant === 'mine' ? 'bg-black/25' : 'bg-background/80';
-  const barFill = variant === 'mine' ? 'bg-white/90' : 'bg-primary';
+    variant === 'mine' ? 'text-white/75 tabular' : 'text-fg-tertiary tabular';
+  const barTrack = variant === 'mine' ? 'bg-white/25' : 'bg-fill-strong';
+  const barFill = variant === 'mine' ? 'bg-white' : 'bg-accent';
 
   const playBtn =
     variant === 'mine'
-      ? 'bg-white/20 text-white hover:bg-white/30 ring-1 ring-white/30'
-      : 'bg-primary/25 text-primary hover:bg-primary/35 ring-1 ring-primary/35';
+      ? 'bg-white text-bubble-out hover:bg-white/90'
+      : 'bg-action text-white hover:opacity-90';
 
   return (
     <div
-      className={`flex min-w-[220px] max-w-[min(100%,300px)] items-center gap-3 rounded-2xl px-3 py-2.5 ${shell}`}
+      className={`flex min-w-[220px] max-w-[min(100%,300px)] items-center gap-3 rounded-bubble px-3 py-2 ${shell}`}
     >
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
       <button
         type="button"
         onClick={toggle}
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${playBtn}`}
+        className={`press flex size-9 shrink-0 items-center justify-center rounded-full transition-colors ${playBtn}`}
         aria-label={playing ? 'Pause' : 'Play'}
       >
         {playing ? <Pause className="h-4 w-4" fill="currentColor" /> : <Play className="ml-0.5 h-4 w-4" fill="currentColor" />}
@@ -118,15 +118,15 @@ export default function ChatThemeAudioPlayer({
         <div
           role="presentation"
           onClick={seek}
-          className={`relative h-2 w-full cursor-pointer rounded-full ${barTrack}`}
+          className={`relative h-1 w-full cursor-pointer rounded-pill ${barTrack}`}
           aria-hidden
         >
           <div
-            className={`absolute left-0 top-0 h-full rounded-full ${barFill}`}
+            className={`absolute left-0 top-0 h-full rounded-pill ${barFill}`}
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <div className={`mt-1.5 flex justify-between text-[10px] font-medium ${timeClass}`}>
+        <div className={`type-badge mt-1.5 flex justify-between ${timeClass}`}>
           <span>{formatTime(current)}</span>
           <span>{formatTime(durForUi)}</span>
         </div>

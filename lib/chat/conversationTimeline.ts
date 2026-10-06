@@ -61,3 +61,26 @@ export function buildTimelineEntries(messages: Message[]): ChatTimelineEntry[] {
 
   return entries;
 }
+
+/** Messages from one sender within this gap read as one run (spec §7.2). */
+export const RUN_GAP_MS = 5 * 60 * 1000;
+
+/**
+ * For each message, whether it starts and/or ends a run of consecutive messages from the same
+ * sender on the same day. Call logs break runs.
+ */
+export function messageRuns(messages: Message[]): Map<string, { first: boolean; last: boolean }> {
+  const out = new Map<string, { first: boolean; last: boolean }>();
+  const joins = (a: Message | undefined, b: Message | undefined) =>
+    !!a &&
+    !!b &&
+    a.user_id === b.user_id &&
+    a.message_type !== 'call_log' &&
+    b.message_type !== 'call_log' &&
+    getDayStart(a.time_created) === getDayStart(b.time_created) &&
+    Math.abs(b.time_created - a.time_created) <= RUN_GAP_MS;
+  messages.forEach((m, i) => {
+    out.set(m.id, { first: !joins(messages[i - 1], m), last: !joins(m, messages[i + 1]) });
+  });
+  return out;
+}

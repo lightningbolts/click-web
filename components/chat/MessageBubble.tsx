@@ -1,187 +1,145 @@
 'use client';
 
-import {
-  useState,
-  useRef,
-  useLayoutEffect,
-  useCallback,
-  useMemo,
-  useEffect,
-  type RefObject,
-  type MouseEvent,
-} from 'react';
-import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
-import { Pencil, Trash2, SmilePlus, Check, Phone, CornerDownRight, Pin, PinOff } from 'lucide-react';
+import { useEffect, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { Lock, Phone } from 'lucide-react';
+import { Avatar } from '@/components/ds/Avatar';
+import { toast } from '@/components/ds/Toast';
 import type { Message, MessageReaction } from '@/lib/chat/types';
 import { isClientOptimisticMessageId } from '@/lib/chat/clientOptimistic';
-import ReactionPicker from './ReactionPicker';
 import { getReplyFromMetadata } from '@/lib/chat/reply';
 import { LinkifiedText } from '@/lib/chat/linkify';
 import {
+  chatAttachmentPathFromSignedUrl,
   durationSecondsFromMetadata,
   isEncryptedMediaFromMetadata,
   mediaPathFromMetadata,
-  chatAttachmentPathFromSignedUrl,
   mediaUrlFromMetadata,
   originalMimeTypeFromMetadata,
 } from '@/lib/chat/mediaMetadata';
 import { isAnyE2eeWireContent, type DerivedKeys } from '@/lib/chat/crypto';
-import {
-  tryDecodeEnvelope,
-  tryDecodeV2AttachmentDescriptor,
-  type AttachmentV2Descriptor,
-} from '@/lib/chat/attachmentCrypto';
+import { tryDecodeEnvelope, tryDecodeV2AttachmentDescriptor } from '@/lib/chat/attachmentCrypto';
 import { isBeaconChatMessage } from '@/lib/chat/messages';
 import { chatGifFromMessage } from '@/lib/chat/gif';
+import { mediaV2Fields } from '@/lib/chat/mediaV2Fields';
 import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION, parsePlan } from '@/lib/chat/plans';
-import { PlanCard } from './PlanCard';
+import { useSecureMedia } from '@/lib/chat/useSecureMedia';
+import type { E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { cn } from '@/lib/cn';
 import AttachmentBubble from './AttachmentBubble';
 import BeaconChatCard from './BeaconChatCard';
-import { useSecureMedia } from '@/lib/chat/useSecureMedia';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
-import { clampBarLeftToBubble, clampTop, placeMineMessageActionBar, placeTheirMessageActionBar } from '@/lib/chat/portalBounds';
-import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
-import type { E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { ClickDropBubble } from './ClickDropBubble';
+import { MessageActionBar } from './MessageActionBar';
+import { MessageMeta, callLogLabel, formatMessageTime, isSafeMediaUrl } from './messageMeta';
+import { PlanCard } from './PlanCard';
 
-const ACTION_MENU_OPEN_EVENT = 'chat:message-action-open';
+/** How long ciphertext shimmers before we call it undecryptable. */
+const DECRYPT_GRACE_MS = 6000;
 
-/** Crossing gaps to portaled UI + slower movement should not dismiss menus. */
-const HIDE_DELAY_MS = 520;
-const HIDE_DELAY_REACTION_OPEN_MS = 1400;
+export type MessageSender = { id: string; name: string; avatarUrl?: string | null };
+
+export type DropState = {
+  developedAt: string | null;
+  onDeveloped: (id: string, at: string) => void;
+  nowMs: number;
+};
 
 interface MessageBubbleProps {
   message: Message;
   isMine: boolean;
   currentUserId: string;
-  /** Show the sender's first initial avatar */
-  senderInitial?: string;
-  /** Short label for group chats (first two chars of user id) when not the viewer. */
-  senderLabel?: string;
-  /** Green online dot on the sender avatar (Realtime `room:presence`). */
-  showSenderOnline?: boolean;
+  /** Position in a run of messages from one sender: names go on the first, avatars on the last. */
+  first: boolean;
+  last: boolean;
+  /** Set in groups for other people's messages. */
+  sender?: MessageSender | null;
   onReply?: (message: Message) => void;
   onReact: (messageId: string, emoji: string) => void;
   onEdit: (messageId: string, currentContent: string) => void;
   onDelete: (messageId: string) => void;
-  /** Messages glass panel — keeps portaled toolbars inside the chat card. */
-  portalsBoundsRef?: RefObject<HTMLElement | null>;
-  /** Active chat crypto key for decrypting encrypted media payloads. */
   mediaChatKey?: DerivedKeys | ArrayBuffer | null;
-  /** Factory returning `Authorization: Bearer …` headers; used to sign attachment URLs. */
   getAuthHeaders?: () => Promise<HeadersInit>;
-  /** Loader for the current chat epoch key, used by v2 media and file attachments. */
   getE2eeV2Session?: (allowUpgrade?: boolean, forceRefresh?: boolean) => Promise<E2eeV2Session | null>;
-  /** Transient search deep-link highlight. */
+  /** Jump / search highlight. */
   highlighted?: boolean;
-  /** Pinned in this conversation (shows a pin marker by the time). */
   pinned?: boolean;
   onTogglePin?: (message: Message) => void;
-  /** Going / can't make it on a plan card. */
   onPlanRsvp?: (message: Message, going: boolean) => void;
-  /** On-device quote text for a reply target (replies no longer carry a plaintext excerpt). */
+  /** On-device quote text for a reply target (replies carry no plaintext excerpt). */
   resolveReplySnippet?: (messageId: string) => string | null;
+  /** Who wrote the quoted message ("You", a name), when it's loaded. */
+  resolveReplyAuthor?: (messageId: string) => string | null;
+  /** Scroll to the message a reply quotes. */
+  onJumpTo?: (messageId: string) => void;
+  /** Click Drops only. */
+  drop?: DropState;
 }
 
-function callLogLabel(metadata: unknown): { text: string; missed: boolean } {
-  const m = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? (metadata as Record<string, unknown>) : {};
-  const state = typeof m.call_state === 'string' ? m.call_state : '';
-  const rawDur = m.duration_seconds;
-  const dur =
-    typeof rawDur === 'number'
-      ? rawDur
-      : typeof rawDur === 'string'
-        ? parseInt(rawDur, 10) || 0
-        : 0;
-  if (state === 'missed') return { text: 'Missed Voice Call', missed: true };
-  if (state === 'declined') return { text: 'Declined Call', missed: false };
-  if (state === 'completed') {
-    const s = Math.max(0, Math.floor(dur));
-    const min = Math.floor(s / 60);
-    const sec = s % 60;
-    const durLabel = min > 0 ? `${min}m ${sec.toString().padStart(2, '0')}s` : `${sec}s`;
-    return { text: `Call Ended • ${durLabel}`, missed: false };
-  }
-  return { text: 'Call', missed: false };
-}
-
-function formatMessageTimeLabel(ms: number) {
-  return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
-type MineDeliveryState = 'pending' | 'sent' | 'delivered' | 'read';
-
-function mineDeliveryState(message: Message): MineDeliveryState {
-  const meta =
-    message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata)
-      ? (message.metadata as Record<string, unknown>)
-      : {};
-  const optimistic = isClientOptimisticMessageId(message.id);
-  const postAck = meta._webPostAck === true || !optimistic;
-  const delivered =
-    message.delivered_at != null && Number.isFinite(Number(message.delivered_at));
-  // Use `read_at` only — optimistic rows used `is_read: true` by mistake, which showed double ticks then dropped to one after merge.
-  const read = message.read_at != null && Number.isFinite(Number(message.read_at));
-  if (read) return 'read';
-  if (delivered) return 'delivered';
-  if (postAck) return 'sent';
-  return 'pending';
-}
-
-/** WhatsApp-style ticks for outgoing non–call-log messages (web). */
-function MineDeliveryTicks({ message }: { message: Message }) {
-  const state = mineDeliveryState(message);
-  const pair = (className: string, title: string) => (
-    <span className={`inline-flex items-center -space-x-1.5 ${className}`} title={title}>
-      <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
-      <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
-    </span>
-  );
-
-  if (state === 'read') {
-    return pair('text-primary', 'Read');
-  }
-  if (state === 'delivered') {
-    return pair('text-on-surface-variant', 'Delivered');
-  }
-  if (state === 'sent') {
-    return (
-      <span className="inline-flex text-on-surface-variant" title="Sent">
-        <Check className="w-3 h-3" strokeWidth={2.5} aria-hidden />
-      </span>
-    );
+/** Ciphertext shimmers while keys load; after a grace period it says so instead of spinning forever. */
+function EncryptedText({ mine }: { mine: boolean }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setFailed(true), DECRYPT_GRACE_MS);
+    return () => window.clearTimeout(t);
+  }, []);
+  if (!failed) {
+    return <span aria-busy aria-label="Decrypting message" className={cn('block h-4 w-40 max-w-full animate-pulse rounded-xs', mine ? 'bg-white/20' : 'bg-fill-strong')} />;
   }
   return (
-    <span className="inline-flex h-3 w-3 rounded-full border border-border-hard opacity-70" title="Sending…" aria-hidden />
+    <span className={cn('inline-flex items-center gap-1.5 italic', mine ? 'text-white/80' : 'text-fg-secondary')}>
+      <Lock size={14} aria-hidden />
+      Couldn’t decrypt this message
+    </span>
   );
 }
 
-function isSafeRenderableMediaUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return u.protocol === 'https:' || u.protocol === 'http:' || u.protocol === 'blob:';
-  } catch {
-    return false;
-  }
+function ReplyQuote({
+  author,
+  snippet,
+  mine,
+  inBubble,
+  onClick,
+}: {
+  author: string | null;
+  snippet: string;
+  mine: boolean;
+  inBubble: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      aria-label={`Replying to: ${snippet}. Show message`}
+      className={cn(
+        'type-meta flex w-full min-w-0 max-w-full items-stretch gap-2 rounded-sm py-1 pl-1 pr-2 text-left',
+        inBubble ? 'mb-1.5' : 'mb-1 w-auto',
+        inBubble && mine ? 'bg-white/[0.14] text-white/90' : 'bg-fill-subtle text-fg-secondary',
+        onClick && 'cursor-pointer hover:opacity-90',
+      )}
+    >
+      <span aria-hidden className={cn('w-[3px] shrink-0 rounded-pill', inBubble && mine ? 'bg-white/85' : 'bg-accent')} />
+      <span className="min-w-0">
+        {author ? <span className={cn('block truncate font-semibold', inBubble && mine ? 'text-white' : 'text-fg')}>{author}</span> : null}
+        <span className="line-clamp-2">{snippet}</span>
+      </span>
+    </button>
+  );
 }
 
-
-/**
- * MessageBubble - renders a single chat message with reactions,
- * edit/delete controls, and a reaction picker.
- */
+/** One message in the thread (spec §7.2). */
 export default function MessageBubble({
   message,
   isMine,
   currentUserId,
-  senderInitial = '?',
-  senderLabel,
-  showSenderOnline = false,
+  first,
+  last,
+  sender,
   onReply,
   onReact,
   onEdit,
   onDelete,
-  portalsBoundsRef,
   mediaChatKey,
   getAuthHeaders,
   getE2eeV2Session,
@@ -190,666 +148,321 @@ export default function MessageBubble({
   onTogglePin,
   onPlanRsvp,
   resolveReplySnippet,
+  resolveReplyAuthor,
+  onJumpTo,
+  drop,
 }: MessageBubbleProps) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [showActions, setShowActions] = useState(false);
-  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bubbleRef = useRef<HTMLDivElement>(null);
-  /** Whole message column (bubble + reactions + time); toolbar is positioned from this so it never covers text. */
-  const messageColumnRef = useRef<HTMLDivElement>(null);
-  const actionBarRef = useRef<HTMLDivElement>(null);
-  const layoutApplyRef = useRef<() => void>(() => {});
-  /** Portaled toolbar geometry (for layout + emoji picker dock). */
-  const [actionBarGeom, setActionBarGeom] = useState<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    maxWidthPx?: number;
-  } | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const cancelHide = useCallback(() => {
-    if (hideTimeout.current) clearTimeout(hideTimeout.current);
-  }, []);
-
-  const scheduleHide = useCallback(() => {
-    if (hideTimeout.current) clearTimeout(hideTimeout.current);
-    const delay = showPicker ? HIDE_DELAY_REACTION_OPEN_MS : HIDE_DELAY_MS;
-    hideTimeout.current = setTimeout(() => {
-      setShowActions(false);
-      setShowPicker(false);
-    }, delay);
-  }, [showPicker]);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const onOtherMenuOpened = (event: Event) => {
-      const incomingId = (event as CustomEvent<{ messageId?: string }>).detail?.messageId;
-      if (!incomingId || incomingId === message.id) return;
-      setShowActions(false);
-      setShowPicker(false);
-    };
-    document.addEventListener(ACTION_MENU_OPEN_EVENT, onOtherMenuOpened as EventListener);
-    return () => {
-      document.removeEventListener(ACTION_MENU_OPEN_EVENT, onOtherMenuOpened as EventListener);
-    };
-  }, [message.id]);
-
-  useEffect(() => {
-    if (showPicker) cancelHide();
-  }, [showPicker, cancelHide]);
-
+  const meta = (message.metadata && typeof message.metadata === 'object' ? message.metadata : {}) as Record<string, unknown>;
   const mediaUrl = mediaUrlFromMetadata(message.metadata);
-  const mediaPath =
-    mediaPathFromMetadata(message.metadata) ?? chatAttachmentPathFromSignedUrl(mediaUrl);
   const isEncryptedMedia = isEncryptedMediaFromMetadata(message.metadata);
-  const originalMimeType = originalMimeTypeFromMetadata(message.metadata);
-  const v2MediaMetadata = useMemo(() => {
-    const meta = message.metadata && typeof message.metadata === 'object' ? message.metadata : {};
-    const cryptoVersion = Number((meta as Record<string, unknown>).crypto_version);
-    const epoch = Number((meta as Record<string, unknown>).epoch);
-    const senderDeviceId = (meta as Record<string, unknown>).sender_device_id;
-    const clientMessageId = (meta as Record<string, unknown>).client_message_id;
-    const digest = (meta as Record<string, unknown>).media_ciphertext_sha256;
-    if (
-      cryptoVersion !== 2 ||
-      !Number.isSafeInteger(epoch) ||
-      typeof senderDeviceId !== 'string' ||
-      typeof clientMessageId !== 'string' ||
-      typeof digest !== 'string'
-    ) {
-      return null;
-    }
-    return {
-      chatId: message.chat_id,
-      epoch,
-      senderDeviceId,
-      clientMessageId,
-      mediaCiphertextSha256: digest,
-    };
-  }, [message.chat_id, message.metadata]);
   const secureMedia = useSecureMedia({
     storageUrl: mediaUrl,
-    storagePath: mediaPath,
+    storagePath: mediaPathFromMetadata(message.metadata) ?? chatAttachmentPathFromSignedUrl(mediaUrl),
     chatKey: mediaChatKey,
-    mimeType: originalMimeType,
+    mimeType: originalMimeTypeFromMetadata(message.metadata),
     isEncryptedMedia,
     getE2eeV2Session,
     getAuthHeaders,
-    v2Metadata: v2MediaMetadata,
+    v2Metadata: mediaV2Fields(meta, message.chat_id),
   });
 
-  useLayoutEffect(() => {
-    if (!showActions || typeof document === 'undefined') {
-      setActionBarGeom(null);
-      return;
-    }
-    const gap = 8;
-    const pad = 12;
-    const estimateBarW = (maxWidthPx?: number) => {
-      const mineExtra = isMine ? 88 : 0;
-      const replyExtra = typeof onReply === 'function' ? 48 : 0;
-      const estimated = 36 + mineExtra + replyExtra;
-      return maxWidthPx !== undefined ? Math.min(estimated, maxWidthPx) : estimated;
-    };
-
-    const apply = () => {
-      const el = messageColumnRef.current;
-      if (!el) {
-        setActionBarGeom(null);
-        return;
-      }
-      const boundsRect = portalsBoundsRef?.current?.getBoundingClientRect() ?? null;
-      const maxWidthPx =
-        boundsRect && boundsRect.width > 2 * pad ? boundsRect.width - 2 * pad : undefined;
-      const r = el.getBoundingClientRect();
-      const bubbleR = bubbleRef.current?.getBoundingClientRect();
-      const measuredW = actionBarRef.current?.offsetWidth;
-      const measuredH = actionBarRef.current?.offsetHeight;
-      const rawBarW = measuredW && measuredW > 0 ? measuredW : estimateBarW(maxWidthPx);
-      const barW = maxWidthPx !== undefined ? Math.min(rawBarW, maxWidthPx) : rawBarW;
-      const barH = measuredH && measuredH > 0 ? measuredH : 44;
-
-      let leftEdge: number;
-      let top: number;
-
-      if (isMine && bubbleR) {
-        const placed = placeMineMessageActionBar(bubbleR, barW, barH, gap, pad, boundsRect, pad);
-        leftEdge = placed.left;
-        top = placed.top;
-      } else if (bubbleR) {
-        /** Theirs: beside the bubble (right edge) when possible; else above/below, end-aligned. */
-        const placed = placeTheirMessageActionBar(bubbleR, barW, barH, gap, pad, boundsRect, pad);
-        leftEdge = placed.left;
-        top = placed.top;
-      } else {
-        leftEdge = clampBarLeftToBubble(r.left, r.right, barW, 'start', pad, boundsRect, pad);
-        top = clampTop(r.top - barH - gap, barH, pad, boundsRect, pad);
-      }
-
-      setActionBarGeom({
-        left: leftEdge,
-        top,
-        width: barW,
-        height: barH,
-        ...(maxWidthPx !== undefined ? { maxWidthPx } : {}),
-      });
-    };
-    layoutApplyRef.current = apply;
-    apply();
-    const raf = requestAnimationFrame(apply);
-    window.addEventListener('resize', apply);
-    window.addEventListener('scroll', apply, true);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', apply);
-      window.removeEventListener('scroll', apply, true);
-    };
-  }, [showActions, isMine, portalsBoundsRef, onReply]);
-
-  useLayoutEffect(() => {
-    if (!showActions || !actionBarGeom) return;
-    const el = actionBarRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => layoutApplyRef.current());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [showActions, actionBarGeom]);
-
-  const pickerToolbarDock = useMemo(() => {
-    if (!showActions || !actionBarGeom) return null;
-    return {
-      ...actionBarGeom,
-      gap: 16,
-      preferSide: isMine ? ('left' as const) : ('right' as const),
-    };
-  }, [isMine, showActions, actionBarGeom]);
-
   if (message.message_type === 'call_log') {
-    const { text, missed } = callLogLabel(message.metadata);
+    const { text, missed } = callLogLabel(message);
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.18 }}
-        className="flex w-full justify-center px-2 py-2"
-      >
-        <div
-          className="inline-flex max-w-[90%] items-center gap-2 rounded-[20px] border border-border-hard bg-surface-container px-3.5 py-2 text-sm "
-          role="status"
-        >
-          <Phone className={`h-4 w-4 shrink-0 ${missed ? 'text-red-400' : 'text-on-surface-variant'}`} aria-hidden />
-          <span className={missed ? 'font-medium text-red-400' : 'font-medium text-on-surface'}>{text}</span>
-          <span className="text-[10px] text-on-surface-variant">{formatMessageTimeLabel(message.time_created)}</span>
-        </div>
-      </motion.div>
+      <div data-message-id={message.id} className="flex w-full justify-center py-2" role="status">
+        <span className="type-meta inline-flex items-center gap-2 rounded-pill bg-bg-elevated px-3.5 py-1.5 shadow-overlay">
+          <Phone size={14} className={missed ? 'text-destructive' : 'text-fg-tertiary'} aria-hidden />
+          <span className={cn('font-semibold', missed ? 'text-destructive' : 'text-fg')}>{text}</span>
+          <span className="tabular text-fg-tertiary">{formatMessageTime(message.time_created)}</span>
+        </span>
+      </div>
     );
   }
 
-  // RSVPs on a plan are counted on its card, not repeated as reaction chips.
-  const isPlanMessage = message.message_type === 'text' && parsePlan(message.metadata) != null;
-  const flatReactions: { emoji: string; count: number; iMine: boolean }[] = Object.entries(
-    message.reactions ?? {}
-  )
-    .filter(([emoji]) => !isPlanMessage || (emoji !== PLAN_GOING_REACTION && emoji !== PLAN_DECLINED_REACTION))
-    .map(([emoji, users]) => ({
-    emoji,
-    count: (users as MessageReaction[]).length,
-    iMine: (users as MessageReaction[]).some((r) => r.user_id === currentUserId),
-  }));
-
-  const myReactions = flatReactions.filter((r) => r.iMine).map((r) => r.emoji);
-
-  const handleMouseEnter = () => {
-    cancelHide();
-    if (typeof document !== 'undefined') {
-      document.dispatchEvent(
-        new CustomEvent<{ messageId: string }>(ACTION_MENU_OPEN_EVENT, {
-          detail: { messageId: message.id },
-        }),
-      );
-    }
-    setShowActions(true);
-  };
-
-  const handleMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
-    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
-    scheduleHide();
-  };
-
-  const handlePortaledMouseLeave = (e: MouseEvent<HTMLDivElement>) => {
-    if (pointerMovesWithinHoverGroup(e.relatedTarget, message.id)) return;
-    scheduleHide();
-  };
-
-  const timeLabel = formatMessageTimeLabel(message.time_created);
-  const replyMeta = getReplyFromMetadata(message.metadata);
-  const replySnippet = replyMeta
-    ? replyMeta.snippet || resolveReplySnippet?.(replyMeta.id) || 'Message'
-    : '';
+  const content = message.content;
+  const caption = content.trim();
   const plan = message.message_type === 'text' ? parsePlan(message.metadata) : null;
-  const resolvedMediaUrl = secureMedia.src;
-  const audioDuration = durationSecondsFromMetadata(message.metadata);
-  const linkVariant = isMine ? 'mine' : 'theirs';
-  const captionText = message.content.trim();
-  const showCaption = captionText.length > 0;
-  const captionLooksEncrypted =
-    message.message_type === 'text' && showCaption && isAnyE2eeWireContent(captionText);
+  const gif = chatGifFromMessage(message);
+  const isDrop = meta.disposable_roll === true && message.message_type === 'image' && drop != null;
   const isImage = message.message_type === 'image';
   const isAudio = message.message_type === 'audio';
-  const attachmentEnvelope =
-    message.message_type === 'file' || captionText.startsWith('ccx:v1:')
-      ? tryDecodeEnvelope(captionText)
-      : null;
-  const attachmentV2Descriptor =
-    message.message_type === 'file' ? tryDecodeV2AttachmentDescriptor(captionText) : null;
-  const isAttachment = attachmentEnvelope !== null || attachmentV2Descriptor !== null;
   const isBeacon = isBeaconChatMessage(message);
-  const gif = chatGifFromMessage(message);
-  // Largest box within 16rem × 18rem that keeps the GIF's aspect ratio.
-  const gifDisplayWidth = gif ? Math.min(256, Math.round((288 * gif.width) / gif.height)) : 0;
-  const textBubbleClass = isMine
-    ? 'bg-primary text-on-primary rounded-br-sm'
-    : 'border border-border-hard bg-surface-container text-on-surface rounded-bl-sm';
+  const attachment =
+    message.message_type === 'file' || caption.startsWith('ccx:v1:')
+      ? (tryDecodeEnvelope(caption) ?? (message.message_type === 'file' ? tryDecodeV2AttachmentDescriptor(caption) : null))
+      : null;
+  const ciphertext = isAnyE2eeWireContent(caption);
+  const isText = !plan && !gif && !isImage && !isAudio && !isBeacon && !attachment;
+
+  // RSVPs on a plan are counted on its card, not repeated as reaction chips.
+  const reactions = Object.entries(message.reactions ?? {})
+    .filter(([emoji]) => !plan || (emoji !== PLAN_GOING_REACTION && emoji !== PLAN_DECLINED_REACTION))
+    .map(([emoji, users]) => ({
+      emoji,
+      count: (users as MessageReaction[]).length,
+      mine: (users as MessageReaction[]).some((r) => r.user_id === currentUserId),
+    }))
+    .filter((r) => r.count > 0);
+  const myReactions = new Set(reactions.filter((r) => r.mine).map((r) => r.emoji));
+
+  const reply = getReplyFromMetadata(message.metadata);
+  const replySnippet = reply ? reply.snippet || resolveReplySnippet?.(reply.id) || 'Message' : '';
+  const replyAuthor = reply ? (resolveReplyAuthor?.(reply.id) ?? null) : null;
+  const jumpToReply = reply && onJumpTo ? () => onJumpTo(reply.id) : undefined;
+  const optimistic = isClientOptimisticMessageId(message.id);
+  const imageSrc = secureMedia.src && isSafeMediaUrl(secureMedia.src) ? secureMedia.src : null;
+  const variant = isMine ? 'mine' : 'theirs';
+  const tail = last ? (isMine ? 'rounded-br-xs' : 'rounded-bl-xs') : '';
+  const bubbleTone = isMine ? 'bg-bubble-out text-white' : 'bg-bubble-in text-fg';
+  const metaBelow = <MessageMeta message={message} mine={isMine} pinned={pinned} tone="plain" className="mt-1 px-1" />;
+  const metaOverlay = (
+    <MessageMeta message={message} mine={isMine} pinned={pinned} tone="media" className="material-glass-dark absolute bottom-2 right-2 rounded-pill px-2 py-0.5" />
+  );
+
+  const save = () => {
+    if (!imageSrc) return;
+    const a = document.createElement('a');
+    a.href = imageSrc;
+    a.download = `click-photo-${message.id.slice(0, 8)}`;
+    a.rel = 'noopener';
+    a.click();
+  };
+  const copy = () => {
+    void navigator.clipboard
+      .writeText(content)
+      .then(() => toast('Copied'))
+      .catch(() => toast.error('Couldn’t copy. Try again.'));
+  };
+
+  const react = (emoji: string) => onReact(message.id, emoji);
+  const active = hovered || focused || menuOpen || pickerOpen;
+
+  const onRowKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === '.') {
+      e.preventDefault();
+      setMenuOpen(true);
+    } else if ((e.key === 'r' || e.key === 'R') && onReply && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      onReply(message);
+    }
+  };
+  const onContextMenu = (e: MouseEvent<HTMLDivElement>) => {
+    // Leave the browser menu for selected text and links.
+    if (window.getSelection()?.toString() || (e.target as HTMLElement).closest('a')) return;
+    e.preventDefault();
+    setFocused(true);
+    setMenuOpen(true);
+  };
+  const onBlur = (e: FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+  };
+
+  let body: ReactNode;
+  if (isDrop && drop) {
+    body = (
+      <div className="relative">
+        <ClickDropBubble
+          message={message}
+          previewSrc={imageSrc}
+          previewLoading={secureMedia.isLoading}
+          developedAt={drop.developedAt}
+          onDeveloped={drop.onDeveloped}
+          mediaChatKey={mediaChatKey}
+          getAuthHeaders={getAuthHeaders}
+          getE2eeV2Session={getE2eeV2Session}
+          nowMs={drop.nowMs}
+        />
+        {metaOverlay}
+      </div>
+    );
+  } else if (isBeacon) {
+    body = (
+      <>
+        {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble={false} onClick={jumpToReply} /> : null}
+        <BeaconChatCard message={message} />
+        {metaBelow}
+      </>
+    );
+  } else if (attachment) {
+    body = (
+      <>
+        {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble={false} onClick={jumpToReply} /> : null}
+        <AttachmentBubble
+          envelope={attachment}
+          isMine={isMine}
+          getAuthHeaders={getAuthHeaders ?? (async () => ({ 'Content-Type': 'application/json' }))}
+          chatId={message.chat_id}
+          messageMetadata={mediaV2Fields(meta, message.chat_id)}
+          getE2eeV2Session={getE2eeV2Session}
+        />
+        {metaBelow}
+      </>
+    );
+  } else if (plan) {
+    body = (
+      <>
+        <PlanCard plan={plan} message={message} currentUserId={currentUserId} isMine={isMine} onRsvp={onPlanRsvp} />
+        {metaBelow}
+      </>
+    );
+  } else if (gif) {
+    const width = Math.min(256, Math.round((288 * gif.width) / gif.height));
+    body = (
+      <>
+        {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble={false} onClick={jumpToReply} /> : null}
+        <div className="relative max-w-full overflow-hidden rounded-lg bg-fill-subtle" style={{ width, aspectRatio: `${gif.width} / ${gif.height}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- KLIPY media must load from the URL the API returned */}
+          <img src={gif.url} alt="GIF" loading="lazy" referrerPolicy="no-referrer" className="block size-full object-cover" />
+          {metaOverlay}
+        </div>
+      </>
+    );
+  } else if (isImage || isAudio) {
+    const unavailable = (
+      <p className={cn('type-meta rounded-bubble px-3 py-2', bubbleTone)}>
+        <Lock size={12} className="mr-1 inline" aria-hidden />
+        {isImage ? 'Photo' : 'Voice message'} unavailable
+      </p>
+    );
+    body = (
+      <>
+        {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble={false} onClick={jumpToReply} /> : null}
+        {isImage ? (
+          secureMedia.isLoading ? (
+            <div className="aspect-[4/3] w-[320px] max-w-full animate-pulse rounded-lg bg-fill-subtle" aria-busy aria-label="Decrypting photo" />
+          ) : imageSrc ? (
+            <div className="relative max-w-[min(100%,320px)] overflow-hidden rounded-lg bg-fill-subtle">
+              {/* eslint-disable-next-line @next/next/no-img-element -- decrypted or signed media URL */}
+              <img src={imageSrc} alt="Photo" loading="lazy" className="block max-h-[360px] w-auto max-w-full object-cover" />
+              {!caption ? metaOverlay : null}
+            </div>
+          ) : (
+            unavailable
+          )
+        ) : secureMedia.isLoading ? (
+          <div className="h-[52px] w-[240px] max-w-full animate-pulse rounded-bubble bg-fill-subtle" aria-busy aria-label="Decrypting voice message" />
+        ) : imageSrc ? (
+          <ChatThemeAudioPlayer src={imageSrc} variant={variant} durationHint={durationSecondsFromMetadata(message.metadata)} />
+        ) : (
+          unavailable
+        )}
+        {caption ? (
+          <div className={cn('relative mt-0.5 max-w-full rounded-bubble px-3 py-2 type-body break-words pointer-coarse:text-[16px]', bubbleTone, tail)}>
+            {ciphertext ? <EncryptedText mine={isMine} /> : <LinkifiedText text={content} variant={variant} />}
+            <InlineMeta message={message} mine={isMine} pinned={pinned} />
+          </div>
+        ) : isAudio ? (
+          metaBelow
+        ) : null}
+      </>
+    );
+  } else {
+    body = (
+      <div className={cn('relative max-w-full rounded-bubble px-3 py-2 type-body break-words whitespace-pre-wrap pointer-coarse:text-[16px]', bubbleTone, tail)}>
+        {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble onClick={jumpToReply} /> : null}
+        {ciphertext ? <EncryptedText mine={isMine} /> : <LinkifiedText text={content} variant={variant} />}
+        <InlineMeta message={message} mine={isMine} pinned={pinned} />
+      </div>
+    );
+  }
+
+  const canEdit = isMine && isText && !ciphertext && !optimistic;
 
   return (
-    <motion.div
+    <div
       data-message-id={message.id}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.18 }}
-      className={`flex items-end gap-2 group rounded-2xl transition-[box-shadow,background-color] duration-700 ${
-        isMine ? 'flex-row-reverse' : 'flex-row'
-      } ${highlighted ? 'bg-primary/15 ring-2 ring-primary/50 shadow-[0_0_0_4px_rgba(99,14,212,0.12)]' : ''}`}
-    >
-      {/* Avatar */}
-      {!isMine && (
-        <div className="relative w-8 h-8 shrink-0 mb-1">
-          <div
-            className="flex h-full w-full items-center justify-center rounded-full bg-primary
-            text-xs font-bold text-on-primary"
-          >
-            {senderLabel ?? senderInitial}
-          </div>
-          {showSenderOnline && (
-            <span
-              className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background"
-              aria-hidden
-            />
-          )}
-        </div>
+      tabIndex={0}
+      aria-label={`${isMine ? 'You' : (sender?.name ?? 'Them')}, ${formatMessageTime(message.time_created)}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={onBlur}
+      onKeyDown={onRowKeyDown}
+      onContextMenu={onContextMenu}
+      className={cn(
+        'relative flex w-full items-end gap-2 rounded-md py-[1.5px] outline-none transition-colors duration-[1200ms] focus-visible:ring-2 focus-visible:ring-accent',
+        isMine ? 'justify-end pl-16' : 'justify-start pr-16',
+        first && 'mt-2',
+        highlighted && 'bg-selection',
       )}
+    >
+      {sender ? (
+        <span className="w-8 shrink-0">
+          {last ? <Avatar seed={sender.id} name={sender.name} src={sender.avatarUrl ?? null} size={32} /> : null}
+        </span>
+      ) : null}
 
       <div
-        ref={messageColumnRef}
-        {...{ [CHAT_HOVER_ANCHOR_ATTR]: message.id }}
-        className={`relative flex max-w-[min(75%,32rem)] flex-col ${isMine ? 'items-end' : 'items-start'}`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        className={cn('relative flex min-w-0 max-w-[min(75%,520px)] flex-col', isMine ? 'items-end' : 'items-start')}
+        onDoubleClick={() => {
+          window.getSelection()?.removeAllRanges();
+          react('❤️');
+        }}
       >
-        <ReactionPicker
-          anchorRef={bubbleRef}
-          boundsRef={portalsBoundsRef}
-          alignToBubbleEnd={isMine}
-          toolbarDock={pickerToolbarDock}
-          hoverGroupId={message.id}
-          visible={showPicker}
-          activeReactions={myReactions}
-          onReact={(emoji) => {
-            onReact(message.id, emoji);
-            setShowPicker(false);
-          }}
-          onPortaledPointerChange={(inside) => {
-            if (inside) cancelHide();
-            else scheduleHide();
-          }}
-        />
+        {sender && first ? <span className="type-meta mb-0.5 truncate px-3 font-semibold text-fg-secondary">{sender.name}</span> : null}
 
-        {isBeacon ? (
-          <div
-            ref={bubbleRef}
-            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
-          >
-            {replyMeta && (
-              <div
-                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
-                  isMine
-                    ? 'border-white/20 bg-black/15 text-on-primary'
-                    : 'border-border-hard bg-surface text-on-surface-variant'
-                }`}
-              >
-                <span className="flex items-center gap-1 font-medium opacity-90">
-                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
-                  Reply
-                </span>
-                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
-              </div>
-            )}
-            <BeaconChatCard message={message} />
-          </div>
-        ) : isAttachment && attachmentEnvelope ? (
-          <div
-            ref={bubbleRef}
-            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
-          >
-            {replyMeta && (
-              <div
-                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
-                  isMine
-                    ? 'border-white/20 bg-black/15 text-on-primary'
-                    : 'border-border-hard bg-surface text-on-surface-variant'
-                }`}
-              >
-                <span className="flex items-center gap-1 font-medium opacity-90">
-                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
-                  Reply
-                </span>
-                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
-              </div>
-            )}
-            <AttachmentBubble
-              envelope={attachmentEnvelope ?? attachmentV2Descriptor}
-              isMine={isMine}
-              getAuthHeaders={
-                getAuthHeaders ??
-                (async () => ({ 'Content-Type': 'application/json' }))
-              }
-              chatId={message.chat_id}
-              messageMetadata={v2MediaMetadata}
-              getE2eeV2Session={getE2eeV2Session}
-            />
-          </div>
-        ) : plan ? (
-          <div ref={bubbleRef} className={`relative flex w-full flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-            <PlanCard
-              plan={plan}
-              message={message}
-              currentUserId={currentUserId}
-              isMine={isMine}
-              onRsvp={onPlanRsvp}
-            />
-          </div>
-        ) : gif ? (
-          <div
-            ref={bubbleRef}
-            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
-          >
-            {replyMeta && (
-              <div
-                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
-                  isMine
-                    ? 'border-white/20 bg-black/15 text-on-primary'
-                    : 'border-border-hard bg-surface text-on-surface-variant'
-                }`}
-              >
-                <span className="flex items-center gap-1 font-medium opacity-90">
-                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
-                  Reply
-                </span>
-                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
-              </div>
-            )}
-            <div
-              className="max-w-full overflow-hidden rounded-2xl border border-border-hard bg-surface-container"
-              style={{ width: gifDisplayWidth, aspectRatio: `${gif.width} / ${gif.height}` }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- KLIPY media must load from the URL the API returned */}
-              <img
-                src={gif.url}
-                alt="GIF"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                className="block h-full w-full object-cover"
-              />
-            </div>
-          </div>
-        ) : isImage || isAudio ? (
-          <div
-            ref={bubbleRef}
-            className={`relative flex w-full flex-col gap-2 ${isMine ? 'items-end' : 'items-start'}`}
-          >
-            {replyMeta && (
-              <div
-                className={`max-w-full rounded-2xl border px-3 py-2 text-xs leading-snug ${
-                  isMine
-                    ? 'border-white/20 bg-black/15 text-on-primary'
-                    : 'border-border-hard bg-surface text-on-surface-variant'
-                }`}
-              >
-                <span className="flex items-center gap-1 font-medium opacity-90">
-                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
-                  Reply
-                </span>
-                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
-              </div>
-            )}
+        {active && !optimistic ? (
+          <MessageActionBar
+            mine={isMine}
+            myReactions={myReactions}
+            onReact={react}
+            onReply={onReply ? () => onReply(message) : undefined}
+            onCopy={isText && !ciphertext && caption ? copy : undefined}
+            onEdit={canEdit ? () => onEdit(message.id, content) : undefined}
+            pinned={pinned}
+            onTogglePin={onTogglePin ? () => onTogglePin(message) : undefined}
+            onSaveImage={isImage && imageSrc && !isDrop ? save : undefined}
+            onDelete={isMine ? () => onDelete(message.id) : undefined}
+            menuOpen={menuOpen}
+            onMenuOpenChange={setMenuOpen}
+            pickerOpen={pickerOpen}
+            onPickerOpenChange={setPickerOpen}
+          />
+        ) : null}
 
-            {isImage && (
-              <>
-                {secureMedia.isLoading ? (
-                  <div
-                    className="h-56 w-[min(100%,20rem)] animate-pulse rounded-2xl border border-border-hard bg-surface-container"
-                    aria-busy
-                    aria-label="Decrypting photo"
-                  />
-                ) : resolvedMediaUrl && isSafeRenderableMediaUrl(resolvedMediaUrl) ? (
-                  <div
-                    className={`max-w-full overflow-hidden rounded-2xl ${
-                      isMine
-                        ? 'shadow-[0_10px_40px_rgba(124,56,237,0.38)] ring-1 ring-white/30'
-                        : 'border border-border-hard shadow-[0_8px_28px_rgba(0,0,0,0.35)] ring-1 ring-black/30'
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs are dynamic per project */}
-                    <img
-                      src={resolvedMediaUrl}
-                      alt=""
-                      className="block max-h-72 w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                ) : (
-                  <p className={`text-xs ${isMine ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                    {isEncryptedMedia || secureMedia.error ? 'Encrypted photo unavailable' : 'Photo unavailable'}
-                  </p>
-                )}
-              </>
-            )}
+        {body}
 
-            {isAudio && (
-              <>
-                {secureMedia.isLoading ? (
-                  <div
-                    className={`h-[60px] min-w-[220px] max-w-[min(100%,300px)] animate-pulse rounded-2xl border ${
-                      isMine ? 'border-white/20 bg-white/10' : 'border-border-hard bg-surface-container'
-                    }`}
-                    aria-busy
-                    aria-label="Decrypting voice message"
-                  />
-                ) : resolvedMediaUrl && isSafeRenderableMediaUrl(resolvedMediaUrl) ? (
-                  <ChatThemeAudioPlayer
-                    src={resolvedMediaUrl}
-                    variant={linkVariant}
-                    durationHint={audioDuration}
-                  />
-                ) : (
-                  <p className={`text-xs ${isMine ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                    {isEncryptedMedia || secureMedia.error
-                      ? 'Encrypted voice message unavailable'
-                      : 'Voice message unavailable'}
-                  </p>
-                )}
-              </>
-            )}
-
-            {showCaption && (
-              <div
-                className={`relative max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${textBubbleClass}`}
-              >
-                {captionLooksEncrypted ? (
-                  <div
-                    className="h-4 max-w-[12rem] rounded-md bg-white/15 animate-pulse"
-                    aria-busy
-                    aria-label="Decrypting message"
-                  />
-                ) : (
-                  <LinkifiedText text={message.content} variant={linkVariant} />
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div
-            ref={bubbleRef}
-            className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${textBubbleClass}`}
-          >
-            {replyMeta && (
-              <div
-                className={`mb-2 rounded-lg border px-2.5 py-1.5 text-xs leading-snug ${
-                  isMine
-                    ? 'border-white/15 bg-black/15 text-on-primary/90'
-                    : 'border-border-hard bg-surface text-on-surface-variant'
-                }`}
-              >
-                <span className="flex items-center gap-1 font-medium opacity-80">
-                  <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
-                  Reply
-                </span>
-                <p className="mt-0.5 line-clamp-3">{replySnippet}</p>
-              </div>
-            )}
-            {message.message_type === 'text' && isAnyE2eeWireContent(message.content) ? (
-              <div
-                className="h-4 max-w-[14rem] rounded-md bg-white/15 animate-pulse"
-                aria-busy
-                aria-label="Decrypting message"
-              />
-            ) : (
-              <LinkifiedText text={message.content} variant={linkVariant} />
-            )}
-          </div>
-        )}
-
-        {showActions &&
-          actionBarGeom &&
-          typeof document !== 'undefined' &&
-          createPortal(
-            <div
-              ref={actionBarRef}
-              {...{ [CHAT_HOVER_ANCHOR_ATTR]: message.id }}
-              style={{
-                position: 'fixed',
-                top: actionBarGeom.top,
-                left: actionBarGeom.left,
-                zIndex: 190,
-                maxWidth: actionBarGeom.maxWidthPx,
-                boxSizing: 'border-box',
-              }}
-              onMouseEnter={cancelHide}
-              onMouseLeave={handlePortaledMouseLeave}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'spring', stiffness: 520, damping: 32 }}
-                className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full border border-border-hard bg-surface px-1.5 py-1 shadow-xl max-w-full [scrollbar-width:thin]"
-                style={{ transformOrigin: 'center center' }}
-              >
+        {reactions.length > 0 ? (
+          <div className={cn('relative z-[1] -mt-1 flex flex-wrap gap-1 px-2', isMine ? 'justify-end' : 'justify-start')}>
+            {reactions.map((r) => (
               <button
+                key={r.emoji}
                 type="button"
-                onClick={() => setShowPicker((p) => !p)}
-                className="shrink-0 p-1 rounded-full hover:bg-primary/20 text-on-surface-variant hover:text-primary transition-colors"
-                title="React"
+                onClick={() => react(r.emoji)}
+                aria-pressed={r.mine}
+                aria-label={`${r.emoji} ${r.count}${r.mine ? ', including you' : ''}`}
+                className={cn(
+                  'press type-badge tabular inline-flex items-center gap-1 rounded-pill border px-2 py-[3px]',
+                  r.mine ? 'border-[color-mix(in_srgb,var(--accent)_45%,transparent)] bg-selection text-accent' : 'border-hairline bg-bubble-in text-fg-secondary',
+                )}
               >
-                <SmilePlus className="w-3.5 h-3.5" />
-              </button>
-              {onReply && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onReply(message);
-                    setShowActions(false);
-                  }}
-                  className="shrink-0 p-1 rounded-full hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors text-[11px] font-semibold px-2"
-                  title="Reply"
-                >
-                  Reply
-                </button>
-              )}
-              {isMine && message.message_type === 'text' && !gif && (
-                <button
-                  type="button"
-                  onClick={() => onEdit(message.id, message.content)}
-                  className="shrink-0 p-1 rounded-full hover:bg-primary/20 text-on-surface-variant hover:text-primary transition-colors"
-                  title="Edit"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {onTogglePin && !isClientOptimisticMessageId(message.id) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onTogglePin(message);
-                    setShowActions(false);
-                  }}
-                  className="shrink-0 p-1 rounded-full hover:bg-primary/20 text-on-surface-variant hover:text-primary transition-colors"
-                  title={pinned ? 'Unpin' : 'Pin'}
-                  aria-label={pinned ? 'Unpin message' : 'Pin message'}
-                >
-                  {pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
-                </button>
-              )}
-              {isMine && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(message.id)}
-                  className="shrink-0 p-1 rounded-full hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-              </motion.div>
-            </div>,
-            document.body,
-          )}
-
-        {/* Reactions row */}
-        {flatReactions.length > 0 && (
-          <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
-            {flatReactions.map(({ emoji, count, iMine: active }) => (
-              <button
-                key={emoji}
-                onClick={() => onReact(message.id, emoji)}
-                className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full 
-                  border transition-colors
-                  ${active
-                    ? 'bg-primary/20 border-primary/50 text-primary'
-                    : 'bg-surface-container border-border-hard text-on-surface-variant hover:border-outline'
-                  }`}
-              >
-                <span>{emoji}</span>
-                <span className="font-medium">{count}</span>
+                <span aria-hidden>{r.emoji}</span>
+                {r.count > 1 ? <span aria-hidden className="font-semibold">{r.count}</span> : null}
               </button>
             ))}
           </div>
-        )}
-
-        {/* Timestamp & delivery ticks (outgoing) */}
-        <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
-          {pinned ? <Pin className="h-3 w-3 text-primary" aria-label="Pinned" /> : null}
-          <span className="text-[10px] text-on-surface-variant">
-            {timeLabel}
-            {message.time_edited ? (
-              <span className="ml-1 italic text-outline opacity-90">· edited</span>
-            ) : null}
-          </span>
-          {isMine && <MineDeliveryTicks message={message} />}
-        </div>
+        ) : null}
       </div>
-    </motion.div>
+    </div>
+  );
+}
+
+/**
+ * Time and receipt tucked into the bubble's last line (spec §7.2): an invisible copy reserves
+ * the space so text wraps around it, and the visible one sits in the corner.
+ */
+function InlineMeta({ message, mine, pinned }: { message: Message; mine: boolean; pinned: boolean }) {
+  const tone = mine ? 'out' : 'in';
+  return (
+    <>
+      <MessageMeta message={message} mine={mine} pinned={pinned} tone={tone} className="invisible ml-2 align-bottom" />
+      <MessageMeta message={message} mine={mine} pinned={pinned} tone={tone} className="absolute bottom-1.5 right-3" />
+    </>
   );
 }

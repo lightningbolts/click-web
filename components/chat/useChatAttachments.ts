@@ -8,6 +8,7 @@ import {
   type SetStateAction,
 } from 'react';
 import type { Message } from '@/lib/chat/types';
+import type { ChatNotify } from './chatNotify';
 import { uploadChatMediaBlob, uploadChatMediaV2Blob } from '@/lib/chat/chatMediaStorage';
 import { uploadChatAttachmentBlob, uploadChatAttachmentV2Blob } from '@/lib/chat/chatAttachmentStorage';
 import { validateAttachment } from '@/lib/chat/attachmentValidator';
@@ -49,7 +50,7 @@ export function useChatAttachments({
   setMediaBusy,
   isRecording,
   setReplyingTo,
-  setActionToast,
+  notify,
   setInputText,
   setIsDraggingAttachment,
   inputTextRef,
@@ -69,7 +70,7 @@ export function useChatAttachments({
   setMediaBusy: Dispatch<SetStateAction<boolean>>;
   isRecording: boolean;
   setReplyingTo: Dispatch<SetStateAction<Message | null>>;
-  setActionToast: Dispatch<SetStateAction<{ type: 'success' | 'error'; message: string } | null>>;
+  notify: ChatNotify;
   setInputText: Dispatch<SetStateAction<string>>;
   setIsDraggingAttachment: Dispatch<SetStateAction<boolean>>;
   inputTextRef: MutableRefObject<string>;
@@ -85,11 +86,11 @@ export function useChatAttachments({
       e.target.value = '';
       if (!file || !chatId || mediaBusy || isRecording) return;
       if (!file.type.startsWith('image/')) {
-        setActionToast({ type: 'error', message: 'Please choose an image file' });
+        notify({ type: 'error', message: 'Please choose an image file' });
         return;
       }
       if (file.size > MAX_MEDIA_BYTES) {
-        setActionToast({ type: 'error', message: 'Photo exceeds the 25 MiB limit' });
+        notify({ type: 'error', message: 'Photo exceeds the 25 MiB limit' });
         return;
       }
       setMediaBusy(true);
@@ -150,7 +151,7 @@ export function useChatAttachments({
         setReplyingTo(null);
       } catch (err) {
         console.error('Photo send error:', err);
-        setActionToast({ type: 'error', message: 'Could not send photo' });
+        notify({ type: 'error', message: 'Could not send photo' });
       } finally {
         setMediaBusy(false);
       }
@@ -181,7 +182,7 @@ export function useChatAttachments({
         sizeBytes: file.size,
       });
       if (!validation.ok) {
-        setActionToast({ type: 'error', message: validation.message });
+        notify({ type: 'error', message: validation.message });
         return;
       }
 
@@ -279,7 +280,7 @@ export function useChatAttachments({
         setReplyingTo(null);
       } catch (err) {
         console.error('Attachment send error:', err);
-        setActionToast({
+        notify({
           type: 'error',
           message: err instanceof Error ? err.message : 'Could not send attachment',
         });

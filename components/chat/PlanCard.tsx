@@ -38,34 +38,34 @@ export function PlanCard({
   return (
     <div
       className={cn(
-        'w-[min(100%,20rem)] overflow-hidden rounded-[16px] border bg-surface text-on-surface',
-        isMine ? 'border-primary/40' : 'border-border-hard',
+        'w-[min(100%,20rem)] overflow-hidden rounded-lg border bg-bg-elevated text-fg shadow-overlay',
+        isMine ? 'border-[color-mix(in_srgb,var(--accent)_35%,transparent)]' : 'border-hairline',
       )}
       data-testid="plan-card"
     >
       <div className="flex items-start gap-3 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-primary-container text-on-primary-container">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-selection text-accent">
           <CalendarDays className="h-5 w-5" aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+          <p className="type-badge uppercase text-fg-tertiary">
             {over ? 'Plan · done' : 'Plan'}
           </p>
-          <p className="mt-0.5 break-words text-base font-bold leading-snug">{plan.title}</p>
-          <p className="mt-1 text-sm text-on-surface-variant">{planWhenText(plan)}</p>
+          <p className="type-headline mt-0.5 break-words">{plan.title}</p>
+          <p className="type-meta mt-1 text-fg-secondary">{planWhenText(plan)}</p>
           {plan.placeName ? (
             maps ? (
               <a
                 href={maps}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                className="type-meta mt-1 inline-flex items-center gap-1 font-semibold text-accent hover:underline"
               >
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span className="truncate">{plan.placeName}</span>
               </a>
             ) : (
-              <p className="mt-1 inline-flex items-center gap-1 text-sm text-on-surface-variant">
+              <p className="type-meta mt-1 inline-flex items-center gap-1 text-fg-secondary">
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 {plan.placeName}
               </p>
@@ -73,8 +73,8 @@ export function PlanCard({
           ) : null}
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-border-hard px-4 py-2.5">
-        <p className="text-xs font-semibold text-on-surface-variant">
+      <div className="flex items-center justify-between gap-2 border-t border-hairline px-4 py-2.5">
+        <p className="type-meta tabular font-semibold text-fg-secondary">
           {going.length} going{declined.length > 0 ? ` · ${declined.length} can't` : ''}
         </p>
         {!over && onRsvp ? (
@@ -84,8 +84,8 @@ export function PlanCard({
               onClick={() => onRsvp(message, true)}
               aria-pressed={imGoing}
               className={cn(
-                'inline-flex h-8 items-center gap-1 rounded-[8px] border px-2.5 text-xs font-bold',
-                imGoing ? 'border-primary bg-primary text-on-primary' : 'border-border-hard text-on-surface hover:bg-surface-container-low',
+                'press type-meta inline-flex h-8 items-center gap-1 rounded-pill px-3 font-semibold',
+                imGoing ? 'bg-action text-white' : 'bg-fill-subtle text-fg hover:bg-hover',
               )}
             >
               <Check className="h-3.5 w-3.5" aria-hidden />
@@ -96,8 +96,8 @@ export function PlanCard({
               onClick={() => onRsvp(message, false)}
               aria-pressed={imOut}
               className={cn(
-                'inline-flex h-8 items-center gap-1 rounded-[8px] border px-2.5 text-xs font-bold',
-                imOut ? 'border-on-surface bg-on-surface text-surface' : 'border-border-hard text-on-surface hover:bg-surface-container-low',
+                'press type-meta inline-flex h-8 items-center gap-1 rounded-pill px-3 font-semibold',
+                imOut ? 'bg-fg text-bg' : 'bg-fill-subtle text-fg hover:bg-hover',
               )}
             >
               <X className="h-3.5 w-3.5" aria-hidden />

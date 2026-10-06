@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Message } from '@/lib/chat/types';
+import { chatNotify } from './chatNotify';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import {
@@ -47,9 +48,6 @@ export function useMessageActions({
   setReplyingTo,
   mediaBusy,
   isRecording,
-  pendingDeleteMessageId,
-  setPendingDeleteMessageId,
-  setShowDeleteConfirm,
   inputRef,
   getAuthHeaders,
   appendReplyToMetadata,
@@ -79,9 +77,6 @@ export function useMessageActions({
   setReplyingTo: Dispatch<SetStateAction<Message | null>>;
   mediaBusy: boolean;
   isRecording: boolean;
-  pendingDeleteMessageId: string | null;
-  setPendingDeleteMessageId: Dispatch<SetStateAction<string | null>>;
-  setShowDeleteConfirm: Dispatch<SetStateAction<boolean>>;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   getAuthHeaders: () => Promise<HeadersInit>;
   appendReplyToMetadata: (meta: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -372,6 +367,7 @@ export function useMessageActions({
         next.splice(index, 0, removed);
         return next;
       });
+      chatNotify({ type: 'error', message: 'Couldn’t delete the message. Try again.' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getAuthHeaders, messages]);
@@ -424,14 +420,6 @@ export function useMessageActions({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId, getAuthHeaders, messages]);
 
-  const confirmDeleteMessage = useCallback(async () => {
-    if (!pendingDeleteMessageId) return;
-    await deleteMessage(pendingDeleteMessageId);
-    setPendingDeleteMessageId(null);
-    setShowDeleteConfirm(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deleteMessage, pendingDeleteMessageId]);
-
   return {
     sendMessage,
     sendGif,
@@ -442,6 +430,5 @@ export function useMessageActions({
     submitEdit,
     deleteMessage,
     handleReact,
-    confirmDeleteMessage,
   };
 }

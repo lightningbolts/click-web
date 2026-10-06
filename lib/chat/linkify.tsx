@@ -13,6 +13,15 @@ function trimTrailingPunctuation(href: string): string {
   return href.replace(/[),.;:!?]+$/u, '');
 }
 
+/** Every http(s) link in `text`, as it would be linked. */
+export function extractLinks(text: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(URL_RE.source, URL_RE.flags);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) out.push(trimTrailingPunctuation(m[1]));
+  return out;
+}
+
 export interface LinkifiedTextProps {
   text: string;
   className?: string;
@@ -23,8 +32,8 @@ export interface LinkifiedTextProps {
 export function LinkifiedText({ text, className = '', variant }: LinkifiedTextProps): ReactNode {
   const linkClass =
     variant === 'mine'
-      ? 'text-on-primary underline decoration-white/60 underline-offset-2 hover:decoration-white'
-      : 'text-primary underline decoration-primary/50 underline-offset-2 hover:decoration-primary';
+      ? 'text-white underline decoration-white/60 underline-offset-2 hover:decoration-white'
+      : 'text-accent underline decoration-accent/50 underline-offset-2 hover:decoration-accent';
 
   const parts: ReactNode[] = [];
   let last = 0;

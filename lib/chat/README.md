@@ -51,9 +51,9 @@ Server-side write authorization lives in `lib/server/chatGatekeeper.ts` (documen
 | `insertCallLogMessage` | POST call_log rows through messages API |
 | `notifyMessagesDelivered` | PATCH `/api/chat/messages/delivered` for sender "Delivered" state |
 
-### `layout.ts`
+### Thread layout
 
-`CHAT_PANEL_CLASS` is the bordered 16px card that wraps header, transcript, composer, and the conversation list. The dashboard pane already uses `PAGE_COLUMN_CLASS`, so the card edges match Memory Box. Do not use `max-w-xl` or `max-w-none` on the thread. Bubble width stays on `MessageBubble` (`max-w-[min(75%,32rem)]`).
+The open conversation (`components/chat/ChatView.tsx`, spec §7.2) is full-bleed over its `ChatBackground`, with the timeline centred at `max-w-[720px]`. Bubbles cap at `max-w-[min(75%,32rem)]` inside `MessageBubble`; runs of one sender's messages (`messageRuns`, 5 min) share tails, names and avatars.
 
 ### `chatGatekeeper` (server)
 

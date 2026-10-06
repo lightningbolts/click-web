@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from 'react';
 import type { Message } from '@/lib/chat/types';
+import type { ChatNotify } from './chatNotify';
 import { normalizeDbMessage } from '@/lib/chat/messages';
 import { uploadChatMediaBlob, uploadChatMediaV2Blob } from '@/lib/chat/chatMediaStorage';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
@@ -42,7 +43,7 @@ export function useVoiceMessages({
   setRecordingMs,
   setMessages,
   setReplyingTo,
-  setActionToast,
+  notify,
   setInputText,
   inputTextRef,
   getAuthHeaders,
@@ -65,7 +66,7 @@ export function useVoiceMessages({
   setRecordingMs: Dispatch<SetStateAction<number>>;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setReplyingTo: Dispatch<SetStateAction<Message | null>>;
-  setActionToast: Dispatch<SetStateAction<{ type: 'success' | 'error'; message: string } | null>>;
+  notify: ChatNotify;
   setInputText: Dispatch<SetStateAction<string>>;
   inputTextRef: MutableRefObject<string>;
   getAuthHeaders: () => Promise<HeadersInit>;
@@ -177,7 +178,7 @@ export function useVoiceMessages({
         setReplyingTo(null);
       } catch (err) {
         console.error('Voice send error:', err);
-        setActionToast({ type: 'error', message: 'Could not send voice message' });
+        notify({ type: 'error', message: 'Could not send voice message' });
       } finally {
         setMediaBusy(false);
       }
@@ -243,7 +244,7 @@ export function useVoiceMessages({
       mr.start(400);
       setIsRecording(true);
     } catch {
-      setActionToast({ type: 'error', message: 'Microphone access denied or unavailable' });
+      notify({ type: 'error', message: 'Microphone access denied or unavailable' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, mediaBusy, isRecording, uploadAndSendVoice]);

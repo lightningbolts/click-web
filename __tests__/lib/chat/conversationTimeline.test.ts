@@ -2,6 +2,7 @@ import {
   buildTimelineEntries,
   formatConversationDayLabel,
   getDayStart,
+  messageRuns,
 } from '@/lib/chat/conversationTimeline';
 import type { Message } from '@/lib/chat/types';
 
@@ -61,5 +62,30 @@ describe('conversationTimeline helpers (moved verbatim from ChatView)', () => {
 
   it('buildTimelineEntries returns empty for no messages', () => {
     expect(buildTimelineEntries([])).toEqual([]);
+  });
+});
+
+describe('messageRuns', () => {
+  const base = new Date(2026, 9, 6, 12, 0, 0).getTime();
+  const from = (id: string, user: string, offsetMin: number, type: Message['message_type'] = 'text'): Message => ({
+    ...msg(id, base + offsetMin * 60_000),
+    user_id: user,
+    message_type: type,
+  });
+
+  it('groups consecutive messages from one sender', () => {
+    const runs = messageRuns([from('a', 'u1', 0), from('b', 'u1', 1), from('c', 'u1', 2), from('d', 'u2', 3)]);
+    expect(runs.get('a')).toEqual({ first: true, last: false });
+    expect(runs.get('b')).toEqual({ first: false, last: false });
+    expect(runs.get('c')).toEqual({ first: false, last: true });
+    expect(runs.get('d')).toEqual({ first: true, last: true });
+  });
+
+  it('breaks runs on long gaps and call logs', () => {
+    const runs = messageRuns([from('a', 'u1', 0), from('b', 'u1', 10), from('c', 'u1', 11, 'call_log'), from('d', 'u1', 12)]);
+    expect(runs.get('a')).toEqual({ first: true, last: true });
+    expect(runs.get('b')).toEqual({ first: true, last: true });
+    expect(runs.get('c')).toEqual({ first: true, last: true });
+    expect(runs.get('d')).toEqual({ first: true, last: true });
   });
 });

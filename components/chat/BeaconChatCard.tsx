@@ -41,7 +41,7 @@ export default function BeaconChatCard({ message }: { message: Message }) {
   const body = (
     <article
       data-testid="beacon-chat-card"
-      className="w-full max-w-[280px] overflow-hidden rounded-[12px] border border-border-hard bg-surface text-left"
+      className="w-full max-w-[280px] overflow-hidden rounded-lg border border-hairline bg-bg-elevated text-left shadow-overlay"
     >
       <CardVisualHero
         id={preview.beaconId || message.id}
@@ -50,15 +50,15 @@ export default function BeaconChatCard({ message }: { message: Message }) {
         className="h-28"
       />
       <div className="space-y-1 px-3 py-2.5">
-        <p className="line-clamp-2 text-sm font-semibold text-on-surface">{preview.title}</p>
+        <p className="type-body-strong line-clamp-2 text-fg">{preview.title}</p>
         {metaLine ? (
-          <p className="flex items-start gap-1 text-[11px] text-on-surface-variant">
+          <p className="type-meta flex items-start gap-1 text-fg-secondary">
             <MapPin className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
             <span className="line-clamp-2">{metaLine}</span>
           </p>
         ) : null}
         {preview.description ? (
-          <p className="line-clamp-2 text-xs text-on-surface-variant">{preview.description}</p>
+          <p className="type-meta line-clamp-2 text-fg-tertiary">{preview.description}</p>
         ) : null}
       </div>
     </article>
@@ -67,7 +67,7 @@ export default function BeaconChatCard({ message }: { message: Message }) {
   if (!href) return body;
 
   return (
-    <Link href={href} className="block max-w-[280px] outline-none focus-visible:ring-2 focus-visible:ring-primary">
+    <Link href={href} className="block max-w-[280px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent">
       {body}
     </Link>
   );

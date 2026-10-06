@@ -141,9 +141,7 @@ export default function AttachmentBubble({
     }
   }, [chatId, envelope, getAuthHeaders, getE2eeV2Session, messageMetadata, state.kind]);
 
-  const bubbleClass = isMine
-    ? 'border border-border-hard bg-primary text-on-primary'
-    : 'border border-border-hard bg-surface-container text-on-surface';
+  const bubbleClass = isMine ? 'bg-bubble-out text-white' : 'bg-bubble-in text-fg';
 
   const busy = state.kind === 'downloading' || state.kind === 'verifying';
   const error = state.kind === 'error' ? state.message : null;
@@ -151,32 +149,32 @@ export default function AttachmentBubble({
 
   return (
     <div
-      className={`flex w-[min(100%,22rem)] items-stretch gap-3 rounded-2xl px-3 py-2.5 ${bubbleClass}`}
+      className={`flex w-[min(100%,22rem)] items-center gap-3 rounded-bubble px-3 py-2.5 ${bubbleClass}`}
       role="group"
       aria-label={`Encrypted attachment: ${envelope.name}`}
     >
       <div
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-          isMine ? 'bg-black/15 text-on-primary' : 'bg-on-primary-container text-primary'
+        className={`flex size-10 shrink-0 items-center justify-center rounded-sm ${
+          isMine ? 'bg-white/15 text-white' : 'bg-selection text-accent'
         }`}
       >
-        <Icon className="h-5 w-5" aria-hidden />
+        <Icon size={20} aria-hidden />
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <span className="truncate text-sm font-medium leading-tight">{envelope.name}</span>
-        <span className={`truncate text-[11px] leading-tight ${isMine ? 'text-on-primary/80' : 'text-on-surface-variant'}`}>
+        <span className="type-body-strong truncate">{envelope.name}</span>
+        <span className={`type-meta tabular truncate ${isMine ? 'text-white/75' : 'text-fg-tertiary'}`}>
           {formatBytes(envelope.size)}
           {envelope.mime ? ` · ${envelope.mime}` : ''}
         </span>
         {error && (
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-red-700 dark:text-red-300">
-            <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
+          <span className={`type-meta mt-0.5 flex items-center gap-1 ${isMine ? 'text-white' : 'text-destructive'}`}>
+            <AlertCircle size={12} className="shrink-0" aria-hidden />
             {error}
           </span>
         )}
         {done && (
-          <span className={`mt-0.5 flex items-center gap-1 text-[11px] ${isMine ? 'text-emerald-100' : 'text-emerald-700 dark:text-emerald-400'}`}>
-            <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
+          <span className={`type-meta mt-0.5 flex items-center gap-1 ${isMine ? 'text-white/85' : 'text-online-text'}`}>
+            <CheckCircle2 size={12} className="shrink-0" aria-hidden />
             Decrypted · integrity verified
           </span>
         )}
@@ -185,20 +183,12 @@ export default function AttachmentBubble({
         type="button"
         onClick={onDownload}
         disabled={busy}
-        className={`flex shrink-0 items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-          busy
-            ? 'cursor-wait opacity-70 ' + (isMine ? 'bg-black/15 text-on-primary' : 'bg-surface text-on-surface-variant')
-            : isMine
-              ? 'bg-black/15 text-on-primary hover:bg-black/25'
-              : 'bg-primary/15 text-primary hover:bg-primary/25'
+        className={`press flex size-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-wait disabled:opacity-70 ${
+          isMine ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-fill-subtle text-accent hover:bg-hover'
         }`}
         aria-label={`Download ${envelope.name}`}
       >
-        {busy ? (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        ) : (
-          <FileDown className="h-4 w-4" aria-hidden />
-        )}
+        {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <FileDown size={16} aria-hidden />}
       </button>
     </div>
   );
