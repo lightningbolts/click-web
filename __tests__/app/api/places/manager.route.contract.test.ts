@@ -16,6 +16,10 @@ jest.mock('@/lib/server/supabaseRouteAuth', () => ({
 }));
 jest.mock('@/lib/server/admin/supabaseAdmin', () => ({ createAdminSupabaseClient: () => mockState.db!.client }));
 jest.mock('@/lib/server/businessInsightsEligibility', () => ({ userMayAccessBusinessInsights: async () => mockState.insights }));
+jest.mock('@/lib/server/places/entitlement', () => ({
+  ...jest.requireActual('@/lib/server/places/entitlement'),
+  userMayViewPlaceInsights: async () => mockState.insights,
+}));
 
 const params = ctx({ placeId: IDS.cafe });
 const NOW_MS = Date.parse('2026-10-01T19:00:00.000Z');

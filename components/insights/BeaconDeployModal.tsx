@@ -7,7 +7,7 @@ import { X, Radio, Sparkles } from "lucide-react";
 import type { VibeRadarCategoryTotal, VenuePopUpHubBeacon } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
 import { postInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
-import { FcTextarea } from "@/components/fc";
+import { fieldClassName } from "@/components/ds/TextField";
 
 const DEFAULT_CATEGORIES = [
   "Coffee",
@@ -80,7 +80,7 @@ export default function BeaconDeployModal({
       e.preventDefault();
       setError(null);
       if (!venueId || demoLocked) {
-        setError(demoLocked ? "Turn off demo data to deploy a live beacon." : "Link a venue first.");
+        setError(demoLocked ? "Turn off demo data to deploy a live beacon." : "Open Insights from one of your Places first.");
         return;
       }
       const perkTrim = perk.trim();
@@ -206,14 +206,14 @@ export default function BeaconDeployModal({
                     <label htmlFor="beacon-perk" className="text-xs font-medium text-on-surface-variant block mb-1.5">
                       Perk or offer
                     </label>
-                    <FcTextarea
+                    <textarea
                       id="beacon-perk"
                       value={perk}
                       onChange={(e) => setPerk(e.target.value)}
                       rows={3}
                       maxLength={500}
                       placeholder="e.g. 10% off drinks for the next two hours"
-                      className="w-full resize-none"
+                      className={`${fieldClassName} min-h-[96px] w-full resize-none py-2.5`}
                     />
                   </div>
 

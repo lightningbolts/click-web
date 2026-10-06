@@ -1,14 +1,12 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Radar, Crosshair } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
-import { DemoBanner } from "@/components/insights/DemoBanner";
 import { GlassPanel } from "@/components/insights/GlassPanel";
 import BeaconDeployModal from "@/components/insights/BeaconDeployModal";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
@@ -33,13 +31,14 @@ const itemVariants = {
 };
 
 export default function VibeRadarClient({
+  placeId,
   initialPayload,
 }: {
+  placeId: string;
   initialPayload: VibeRadarApiResponse | null;
 }) {
   const { user } = useAuth();
-  const searchParams = useSearchParams();
-  const venueQuery = searchParams.get("venue_id");
+  const venueQuery = placeId;
   const { demoMode } = useInsightsDemo();
   const [modalOpen, setModalOpen] = useState(false);
   const [beaconPulse, setBeaconPulse] = useState(false);
@@ -118,11 +117,6 @@ export default function VibeRadarClient({
       animate="visible"
       className="space-y-6"
     >
-      {demoMode ? (
-        <motion.div variants={itemVariants}>
-          <DemoBanner />
-        </motion.div>
-      ) : null}
 
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -132,7 +126,7 @@ export default function VibeRadarClient({
           <div>
             <h2 className="text-xl font-bold text-on-surface">Vibe Radar</h2>
             <p className="text-sm text-on-surface-variant">
-              Availability intents near your venue — anonymized cells only
+              What people nearby are up for, in anonymous map cells
             </p>
           </div>
         </div>
@@ -148,8 +142,7 @@ export default function VibeRadarClient({
 
       {view?.status === "venue_coordinates_required" ? (
         <motion.p variants={itemVariants} className="text-sm text-amber-800 dark:text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-          Add latitude and longitude on your venue record to anchor the map and proximity window for
-          this report.
+          Your Place needs a map location before Vibe Radar can draw this report. Contact Click to set it.
         </motion.p>
       ) : null}
 

@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
 import { hasSupabaseAuthCookie } from '@/lib/auth/authCookie';
 import { isSignedInAppPath } from '@/lib/shell/appRoutes';
 import { legacyTabRedirect } from '@/lib/shell/legacyTabRedirect';
+import { BIZ_PLACE_COOKIE } from '@/lib/places/workspace';
 import { shouldApplyReadHeavyRateLimit } from '@/lib/server/readHeavyRateLimit';
 import {
   CONNECTIONS_RATE_LIMIT,
@@ -88,8 +88,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
-  const insightsRoute = pathname === '/insights' || pathname.startsWith('/insights/');
-  const appRoute = isSignedInAppPath(pathname);
+  // Business needs a session, never payment (spec §9.3); onboarding is open to everyone.
+  const businessRoute = (pathname === '/business' || pathname.startsWith('/business/')) && !pathname.startsWith('/business/get-started');
+  const appRoute = isSignedInAppPath(pathname) || businessRoute;
   const toLogin = () => {
     const url = new URL('/login', request.url);
     url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
@@ -155,14 +156,17 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (insightsRoute && claims?.sub) {
-    const allowed = await userMayAccessBusinessInsights(supabase, {
-      id: claims.sub,
-      email: typeof claims.email === 'string' ? claims.email : undefined,
+  // Remember the last workspace Place for `/business` (validated when read). Server Components
+  // can't set cookies, so it's set here (spec §9.3).
+  const workspace = /^\/business\/places\/([0-9a-f-]{36})(?:\/|$)/i.exec(pathname);
+  if (workspace && claims) {
+    supabaseResponse.cookies.set(BIZ_PLACE_COOKIE, workspace[1], {
+      path: '/business',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: request.nextUrl.protocol === 'https:',
+      maxAge: 90 * 24 * 60 * 60,
     });
-    if (!allowed) {
-      return withCookies(NextResponse.redirect(new URL('/business/signup', request.url)));
-    }
   }
 
   return supabaseResponse;
@@ -183,7 +187,6 @@ export const config = {
     '/',
     '/admin/:path*',
     '/business/:path*',
-    '/insights/:path*',
     '/clicks/:path*',
     '/map/:path*',
     '/add/:path*',

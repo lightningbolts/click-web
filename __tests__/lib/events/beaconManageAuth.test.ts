@@ -42,6 +42,10 @@ describe("beaconManageAuth (spec §9 roles)", () => {
     const create = read("app/api/beacons/route.ts");
     expect(create).toContain("placeRoleCanWrite(role)");
     expect(create).toContain("Viewers can't create events for this Place");
+    // Spec §9.7 / §9.10: viewers get 403 role_insufficient, never a free official event.
+    const gate = create.slice(create.indexOf("placeRoleCanWrite(role)"), create.indexOf("venueId = venueIdRaw"));
+    expect(gate).toContain('code: "role_insufficient"');
+    expect(gate).toContain("status: 403");
     const item = read("app/api/beacons/[beaconId]/route.ts");
     expect(item).toContain("allowPlaceManagers: true");
   });

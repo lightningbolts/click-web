@@ -488,7 +488,10 @@ export async function POST(request: NextRequest) {
       const role = await placeRoleFor(createAdminSupabaseClient(), user.id, venueIdRaw);
       if (!placeRoleCanWrite(role)) {
         return NextResponse.json(
-          { error: role === "viewer" ? "Viewers can't create events for this Place" : "Not a manager for this venue" },
+          {
+            error: role === "viewer" ? "Viewers can't create events for this Place" : "You don't manage this Place",
+            code: "role_insufficient",
+          },
           { status: 403 },
         );
       }

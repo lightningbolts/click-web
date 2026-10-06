@@ -1,7 +1,8 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { FcCard } from "@/components/fc";
+import { StatTile } from "@/components/ds/StatTile";
+import { ChartCard as Card } from "@/components/insights/ChartCard";
 import { useInsightsChartTheme } from "@/lib/theme/insightsChartTheme";
 import type { PlaceStats } from "@/lib/server/places/stats";
 
@@ -24,24 +25,14 @@ function pct(n: number, d: number): string {
 }
 
 function Tile({ label, value, note }: { label: string; value: string | number; note?: string }) {
-  return (
-    <FcCard className="p-4">
-      <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-on-surface">{value}</p>
-      {note ? <p className="mt-1 text-xs text-on-surface-variant">{note}</p> : null}
-    </FcCard>
-  );
+  return <StatTile label={label} value={value} hint={note} />;
 }
 
 function ChartCard({ title, n, children }: { title: string; n: number; children: React.ReactNode }) {
   return (
-    <FcCard className="space-y-3 p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-base font-bold text-on-surface">{title}</h3>
-        <span className="text-xs font-semibold text-on-surface-variant">n = {n}</span>
-      </div>
+    <Card title={title} subtitle={`n = ${n.toLocaleString("en-US")}`}>
       {children}
-    </FcCard>
+    </Card>
   );
 }
 
@@ -54,7 +45,7 @@ function Heatmap({ grid }: { grid: number[][] }) {
           <tr>
             <th className="w-10" />
             {Array.from({ length: 24 }, (_, h) => (
-              <th key={h} scope="col" className="text-[10px] font-medium text-on-surface-variant">
+              <th key={h} scope="col" className="type-badge font-medium text-fg-tertiary">
                 {h % 6 === 0 ? h : ""}
               </th>
             ))}
@@ -63,15 +54,15 @@ function Heatmap({ grid }: { grid: number[][] }) {
         <tbody>
           {grid.map((row, d) => (
             <tr key={DAYS[d]}>
-              <th scope="row" className="pr-1 text-left text-xs font-semibold text-on-surface-variant">
+              <th scope="row" className="type-meta pr-1 text-left font-semibold text-fg-secondary">
                 {DAYS[d]}
               </th>
               {row.map((count, h) => (
                 <td
                   key={h}
                   title={`${DAYS[d]} ${String(h).padStart(2, "0")}:00 · ${count} check-in${count === 1 ? "" : "s"}`}
-                  className="h-5 rounded-[3px] border border-border-hard/30"
-                  style={{ background: count === 0 ? "transparent" : `rgba(124, 58, 237, ${0.15 + 0.85 * (count / max)})` }}
+                  className="h-5 rounded-xs bg-fill-subtle"
+                  style={count === 0 ? undefined : { background: `color-mix(in srgb, var(--action) ${Math.round(15 + 85 * (count / max))}%, transparent)` }}
                 />
               ))}
             </tr>
@@ -86,14 +77,14 @@ function SplitBar({ label, yes, no }: { label: string; yes: number; no: number }
   const total = yes + no;
   return (
     <div>
-      <div className="flex justify-between text-sm">
-        <span className="font-semibold text-on-surface">{label}</span>
-        <span className="text-on-surface-variant">
+      <div className="type-meta flex justify-between">
+        <span className="font-semibold text-fg">{label}</span>
+        <span className="tabular text-fg-secondary">
           {yes} yes · {no} no (n = {total})
         </span>
       </div>
-      <div className="mt-1 flex h-3 overflow-hidden rounded-full border-2 border-border-hard" aria-hidden>
-        <div className="bg-primary" style={{ width: total ? `${(yes / total) * 100}%` : 0 }} />
+      <div className="mt-1.5 flex h-2 overflow-hidden rounded-pill bg-fill-subtle" aria-hidden>
+        <div className="rounded-pill bg-action" style={{ width: total ? `${(yes / total) * 100}%` : 0 }} />
       </div>
     </div>
   );
@@ -108,12 +99,13 @@ export default function PlaceStatsView({ stats }: { stats: PlaceStats }) {
     background: chart.tooltipBg,
     border: `1px solid ${chart.tooltipBorder}`,
     color: chart.tooltipText,
-    borderRadius: 8,
-    fontSize: 12,
+    borderRadius: "var(--r-sm)",
+    boxShadow: "var(--shadow-overlay)",
+    fontSize: 13,
   };
 
   return (
-    <div className="space-y-6" data-testid="place-stats">
+    <div className="flex flex-col gap-6" data-testid="place-stats">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Tile label="Check-ins" value={t.check_ins} note={`Last ${stats.range_days} days`} />
         <Tile label="Unique visitors" value={t.unique_visitors} />
@@ -131,15 +123,15 @@ export default function PlaceStatsView({ stats }: { stats: PlaceStats }) {
         <ChartCard title="Energy" n={energyTotal}>
           <ul className="space-y-2">
             {stats.energy_distribution.map((count, i) => (
-              <li key={ENERGY[i]} className="flex items-center gap-3 text-sm">
-                <span className="w-16 font-semibold text-on-surface">{ENERGY[i]}</span>
-                <span className="h-3 flex-1 overflow-hidden rounded-full border border-border-hard/40" aria-hidden>
+              <li key={ENERGY[i]} className="type-meta flex items-center gap-3">
+                <span className="w-16 font-semibold text-fg">{ENERGY[i]}</span>
+                <span className="h-2 flex-1 overflow-hidden rounded-pill bg-fill-subtle" aria-hidden>
                   <span
                     className="block h-full rounded-full"
                     style={{ width: energyTotal ? `${(count / energyTotal) * 100}%` : 0, background: ENERGY_STEPS[i] }}
                   />
                 </span>
-                <span className="w-20 text-right text-on-surface-variant">
+                <span className="tabular w-20 text-right text-fg-secondary">
                   {count} · {pct(count, energyTotal)}
                 </span>
               </li>
@@ -178,7 +170,7 @@ export default function PlaceStatsView({ stats }: { stats: PlaceStats }) {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-on-surface-variant">Purple: check-ins · Gray: unique visitors</p>
+            <p className="type-meta text-fg-tertiary">Purple: check-ins · Gray: unique visitors</p>
           </ChartCard>
           <ChartCard title="Average energy by day" n={sum(stats.daily.map((d) => d.pulses))}>
             <div className="h-56">
@@ -220,7 +212,7 @@ export default function PlaceStatsView({ stats }: { stats: PlaceStats }) {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <ul className="flex flex-wrap gap-3 text-xs text-on-surface-variant">
+              <ul className="type-meta flex flex-wrap gap-3 text-fg-secondary">
                 {ENERGY.map((label, i) => (
                   <li key={label} className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-sm" style={{ background: ENERGY_STEPS[i] }} aria-hidden />

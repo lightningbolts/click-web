@@ -6,26 +6,13 @@ import { cn } from "@/lib/cn";
 interface GlassPanelProps {
   children: ReactNode;
   className?: string;
+  /** @deprecated Cards never lift or change on hover (spec §5.4). */
   hover?: boolean;
-  /** @deprecated Ignored — Functional Clarity has no glow */
+  /** @deprecated No glow in Quiet Presence. */
   glow?: "purple" | "blue" | "green" | "none";
 }
 
-/** Opaque FC card (legacy name retained for call-site compatibility). */
-export function GlassPanel({
-  children,
-  className = "",
-  hover = true,
-}: GlassPanelProps) {
-  return (
-    <div
-      className={cn(
-        "fc-card transition-colors",
-        hover && "hover:bg-surface-container-low",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+/** Insights card on the ds surface (legacy name kept for call sites): no border, no shadow. */
+export function GlassPanel({ children, className = "" }: GlassPanelProps) {
+  return <div className={cn("rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)]", className)}>{children}</div>;
 }

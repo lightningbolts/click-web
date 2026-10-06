@@ -79,6 +79,8 @@ export const placeManagerPatchBodySchema = z
     website_url: optionalText(500),
     hub_enabled: z.boolean().optional(),
     listed: z.boolean().optional(),
+    /** Owner moves a legacy `draft` Place into Click's review queue (spec §9.5). */
+    submit_for_review: z.literal(true).optional(),
     address_line: optionalText(200),
     city: optionalText(100),
     region: optionalText(100),

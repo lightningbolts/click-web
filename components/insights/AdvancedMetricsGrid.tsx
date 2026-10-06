@@ -112,14 +112,14 @@ export default function AdvancedMetricsGrid({
                 <HeartHandshake className="w-4 h-4 text-primary" />
               </div>
               <span className="text-sm font-medium text-on-surface-variant">
-                Venue Loyalty Coefficient
+                Place loyalty
               </span>
             </div>
             <div className="text-4xl font-semibold text-on-surface tabular-nums">
               {data.venueLoyaltyCoefficient.toFixed(1)}%
             </div>
             <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">
-              Return visitors after connecting — share of guests who came back to this venue more
+              Return visitors after connecting — share of guests who came back to this Place more
               than 24 hours after their first connection here.
             </p>
             <InsightCallout

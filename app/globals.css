@@ -1065,7 +1065,12 @@ a {
   [data-topbar],
   [data-tabbar],
   [data-site-chrome],
-  [data-print-hidden] {
+  [data-print-hidden],
+  [data-workspace-chrome] {
+    display: none !important;
+  }
+  /* A poster page prints the sheet alone. */
+  body:has([data-poster]) *:not([data-poster]):not([data-poster] *):not(:has([data-poster])) {
     display: none !important;
   }
   body {

@@ -48,7 +48,6 @@ import {
   mockInsightsHourlyDistribution,
   mockInsightsPeakHour,
 } from "@/lib/insights/mockData";
-import { DemoBanner } from "./DemoBanner";
 import { useInsightsDemo } from "./InsightsDemoContext";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { VibeMessage, TribeBubble, HeatmapZone } from "@/lib/insights/mockData";
@@ -225,16 +224,16 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           >
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-on-surface mb-2">
-              Access Denied
+              Insights aren’t on for this Place
             </h1>
             <p className="text-on-surface-variant mb-6">
-              This dashboard is only available to verified business partners.
+              Insights are part of Click for Business for this Place.
             </p>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/business")}
               className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
             >
-              Go to your dashboard
+              Go to your Places
             </button>
           </motion.div>
         </div>
@@ -284,7 +283,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
               "We need at least 5 connections to generate insights to protect user privacy."}
           </p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/business")}
             className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
           >
             Back to your dashboard
@@ -324,11 +323,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       animate="visible"
       className="space-y-6"
     >
-      {isDemoFallback ? (
-        <motion.div variants={itemVariants}>
-          <DemoBanner />
-        </motion.div>
-      ) : data?.status === "no_venue" && data.message ? (
+      {isDemoFallback ? null : data?.status === "no_venue" && data.message ? (
         <motion.div
           variants={itemVariants}
           className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
@@ -609,7 +604,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
 /**
  * InsightsDashboard - Renders the overview bento-grid content.
- * The layout shell is provided by app/insights/layout.tsx (BusinessInsightsShell).
+ * Rendered inside the Place workspace (Insights › Overview).
  * Pass venueId to fetch real data from the API.
  */
 export default function InsightsDashboard({ venueId }: { venueId?: string }) {

@@ -50,7 +50,7 @@ function recommendationFor(
   switch (metricKey) {
     case "sticky_score":
       if (value < 40) {
-        return "Your venue isn't creating lasting social moments yet. Try structured prompts at entry points — a question board, a shared activity, anything that gives strangers a reason to talk.";
+        return "Your Place isn't creating lasting social moments yet. Try structured prompts at entry points — a question board, a shared activity, anything that gives strangers a reason to talk.";
       }
       if (value <= 70) {
         return "Solid community foundation. Focus on the 30-minute window after peak arrival — that's when most connections form or don't.";
@@ -69,7 +69,7 @@ function recommendationFor(
         return "Few guests return after their first connection here. Consider a follow-up prompt 7 days after a connection inviting both people back to your venue.";
       }
       if (value <= 50) {
-        return "Moderate return rate. Your venue is memorable — focus on why the top 20% return and replicate that experience.";
+        return "Moderate return rate. Your Place is memorable — focus on why the top 20% return and replicate that experience.";
       }
       return "Exceptional loyalty. You're a genuine third place. This is a strong signal for sponsorship pitches.";
     case "psv_velocity":
@@ -82,7 +82,7 @@ function recommendationFor(
       return "Very sharp peak. Risk of overcrowding killing connection quality. Consider a second programming window to distribute social energy.";
     case "wri":
       if (value < 0.7) {
-        return "Bad weather hurts you significantly. You're an outdoor-dependent venue socially. Consider covered or indoor connection zones.";
+        return "Bad weather hurts you significantly. You're an outdoor-dependent Place socially. Consider covered or indoor connection zones.";
       }
       if (value <= 1.1) {
         return "Weather-neutral — your social activity is consistent. Strong signal for year-round programming.";

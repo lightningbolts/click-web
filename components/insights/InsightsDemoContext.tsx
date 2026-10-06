@@ -1,86 +1,19 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-import { useSearchParams } from "next/navigation";
+import { createContext, useContext, type ReactNode } from "react";
 
-const STORAGE_KEY = "click_insights_demo_mode";
+type InsightsDemoContextValue = { demoMode: boolean };
 
-function readStoredDemo(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
+const InsightsDemoContext = createContext<InsightsDemoContextValue>({ demoMode: false });
 
-type InsightsDemoContextValue = {
-  demoMode: boolean;
-  setDemoMode: (value: boolean) => void;
-};
-
-const InsightsDemoContext = createContext<InsightsDemoContextValue | null>(null);
-
-export function InsightsDemoProvider({ children }: { children: ReactNode }) {
-  const searchParams = useSearchParams();
-  const [demoMode, setDemoModeState] = useState(false);
-
-  useLayoutEffect(() => {
-    const q = searchParams.get("demo");
-    if (q === "1") {
-      setDemoModeState(true);
-      try {
-        window.localStorage.setItem(STORAGE_KEY, "true");
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-    if (q === "0") {
-      setDemoModeState(false);
-      try {
-        window.localStorage.setItem(STORAGE_KEY, "false");
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-    setDemoModeState(readStoredDemo());
-  }, [searchParams]);
-
-  const setDemoMode = useCallback((value: boolean) => {
-    setDemoModeState(value);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, value ? "true" : "false");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const value = useMemo(
-    () => ({ demoMode, setDemoMode }),
-    [demoMode, setDemoMode],
-  );
-
-  return (
-    <InsightsDemoContext.Provider value={value}>
-      {children}
-    </InsightsDemoContext.Provider>
-  );
+/**
+ * Demo data for sales (spec §9.5): on only while the URL carries `?demo=1`, and never offered as
+ * a toggle. The Insights page shows a persistent "Demo data" notice whenever it's on.
+ */
+export function InsightsDemoProvider({ demoMode, children }: { demoMode: boolean; children: ReactNode }) {
+  return <InsightsDemoContext.Provider value={{ demoMode }}>{children}</InsightsDemoContext.Provider>;
 }
 
 export function useInsightsDemo(): InsightsDemoContextValue {
-  const ctx = useContext(InsightsDemoContext);
-  if (!ctx) {
-    throw new Error("useInsightsDemo must be used within InsightsDemoProvider");
-  }
-  return ctx;
+  return useContext(InsightsDemoContext);
 }

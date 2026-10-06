@@ -13,23 +13,15 @@ describe("shared page column", () => {
     expect(column).toContain("PAGE_COLUMN_CLASS");
   });
 
-  it("puts Insights chrome and Footer on PAGE_COLUMN_CLASS without extra bar padding", () => {
-    const insights = read("components/shell/ProductAppShell.tsx");
-    expect(insights).toContain("PAGE_COLUMN_CLASS");
-    expect(insights).not.toMatch(/bg-surface px-4 py-3 md:px-10/);
-    expect(insights).toContain("flex-wrap");
-
+  it("puts the Footer on PAGE_COLUMN_CLASS without extra bar padding", () => {
     const footer = read("components/Footer.tsx");
     expect(footer).toContain("PAGE_COLUMN_CLASS");
     expect(footer).not.toMatch(/px-6 py-12 text-on-surface md:px-12/);
   });
 
-  it("keeps the map pane full-bleed and Insights out of the 1800px column", () => {
+  it("keeps the map pane full-bleed", () => {
     // The map is a full-width app pane (spec §6.1), not a page column.
     const dashboard = read("components/DashboardView.tsx");
     expect(dashboard).not.toContain("PAGE_COLUMN_CLASS");
-
-    const insightsBody = read("components/insights/BusinessInsightsShell.tsx");
-    expect(insightsBody).not.toContain("max-w-[1800px]");
   });
 });

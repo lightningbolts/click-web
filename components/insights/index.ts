@@ -10,9 +10,6 @@
 // Main Dashboard (Shell + Content) + GlassPanel
 export { default as InsightsDashboard, GlassPanel } from "./InsightsDashboard";
 
-// Business Insights Shell (nav + layout)
-export { default as BusinessInsightsShell } from "./BusinessInsightsShell";
-
 // Metric Cards
 export {
   StickyScoreCard,

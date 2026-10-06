@@ -33,9 +33,9 @@ export function ManageHeader({
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
   const crumbs = place
     ? [
-        { href: "/business/places", label: "Business" },
+        { href: "/business", label: "Business" },
         { href: `/business/places/${place.id}`, label: place.name },
-        { href: `/insights/events?venue_id=${place.id}`, label: "Events" },
+        { href: `/business/places/${place.id}/events`, label: "Events" },
       ]
     : [{ href: "/events", label: "Events" }];
 

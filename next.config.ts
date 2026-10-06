@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { version } from "./package.json";
+import { businessRedirects } from "./lib/shell/businessRedirects";
 
 /** "0.1.0 · a1b2c3d" when the build knows its commit (Workers Builds / GitHub CI). */
 const commit = (process.env.WORKERS_CI_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "").slice(0, 7);
@@ -39,6 +40,9 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/**' },
       { protocol: 'http', hostname: '127.0.0.1', port: '54321', pathname: '/storage/v1/**' },
     ],
+  },
+  async redirects() {
+    return businessRedirects();
   },
   async headers() {
     return [

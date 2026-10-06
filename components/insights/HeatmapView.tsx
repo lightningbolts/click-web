@@ -104,7 +104,7 @@ export default function HeatmapView({ zones }: HeatmapViewProps) {
         {zones.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center p-6">
             <p className="max-w-sm text-center text-sm font-medium text-white/70">
-              No zone data yet. When your venue records spatial check-ins, heat zones will appear here.
+              No zone data yet. When your Place records check-ins by area, heat zones will appear here.
             </p>
           </div>
         ) : null}

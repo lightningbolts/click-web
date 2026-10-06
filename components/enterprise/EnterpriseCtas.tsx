@@ -1,27 +1,20 @@
-'use client';
+import { Button } from '@/components/ds/Button';
+import { APP_CONFIG } from '@/lib/config';
 
-import { useState } from 'react';
-import WaitlistModal from '@/components/marketing/WaitlistModal';
-
+/** "Set up your Place" (free, self-serve) and "Talk to us" (spec §8.2). */
 export default function EnterpriseCtas() {
-  const [open, setOpen] = useState(false);
   return (
     <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-      <a
-        href="mailto:mepsht@uw.edu?subject=Click%20for%20venues"
-        className="fc-btn-primary inline-flex w-full items-center justify-center px-8 py-4 text-base font-bold sm:w-auto"
+      <Button href="/business/get-started" variant="primary" size="lg" data-testid="enterprise-get-started">
+        Set up your Place
+      </Button>
+      <Button
+        href={`mailto:${APP_CONFIG.business_contact_email}?subject=${encodeURIComponent('Click for Business')}`}
+        variant="secondary"
+        size="lg"
       >
         Talk to us
-      </a>
-      <button
-        type="button"
-        data-testid="enterprise-waitlist"
-        onClick={() => setOpen(true)}
-        className="inline-flex w-full items-center justify-center rounded-[8px] border border-border-hard bg-surface px-8 py-4 text-base font-semibold text-on-surface hover:bg-surface-container sm:w-auto"
-      >
-        Join the waitlist
-      </button>
-      <WaitlistModal open={open} onClose={() => setOpen(false)} source="enterprise_landing" />
+      </Button>
     </div>
   );
 }

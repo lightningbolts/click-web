@@ -263,7 +263,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-zinc-400">
               <tr>
-                <th className="px-2 py-2">Venue</th>
+                <th className="px-2 py-2">Place</th>
                 <th className="px-2 py-2">Tier</th>
                 <th className="px-2 py-2">Subscription Status</th>
                 <th className="px-2 py-2">Managers</th>
@@ -300,12 +300,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <div className="glass-panel overflow-x-auto rounded-2xl p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">Venue Verification Queue</h3>
+          <h3 className="mb-1 text-sm font-semibold text-white">Billing</h3>
+          <p className="mb-3 text-xs text-zinc-400">Plan status per Place. Verification is in Places.</p>
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-zinc-400">
               <tr>
-                <th className="px-2 py-2">Venue</th>
-                <th className="px-2 py-2">Current Status</th>
+                <th className="px-2 py-2">Place</th>
+                <th className="px-2 py-2">Plan status</th>
                 <th className="px-2 py-2">Owners/Managers</th>
                 <th className="px-2 py-2">Created</th>
                 <th className="px-2 py-2">Decision</th>
@@ -315,7 +316,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {data.insights.verificationQueue.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
-                    No pending venues in verification queue.
+                    No Places waiting on a plan decision.
                   </td>
                 </tr>
               ) : (
@@ -330,13 +331,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         <form action={approveVenueAction}>
                           <input type="hidden" name="venue_id" value={queueItem.venueId} />
                           <button className="rounded-md border border-emerald-500/40 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10">
-                            Approve
+                            Grant trial
                           </button>
                         </form>
                         <form action={rejectVenueAction}>
                           <input type="hidden" name="venue_id" value={queueItem.venueId} />
                           <button className="rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
-                            Reject
+                            Cancel plan
                           </button>
                         </form>
                       </div>
@@ -357,7 +358,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <table className="min-w-full text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-zinc-400">
                   <tr>
-                    <th className="px-2 py-2">Venue</th>
+                    <th className="px-2 py-2">Place</th>
                     <th className="px-2 py-2">Category</th>
                     <th className="px-2 py-2">Perk</th>
                     <th className="px-2 py-2">Coordinates</th>

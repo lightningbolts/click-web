@@ -132,12 +132,13 @@ export async function severConnectionAction(formData: FormData): Promise<void> {
   redirectWithStatus('notice', 'Toxic connection severed and users blocked from each other.');
 }
 
+/** Billing (spec §9.9, D10): grants a trial. This is not verification; that lives in /admin/places. */
 export async function approveVenueAction(formData: FormData): Promise<void> {
   await requireAdminSession();
 
   const venueId = getTextField(formData, 'venue_id');
   if (!venueId) {
-    redirectWithStatus('error', 'venue_id is required for approval.');
+    redirectWithStatus('error', 'venue_id is required to grant a trial.');
   }
 
   const admin = createAdminSupabaseClient();
@@ -147,11 +148,11 @@ export async function approveVenueAction(formData: FormData): Promise<void> {
     .eq('id', venueId);
 
   if (error) {
-    redirectWithStatus('error', `Venue approval failed: ${error.message}`);
+    redirectWithStatus('error', `Granting the trial failed: ${error.message}`);
   }
 
   revalidatePath('/admin');
-  redirectWithStatus('notice', 'Venue approved and moved to trialing tier access.');
+  redirectWithStatus('notice', 'Trial granted: Insights are on for this Place.');
 }
 
 export async function rejectVenueAction(formData: FormData): Promise<void> {
@@ -159,7 +160,7 @@ export async function rejectVenueAction(formData: FormData): Promise<void> {
 
   const venueId = getTextField(formData, 'venue_id');
   if (!venueId) {
-    redirectWithStatus('error', 'venue_id is required for rejection.');
+    redirectWithStatus('error', 'venue_id is required to cancel the plan.');
   }
 
   const admin = createAdminSupabaseClient();
@@ -169,9 +170,9 @@ export async function rejectVenueAction(formData: FormData): Promise<void> {
     .eq('id', venueId);
 
   if (error) {
-    redirectWithStatus('error', `Venue rejection failed: ${error.message}`);
+    redirectWithStatus('error', `Canceling the plan failed: ${error.message}`);
   }
 
   revalidatePath('/admin');
-  redirectWithStatus('notice', 'Venue marked as rejected (canceled).');
+  redirectWithStatus('notice', 'Plan canceled for this Place.');
 }

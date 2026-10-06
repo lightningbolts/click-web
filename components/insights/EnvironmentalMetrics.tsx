@@ -224,7 +224,7 @@ export default function EnvironmentalMetrics({
               <span className="text-sm font-medium text-on-surface-variant">Social Flow (GCR)</span>
             </div>
             <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
-              Share of connections where someone quickly met again at your venue — group mingling vs
+              Share of connections where someone quickly met again at your Place — group mingling vs
               intimate 1:1 pace.
             </p>
             <div className="space-y-2">

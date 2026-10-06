@@ -27,13 +27,13 @@ type TabId = 'overview' | 'heatmap' | 'events' | 'live';
 
 const COMPANION: Record<TabId, { title: string; body: string; signal: string }> = {
   overview: {
-    title: 'A venue-level read, not vanity analytics',
+    title: 'A Place-level read, not vanity analytics',
     body: 'The overview combines connection density, activity, and attendance into one operating view using sample HUB data.',
     signal: 'Use this to understand whether people are actually meeting, not just opening an app.',
   },
   heatmap: {
     title: 'See where real-world interaction concentrates',
-    body: 'The heatmap mirrors the venue dashboard with floor-level pins and connection density, so operators can compare spaces rather than raw traffic alone.',
+    body: 'The heatmap mirrors the Place dashboard with floor-level pins and connection density, so operators can compare spaces rather than raw traffic alone.',
     signal: 'Use this to identify high-value areas, dead zones, and changes after programming or layout decisions.',
   },
   events: {
@@ -60,7 +60,7 @@ export default function EnterprisePlayground() {
           <h3 className="mt-1 text-xl font-bold tracking-tight text-on-surface sm:text-2xl">See how Click turns in-person activity into an operating signal.</h3>
         </div>
         <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
-          Explore the same sample venue from four perspectives. This demo contains no customer or live production data.
+          Explore the same sample Place from four angles. This demo contains no customer or live production data.
         </p>
       </div>
 
@@ -71,7 +71,7 @@ export default function EnterprisePlayground() {
               <nav
                 className="flex shrink-0 gap-1 overflow-x-auto border-b border-border-hard bg-surface p-2 lg:w-44 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r"
                 role="tablist"
-                aria-label="Venue demo"
+                aria-label="Place demo"
               >
                 {TABS.map((item) => {
                   const Icon = item.icon;
@@ -100,7 +100,7 @@ export default function EnterprisePlayground() {
                 <div className="mb-5 flex items-start justify-between gap-4 border-b border-border-hard pb-4">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary">{active.eyebrow}</p>
-                    <p className="mt-1 text-sm text-on-surface-variant">Sample HUB data · Seattle campus venue</p>
+                    <p className="mt-1 text-sm text-on-surface-variant">Sample HUB data · Seattle campus Place</p>
                   </div>
                   <span className="rounded-full border border-border-hard bg-surface-container px-3 py-1 text-[11px] font-semibold text-on-surface-variant">
                     Demo data
