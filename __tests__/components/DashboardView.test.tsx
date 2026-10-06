@@ -65,7 +65,7 @@ jest.mock('@/components/InterestTagging', () => {
   };
 });
 
-jest.mock('@/components/dashboard/ConnectionMap', () => ({
+jest.mock('@/components/map/ConnectionMap', () => ({
   __esModule: true,
   default: () => <div data-testid="connection-map" />,
 }));

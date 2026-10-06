@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn';
 import { useSessionCachedState, writeSessionCache } from '@/lib/dashboard/sessionCache';
 
 // MapLibre loads only when the map pane renders (spec §11.2).
-const ConnectionMap = dynamic(() => import('@/components/dashboard/ConnectionMap'), { ssr: false });
+const ConnectionMap = dynamic(() => import('@/components/map/ConnectionMap'), { ssr: false });
 
 interface DashboardViewProps {
   user: any;

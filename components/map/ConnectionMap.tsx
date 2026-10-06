@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as maplibregl from '@/lib/maps/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { MapPin, Loader2, Layers, List } from 'lucide-react';
-import type { ConnectionRecord } from './ConnectionTable';
+import { Layers, LocateFixed, MapPin, Minus, Plus } from 'lucide-react';
+import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { getSupabaseClient } from '@/lib/supabase';
 import {
   DEFAULT_MAP_LAYER_TOGGLES,
@@ -20,9 +20,30 @@ import {
 } from '@/lib/map/mapBeacons';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { FC_PRIMARY, FC_SECONDARY, mapStyleForTheme } from '@/lib/theme/mapStyles';
-import { Toggle } from '@/components/ui/Toggle';
-import { ConnectionPeerAvatar } from './ConnectionPeerAvatar';
-import { MapSelectionPanel, type MapSelection } from './map/MapSelectionPanel';
+import type { PlaceSummary } from '@/lib/places/types';
+import {
+  buildConnectionFeatures,
+  buildPlaceFeatures,
+  emptyFc,
+  radiusMetersFromBounds,
+  spreadOverlappingConnections,
+} from '@/lib/map/connectionMapGeo';
+import Link from 'next/link';
+import { Avatar } from '@/components/ds/Avatar';
+import { CardVisual } from '@/components/ds/CardVisual';
+import { Chip } from '@/components/ds/Chip';
+import { EmptyState } from '@/components/ds/EmptyState';
+import { IconButton } from '@/components/ds/IconButton';
+import { Loader } from '@/components/ds/Loader';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ds/Popover';
+import { SearchField } from '@/components/ds/SearchField';
+import { StatusPill } from '@/components/ds/StatusPill';
+import { ToggleList, ToggleRow } from '@/components/settings/ToggleRows';
+import { categoryLabel } from '@/lib/places/categories';
+import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
+import { MapSelectionPanel, type MapSelection } from './MapSelectionPanel';
+
+type NearbyFilter = 'all' | 'events' | 'places' | 'people' | 'other';
 
 interface ConnectionMapProps {
   connections: ConnectionRecord[];
@@ -33,86 +54,15 @@ interface ConnectionMapProps {
   active?: boolean;
 }
 
-type PositionedConnection = {
-  connection: ConnectionRecord;
-  markerLongitude: number;
-  markerLatitude: number;
-  groupedConnections: ConnectionRecord[];
-};
-
-const FEET_TO_METERS = 0.3048;
-const GROUPING_DISTANCE_METERS = 10 * FEET_TO_METERS;
-
-const spreadOverlappingConnections = (input: ConnectionRecord[]): PositionedConnection[] => {
-  const withLocation = input.filter((connection) => connection.geo_location);
-
-  const distanceMeters = (a: ConnectionRecord, b: ConnectionRecord): number => {
-    if (!a.geo_location || !b.geo_location) return Number.POSITIVE_INFINITY;
-
-    const lat1 = (a.geo_location.latitude * Math.PI) / 180;
-    const lon1 = (a.geo_location.longitude * Math.PI) / 180;
-    const lat2 = (b.geo_location.latitude * Math.PI) / 180;
-    const lon2 = (b.geo_location.longitude * Math.PI) / 180;
-
-    const dLat = lat2 - lat1;
-    const dLon = lon2 - lon1;
-    const haversine =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-    return 2 * 6371000 * Math.asin(Math.sqrt(haversine));
-  };
-
-  const sorted = withLocation
-    .slice()
-    .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime());
-
-  const clusters: ConnectionRecord[][] = [];
-
-  sorted.forEach((connection) => {
-    const targetCluster = clusters.find((cluster) => {
-      const anchor = cluster[0];
-      return distanceMeters(connection, anchor) <= GROUPING_DISTANCE_METERS;
-    });
-
-    if (targetCluster) {
-      targetCluster.push(connection);
-    } else {
-      clusters.push([connection]);
-    }
-  });
-
-  const positioned: PositionedConnection[] = [];
-
-  clusters.forEach((group) => {
-    if (group.length === 0) return;
-
-    const valid = group.filter((connection) => connection.geo_location);
-    if (valid.length === 0) return;
-
-    const centroidLatitude = valid.reduce((sum, connection) => sum + (connection.geo_location?.latitude ?? 0), 0) / valid.length;
-    const centroidLongitude = valid.reduce((sum, connection) => sum + (connection.geo_location?.longitude ?? 0), 0) / valid.length;
-
-    const displayConnection = group
-      .slice()
-      .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime())[0];
-
-    positioned.push({
-      connection: displayConnection,
-      markerLatitude: centroidLatitude,
-      markerLongitude: centroidLongitude,
-      groupedConnections: group,
-    });
-  });
-
-  return positioned;
-};
-
 const SRC_CONNECTIONS = 'connections-geo';
 const SRC_OFFICIAL = 'beacons-official-geo';
 const SRC_COMMUNITY = 'beacons-community-geo';
 const SRC_HAZARDS = 'beacons-hazards-geo';
 const SRC_SELECTED = 'selected-point';
+const SRC_PLACES = 'places-geo';
+
+/** Every source and layer this component adds: carried across theme swaps (see `transformStyle`). */
+export const CUSTOM_SOURCE_IDS = [SRC_CONNECTIONS, SRC_OFFICIAL, SRC_COMMUNITY, SRC_HAZARDS, SRC_PLACES, SRC_SELECTED];
 
 const INTERACTIVE_LAYERS = [
   'connection-clusters',
@@ -123,6 +73,7 @@ const INTERACTIVE_LAYERS = [
   'community-beacon-unclustered',
   'hazard-beacon-clusters',
   'hazard-beacon-unclustered',
+  'place-unclustered',
 ];
 
 const CLUSTER_MAX_ZOOM = 14;
@@ -131,44 +82,6 @@ const CLUSTER_RADIUS = 52;
 const BEACON_CLUSTER_MAX_ZOOM = 16;
 const BEACON_CLUSTER_RADIUS = 44;
 
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const p1 = (lat1 * Math.PI) / 180;
-  const p2 = (lat2 * Math.PI) / 180;
-  const dp = ((lat2 - lat1) * Math.PI) / 180;
-  const dl = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dp / 2) * Math.sin(dp / 2) +
-    Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
-  return 2 * R * Math.asin(Math.sqrt(Math.min(1, a)));
-}
-
-/** Query radius for `/api/beacons` from the visible map bounds (half diagonal × padding), clamped to API limits. */
-function radiusMetersFromBounds(bounds: maplibregl.LngLatBounds): number {
-  const ne = bounds.getNorthEast();
-  const sw = bounds.getSouthWest();
-  const diag = haversineMeters(sw.lat, sw.lng, ne.lat, ne.lng);
-  return Math.min(50_000, Math.max(400, (diag / 2) * 1.28));
-}
-
-function emptyFc() {
-  return { type: 'FeatureCollection' as const, features: [] as GeoJSON.Feature[] };
-}
-
-function buildConnectionFeatures(positioned: PositionedConnection[]): GeoJSON.Feature[] {
-  return positioned.map((pc) => ({
-    type: 'Feature' as const,
-    geometry: {
-      type: 'Point' as const,
-      coordinates: [pc.markerLongitude, pc.markerLatitude],
-    },
-    properties: {
-      count: pc.groupedConnections.length,
-      connIds: pc.groupedConnections.map((c) => c.id).join(','),
-    },
-  }));
-}
-
 /**
  * MapLibre GL map for connection locations + optional map beacon layers (clustered).
  *
@@ -176,6 +89,7 @@ function buildConnectionFeatures(positioned: PositionedConnection[]): GeoJSON.Fe
  */
 export default function ConnectionMap({ connections, onConnectionClick, onOpenProfile, active = true }: ConnectionMapProps) {
   const { theme } = useTheme();
+  const themeRef = useRef(theme);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const initialFitDoneRef = useRef(false);
@@ -188,12 +102,15 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
   const [layersOpen, setLayersOpen] = useState(false);
   const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
+  const [places, setPlaces] = useState<PlaceSummary[]>([]);
   const [selection, setSelection] = useState<MapSelection | null>(null);
   /** Hover label is positioned imperatively: a mousemove must not re-render the map component. */
   const tooltipRef = useRef<HTMLDivElement>(null);
   /** Connections and events inside the current viewport (desktop "In view" list). */
   const [viewBounds, setViewBounds] = useState<maplibregl.LngLatBounds | null>(null);
   const [listOpenMobile, setListOpenMobile] = useState(false);
+  const [filter, setFilter] = useState<NearbyFilter>('all');
+  const [query, setQuery] = useState('');
 
   const beaconsRef = useRef<MapBeaconRecord[]>([]);
   useEffect(() => {
@@ -320,6 +237,33 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     };
   }, [wantsBeaconFetch, active, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
 
+  // Click Places near the view (feature-flagged: a 403/404 simply means no Places layer).
+  useEffect(() => {
+    if (!layers.places || !active) return;
+    let cancelled = false;
+    const run = async () => {
+      const supabase = getSupabaseClient();
+      const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
+      const q = new URLSearchParams({
+        lat: String(beaconQueryLat),
+        lon: String(beaconQueryLng),
+        radius_meters: String(Math.round(Math.min(beaconQueryRadiusM, 25_000))),
+      });
+      try {
+        const res = await fetch(`/api/places/nearby?${q.toString()}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as { places?: PlaceSummary[] };
+        if (!cancelled) setPlaces(Array.isArray(json.places) ? json.places : []);
+      } catch {
+        /* keep current pins */
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [layers.places, active, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
+
   const attachMapInteractions = useCallback((mapInstance: maplibregl.Map) => {
     const zoomIntoCluster = (sourceId: string) => (e: maplibregl.MapLayerMouseEvent) => {
       const f = e.features?.[0];
@@ -380,6 +324,15 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
     };
 
+    mapInstance.on('click', 'place-unclustered', (e) => {
+      const f = e.features?.[0];
+      const id = f?.properties?.id;
+      if (typeof id !== 'string' || !f || f.geometry.type !== 'Point') return;
+      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+      setSelection({ kind: 'place', id, lng, lat });
+    });
+    mapInstance.on('mousemove', 'place-unclustered', onHover);
+    mapInstance.on('mouseleave', 'place-unclustered', onLeave);
     mapInstance.on('click', 'connection-clusters', zoomIntoCluster(SRC_CONNECTIONS));
     mapInstance.on('click', 'connection-unclustered', onConnPointClick);
     for (const [prefix, src] of [
@@ -417,14 +370,13 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     try {
       const mapInstance = new maplibregl.Map({
         container: mapContainer.current,
-        style: mapStyleForTheme(theme),
+        style: mapStyleForTheme(themeRef.current),
         center: mapInitCenterRef.current ?? mapCenter,
         zoom: 12,
         attributionControl: false,
       });
 
       map.current = mapInstance;
-      mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
       mapInstance.on('load', () => {
         mapInstance.addSource(SRC_CONNECTIONS, {
@@ -550,6 +502,27 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
         addBeaconStack(SRC_COMMUNITY, 'community-beacon', FC_SECONDARY);
         addBeaconStack(SRC_HAZARDS, 'hazard-beacon', '#c2410c');
 
+        // Click Places: surface plates with a hairline, so they read as places, not people (spec §7.5).
+        mapInstance.addSource(SRC_PLACES, { type: 'geojson', data: emptyFc() });
+        mapInstance.addLayer({
+          id: 'place-unclustered',
+          type: 'circle',
+          source: SRC_PLACES,
+          paint: {
+            'circle-color': '#ffffff',
+            'circle-radius': 11,
+            'circle-stroke-width': ['case', ['==', ['get', 'live'], 1], 3, 1.5],
+            'circle-stroke-color': ['case', ['==', ['get', 'live'], 1], FC_PRIMARY, 'rgba(60,60,67,0.45)'],
+          },
+        });
+        mapInstance.addLayer({
+          id: 'place-icon',
+          type: 'symbol',
+          source: SRC_PLACES,
+          layout: { 'text-field': '⌂', 'text-size': 13, 'text-allow-overlap': true, 'text-ignore-placement': true },
+          paint: { 'text-color': '#3c3c43' },
+        });
+
         // Selection ring above everything.
         mapInstance.addSource(SRC_SELECTED, { type: 'geojson', data: emptyFc() });
         mapInstance.addLayer({
@@ -607,7 +580,28 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       setMapInitialized(false);
       setMapPresentationReady(false);
     };
-  }, [attachMapInteractions, theme]);
+    // Theme swaps restyle in place (below); the map is never rebuilt for them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachMapInteractions]);
+
+  // Theme changes setStyle in place and carry our sources and layers over, so the camera and
+  // pins stay put (AGENTS.md: never remount MapLibre for a theme change).
+  useEffect(() => {
+    if (themeRef.current === theme) return;
+    themeRef.current = theme;
+    const m = map.current;
+    if (!m) return;
+    m.setStyle(mapStyleForTheme(theme), {
+      transformStyle: (previous, next) => {
+        if (!previous) return next;
+        const ours = new Set(CUSTOM_SOURCE_IDS);
+        const sources = { ...next.sources };
+        for (const id of CUSTOM_SOURCE_IDS) if (previous.sources[id]) sources[id] = previous.sources[id];
+        const layers = previous.layers.filter((l) => 'source' in l && typeof l.source === 'string' && ours.has(l.source));
+        return { ...next, sources, layers: [...next.layers, ...layers] };
+      },
+    });
+  }, [theme]);
 
   useEffect(() => {
     const m = map.current;
@@ -641,6 +635,15 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     setSrc(SRC_COMMUNITY, beaconGeoJsonFeatures(visibleBeacons, 'community'));
     setSrc(SRC_HAZARDS, beaconGeoJsonFeatures(visibleBeacons, 'hazard'));
   }, [mapInitialized, beacons, layers]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !mapInitialized) return;
+    (m.getSource(SRC_PLACES) as maplibregl.GeoJSONSource | undefined)?.setData({
+      type: 'FeatureCollection',
+      features: layers.places ? buildPlaceFeatures(places) : [],
+    });
+  }, [mapInitialized, places, layers.places]);
 
   // Selection ring follows the selection.
   useEffect(() => {
@@ -688,22 +691,20 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   }, [active]);
 
   const inView = useMemo(() => {
-    if (!viewBounds) return { spots: positionedConnections.slice(0, 40), places: [] as MapBeaconRecord[] };
-    const spots = layers.myNetwork
-      ? positionedConnections.filter((p) => viewBounds.contains([p.markerLongitude, p.markerLatitude]))
-      : [];
-    const places = beacons
-      .filter((b) => layers[mapLayerForBeacon(b.beacon_type)] && viewBounds.contains([b.lng, b.lat]))
-      .sort((a, b) => Number(b.beacon_type === 'event') - Number(a.beacon_type === 'event'));
+    const within = (lng: number, lat: number) => !viewBounds || viewBounds.contains([lng, lat]);
+    const spots = layers.myNetwork ? positionedConnections.filter((p) => within(p.markerLongitude, p.markerLatitude)) : [];
+    const pins = beacons.filter((b) => layers[mapLayerForBeacon(b.beacon_type)] && within(b.lng, b.lat));
     return {
-      spots: spots.sort((a, b) => b.connection.dateMet.getTime() - a.connection.dateMet.getTime()).slice(0, 40),
-      places: places.slice(0, 40),
+      spots: spots.sort((a, b) => b.connection.dateMet.getTime() - a.connection.dateMet.getTime()).slice(0, 60),
+      events: pins.filter((b) => b.beacon_type === 'event').slice(0, 60),
+      other: pins.filter((b) => b.beacon_type !== 'event').slice(0, 60),
+      places: layers.places ? places.filter((p) => within(p.longitude, p.latitude)).slice(0, 60) : [],
     };
-  }, [beacons, layers, positionedConnections, viewBounds]);
+  }, [beacons, layers, places, positionedConnections, viewBounds]);
 
   const focusOn = (sel: MapSelection) => {
     setSelection(sel);
-    setListOpenMobile(false);
+    setListOpenMobile(true);
     map.current?.easeTo({ center: [sel.lng, sel.lat], zoom: Math.max(map.current.getZoom(), 15), duration: 480 });
   };
 
@@ -711,24 +712,19 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  if (!hasGeoConnections) {
-    return (
-      <div className="fc-card flex flex-1 flex-col items-center justify-center rounded-[16px] border border-border-hard p-12 text-center">
-        <MapPin className="mx-auto mb-4 h-12 w-12 text-outline" />
-        <h3 className="mb-2 text-xl font-semibold">No places yet</h3>
-        <p className="max-w-sm text-on-surface-variant">
-          Your Click map will appear here once you start making clicks!
-        </p>
-      </div>
+  const locate = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => map.current?.easeTo({ center: [coords.longitude, coords.latitude], zoom: 15, duration: 600 }),
+      () => undefined,
+      { enableHighAccuracy: true, timeout: 10_000 },
     );
-  }
+  };
 
   if (mapError) {
     return (
-      <div className="fc-card flex flex-1 flex-col items-center justify-center rounded-[16px] border border-border-hard p-12 text-center">
-        <MapPin className="mx-auto mb-4 h-12 w-12 text-error" />
-        <h3 className="mb-2 text-xl font-semibold">Map unavailable</h3>
-        <p className="text-on-surface-variant">{mapError}</p>
+      <div className="flex flex-1 items-center justify-center p-8">
+        <EmptyState icon={MapPin} title="The map didn’t load" body="Check your connection and reload the page." />
       </div>
     );
   }
@@ -741,189 +737,256 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
           .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime())
       : [];
   const selectedBeacon = selection?.kind === 'beacon' ? beacons.find((b) => b.id === selection.id) ?? null : null;
+  const selectedPlace = selection?.kind === 'place' ? places.find((p) => p.id === selection.id) ?? null : null;
 
   const layerRows: { key: keyof MapLayerToggles; label: string }[] = [
     { key: 'myNetwork', label: 'People I met' },
     { key: 'events', label: 'Events' },
-    { key: 'socialVibes', label: 'Social vibes' },
+    { key: 'places', label: 'Places' },
+    { key: 'socialVibes', label: 'Hangouts' },
     { key: 'soundtracks', label: 'Soundtracks' },
     { key: 'alertsUtilities', label: 'Alerts & utilities' },
     { key: 'other', label: 'Other' },
   ];
 
-  const inViewList = (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-border-hard px-4 py-3">
-        <p className="text-sm font-bold text-on-surface">In view</p>
-        <p className="text-xs text-on-surface-variant">
-          {inView.spots.reduce((n, s) => n + s.groupedConnections.length, 0)} people · {inView.places.length} places
+  const needle = query.trim().toLowerCase();
+  const matches = (text: string | null | undefined) => !needle || (text ?? '').toLowerCase().includes(needle);
+  const rows = {
+    events: filter === 'all' || filter === 'events' ? inView.events.filter((b) => matches(displayTitleForBeacon(b))) : [],
+    places: filter === 'all' || filter === 'places' ? inView.places.filter((p) => matches(p.name)) : [],
+    people: filter === 'all' || filter === 'people' ? inView.spots.filter((s) => s.groupedConnections.some((c) => matches(c.name))) : [],
+    other: filter === 'all' || filter === 'other' ? inView.other.filter((b) => matches(displayTitleForBeacon(b))) : [],
+  };
+  const peopleInView = inView.spots.reduce((n, s) => n + s.groupedConnections.length, 0);
+  const total = inView.events.length + inView.places.length + peopleInView + inView.other.length;
+  const liveNow = inView.places.filter((p) => p.pulse.state === 'live').length;
+  const chips: { value: NearbyFilter; label: string; count: number }[] = [
+    { value: 'all', label: 'All', count: total },
+    { value: 'events', label: 'Events', count: inView.events.length },
+    { value: 'places', label: 'Places', count: inView.places.length },
+    { value: 'people', label: 'People', count: peopleInView },
+    { value: 'other', label: 'Other', count: inView.other.length },
+  ];
+  const nothing = rows.events.length + rows.places.length + rows.people.length + rows.other.length === 0;
+
+  const Row = ({
+    visual,
+    title,
+    subtitle,
+    live,
+    onSelect,
+  }: {
+    visual: React.ReactNode;
+    title: string;
+    subtitle: string;
+    live?: boolean;
+    onSelect: () => void;
+  }) => (
+    <li>
+      <button type="button" onClick={onSelect} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-hover">
+        {visual}
+        <span className="min-w-0 flex-1">
+          <span className="type-body-strong flex items-center gap-1.5 text-fg">
+            <span className="truncate">{title}</span>
+            {live ? <StatusPill variant="live">Live</StatusPill> : null}
+          </span>
+          <span className="type-meta block truncate text-fg-tertiary">{subtitle}</span>
+        </span>
+      </button>
+    </li>
+  );
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <section className="pb-2">
+      <h3 className="type-meta px-2 pb-1 pt-2 font-semibold text-fg-secondary">{title}</h3>
+      <ul>{children}</ul>
+    </section>
+  );
+
+  const nearbyList = (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 px-4 pb-2 pt-4">
+        <h2 className="type-title-3 text-fg">Nearby</h2>
+        <p className="type-meta tabular text-fg-tertiary">
+          {total} nearby{liveNow ? ` · ${liveNow} live now` : ''}
         </p>
+        <SearchField value={query} onValueChange={setQuery} label="Search the map" placeholder="Search places, events, people" className="mt-3" />
+        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4" role="group" aria-label="Show">
+          {chips.map((c) => (
+            <Chip key={c.value} size="sm" selected={filter === c.value} onClick={() => setFilter(c.value)}>
+              {c.label}
+              <span className="tabular opacity-70">{c.count}</span>
+            </Chip>
+          ))}
+        </div>
       </div>
-      <div className="chat-thread-scroll min-h-0 flex-1 p-1.5">
-        {inView.spots.length === 0 && inView.places.length === 0 ? (
-          <p className="px-3 py-6 text-sm text-on-surface-variant">Nothing here. Zoom out or pan to see more.</p>
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        {!hasGeoConnections && filter !== 'events' && filter !== 'places' ? (
+          <p className="type-meta mx-2 my-2 rounded-md bg-surface-raised px-3 py-2.5 text-fg-secondary">
+            People you Click with appear where you met, once you allow location in the app.
+          </p>
         ) : null}
-        {inView.spots.map((spot) => (
-          <button
-            key={spot.connection.id}
-            type="button"
-            onClick={() =>
-              focusOn({
-                kind: 'connections',
-                ids: spot.groupedConnections.map((c) => c.id),
-                lng: spot.markerLongitude,
-                lat: spot.markerLatitude,
-              })
-            }
-            className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-surface-container-low"
-          >
-            <ConnectionPeerAvatar label={spot.connection.name} imageUrl={spot.connection.avatarUrl} size="md" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-on-surface">
-                {spot.connection.name}
-                {spot.groupedConnections.length > 1 ? ` +${spot.groupedConnections.length - 1}` : ''}
-              </span>
-              <span className="block truncate text-xs text-on-surface-variant">{spot.connection.location}</span>
-            </span>
-          </button>
-        ))}
-        {inView.places.length > 0 ? (
-          <p className="px-2.5 pb-1 pt-3 text-xs font-bold uppercase tracking-wide text-on-surface-variant">Places</p>
+        {nothing ? <p className="type-body px-2 py-6 text-center text-fg-secondary">Nothing here. Zoom out or move the map.</p> : null}
+        {rows.events.length ? (
+          <Section title="Events">
+            {rows.events.map((b) => (
+              <Row
+                key={b.id}
+                visual={<CardVisual seed={b.id} photoUrl={beaconHeroImageUrl(b.metadata)} radius="sm" className="size-12 shrink-0" sizes="48px" />}
+                title={displayTitleForBeacon(b)}
+                subtitle={humanizeBeaconType(b.beacon_type)}
+                onSelect={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}
+              />
+            ))}
+          </Section>
         ) : null}
-        {inView.places.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            onClick={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}
-            className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-surface-container-low"
-          >
-            <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] bg-white text-sm"
-              style={{ borderColor: beaconRowTint(b), color: beaconRowTint(b) }}
-              aria-hidden
-            >
-              {b.beacon_type === 'event' ? '◆' : '•'}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-on-surface">{displayTitleForBeacon(b)}</span>
-              <span className="block truncate text-xs text-on-surface-variant">{humanizeBeaconType(b.beacon_type)}</span>
-            </span>
-          </button>
-        ))}
+        {rows.places.length ? (
+          <Section title="Places">
+            {rows.places.map((p) => (
+              <Row
+                key={p.id}
+                visual={<CardVisual seed={p.id} photoUrl={p.photo_url} radius="sm" className="size-12 shrink-0" sizes="48px" />}
+                title={p.name}
+                subtitle={[categoryLabel(p.category), p.city].filter(Boolean).join(' · ')}
+                live={p.pulse.state === 'live'}
+                onSelect={() => focusOn({ kind: 'place', id: p.id, lng: p.longitude, lat: p.latitude })}
+              />
+            ))}
+          </Section>
+        ) : null}
+        {rows.people.length ? (
+          <Section title="People">
+            {rows.people.map((spot) => (
+              <Row
+                key={spot.connection.id}
+                visual={<Avatar seed={spot.connection.otherUserId ?? spot.connection.id} name={spot.connection.name} src={spot.connection.avatarUrl} size={48} />}
+                title={`${spot.connection.name}${spot.groupedConnections.length > 1 ? ` +${spot.groupedConnections.length - 1}` : ''}`}
+                subtitle={spot.connection.location}
+                onSelect={() =>
+                  focusOn({ kind: 'connections', ids: spot.groupedConnections.map((c) => c.id), lng: spot.markerLongitude, lat: spot.markerLatitude })
+                }
+              />
+            ))}
+          </Section>
+        ) : null}
+        {rows.other.length ? (
+          <Section title="Other">
+            {rows.other.map((b) => (
+              <Row
+                key={b.id}
+                visual={
+                  <span
+                    className="flex size-12 shrink-0 items-center justify-center rounded-sm bg-surface-raised"
+                    style={{ color: beaconRowTint(b) }}
+                    aria-hidden
+                  >
+                    <MapPin size={20} />
+                  </span>
+                }
+                title={displayTitleForBeacon(b)}
+                subtitle={humanizeBeaconType(b.beacon_type)}
+                onSelect={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}
+              />
+            ))}
+          </Section>
+        ) : null}
       </div>
     </div>
   );
 
+  const panelBody = selection ? (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <MapSelectionPanel
+        selection={selection}
+        connections={selectedConnections}
+        beacon={selectedBeacon}
+        place={selectedPlace}
+        onClose={() => setSelection(null)}
+        onMessage={onConnectionClick}
+        onProfile={onOpenProfile ? (c) => c.otherUserId && onOpenProfile(c.otherUserId, c.id) : undefined}
+      />
+    </div>
+  ) : (
+    nearbyList
+  );
+
   return (
-    <div className="relative flex min-h-[420px] w-full flex-1 gap-4 overflow-hidden" data-testid="connection-map">
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container">
-        <div
-          className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
-            mapPresentationReady ? 'pointer-events-none opacity-0' : 'opacity-100'
-          }`}
-          aria-hidden={mapPresentationReady}
-        >
-          <div className="text-center">
-            <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-on-surface-variant">Loading map…</p>
-          </div>
-        </div>
-
-        <div
-          ref={mapContainer}
-          className={`absolute inset-0 transition-opacity duration-500 ease-out ${mapPresentationReady ? 'opacity-100' : 'opacity-0'}`}
-        />
-
-        <div
-          ref={tooltipRef}
-          className="pointer-events-none absolute left-0 top-0 z-[7] whitespace-nowrap rounded-[8px] border border-border-hard bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface opacity-0 shadow-lg transition-opacity duration-100"
-          role="tooltip"
-          aria-hidden
-        />
-
-        {mapPresentationReady ? (
-          <div className="absolute left-3 top-3 z-[6] flex flex-col items-start gap-2">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setLayersOpen((o) => !o)}
-                aria-expanded={layersOpen}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold text-on-surface shadow-lg hover:bg-surface-container-low"
-              >
-                <Layers className="h-4 w-4 text-primary" aria-hidden />
-                Layers
-              </button>
-              <button
-                type="button"
-                onClick={() => setListOpenMobile((o) => !o)}
-                aria-expanded={listOpenMobile}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-border-hard bg-surface px-3 text-sm font-semibold text-on-surface shadow-lg hover:bg-surface-container-low lg:hidden"
-              >
-                <List className="h-4 w-4 text-primary" aria-hidden />
-                In view
-              </button>
-            </div>
-            {layersOpen ? (
-              <div className="w-60 rounded-[12px] border border-border-hard bg-surface p-3 text-sm text-on-surface shadow-xl">
-                <div className="mb-2 flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-full bg-primary ring-2 ring-white" aria-hidden />
-                    People
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-full border-[3px] border-secondary bg-white" aria-hidden />
-                    Places
-                  </span>
-                </div>
-                {layerRows.map((row) => (
-                  <label key={row.key} className="flex cursor-pointer items-center justify-between gap-2 py-1.5 font-medium">
-                    {row.label}
-                    <Toggle checked={layers[row.key]} onCheckedChange={() => toggle(row.key)} aria-label={row.label} className="scale-75" />
-                  </label>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Narrow: bottom sheet for the selection or the in-view list. */}
-        {selection || listOpenMobile ? (
-          <div className="absolute inset-x-2 bottom-2 z-[8] max-h-[60%] overflow-y-auto rounded-[16px] border border-border-hard bg-surface shadow-xl lg:hidden">
-            {selection ? (
-              <MapSelectionPanel
-                selection={selection}
-                connections={selectedConnections}
-                beacon={selectedBeacon}
-                onClose={() => setSelection(null)}
-                onMessage={onConnectionClick}
-                onProfile={
-                  onOpenProfile ? (c) => c.otherUserId && onOpenProfile(c.otherUserId, c.id) : undefined
-                }
-              />
-            ) : (
-              <div className="h-[min(22rem,55vh)]">{inViewList}</div>
-            )}
-          </div>
-        ) : null}
+    <div className="relative min-h-[420px] w-full flex-1 overflow-hidden bg-surface-raised" data-testid="connection-map">
+      <div
+        className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-raised transition-opacity duration-[var(--d-slow)] ${
+          mapPresentationReady ? 'pointer-events-none opacity-0' : 'opacity-100'
+        }`}
+        aria-hidden={mapPresentationReady}
+      >
+        <Loader size={44} label="Loading map" />
       </div>
 
-      {/* Desktop: map and detail side by side. */}
-      <aside className="hidden w-[20rem] shrink-0 overflow-hidden rounded-[16px] border border-border-hard bg-surface lg:flex lg:flex-col">
-        {selection ? (
-          <div className="chat-thread-scroll min-h-0 flex-1">
-            <MapSelectionPanel
-              selection={selection}
-              connections={selectedConnections}
-              beacon={selectedBeacon}
-              onClose={() => setSelection(null)}
-              onMessage={onConnectionClick}
-              onProfile={onOpenProfile ? (c) => c.otherUserId && onOpenProfile(c.otherUserId, c.id) : undefined}
-            />
-          </div>
-        ) : (
-          inViewList
-        )}
+      <div
+        ref={mapContainer}
+        className={`absolute inset-0 transition-opacity duration-[var(--d-slow)] ${mapPresentationReady ? 'opacity-100' : 'opacity-0'}`}
+      />
+
+      <div
+        ref={tooltipRef}
+        className="type-meta pointer-events-none absolute left-0 top-0 z-[7] whitespace-nowrap rounded-md bg-bg-elevated px-2.5 py-1.5 font-semibold text-fg opacity-0 shadow-overlay transition-opacity duration-100"
+        role="tooltip"
+        aria-hidden
+      />
+
+      {/* Desktop: the Nearby panel floats at the left (spec §7.5). */}
+      <aside
+        aria-label="Nearby"
+        className="absolute bottom-4 left-4 top-4 z-[8] hidden w-[380px] flex-col overflow-hidden rounded-xl bg-bg-elevated shadow-overlay md:flex"
+      >
+        {panelBody}
       </aside>
+
+      {/* Phones: a bottom panel that peeks at "Nearby · N" and expands. */}
+      <div className="absolute inset-x-0 bottom-0 z-[8] flex max-h-[80dvh] flex-col rounded-t-xl bg-bg-elevated shadow-overlay md:hidden">
+        <button
+          type="button"
+          onClick={() => setListOpenMobile((o) => !o)}
+          aria-expanded={listOpenMobile || Boolean(selection)}
+          className="flex shrink-0 flex-col items-center gap-2 px-4 pb-3 pt-2"
+        >
+          <span aria-hidden className="h-[5px] w-9 rounded-pill bg-fill-strong" />
+          {listOpenMobile || selection ? null : (
+            <span className="type-body-strong text-fg">
+              Nearby · <span className="tabular">{total}</span>
+            </span>
+          )}
+        </button>
+        {listOpenMobile || selection ? <div className="flex max-h-[60dvh] min-h-0 flex-col">{panelBody}</div> : null}
+      </div>
+
+      {mapPresentationReady ? (
+        <div className="absolute bottom-[96px] right-4 z-[6] flex flex-col items-end gap-2 md:bottom-4">
+          <div className="hidden flex-col gap-2 md:flex">
+            <IconButton icon={Plus} variant="glass" aria-label="Zoom in" onClick={() => map.current?.zoomIn()} />
+            <IconButton icon={Minus} variant="glass" aria-label="Zoom out" onClick={() => map.current?.zoomOut()} />
+          </div>
+          <IconButton icon={LocateFixed} variant="glass" aria-label="Show where I am" onClick={locate} />
+          <Popover open={layersOpen} onOpenChange={setLayersOpen}>
+            <PopoverTrigger asChild>
+              <IconButton icon={Layers} variant="glass" aria-label="Map layers" />
+            </PopoverTrigger>
+            <PopoverContent side="left" align="end" className="w-64 p-1.5">
+              <ToggleList>
+                {layerRows.map((row) => (
+                  <ToggleRow key={row.key} title={row.label} checked={layers[row.key]} onChange={() => toggle(row.key)} />
+                ))}
+              </ToggleList>
+            </PopoverContent>
+          </Popover>
+          <Link
+            href="/events/new"
+            aria-label="Create an event"
+            className="press flex size-12 items-center justify-center rounded-full bg-action text-on-action shadow-overlay hover:bg-action-hover"
+          >
+            <Plus size={22} strokeWidth={2.25} aria-hidden />
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
