@@ -1,36 +1,13 @@
 import 'server-only';
 
+import { cloudflareEnv } from '@/lib/server/cloudflareEnv';
+
 type RateLimitBinding = {
   limit: (options: { key: string }) => Promise<{ success: boolean }>;
 };
 
-type CloudflareEnvBag = Record<string, unknown> | undefined;
-
-function getCloudflareEnv(): CloudflareEnvBag {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getCloudflareContext } = require('@opennextjs/cloudflare') as {
-      getCloudflareContext: () => { env?: CloudflareEnvBag };
-    };
-    const ctx = getCloudflareContext();
-    if (ctx?.env) return ctx.env;
-  } catch {
-    /* local next / outside request context */
-  }
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const workers = require('cloudflare:workers') as { env?: CloudflareEnvBag };
-    if (workers.env) return workers.env;
-  } catch {
-    /* not on Workers */
-  }
-
-  return undefined;
-}
-
 function getRateLimitBinding(name: string): RateLimitBinding | null {
-  const env = getCloudflareEnv();
+  const env = cloudflareEnv();
   const binding = env?.[name];
   if (
     binding &&

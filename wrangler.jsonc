@@ -34,6 +34,11 @@
   "vars": {
     "NEXT_PUBLIC_BASE_URL": "https://joinclick.co"
   },
+  // Cloudflare Images: resizes an event's picture for its Apple Wallet pass (free tier: 5,000
+  // unique transformations a month). Without it, passes wear the event's generated colors.
+  "images": {
+    "binding": "IMAGES"
+  },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
