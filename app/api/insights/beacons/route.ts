@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
-import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
+import { userMayViewPlaceInsights } from "@/lib/server/places/entitlement";
 import type { VenuePopUpHubBeacon } from "@/lib/insights/vibeRadar";
 import { parseBody } from "@/lib/api/parseBody";
 import { insightsBeaconCreateBodySchema } from "@/lib/api/schemas/user";
@@ -20,18 +20,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!(await userMayAccessBusinessInsights(supabase, user))) {
-      return NextResponse.json(
-        { error: "Forbidden: Requires verified business or active venue subscription" },
-        { status: 403 },
-      );
-    }
-
     const parsed = await parseBody(request, insightsBeaconCreateBodySchema);
     if (!parsed.ok) return parsed.response;
     const body = parsed.data;
 
     const venueId = typeof body.venue_id === "string" ? body.venue_id.trim() : "";
+    // Pop-up perks are part of Insights, paid per Place (spec §9.7).
+    if (venueId && !(await userMayViewPlaceInsights(supabase, user, venueId))) {
+      return NextResponse.json(
+        { error: "Forbidden: Requires verified business or active venue subscription" },
+        { status: 403 },
+      );
+    }
     const perk =
       typeof body.perk_description === "string" ? body.perk_description.trim() : "";
     const categoryTarget =

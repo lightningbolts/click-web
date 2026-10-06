@@ -11,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { beaconId } = await params;
-    const auth = await requireEventManager(request, beaconId);
+    const auth = await requireEventManager(request, beaconId, { allowViewers: true });
     if (!auth.ok) return auth.response;
     const summary = await loadRecapSummary(auth.admin, beaconId);
     return NextResponse.json({

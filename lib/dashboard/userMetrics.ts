@@ -3,7 +3,10 @@ import type { LucideIcon } from 'lucide-react';
 import { Award, Flame, Heart, Network, Sparkles, Star, Users } from 'lucide-react';
 import { isPriorSource } from '@/lib/insights/analytics';
 
-function handshakeOnly(connections: ConnectionRecord[]): ConnectionRecord[] {
+/** The fields metrics read, so server rows can be measured without a full ConnectionRecord. */
+export type MetricConnection = Pick<ConnectionRecord, 'dateMet' | 'status' | 'source'>;
+
+function handshakeOnly<T extends MetricConnection>(connections: T[]): T[] {
   return connections.filter((c) => !isPriorSource(c.source));
 }
 
@@ -18,7 +21,7 @@ function dateKey(d: Date): string {
  * Longest run of consecutive calendar days with at least one connection,
  * ending on the user's most recent connection day (not necessarily today).
  */
-export function computeConnectionStreak(connections: ConnectionRecord[]): number {
+export function computeConnectionStreak(connections: MetricConnection[]): number {
   if (connections.length === 0) return 0;
   const days = new Set<string>();
   for (const c of connections) {
@@ -44,13 +47,13 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-export function countConnectionsThisMonth(connections: ConnectionRecord[], now = new Date()): number {
+export function countConnectionsThisMonth(connections: MetricConnection[], now = new Date()): number {
   const start = startOfMonth(now);
   return connections.filter((c) => c.dateMet >= start).length;
 }
 
 /** Connections whose `dateMet` falls in the previous calendar month (relative to `now`). */
-export function countConnectionsLastMonth(connections: ConnectionRecord[], now = new Date()): number {
+export function countConnectionsLastMonth(connections: MetricConnection[], now = new Date()): number {
   const thisStart = startOfMonth(now);
   const lastStart = new Date(thisStart);
   lastStart.setMonth(lastStart.getMonth() - 1);
@@ -95,7 +98,7 @@ export interface UserDashboardMetrics {
   totalNetworkGrowthPercent: number | null;
 }
 
-export function buildDashboardMetrics(connections: ConnectionRecord[], now = new Date()): UserDashboardMetrics {
+export function buildDashboardMetrics(connections: MetricConnection[], now = new Date()): UserDashboardMetrics {
   const handshake = handshakeOnly(connections);
   const totalConnections = handshake.length;
   const thisMonth = countConnectionsThisMonth(handshake, now);

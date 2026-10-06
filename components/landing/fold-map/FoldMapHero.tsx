@@ -33,19 +33,19 @@ export default function FoldMapHero({
       <span className="sr-only" dangerouslySetInnerHTML={{ __html: `<!--${DIRECTION_CONTRACT}-->` }} />
       <FoldMapLazy cells={cells} />
       <div className="pointer-events-none absolute inset-0 z-[2] flex items-end p-4 sm:p-6 md:p-8">
-        <div className="landing-hero-reveal pointer-events-auto w-full max-w-md rounded-[16px] border border-border-hard bg-surface p-6 shadow-lg sm:p-8">
+        <div className="landing-hero-reveal pointer-events-auto w-full max-w-md rounded-[16px] border border-hairline bg-surface p-6 shadow-lg sm:p-8">
           <ClickLogo variant="mark" size={56} className="h-14 w-14" priority />
           <h1
             id="landing-hero-heading"
-            className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-on-surface sm:text-5xl"
+            className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-fg sm:text-5xl"
           >
-            <span className="text-on-surface">Click:</span>{' '}
-            <span className="text-primary">from handshake to friendship.</span>
+            <span className="text-fg">Click:</span>{' '}
+            <span className="text-accent">from handshake to friendship.</span>
           </h1>
-          <p className="mt-3 max-w-sm text-base font-medium leading-relaxed text-on-surface-variant">
+          <p className="mt-3 max-w-sm text-base font-medium leading-relaxed text-fg-secondary">
             Stop scrolling. Start living.
           </p>
-          <p className="mt-3 max-w-sm text-sm font-medium leading-relaxed text-on-surface-variant">
+          <p className="mt-3 max-w-sm text-sm font-medium leading-relaxed text-fg-secondary">
             Your phones confirm you were in the same room. No feed. Just the people you actually
             met.
           </p>
@@ -55,7 +55,7 @@ export default function FoldMapHero({
               target="_blank"
               rel="noopener noreferrer"
               data-testid="testflight-cta"
-              className="fc-btn-primary inline-flex h-11 items-center gap-2 px-6 py-2.5"
+              className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 inline-flex h-11 items-center gap-2 px-6 py-2.5"
             >
               <Smartphone className="h-4 w-4" aria-hidden />
               Join the iOS beta
@@ -66,12 +66,12 @@ export default function FoldMapHero({
               onPointerEnter={onPrefetchWaitlist}
               onFocus={onPrefetchWaitlist}
               data-testid="waitlist-cta"
-              className="h-11 rounded-[8px] border border-border-hard bg-surface px-6 py-2.5 text-sm font-bold text-on-surface hover:border-primary hover:text-primary"
+              className="h-11 rounded-[8px] border border-hairline bg-surface px-6 py-2.5 text-sm font-bold text-fg hover:border-action hover:text-accent"
             >
               Join the Waitlist
             </button>
           </div>
-          <p className="mt-3 text-xs font-medium text-on-surface-variant">
+          <p className="mt-3 text-xs font-medium text-fg-secondary">
             iPhone beta via TestFlight. Android coming soon: join the waitlist to hear first.
           </p>
         </div>

@@ -22,24 +22,20 @@ import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
 import { createSecureMediaObjectUrl, type SecureMediaChatKey } from '@/lib/chat/useSecureMedia';
 import { downloadAttachmentCiphertext, signChatAttachmentUrl } from '@/lib/chat/chatAttachmentStorage';
 import type {
-  BeaconPreviewItem,
   ChatMessagesPayload,
   CollaborationSessionResponse,
   ConnectionTabsPayload,
   DecryptedProfileMessage,
-  EventRecommendationPayload,
   FileItem,
   MediaItem,
 } from '@/lib/userProfile/profileModalTypes';
 import {
   extensionFromMime,
   extractLinks,
-  mapBeaconPreview,
   mapFiles,
   mapFilesFromRow,
   mapMedia,
   mapMediaFromRow,
-  mergeBeaconItems,
   mergeFileItems,
   mergeLinkItems,
   mergeMediaItems,
@@ -49,9 +45,9 @@ import {
 import type { LinkItem } from '@/lib/userProfile/profileModalTypes';
 
 /**
- * Data layer for the profile modal's Media / Links / Files / Beacons tabs:
+ * Data layer for the profile modal's Media / Links / Files tabs:
  * BFF fetches, E2EE key unlock, item merging, media URL resolution, and the
- * open/download actions. Extracted verbatim from UserProfileModal.
+ * open/download actions for the profile page tabs (`components/people/PersonTabs`).
  */
 export function useProfileTabsData({
   getAuthHeaders,
@@ -78,6 +74,8 @@ export function useProfileTabsData({
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
   const [fallbackLinkItems, setFallbackLinkItems] = useState<LinkItem[]>([]);
+  /** Decrypted text messages from the chat history page (the Pinned tab reads these). */
+  const [chatTextMessages, setChatTextMessages] = useState<DecryptedProfileMessage[]>([]);
 
   const tabsPath = (() => {
     const paramId = (chatId?.trim() || effectiveConnectionId || groupId?.trim() || '').trim();
@@ -253,63 +251,6 @@ export function useProfileTabsData({
     [localFileItems, bffFileItems],
   );
 
-  const localBeaconItems = useMemo(() => {
-    return decryptedMessages
-      .filter((m) => coerceMessageType(m.messageType) === 'beacon')
-      .map((m) =>
-        mapBeaconPreview({
-          id: m.id,
-          content: m.content,
-          message_type: coerceMessageType(m.messageType),
-          metadata: m.metadata ?? null,
-        }),
-      )
-      .filter((row): row is BeaconPreviewItem => row != null);
-  }, [decryptedMessages]);
-
-  const bffBeaconItems = useMemo(() => {
-    return (tabsPayload?.beacons ?? [])
-      .map((row) =>
-        mapBeaconPreview({
-          id: row.id,
-          content: row.content,
-          message_type: row.message_type,
-          metadata: row.metadata,
-        }),
-      )
-      .filter((row): row is BeaconPreviewItem => row != null);
-  }, [tabsPayload]);
-
-  const beaconItems = useMemo(
-    () => mergeBeaconItems(localBeaconItems, bffBeaconItems),
-    [localBeaconItems, bffBeaconItems],
-  );
-
-  const recommendationPath = effectiveConnectionId
-    ? `/api/connections/${encodeURIComponent(effectiveConnectionId)}/event-recommendation`
-    : null;
-  const { data: recommendationPayload } = useSWR<EventRecommendationPayload>(
-    recommendationPath,
-    async (path: string) => {
-      const headers = await getAuthHeaders();
-      const res = await fetch(path, { headers });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          typeof json?.error === 'string' && json.error.trim()
-            ? json.error
-            : res.statusText || 'Failed to load recommendation',
-        );
-      }
-      return json as EventRecommendationPayload;
-    },
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60_000,
-      keepPreviousData: false,
-    },
-  );
-
   const mediaItemsFingerprint = useMemo(
     () => mediaItems.map((item) => `${item.id}:${item.sourceUrl ?? ""}:${item.storagePath ?? ""}`).join("|"),
     [mediaItems],
@@ -387,6 +328,7 @@ export function useProfileTabsData({
     const sourceRows = chatMessagesPayload?.messages ?? [];
     if (sourceRows.length === 0) {
       setFallbackLinkItems([]);
+      setChatTextMessages([]);
       return;
     }
 
@@ -413,6 +355,7 @@ export function useProfileTabsData({
 
       if (!cancelled) {
         setFallbackLinkItems(extractLinks(decryptedRows));
+        setChatTextMessages(decryptedRows);
       }
     };
 
@@ -541,6 +484,9 @@ export function useProfileTabsData({
   }, [requestedUserId]);
 
   return {
+    /** The chat these tabs read (resolved by the BFF from the connection or group). */
+    resolvedChatId: tabsPayload?.chatId ?? null,
+    chatTextMessages,
     tabsLoading,
     chatMessagesLoading,
     cryptoUnlockError,
@@ -548,10 +494,8 @@ export function useProfileTabsData({
     imageItems,
     audioItems,
     fileItems,
-    beaconItems,
     linkItems,
     resolvedMediaUrls,
-    recommendationPayload,
     openMediaItem,
     downloadMediaItem,
     openFileItem,

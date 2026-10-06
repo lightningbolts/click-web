@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { placeRoleCanWrite, placeRoleFor } from "@/lib/events/beaconManageAuth";
 import { runAfterResponse } from "@/lib/server/afterResponse";
+import { revalidatePublicEvents } from "@/lib/server/events/revalidatePublicEvents";
 import { emitProductEvent } from "@/lib/server/telemetry/productEvents";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
@@ -482,15 +484,16 @@ export async function POST(request: NextRequest) {
       (typeof body.venueId === "string" && body.venueId.trim()) ||
       "";
     if (venueIdRaw.length > 0) {
-      const adminForVenue = createAdminSupabaseClient();
-      const { data: membership } = await adminForVenue
-        .from("place_managers")
-        .select("id")
-        .eq("place_id", venueIdRaw)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!membership) {
-        return NextResponse.json({ error: "Not a manager for this venue" }, { status: 403 });
+      // Owners and managers host as the Place; viewers are read-only (spec §9).
+      const role = await placeRoleFor(createAdminSupabaseClient(), user.id, venueIdRaw);
+      if (!placeRoleCanWrite(role)) {
+        return NextResponse.json(
+          {
+            error: role === "viewer" ? "Viewers can't create events for this Place" : "You don't manage this Place",
+            code: "role_insufficient",
+          },
+          { status: 403 },
+        );
       }
       venueId = venueIdRaw;
     }
@@ -628,9 +631,11 @@ export async function POST(request: NextRequest) {
       if (!fallbackBeacon.id) {
         return NextResponse.json({ error: "Insert failed" }, { status: 500 });
       }
+      if (beacon_type === "event") revalidatePublicEvents(null, venueId);
       return NextResponse.json({ beacon: fallbackBeacon, series_count: seriesCount });
     }
 
+    if (beacon_type === "event") revalidatePublicEvents(null, venueId);
     try {
       const admin = createAdminSupabaseClient();
       const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);

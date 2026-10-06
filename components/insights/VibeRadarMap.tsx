@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as maplibregl from "maplibre-gl";
+import * as maplibregl from '@/lib/maps/maplibre';
 import "maplibre-gl/dist/maplibre-gl.css";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { Loader2, MapPin, Layers } from "lucide-react";
 import type { VibeRadarCluster } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
@@ -14,7 +14,7 @@ import {
 } from "@/lib/map/mapBeacons";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { mapStyleForTheme, FC_PRIMARY } from "@/lib/theme/mapStyles";
-import { Toggle } from "@/components/ui/Toggle";
+import { Toggle } from "@/components/ds/Toggle";
 
 const DEFAULT_CENTER: [number, number] = [-122.3321, 47.6062];
 
@@ -443,16 +443,16 @@ export default function VibeRadarMap({
 
   if (mapError) {
     return (
-      <div className="rounded-2xl border border-border-hard bg-surface-container p-12 text-center">
+      <div className="rounded-2xl border border-hairline bg-surface-raised p-12 text-center">
         <MapPin className="w-14 h-14 text-red-700 dark:text-red-400/90 mx-auto mb-3" />
-        <p className="text-on-surface font-medium">Map unavailable</p>
-        <p className="text-sm text-on-surface-variant mt-1">{mapError}</p>
+        <p className="text-fg font-medium">Map unavailable</p>
+        <p className="text-sm text-fg-secondary mt-1">{mapError}</p>
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-2xl border border-border-hard overflow-hidden bg-background min-h-[420px] h-[min(56vh,620px)]">
+    <div className="relative rounded-2xl border border-hairline overflow-hidden bg-bg min-h-[420px] h-[min(56vh,620px)]">
       <AnimatePresence>
         {!mapLoaded && (
           <motion.div
@@ -461,10 +461,10 @@ export default function VibeRadarMap({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90"
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-bg/90"
           >
-            <Loader2 className="w-9 h-9 text-primary animate-spin mb-2" />
-            <p className="text-sm text-on-surface-variant">Loading map…</p>
+            <Loader2 className="w-9 h-9 text-accent animate-spin mb-2" />
+            <p className="text-sm text-fg-secondary">Loading map…</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -472,9 +472,9 @@ export default function VibeRadarMap({
       <div ref={containerRef} className="absolute inset-0" />
 
       {mapLoaded && (
-        <div className="absolute top-3 left-3 z-[6] max-w-[220px] rounded-2xl border border-border-hard bg-background/70 shadow-lg shadow-black/40 p-3 text-xs text-on-surface">
-          <div className="flex items-center gap-2 mb-2 font-semibold text-on-surface">
-            <Layers className="w-3.5 h-3.5 text-primary" />
+        <div className="absolute top-3 left-3 z-[6] max-w-[220px] rounded-2xl border border-hairline bg-bg/70 shadow-lg shadow-black/40 p-3 text-xs text-fg">
+          <div className="flex items-center gap-2 mb-2 font-semibold text-fg">
+            <Layers className="w-3.5 h-3.5 text-accent" />
             Map layers
           </div>
           <div className="flex items-center gap-2 py-1 select-none">
@@ -500,7 +500,7 @@ export default function VibeRadarMap({
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-4 left-4 right-4 sm:right-auto max-w-md z-[5] rounded-xl border border-border-hard bg-background/85 px-4 py-3 text-sm text-on-surface-variant"
+          className="absolute bottom-4 left-4 right-4 sm:right-auto max-w-md z-[5] rounded-xl border border-hairline bg-bg/85 px-4 py-3 text-sm text-fg-secondary"
         >
           No aggregated cells in range yet. When guests share coarse area buckets with active intents,
           clusters appear here — never individual identities.

@@ -52,10 +52,10 @@ export default function ConnectScene({
   const jordanMemory = state.memories[JORDAN.id] ?? JORDAN.memory;
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background" data-testid="playground-scene-connect">
-      <div className="border-b border-border-hard px-4 py-3">
-        <h3 className="text-lg font-bold text-on-surface">Add Click</h3>
-        <p className="mt-1 text-xs text-on-surface-variant">
+    <div className="flex h-full flex-col overflow-auto bg-bg" data-testid="playground-scene-connect">
+      <div className="border-b border-hairline px-4 py-3">
+        <h3 className="text-lg font-bold text-fg">Add Click</h3>
+        <p className="mt-1 text-xs text-fg-secondary">
           Connect with QR or Tap to Connect, or join a venue community hub
         </p>
       </div>
@@ -77,8 +77,8 @@ export default function ConnectScene({
               onClick={() => setMethod(item.id)}
               className={`flex flex-col items-center gap-1 rounded-[12px] border px-2 py-2 text-[11px] font-semibold ${
                 selected
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border-hard bg-surface text-on-surface-variant'
+                  ? 'border-action bg-action/10 text-accent'
+                  : 'border-hairline bg-surface text-fg-secondary'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -90,15 +90,15 @@ export default function ConnectScene({
 
       {method === 'tap' ? (
         <div className="px-4 pb-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">
             Nearby
           </p>
-          <div className="rounded-[16px] border border-border-hard bg-surface p-4">
+          <div className="rounded-[16px] border border-hairline bg-surface p-4">
             <div className="flex items-center gap-3">
               <PlaygroundAvatar initials={JORDAN.initials} online />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-on-surface">{JORDAN.name}</p>
-                <p className="text-xs text-on-surface-variant">{JORDAN.nearbyMeters}m · Kane Hall lobby</p>
+                <p className="font-semibold text-fg">{JORDAN.name}</p>
+                <p className="text-xs text-fg-secondary">{JORDAN.nearbyMeters}m · Kane Hall lobby</p>
               </div>
             </div>
 
@@ -107,7 +107,7 @@ export default function ConnectScene({
                 type="button"
                 data-testid="playground-tap-jordan"
                 onClick={startTap}
-                className="fc-btn-primary mt-4 w-full py-3"
+                className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 mt-4 w-full py-3"
               >
                 Tap to Click with {JORDAN.name}
               </button>
@@ -116,18 +116,18 @@ export default function ConnectScene({
             {phase === 'handshake' ? (
               <div className="mt-4 flex flex-col items-center py-4" role="status">
                 <div className="relative h-16 w-16">
-                  <span className="absolute inset-0 rounded-full border border-primary/40 animate-ping motion-reduce:animate-none" />
-                  <span className="absolute inset-2 rounded-full bg-primary/20" />
-                  <span className="absolute inset-5 rounded-full bg-primary" />
+                  <span className="absolute inset-0 rounded-full border border-action/40 animate-ping motion-reduce:animate-none" />
+                  <span className="absolute inset-2 rounded-full bg-action/20" />
+                  <span className="absolute inset-5 rounded-full bg-action" />
                 </div>
-                <p className="mt-3 text-xs font-medium text-on-surface">Verifying same room…</p>
-                <p className="mt-1 text-[11px] text-on-surface-variant">BLE + ultrasonic handshake</p>
+                <p className="mt-3 text-xs font-medium text-fg">Verifying same room…</p>
+                <p className="mt-1 text-[11px] text-fg-secondary">BLE + ultrasonic handshake</p>
               </div>
             ) : null}
 
             {phase === 'memory' ? (
               <div className="mt-4 space-y-3">
-                <p className="text-sm font-semibold text-on-surface">How did you meet?</p>
+                <p className="text-sm font-semibold text-fg">How did you meet?</p>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Encounter labels">
                   {MEMORY_PRESETS.map((preset) => (
                     <button
@@ -136,30 +136,30 @@ export default function ConnectScene({
                       onClick={() => setLabel(preset)}
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
                         label === preset
-                          ? 'bg-primary text-on-primary'
-                          : 'border border-border-hard bg-surface-container text-on-surface'
+                          ? 'bg-action text-on-action'
+                          : 'border border-hairline bg-surface-raised text-fg'
                       }`}
                     >
                       {preset}
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-on-surface-variant">
+                <p className="text-[11px] text-fg-secondary">
                   Kane Hall lobby · Clear · 64°F · Loud
                 </p>
-                <button type="button" onClick={confirmMemory} className="fc-btn-primary w-full py-2.5">
+                <button type="button" onClick={confirmMemory} className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 w-full py-2.5">
                   Save memory
                 </button>
               </div>
             ) : null}
 
             {phase === 'done' && jordanMemory ? (
-              <div className="mt-4 rounded-[12px] border border-border-hard bg-primary-container p-3">
-                <p className="text-sm font-semibold text-on-primary-container">You Clicked</p>
-                <p className="mt-1 text-xs text-on-primary-container">
+              <div className="mt-4 rounded-[12px] border border-hairline bg-selection p-3">
+                <p className="text-sm font-semibold text-accent">You Clicked</p>
+                <p className="mt-1 text-xs text-accent">
                   {jordanMemory.label} · {jordanMemory.place}
                 </p>
-                <p className="mt-1 flex items-center gap-2 text-[11px] text-on-surface-variant">
+                <p className="mt-1 flex items-center gap-2 text-[11px] text-fg-secondary">
                   {jordanMemory.weather} <VolumeBars count={jordanMemory.volume} /> {jordanMemory.noise}
                 </p>
               </div>
@@ -170,15 +170,15 @@ export default function ConnectScene({
 
       {method === 'qr' ? (
         <div className="px-4 pb-4">
-          <div className="rounded-[16px] border border-border-hard bg-surface p-4 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">My QR Code</p>
+          <div className="rounded-[16px] border border-hairline bg-surface p-4 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">My QR Code</p>
             <div className="relative mx-auto mt-3 w-fit">
-              <div className="relative rounded-2xl border border-border-hard bg-[#101212] p-3">
+              <div className="relative rounded-2xl border border-hairline bg-[#101212] p-3">
                 <DemoQr size={148} />
               </div>
             </div>
-            <p className="mt-3 font-mono text-sm font-bold tracking-wider text-primary">CK-1842</p>
-            <p className="mt-1 text-xs text-on-surface-variant">
+            <p className="mt-3 font-mono text-sm font-bold tracking-wider text-accent">CK-1842</p>
+            <p className="mt-1 text-xs text-fg-secondary">
               Scan this code to connect with Alex. Token refreshes every 90s.
             </p>
           </div>
@@ -187,18 +187,18 @@ export default function ConnectScene({
 
       {method === 'scan' ? (
         <div className="px-4 pb-4">
-          <div className="flex h-48 flex-col items-center justify-center rounded-[16px] border border-dashed border-border-hard bg-surface-container">
-            <ScanLine className="h-8 w-8 text-primary" />
-            <p className="mt-2 text-sm font-semibold text-on-surface">Point at their Click QR</p>
-            <p className="mt-1 px-6 text-center text-xs text-on-surface-variant">
+          <div className="flex h-48 flex-col items-center justify-center rounded-[16px] border border-dashed border-hairline bg-surface-raised">
+            <ScanLine className="h-8 w-8 text-accent" />
+            <p className="mt-2 text-sm font-semibold text-fg">Point at their Click QR</p>
+            <p className="mt-1 px-6 text-center text-xs text-fg-secondary">
               Demo only. Use Tap above to form a connection.
             </p>
           </div>
         </div>
       ) : null}
 
-      <div className="mt-auto border-t border-border-hard px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+      <div className="mt-auto border-t border-hairline px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">
           Your Clicks
         </p>
         <ul className="mt-2 space-y-2">
@@ -208,8 +208,8 @@ export default function ConnectScene({
               <li key={person.id} className="flex items-center gap-2">
                 <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-on-surface">{person.name}</p>
-                  <p className="truncate text-[11px] text-on-surface-variant">
+                  <p className="truncate text-xs font-semibold text-fg">{person.name}</p>
+                  <p className="truncate text-[11px] text-fg-secondary">
                     {memory ? `${memory.label} · ${memory.place}` : 'Just Clicked'}
                   </p>
                 </div>

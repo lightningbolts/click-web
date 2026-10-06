@@ -1,6 +1,8 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import useSWR from "swr";
+import { InlineNotice } from "@/components/ds/InlineNotice";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
 
@@ -26,11 +28,11 @@ export default function SeedRoomTeaser({ beaconId }: { beaconId: string }) {
   if (!user || !teaser) return null;
 
   return (
-    <div className="rounded-[12px] border border-border-hard bg-surface p-4" data-testid="seed-room-teaser">
-      <p className="text-sm font-semibold text-on-surface">{teaser.headline}</p>
-      <p className="mt-1 text-xs text-on-surface-variant">
+    <div data-testid="seed-room-teaser">
+      <InlineNotice variant="info" icon={Sparkles}>
+        <span className="font-semibold">{teaser.headline}</span>{" "}
         Names stay private until you Click. Open the app at the event to meet them.
-      </p>
+      </InlineNotice>
     </div>
   );
 }

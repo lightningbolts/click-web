@@ -145,3 +145,31 @@ export function addDaysToKey(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
+
+const WEEKDAY_NAMES: Record<Weekday, string> = {
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday',
+};
+
+/** Every day Monday → Sunday with its hours label, marking today in the Place's zone (spec §7.12). */
+export function weekHoursRows(
+  hours: PlaceHours,
+  timezone: string,
+  nowMs: number,
+): { day: Weekday; name: string; label: string; today: boolean }[] {
+  const { weekday } = localParts(timezone, nowMs);
+  return WEEKDAYS.map((day) => {
+    const intervals = hours[day] ?? [];
+    return {
+      day,
+      name: WEEKDAY_NAMES[day],
+      label: intervals.length ? intervals.map(([o, c]) => `${formatClock(o)} – ${formatClock(c)}`).join(', ') : 'Closed',
+      today: day === weekday,
+    };
+  });
+}

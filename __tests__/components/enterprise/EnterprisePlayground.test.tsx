@@ -17,6 +17,10 @@ jest.mock("framer-motion", () => {
     );
   return {
     motion: new Proxy({}, { get: (_target: unknown, prop: string) => Forward(prop) }),
+    m: new Proxy({}, { get: (_target: unknown, prop: string) => Forward(prop) }),
+    LazyMotion: ({ children }: { children: React.ReactNode }) => children,
+    domAnimation: {},
+    domMax: {},
     AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
     useReducedMotion: () => true,
   };

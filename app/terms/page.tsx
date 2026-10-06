@@ -1,17 +1,16 @@
-import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function TermsOfService() {
   return (
-    <div className="min-h-screen bg-background text-on-surface">
-      <div className={`${PAGE_COLUMN_CLASS} py-20`}>
+    <div className="min-h-screen bg-bg text-fg">
+      <div className={"container-content py-20"}>
           <h1 id="terms-heading" data-testid="terms-heading" className="mkt-page-title text-5xl md:text-6xl font-bold mb-6">
-            Terms of <span className="text-primary">Service</span>
+            Terms of <span className="text-accent">Service</span>
           </h1>
-          <p className="text-on-surface-variant mb-12">Last updated: October 2026</p>
+          <p className="text-fg-secondary mb-12">Last updated: October 2026</p>
 
-          <div className="space-y-8 text-on-surface leading-relaxed">
+          <div className="space-y-8 text-fg leading-relaxed">
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Welcome to Click</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Welcome to Click</h2>
               <p>
                 By using Click, you agree to these terms. We've tried to keep them simple and
                 human-readable because we respect your time. If something isn't clear, reach out
@@ -20,7 +19,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">The Service</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">The Service</h2>
               <p>
                 Click is a connection platform designed to transform in-person meetings into
                 lasting digital connections. We provide:
@@ -40,7 +39,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Your Account</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Your Account</h2>
               <ul className="space-y-3 list-disc list-inside">
                 <li>You must be 13 or older to use Click</li>
                 <li>You're responsible for keeping your account secure</li>
@@ -50,7 +49,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Community Guidelines</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Community Guidelines</h2>
               <p className="mb-4">
                 Click is about real connections. We have zero tolerance for objectionable content or
                 abusive users. That includes:
@@ -72,7 +71,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Connections & Expiry</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Connections & Expiry</h2>
               <p>
                 Click uses a multi-stage connection model to encourage authentic interactions:
               </p>
@@ -87,7 +86,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Your Content</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Your Content</h2>
               <p>
                 You own the content you share on Click. By using the service, you grant us
                 a limited license to:
@@ -103,7 +102,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Business Accounts</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Business Accounts</h2>
               <p>
                 Organizations can use Click to facilitate connections at events. Verified business accounts may receive
                 aggregated analytics about connection patterns, including where the product offers them, signals such as
@@ -114,7 +113,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Disclaimers</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Disclaimers</h2>
               <ul className="space-y-3 list-disc list-inside">
                 <li>Click is provided "as is" without warranties of any kind</li>
                 <li>We're not responsible for the behavior of other users</li>
@@ -124,7 +123,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Changes to Terms</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Changes to Terms</h2>
               <p>
                 We may update these terms as Click evolves. We'll notify you of significant
                 changes via email and in-app notification. Continued use after changes means
@@ -133,7 +132,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Termination</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Termination</h2>
               <p>
                 You can stop using Click at any time. We can suspend or terminate accounts that
                 violate these terms. If we terminate your account, we'll provide a reason unless
@@ -142,7 +141,7 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">The Legal Stuff</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">The Legal Stuff</h2>
               <ul className="space-y-3 list-disc list-inside">
                 <li>These terms are governed by Washington State law</li>
                 <li>Disputes will be resolved through arbitration, not class action lawsuits</li>
@@ -151,29 +150,29 @@ export default function TermsOfService() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-on-surface mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-bold text-fg mb-4">Contact Us</h2>
               <p>Questions about these terms? Reach out:</p>
               <div className="mt-4 space-y-2">
                 <p>
-                  <a href="mailto:mepsht@uw.edu" className="text-primary hover:underline">
+                  <a href="mailto:mepsht@uw.edu" className="text-accent hover:underline">
                     mepsht@uw.edu
                   </a>
                 </p>
                 <p>
-                  <a href="mailto:kcheng29@uw.edu" className="text-primary hover:underline">
+                  <a href="mailto:kcheng29@uw.edu" className="text-accent hover:underline">
                     kcheng29@uw.edu
                   </a>
                 </p>
                 <p>
-                  <a href="mailto:rayanr@uw.edu" className="text-primary hover:underline">
+                  <a href="mailto:rayanr@uw.edu" className="text-accent hover:underline">
                     rayanr@uw.edu
                   </a>
                 </p>
               </div>
             </section>
 
-            <section className="border-t border-border-hard pt-8 mt-8">
-              <p className="text-on-surface-variant text-sm">
+            <section className="border-t border-hairline pt-8 mt-8">
+              <p className="text-fg-secondary text-sm">
                 By using Click, you acknowledge that you've read, understood, and agree to be
                 bound by these Terms of Service and our Privacy Policy.
               </p>

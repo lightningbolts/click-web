@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageSquare, 
   Music, 
@@ -110,21 +110,21 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
           <div className="p-2 bg-[#FFD93D]/20 rounded-lg">
             <MessageSquare className="w-4 h-4 text-amber-600 dark:text-[#FFD93D]" />
           </div>
-          <span className="text-sm font-medium text-on-surface-variant">Vibe Stream</span>
+          <span className="text-sm font-medium text-fg-secondary">Vibe Stream</span>
         </div>
         
         {/* Filter dropdown */}
         <div className="relative group">
-          <button className="p-2 hover:bg-surface-container rounded-lg transition-colors flex items-center gap-1">
-            <Filter className="w-4 h-4 text-on-surface-variant" />
+          <button className="p-2 hover:bg-surface-raised rounded-lg transition-colors flex items-center gap-1">
+            <Filter className="w-4 h-4 text-fg-secondary" />
           </button>
-          <div className="absolute right-0 top-full mt-1 bg-surface-container border border-border-hard rounded-lg p-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[120px]">
+          <div className="absolute right-0 top-full mt-1 bg-surface-raised border border-hairline rounded-lg p-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[120px]">
             {(['all', 'positive', 'negative', 'neutral'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`w-full text-left px-3 py-1.5 text-xs rounded-md transition-colors capitalize ${
-                  filter === f ? 'bg-surface-container-high text-on-surface' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  filter === f ? 'bg-surface-raised text-fg' : 'text-fg-secondary hover:text-fg hover:bg-surface-raised'
                 }`}
               >
                 {f}
@@ -136,7 +136,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
 
       {/* Sentiment overview bar */}
       <div className="mb-4">
-        <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-container">
+        <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-raised">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${(stats.positive / denom) * 100}%` }}
@@ -156,7 +156,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
             transition={{ duration: 0.5, delay: 0.2 }}
           />
         </div>
-        <div className="flex justify-between text-[10px] text-on-surface-variant mt-1">
+        <div className="flex justify-between text-[10px] text-fg-secondary mt-1">
           <span className="text-green-700 dark:text-green-400">{stats.positive} positive</span>
           <span className="text-amber-700 dark:text-amber-300">{stats.neutral} neutral</span>
           <span className="text-red-700 dark:text-red-400">{stats.negative} negative</span>
@@ -201,15 +201,15 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
                   
                   {/* Message content */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-on-surface leading-relaxed">
+                    <p className="text-sm text-fg leading-relaxed">
                       {message.message}
                     </p>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[10px] text-on-surface-variant capitalize">
+                      <span className="text-[10px] text-fg-secondary capitalize">
                         {message.category}
                       </span>
-                      <span className="text-[10px] text-outline">•</span>
-                      <span className="text-[10px] text-on-surface-variant">
+                      <span className="text-[10px] text-fg-tertiary">•</span>
+                      <span className="text-[10px] text-fg-secondary">
                         {formatTime(message.timestamp)}
                       </span>
                     </div>
@@ -227,9 +227,9 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
       </div>
 
       {/* Footer stats */}
-      <div className="mt-4 pt-4 border-t border-border-hard flex items-center justify-between">
-        <div className="text-xs text-on-surface-variant">
-          <span className="text-on-surface font-semibold">{filteredMessages.length}</span> messages
+      <div className="mt-4 pt-4 border-t border-hairline flex items-center justify-between">
+        <div className="text-xs text-fg-secondary">
+          <span className="text-fg font-semibold">{filteredMessages.length}</span> messages
           {filter !== 'all' && (
             <span className="ml-1">({filter})</span>
           )}
@@ -238,7 +238,7 @@ export default function VibeStream({ messages, autoScroll = true }: VibeStreamPr
           <span className={positiveRatio >= 50 ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-300'}>
             {positiveRatio.toFixed(0)}%
           </span>
-          <span className="text-on-surface-variant">positive vibes</span>
+          <span className="text-fg-secondary">positive vibes</span>
         </div>
       </div>
     </GlassPanel>

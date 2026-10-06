@@ -6,7 +6,7 @@ Pending for the web redesign (backend shipped, iOS shipped): Click Pass, Add to 
 
 ## Create (auth)
 
-Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/EventCreateForm.tsx) → `POST /api/beacons` with `kind: "event"`. Cover upload uses `POST /api/beacons/image`. Location is a place search (plus an icon-button “Use my location” that reverse-geocodes a label), not raw latitude/longitude fields. Lat/lng are still submitted with the beacon. Create also writes listing columns (`event_visibility`, `event_capacity`, `approval_required`, `guest_list_visibility`, `cover_theme_id`) and dual-writes `starts_at` / `ends_at` / `event_timezone` beside metadata.
+Shared form: [`components/events/EventForm.tsx`](../../components/events/EventForm.tsx) → `POST /api/beacons` with `kind: "event"`. Cover upload uses `POST /api/beacons/image`. Location is a place search (plus an icon-button “Use my location” that reverse-geocodes a label), not raw latitude/longitude fields. Lat/lng are still submitted with the beacon. Create also writes listing columns (`event_visibility`, `event_capacity`, `approval_required`, `guest_list_visibility`, `cover_theme_id`) and dual-writes `starts_at` / `ends_at` / `event_timezone` beside metadata.
 
 | Surface | Route |
 |---------|--------|
@@ -24,7 +24,7 @@ Success navigates to `/e/{id}/manage` so the organizer can Seed a Room (guest-li
 | `/events/new` | Signed in | Same 6xl shell and global Navbar. Split-pane create form (cover + theme \| details + Event options). |
 | `/e/[beaconId]` | Public share link | Same 6xl shell. Cover (upload or generated visual), when **with timezone**, where (omitted if unnamed), muted posted time, host avatar, description (`max-w-prose`), MapLibre pin, RSVP states (going / pending / full / ended). Signed-in RSVP mutates `GET /api/beacons/{id}/rsvp` (attendees + `rsvp_count`) so the guest preview updates without a reload. Hosts see **Edit details** / **Host settings** in the toolbar next to Back, not under the banner. One action row: **Open in Click** + copy-link icon (both `h-11`), then **Get the app** / **Android** as secondary `FcButton`s. Back always returns to `/events` unless an explicit `href` is passed (manage/edit go back to `/e/{id}`). Connections-only and unlisted/invite-only events stay reachable via this URL. |
 | `/e/[beaconId]/manage` | Creator or venue manager | **Back** to the event page, Seed a Room (CSV/paste emails), guest RSVPs, pending/waitlisted Click RSVP approve/deny, network-health metrics, **Edit details** |
-| `/e/[beaconId]/edit` | Creator or venue manager | **Back** to the event page, same `EventCreateForm` as create, `PATCH /api/beacons/{id}`. Hosted list cards and the event toolbar expose **Edit details** and **Host settings**. |
+| `/e/[beaconId]/edit` | Creator or venue manager | **Back** to the event page, same `EventForm` as create (now the Edit tab, `/e/[beaconId]/manage/edit`), `PATCH /api/beacons/{id}`. Hosted list cards and the event toolbar expose **Edit details** and **Host settings**. |
 | `/e/[beaconId]/recap` | Participant (Click RSVP or check-in) | People met at this beacon |
 | `/e/[beaconId]/summary?token=` | Public snapshot | Aggregate counts only, after organizer publish |
 

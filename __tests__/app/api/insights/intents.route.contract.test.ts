@@ -23,6 +23,10 @@ jest.mock('@/lib/server/supabaseRouteAuth', () => ({
 jest.mock('@/lib/server/businessInsightsEligibility', () => ({
   userMayAccessBusinessInsights: (...args: unknown[]) => mockUserMayAccessBusinessInsights(...args),
 }));
+jest.mock('@/lib/server/places/entitlement', () => ({
+  ...jest.requireActual('@/lib/server/places/entitlement'),
+  userMayViewPlaceInsights: (...args: unknown[]) => mockUserMayAccessBusinessInsights(...args),
+}));
 
 jest.mock('@/lib/server/resolveInsightsVenueId', () => ({
   resolveInsightsVenueId: (...args: unknown[]) => mockResolveInsightsVenueId(...args),
@@ -93,18 +97,19 @@ describe('GET /api/insights/intents contract', () => {
       expect(json.error).toBe('Unauthorized');
     });
 
-    it('returns 403 Forbidden when user is not eligible for business insights', async () => {
+    it('returns 403 Forbidden when the resolved Place has no Insights (per-Place entitlement)', async () => {
       mockGetSupabaseFromRouteRequest.mockResolvedValue({
         supabase: {},
         user: { id: MOCK_USER_ID },
         authError: null,
       });
+      mockResolveInsightsVenueId.mockResolvedValue(MOCK_VENUE_ID);
       mockUserMayAccessBusinessInsights.mockResolvedValue(false);
 
       const res = await callRoute();
 
       expect(res.status).toBe(403);
-      expect(mockResolveInsightsVenueId).not.toHaveBeenCalled();
+      expect(mockUserMayAccessBusinessInsights).toHaveBeenCalledWith({}, { id: MOCK_USER_ID }, MOCK_VENUE_ID);
     });
 
     it('returns 403 Forbidden when user is not a manager for the resolved venue', async () => {

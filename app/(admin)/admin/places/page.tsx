@@ -32,8 +32,8 @@ function single(value: string | string[] | undefined): string | null {
 }
 
 const STATUSES = ['all', 'draft', 'pending', 'verified', 'suspended'] as const;
-const inputClass = 'w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-on-surface';
-const buttonClass = 'rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-on-surface hover:bg-zinc-700';
+const inputClass = 'w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-fg';
+const buttonClass = 'rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-zinc-700';
 
 function countBy(rows: Array<Record<string, unknown>>, key: string): Map<string, number> {
   const out = new Map<string, number>();

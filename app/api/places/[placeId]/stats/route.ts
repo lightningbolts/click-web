@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiError } from '@/lib/api/errors';
-import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
+import { userMayViewPlaceInsights } from '@/lib/server/places/entitlement';
 import { requirePlaceManagerContext } from '@/lib/server/places/routeContext';
 import { placeTimezone } from '@/lib/server/places/serialize';
 import { loadPlaceStats } from '@/lib/server/places/stats';
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const search = request.nextUrl.searchParams;
     const range = search.get('range') === '90d' ? 90 : 30;
     const detail = search.get('detail') === 'full' ? 'full' : 'basic';
-    if (detail === 'full' && !(await userMayAccessBusinessInsights(supabase, user))) {
+    if (detail === 'full' && !(await userMayViewPlaceInsights(supabase, user, place.id))) {
       return apiError('Full Place stats are part of Click for Business', 402, 'insights_required');
     }
 

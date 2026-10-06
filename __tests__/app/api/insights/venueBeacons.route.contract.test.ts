@@ -26,6 +26,10 @@ jest.mock('@/lib/server/supabaseRouteAuth', () => ({
 jest.mock('@/lib/server/businessInsightsEligibility', () => ({
   userMayAccessBusinessInsights: (...args: unknown[]) => mockUserMayAccessBusinessInsights(...args),
 }));
+jest.mock('@/lib/server/places/entitlement', () => ({
+  ...jest.requireActual('@/lib/server/places/entitlement'),
+  userMayViewPlaceInsights: (...args: unknown[]) => mockUserMayAccessBusinessInsights(...args),
+}));
 
 const MOCK_USER_ID = 'user-mgr-6060';
 const MOCK_VENUE_ID = 'venue-5050';

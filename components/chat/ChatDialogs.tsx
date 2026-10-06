@@ -1,296 +1,193 @@
 'use client';
 
-import { type Dispatch, type SetStateAction } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { useState } from 'react';
+import { Avatar } from '@/components/ds/Avatar';
+import { Button } from '@/components/ds/Button';
+import { ConfirmDialog } from '@/components/ds/ConfirmDialog';
+import { Dialog, DialogClose } from '@/components/ds/Dialog';
+import { TextField } from '@/components/ds/TextField';
+import { ReportDialog } from '@/components/clicks/ClickDialogs';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { renameCliqueRpc } from '@/lib/chat/createVerifiedClick';
+import { getSupabaseClient } from '@/lib/supabase';
+import { chatNotify } from './chatNotify';
+
+export type ChatDialogState =
+  | { kind: 'delete-message'; messageId: string }
+  | { kind: 'report' }
+  | { kind: 'rename'; current: string }
+  | { kind: 'members' }
+  | null;
+
+function RenameGroupDialog({
+  connectionId,
+  current,
+  onClose,
+  onRenamed,
+}: {
+  connectionId: string;
+  current: string;
+  onClose: () => void;
+  onRenamed: (name: string) => void;
+}) {
+  const [name, setName] = useState(current);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const next = name.trim();
+
+  const save = async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase || !next) return;
+    setBusy(true);
+    setError('');
+    try {
+      await renameCliqueRpc(supabase, connectionId, next);
+      onRenamed(next);
+      chatNotify({ type: 'success', message: 'Group renamed' });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t rename the group.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && !busy && onClose()}
+      title="Rename group"
+      footer={
+        <>
+          <DialogClose asChild>
+            <Button variant="secondary" disabled={busy}>
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button loading={busy} disabled={!next || next === current} onClick={() => void save()}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <TextField
+          label="Group name"
+          hideLabel
+          autoFocus
+          maxLength={60}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={error || undefined}
+        />
+      </form>
+    </Dialog>
+  );
+}
 
 /**
- * ChatView's overlay dialogs: delete-message confirm, report, rename-group,
- * group member picker, and the action toast. Extracted verbatim from ChatView.
+ * The thread's dialogs (spec §7.2): delete-message confirm, report, rename group and the
+ * member list. One at a time, driven by `state`.
  */
 export function ChatDialogs({
+  state,
+  onClose,
   connection,
-  showDeleteConfirm,
-  setShowDeleteConfirm,
-  setPendingDeleteMessageId,
-  confirmDeleteMessage,
-  showReportDialog,
-  setShowReportDialog,
-  reportReason,
-  setReportReason,
+  otherUserName,
+  onConfirmDeleteMessage,
   onReport,
-  showRenameGroupModal,
-  setShowRenameGroupModal,
-  renameGroupInput,
-  setRenameGroupInput,
-  setDisplayGroupName,
+  onRenamed,
   onGroupChatChanged,
-  showGroupMemberPicker,
-  setShowGroupMemberPicker,
-  groupMemberProfileRows,
+  members,
   onOpenProfile,
-  actionToast,
-  setActionToast,
 }: {
+  state: ChatDialogState;
+  onClose: () => void;
   connection: ConnectionRecord;
-  showDeleteConfirm: boolean;
-  setShowDeleteConfirm: Dispatch<SetStateAction<boolean>>;
-  setPendingDeleteMessageId: Dispatch<SetStateAction<string | null>>;
-  confirmDeleteMessage: () => Promise<void>;
-  showReportDialog: boolean;
-  setShowReportDialog: Dispatch<SetStateAction<boolean>>;
-  reportReason: string;
-  setReportReason: Dispatch<SetStateAction<string>>;
+  otherUserName: string;
+  onConfirmDeleteMessage: (messageId: string) => Promise<void>;
   onReport: (reason: string) => Promise<boolean> | boolean;
-  showRenameGroupModal: boolean;
-  setShowRenameGroupModal: Dispatch<SetStateAction<boolean>>;
-  renameGroupInput: string;
-  setRenameGroupInput: Dispatch<SetStateAction<string>>;
-  setDisplayGroupName: Dispatch<SetStateAction<string | null>>;
+  onRenamed: (name: string) => void;
   onGroupChatChanged?: () => void;
-  showGroupMemberPicker: boolean;
-  setShowGroupMemberPicker: Dispatch<SetStateAction<boolean>>;
-  groupMemberProfileRows: { userId: string; label: string }[];
+  members: { userId: string; label: string; avatarUrl?: string | null }[];
   onOpenProfile?: (userId: string) => void;
-  actionToast: { type: 'success' | 'error'; message: string } | null;
-  setActionToast: Dispatch<SetStateAction<{ type: 'success' | 'error'; message: string } | null>>;
 }) {
+  const [busy, setBusy] = useState(false);
+
   return (
     <>
-      <AnimatePresence>
-        {showDeleteConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 "
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-[92%] max-w-sm rounded-2xl border border-border-hard bg-surface p-5"
-            >
-              <h3 className="text-base font-semibold text-on-surface">Delete message?</h3>
-              <p className="mt-2 text-sm text-on-surface-variant">This message will be removed permanently.</p>
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setPendingDeleteMessageId(null);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface hover:bg-surface-container"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteMessage}
-                  className="px-3 py-2 rounded-xl bg-red-600 text-white hover:bg-red-500"
-                >
-                  Delete
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ConfirmDialog
+        open={state?.kind === 'delete-message'}
+        onOpenChange={(o) => !o && !busy && onClose()}
+        title="Delete this message?"
+        message="It’s removed for everyone in the conversation."
+        confirmLabel="Delete"
+        destructive
+        busy={busy}
+        onConfirm={async () => {
+          if (state?.kind !== 'delete-message') return;
+          setBusy(true);
+          try {
+            await onConfirmDeleteMessage(state.messageId);
+          } finally {
+            setBusy(false);
+            onClose();
+          }
+        }}
+      />
 
-      <AnimatePresence>
-        {showReportDialog && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 "
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-[92%] max-w-md rounded-2xl border border-border-hard bg-surface p-5"
-            >
-              <h3 className="text-base font-semibold text-on-surface">Report connection</h3>
-              <p className="mt-2 text-sm text-on-surface-variant">Describe what happened. This helps moderation review quickly.</p>
-              <textarea
-                value={reportReason}
-                onChange={(event) => setReportReason(event.target.value)}
-                rows={4}
-                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Reason for report"
-              />
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setShowReportDialog(false);
-                    setReportReason('');
-                  }}
-                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface hover:bg-surface-container"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    const reason = reportReason.trim();
-                    if (!reason) return;
-                    if (!window.confirm('Submit this report for moderation review?')) {
-                      return;
-                    }
-                    const success = await onReport(reason);
-                    setActionToast(success
-                      ? { type: 'success', message: 'Report submitted' }
-                      : { type: 'error', message: 'Could not submit report' }
-                    );
-                    if (success) {
-                      setShowReportDialog(false);
-                      setReportReason('');
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl bg-amber-600 text-white hover:bg-amber-500"
-                >
-                  Submit report
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ReportDialog
+        name={otherUserName}
+        open={state?.kind === 'report'}
+        onOpenChange={(o) => !o && onClose()}
+        onSubmit={async (reason) => {
+          const ok = await onReport(reason);
+          if (ok) chatNotify({ type: 'success', message: 'Report sent. Thanks for telling us.' });
+          return ok;
+        }}
+      />
 
-      <AnimatePresence>
-        {showRenameGroupModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 "
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-[92%] max-w-sm rounded-2xl border border-border-hard bg-surface p-5"
-            >
-              <h3 className="text-base font-semibold text-on-surface">Rename group</h3>
-              <textarea
-                value={renameGroupInput}
-                onChange={(e) => setRenameGroupInput(e.target.value)}
-                rows={2}
-                className="mt-3 w-full rounded-xl border border-border-hard bg-background px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Group name"
-              />
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRenameGroupModal(false)}
-                  className="px-3 py-2 rounded-xl border border-border-hard text-on-surface hover:bg-surface-container"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!renameGroupInput.trim()}
-                  onClick={async () => {
-                    const supabase = getSupabaseClient();
-                    if (!supabase) return;
-                    const next = renameGroupInput.trim();
-                    if (!next) return;
-                    try {
-                      await renameCliqueRpc(supabase, connection.id, next);
-                      setDisplayGroupName(next);
-                      setActionToast({ type: 'success', message: 'Group renamed' });
-                      setShowRenameGroupModal(false);
-                      onGroupChatChanged?.();
-                    } catch (e: unknown) {
-                      setActionToast({
-                        type: 'error',
-                        message: e instanceof Error ? e.message : 'Could not rename group',
-                      });
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl bg-primary text-on-primary hover:opacity-90 disabled:opacity-40"
-                >
-                  Save
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {state?.kind === 'rename' ? (
+        <RenameGroupDialog
+          connectionId={connection.id}
+          current={state.current}
+          onClose={onClose}
+          onRenamed={(name) => {
+            onRenamed(name);
+            onGroupChatChanged?.();
+          }}
+        />
+      ) : null}
 
-      <AnimatePresence>
-        {showGroupMemberPicker && groupMemberProfileRows.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50  p-4"
-            onClick={() => setShowGroupMemberPicker(false)}
-            role="presentation"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="w-full max-w-sm rounded-2xl border border-border-hard bg-surface p-5 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-on-surface">Members</h3>
-                  <p className="mt-1 text-xs text-on-surface-variant">Choose someone to view their profile.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowGroupMemberPicker(false)}
-                  className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <ul className="mt-4 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-1">
-                {groupMemberProfileRows.map((row) => (
-                  <li key={row.userId}>
-                    <button
-                      type="button"
-                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-on-surface hover:bg-surface-container"
-                      onClick={() => {
-                        onOpenProfile?.(row.userId);
-                        setShowGroupMemberPicker(false);
-                      }}
-                    >
-                      {row.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {actionToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
-          >
-            <div
-              className={`rounded-xl border px-4 py-2.5 text-sm shadow-xl  ${
-                actionToast.type === 'success'
-                  ? 'bg-emerald-600/90 border-emerald-400/40 text-white'
-                  : 'bg-red-600/90 border-red-400/40 text-white'
-              }`}
-            >
-              {actionToast.message}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Dialog
+        open={state?.kind === 'members' && members.length > 0}
+        onOpenChange={(o) => !o && onClose()}
+        title="Members"
+        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in this group`}
+      >
+        <ul className="-mx-2 max-h-[min(60vh,420px)] overflow-y-auto">
+          {members.map((m) => (
+            <li key={m.userId}>
+              <button
+                type="button"
+                className="flex min-h-14 w-full items-center gap-3 rounded-md px-2 text-left hover:bg-hover"
+                onClick={() => {
+                  onClose();
+                  onOpenProfile?.(m.userId);
+                }}
+              >
+                <Avatar seed={m.userId} name={m.label} src={m.avatarUrl ?? null} size={40} />
+                <span className="type-body-strong min-w-0 flex-1 truncate text-fg">{m.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Dialog>
     </>
   );
 }

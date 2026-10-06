@@ -135,6 +135,10 @@ function normalizeSubscriptionStatus(value: string | null): string {
   return value?.trim().toLowerCase() || 'inactive';
 }
 
+/**
+ * Admin-only guess at a tier from free-text columns (spec §9.9): never shown outside /admin.
+ * TODO: replace with a real `places.plan` column once paid plans exist beyond Click for Business.
+ */
 function inferTierFromVenueRow(row: RecordValue): VenueTier {
   const seed = [
     asString(row.subscription_tier),

@@ -11,6 +11,9 @@
     "nodejs_compat_populate_process_env",
     "global_fetch_strictly_public"
   ],
+  // Run dynamic requests near Supabase instead of the visitor's colo: every signed-in
+  // render makes several round-trips to the database (spec §11.3).
+  "placement": { "mode": "smart" },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

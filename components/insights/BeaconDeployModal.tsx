@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { X, Radio, Sparkles } from "lucide-react";
 import type { VibeRadarCategoryTotal, VenuePopUpHubBeacon } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
 import { postInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
-import { FcTextarea } from "@/components/fc";
+import { fieldClassName } from "@/components/ds/TextField";
 
 const DEFAULT_CATEGORIES = [
   "Coffee",
@@ -80,7 +80,7 @@ export default function BeaconDeployModal({
       e.preventDefault();
       setError(null);
       if (!venueId || demoLocked) {
-        setError(demoLocked ? "Turn off demo data to deploy a live beacon." : "Link a venue first.");
+        setError(demoLocked ? "Turn off demo data to deploy a live beacon." : "Open Insights from one of your Places first.");
         return;
       }
       const perkTrim = perk.trim();
@@ -143,22 +143,22 @@ export default function BeaconDeployModal({
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 48, opacity: 0 }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="fixed z-[201] right-4 top-20 bottom-6 w-[min(100%-2rem,420px)] flex flex-col rounded-2xl border border-border-hard bg-background/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] outline-none overflow-hidden"
+              className="fixed z-[201] right-4 top-20 bottom-6 w-[min(100%-2rem,420px)] flex flex-col rounded-2xl border border-hairline bg-bg/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] outline-none overflow-hidden"
             >
-              <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-border-hard">
+              <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-hairline">
                 <div>
-                  <Dialog.Title className="text-lg font-semibold text-on-surface flex items-center gap-2">
-                    <Radio className="w-5 h-5 text-primary" />
+                  <Dialog.Title className="text-lg font-semibold text-fg flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-accent" />
                     Deploy beacon
                   </Dialog.Title>
-                  <Dialog.Description className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                  <Dialog.Description className="text-xs text-fg-secondary mt-1 leading-relaxed">
                     Offer a perk to people broadcasting availability nearby. Counts are aggregated;
                     individual users stay anonymous.
                   </Dialog.Description>
                 </div>
                 <Dialog.Close
                   type="button"
-                  className="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+                  className="p-2 rounded-xl text-fg-secondary hover:text-fg hover:bg-surface-raised transition-colors"
                   aria-label="Close"
                 >
                   <X className="w-5 h-5" />
@@ -167,11 +167,11 @@ export default function BeaconDeployModal({
 
               <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
                 <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-secondary mb-3">
                     Active intents within {radiusMiles.toFixed(1)} mi
                   </h3>
                   {categoryTotals.length === 0 ? (
-                    <p className="text-sm text-on-surface-variant py-2">
+                    <p className="text-sm text-fg-secondary py-2">
                       No category totals yet (privacy thresholds require enough nearby signals). You
                       can still target common intent labels below.
                     </p>
@@ -180,10 +180,10 @@ export default function BeaconDeployModal({
                       {categoryTotals.map((row) => (
                         <li
                           key={row.category}
-                          className="flex items-center justify-between rounded-xl border border-border-hard bg-surface-container px-3 py-2.5"
+                          className="flex items-center justify-between rounded-xl border border-hairline bg-surface-raised px-3 py-2.5"
                         >
                           <span
-                            className="text-sm font-medium text-on-surface flex items-center gap-2"
+                            className="text-sm font-medium text-fg flex items-center gap-2"
                             style={{ textShadow: "0 0 24px rgba(0,0,0,0.4)" }}
                           >
                             <span
@@ -192,7 +192,7 @@ export default function BeaconDeployModal({
                             />
                             {row.category}
                           </span>
-                          <span className="text-sm text-on-surface-variant tabular-nums">
+                          <span className="text-sm text-fg-secondary tabular-nums">
                             {row.count} users
                           </span>
                         </li>
@@ -203,32 +203,32 @@ export default function BeaconDeployModal({
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label htmlFor="beacon-perk" className="text-xs font-medium text-on-surface-variant block mb-1.5">
+                    <label htmlFor="beacon-perk" className="text-xs font-medium text-fg-secondary block mb-1.5">
                       Perk or offer
                     </label>
-                    <FcTextarea
+                    <textarea
                       id="beacon-perk"
                       value={perk}
                       onChange={(e) => setPerk(e.target.value)}
                       rows={3}
                       maxLength={500}
                       placeholder="e.g. 10% off drinks for the next two hours"
-                      className="w-full resize-none"
+                      className={`${fieldClassName} min-h-[96px] w-full resize-none py-2.5`}
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="beacon-category" className="text-xs font-medium text-on-surface-variant block mb-1.5">
+                    <label htmlFor="beacon-category" className="text-xs font-medium text-fg-secondary block mb-1.5">
                       Target intent
                     </label>
                     <select
                       id="beacon-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="fc-input w-full rounded-xl px-3 py-2.5 text-sm"
+                      className="block w-full rounded-md bg-surface-raised text-fg outline-none placeholder:text-fg-tertiary focus:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] w-full rounded-xl px-3 py-2.5 text-sm"
                     >
                       {categoryOptions.map((c) => (
-                        <option key={c} value={c} className="bg-surface-container">
+                        <option key={c} value={c} className="bg-surface-raised">
                           {c}
                         </option>
                       ))}
@@ -236,7 +236,7 @@ export default function BeaconDeployModal({
                   </div>
 
                   <div>
-                    <span className="text-xs font-medium text-on-surface-variant block mb-1.5">Duration</span>
+                    <span className="text-xs font-medium text-fg-secondary block mb-1.5">Duration</span>
                     <div className="flex flex-wrap gap-2">
                       {DURATION_PRESETS.map((p) => (
                         <button
@@ -245,8 +245,8 @@ export default function BeaconDeployModal({
                           onClick={() => setDurationMinutes(p.minutes)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                             durationMinutes === p.minutes
-                              ? "border-primary/50 bg-primary/20 text-on-surface"
-                              : "border-border-hard bg-surface-container text-on-surface-variant hover:border-border-hard"
+                              ? "border-action/50 bg-action/20 text-fg"
+                              : "border-hairline bg-surface-raised text-fg-secondary hover:border-hairline"
                           }`}
                         >
                           {p.label}
@@ -264,7 +264,7 @@ export default function BeaconDeployModal({
                   <button
                     type="submit"
                     disabled={submitting || !venueId || demoLocked}
-                    className="fc-btn-primary w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {submitting ? (
                       "Deploying…"

@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import * as maplibregl from 'maplibre-gl';
+import * as maplibregl from '@/lib/maps/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { dropSameOriginMapRequest } from '@/lib/map/dropSameOriginMapRequest';
+import { cn } from '@/lib/cn';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { FC_PRIMARY, FC_SECONDARY, mapStyleForTheme } from '@/lib/theme/mapStyles';
 
@@ -46,18 +47,26 @@ export default function PinMap({
   className = '',
   testId = 'pin-map',
   maxBounds,
+  onPinMove,
 }: {
   markers: PinMapMarker[];
   className?: string;
   testId?: string;
   maxBounds?: maplibregl.LngLatBoundsLike;
+  /** Makes the pins draggable; called with the new position when one is dropped. */
+  onPinMove?: (id: string, lat: number, lng: number) => void;
 }) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const themeRef = useRef(theme);
-  const markerKey = markers.map((m) => `${m.id}:${m.lat}:${m.lng}`).join('|');
+  const onPinMoveRef = useRef(onPinMove);
+  useEffect(() => {
+    onPinMoveRef.current = onPinMove;
+  }, [onPinMove]);
+  // A draggable map keeps its camera while its pin moves; otherwise new positions re-center it.
+  const markerKey = markers.map((m) => (onPinMove ? m.id : `${m.id}:${m.lat}:${m.lng}`)).join('|');
 
   useEffect(() => {
     themeRef.current = theme;
@@ -110,9 +119,13 @@ export default function PinMap({
     if (!map) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = markers.map((pin) => {
-      const marker = new maplibregl.Marker({ element: markerEl(pin.tone) })
+      const marker = new maplibregl.Marker({ element: markerEl(pin.tone), draggable: Boolean(onPinMoveRef.current) })
         .setLngLat([pin.lng, pin.lat])
         .addTo(map);
+      marker.on('dragend', () => {
+        const { lat, lng } = marker.getLngLat();
+        onPinMoveRef.current?.(pin.id, lat, lng);
+      });
       if (pin.label) {
         marker.setPopup(new maplibregl.Popup({ closeButton: false, offset: 12 }).setText(pin.label));
       }
@@ -124,7 +137,7 @@ export default function PinMap({
     return (
       <div
         data-testid={testId}
-        className={`flex h-64 items-center justify-center rounded-[16px] border border-border-hard bg-surface-container text-sm text-on-surface-variant ${className}`}
+        className={cn('flex h-64 items-center justify-center rounded-[16px] border border-hairline bg-surface-raised text-sm text-fg-secondary', className)}
       >
         Location pin is not available yet.
       </div>
@@ -134,7 +147,7 @@ export default function PinMap({
   return (
     <div
       data-testid={testId}
-      className={`relative h-64 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container ${className}`}
+      className={cn('relative h-64 overflow-hidden rounded-[16px] border border-hairline bg-surface-raised', className)}
     >
       <div ref={containerRef} className="absolute inset-0" />
     </div>

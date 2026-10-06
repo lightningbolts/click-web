@@ -10,8 +10,8 @@ web
 
 Two primary audiences, equally first-class:
 
-- **People who met in the room.** Someone who already formed a verified in-person connection (or is about to) and is continuing that relationship in the browser: dashboard, chat, map, events, QR identity, and optional LiveKit calls. Anonymous visitors on `/` and public `/events` are how many of them arrive.
-- **Venues, promoters, and event operators.** Local operators who need to know **who actually showed up together**, not just door counts. They work in Click for Business (`/insights/*`): verified factions, heatmaps, tribes, vibe radar, events, and engagement.
+- **People who met in the room.** Someone who already formed a verified in-person connection (or is about to) and is continuing that relationship in the browser: Home, Clicks (E2EE chat), map, events and Add Click (QR identity). Anonymous visitors on `/` and public `/events` are how many of them arrive.
+- **Venues, promoters, and event operators.** Local operators who need to know **who actually showed up together**, not just door counts. They work in Click for Business, centered on a Place (`/business/places/{id}`): profile, official events, check-in QR, team and billing, with Insights (traffic, crowd, vibe, events) as a paid tab of each Place.
 
 Mobile remains the hardware-native handshake client. click-web does not replace it for people standing in a room.
 
@@ -34,18 +34,18 @@ click-web’s distinct job in the system is the operator surface (web-only) plus
 - Production origin: `https://joinclick.co`. Local: `npm run dev` on port 3000.
 - Companion to the Kotlin Multiplatform app in the sibling `click/` repo. Shared backend: Supabase Auth, Postgres, Realtime, Edge Functions. Web calling: LiveKit.
 - Consumer rituals: handshake or QR in the room → 48-hour window to act before auto-archive (hygiene, not deletion) → chat / map / events / optional call. Memory Capsules are captured on mobile; web can display them, not produce the sensor readings.
-- Operator rituals: open Insights for a venue, read anonymized hexbins and verified factions, deploy map beacons, run events, export.
+- Operator rituals: open a Place's Insights tab, read anonymized hexbins and verified factions, deploy map beacons, run events, export.
 - Public events (`/events`, `/e/{id}`) allow guest RSVP without an account.
-- Launch posture: **joinclick.co is live** as the browser companion (dashboard, events, chat, map, QR). The **iOS/Android handshake app is not public yet**; consumer acquisition on `/` is waitlist-led for that app (`Join the Waitlist`). `NEXT_PUBLIC_APP_LAUNCHED` gates store/connect surfaces for the mobile app, not the website.
+- Launch posture: **joinclick.co is live** as the browser companion (Home, Clicks, map, events, Add Click). The **iOS/Android handshake app is not public yet**; consumer acquisition on `/` is waitlist-led for that app (`Join the Waitlist`). `NEXT_PUBLIC_APP_LAUNCHED` gates store/connect surfaces for the mobile app, not the website.
 
 ## Capabilities and Constraints
 
 Confirmed on web:
 
-- Authenticated dashboard (connections, map, timeline, E2EE chat, QR, availability intents, stats).
-- In-browser LiveKit voice when credentials are present.
-- Public events directory and microsites; create events from the dashboard.
-- Click for Business: heatmap, live metrics, vibe stream, tribes, social activity, vibe radar, event engagement, Social Sticky Score.
+- Signed-in app as real routes: Home `/`, Clicks `/clicks` (E2EE chat, groups, hubs), `/map`, `/events`, Add Click `/add`, `/me`, `/settings/{section}`, `/activity`, `/people/{id}`. Old `/?tab=` links redirect.
+- Calls are mobile-only; web shows no call UI.
+- Public events directory `/events`, event pages `/e/{id}` with manage tabs, recap and summary; public Place pages `/p/{slug}`.
+- Click for Business: free Place setup (`/business/get-started`), a workspace per Place, and Insights paid per Place (heatmap, live metrics, vibe radar and stream, tribes, social activity, event engagement, Social Sticky Score). Old `/insights/*` links redirect into the Place.
 - Auth callbacks (email verification, PKCE, recovery) must show success/error, not blind redirects.
 - Card identity for beacons/pins is a cross-platform contract (`lib/ui/generateCardVisual.ts` ↔ mobile `CardVisual.kt`).
 
@@ -89,4 +89,6 @@ Must not be fabricated: testimonials, named customers, attendance percentages, s
 
 ## Accessibility & Inclusion
 
-WCAG 2.2 AA is the product standard on click-web surfaces (landing, dashboard, events, insights, auth). Generated card visuals already search for 4.5:1 contrast; that bar applies everywhere, including names, keyboard access, focus, and touch/click targets.
+WCAG 2.2 AA is the product standard on click-web surfaces (landing, signed-in app, events, business, auth). Generated card visuals already search for 4.5:1 contrast; that bar applies everywhere, including names, keyboard access, focus, and touch/click targets.
+
+Text floor (redesign spec §4.2, D4): 13 px for metadata, 12 px only for badges and tab-bar labels. Contrast, not size, is what's enforced; nothing smaller than 12 px.

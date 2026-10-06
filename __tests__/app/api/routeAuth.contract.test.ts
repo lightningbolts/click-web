@@ -37,6 +37,8 @@ const AUTH_MARKERS = [
   // lib/server/places/routeContext.ts: getSupabaseFromRouteRequest + the click_places flag.
   'requirePlacesUser',
   'requirePlaceManagerContext',
+  // lib/server/session.ts: cookie session via getServerUser (getClaims); null → 401.
+  'loadSessionBootstrap',
 ];
 
 /** Intentionally unauthenticated or secret-gated via non-JWT means. */

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadPlaceRefs, type PlaceRef } from "@/lib/server/places/placeRefs";
+import { parseEventCategoryTags } from "@/lib/events/eventCategoryTags";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
 import {
   eventAddressFromMetadata,
@@ -56,6 +57,10 @@ export type PublicEventPayload = {
   listing: EventListingOptions;
   /** The listed Place hosting this official event (Click Places §5.11), else null. */
   place: PlaceRef | null;
+  /** Up to three category chips (Social, Music, ...). */
+  categories: string[];
+  /** The hosting Place even when it is not listed (for manage rights, never rendered). */
+  venue_id: string | null;
 };
 
 export type PublicEventListItem = {
@@ -301,6 +306,8 @@ export async function loadPublicEventPayload(
     cover_theme_id: coverThemeId,
     visual_seed: coverVisualSeed(typeof data.id === "string" ? data.id : beaconId, coverThemeId),
     attendees: previews,
+    categories: parseEventCategoryTags(meta).slice(0, 3),
+    venue_id: venueId,
     listing,
     place,
   };

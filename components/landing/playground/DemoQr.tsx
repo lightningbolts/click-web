@@ -3,7 +3,7 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { DEMO_QR_URL, DEMO_USER_NAME } from './mockData';
 
-/** Matches logged-in `QRIdentityCard`: dark modules on #121212, brand purple, center wordmark. */
+/** Landing demo QR: dark modules on #121212, brand purple, center wordmark. */
 export default function DemoQr({ size = 200 }: { size?: number }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>

@@ -13,6 +13,7 @@ export type EventFormDraft = {
   lat: string;
   lng: string;
   imageUrl: string | null;
+  /** "" when the event has no theme: its visual is seeded by its id. */
   coverThemeId: string;
   visibility: EventVisibility;
   capacity: number | null;

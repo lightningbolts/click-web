@@ -27,7 +27,7 @@ function ClientOnly({ children }: { children: ReactNode }) {
     setMounted(true);
   }, []);
   if (!mounted) {
-    return <div className="h-52 animate-pulse rounded-[16px] bg-surface-container" aria-hidden />;
+    return <div className="h-52 animate-pulse rounded-[16px] bg-surface-raised" aria-hidden />;
   }
   return children;
 }
@@ -51,20 +51,20 @@ export function OverviewScene() {
         <Stat label="Busiest day" hint="Highest activity" value="Saturday" />
         <Stat label="Peak hour" hint="Most active time" value={`${mockInsightsPeakHour}:00`} />
       </div>
-      <div className="rounded-[16px] border border-border-hard bg-background p-4">
+      <div className="rounded-[16px] border border-hairline bg-bg p-4">
         <div className="mb-3 flex items-end justify-between gap-2">
           <div>
-            <p className="text-sm font-medium text-on-surface">Popular times</p>
-            <p className="text-xs text-on-surface-variant">Hourly distribution, same chart Insights uses</p>
+            <p className="text-sm font-medium text-fg">Popular times</p>
+            <p className="text-xs text-fg-secondary">Hourly distribution, same chart Insights uses</p>
           </div>
-          <p className="text-xs text-on-surface-variant">Peak {mockInsightsPeakHour}:00</p>
+          <p className="text-xs text-fg-secondary">Peak {mockInsightsPeakHour}:00</p>
         </div>
         <div className="flex h-28 items-end gap-0.5">
           {mockInsightsHourlyDistribution.map((count, hour) => (
             <div
               key={hour}
               className={`min-w-0 flex-1 rounded-t ${
-                hour === mockInsightsPeakHour ? 'bg-primary' : 'bg-on-surface/20'
+                hour === mockInsightsPeakHour ? 'bg-action' : 'bg-fg/20'
               }`}
               style={{ height: `${Math.max(8, (count / peak) * 100)}%` }}
               title={`${hour}:00 · ${count}`}
@@ -78,10 +78,10 @@ export function OverviewScene() {
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-[16px] border border-border-hard bg-background p-4">
-      <p className="text-3xl font-bold text-on-surface">{value}</p>
-      <p className="mt-1 text-sm text-on-surface-variant">{label}</p>
-      {hint ? <p className="mt-1 text-xs text-on-surface-variant">{hint}</p> : null}
+    <div className="rounded-[16px] border border-hairline bg-bg p-4">
+      <p className="text-3xl font-bold text-fg">{value}</p>
+      <p className="mt-1 text-sm text-fg-secondary">{label}</p>
+      {hint ? <p className="mt-1 text-xs text-fg-secondary">{hint}</p> : null}
     </div>
   );
 }
@@ -92,7 +92,7 @@ export function HeatmapScene() {
       <HeatmapView zones={mockVenueInsights.heatmapZones} />
       <TribeChart tribes={mockVenueInsights.tribes} />
       <div className="lg:col-span-2">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-secondary">
           Floor pins
         </p>
         <PinMapLazy
@@ -125,34 +125,34 @@ export function EventsScene() {
           { label: 'Met someone', value: event.met },
         ];
         return (
-          <li key={event.id} className="rounded-[16px] border border-border-hard bg-background p-4">
+          <li key={event.id} className="rounded-[16px] border border-hairline bg-bg p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="font-bold text-on-surface">{event.title}</p>
-                <p className="mt-1 text-sm text-on-surface-variant">
+                <p className="font-bold text-fg">{event.title}</p>
+                <p className="mt-1 text-sm text-fg-secondary">
                   {event.when} · {event.room} · Host {event.host}
                 </p>
               </div>
-              <span className="rounded-full bg-primary-container px-2.5 py-1 text-xs font-semibold text-on-primary-container">
+              <span className="rounded-full bg-selection px-2.5 py-1 text-xs font-semibold text-accent">
                 {'upcoming' in event && event.upcoming ? 'Upcoming' : `${event.groups} verified groups`}
               </span>
             </div>
             {'upcoming' in event && event.upcoming ? (
-              <p className="mt-3 text-sm text-on-surface-variant">
+              <p className="mt-3 text-sm text-fg-secondary">
                 {event.going} going so far. Check-ins and connections appear once the doors open.
               </p>
             ) : (
               <div className="mt-3 space-y-1.5" aria-label={`${event.title} funnel`}>
                 {steps.map((step) => (
                   <div key={step.label} className="grid grid-cols-[6.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 text-xs">
-                    <span className="font-semibold text-on-surface-variant">{step.label}</span>
-                    <span className="h-2 overflow-hidden rounded-full bg-surface-container">
+                    <span className="font-semibold text-fg-secondary">{step.label}</span>
+                    <span className="h-2 overflow-hidden rounded-full bg-surface-raised">
                       <span
-                        className="block h-full rounded-full bg-primary"
+                        className="block h-full rounded-full bg-action"
                         style={{ width: `${Math.max(4, Math.round((step.value / event.going) * 100))}%` }}
                       />
                     </span>
-                    <span className="text-right font-semibold tabular-nums text-on-surface">{step.value}</span>
+                    <span className="text-right font-semibold tabular-nums text-fg">{step.value}</span>
                   </div>
                 ))}
               </div>

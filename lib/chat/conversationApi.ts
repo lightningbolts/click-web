@@ -25,6 +25,13 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json().catch(() => ({}))) as T;
 }
 
+// ── Unread ─────────────────────────────────────────────────────────────────
+
+/** Marks the latest peer message unread on every device (iOS `ChatRepository.markUnread`). */
+export async function markChatUnread(chatId: string): Promise<void> {
+  await requestJson('/api/chat/messages/unread', { method: 'PATCH', body: JSON.stringify({ chat_id: chatId }) });
+}
+
 // ── Mutes ──────────────────────────────────────────────────────────────────
 
 export const CHAT_MUTES_KEY = '/api/chat/notifications';

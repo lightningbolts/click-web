@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildInitialVerifiedClickName,
   createVerifiedClickFromConnections,
   verifiedCliqueEdgesExist,
 } from '@/lib/chat/createVerifiedClick';
-import { Toggle } from '@/components/ui/Toggle';
+import { Avatar } from '@/components/ds/Avatar';
+import { Button } from '@/components/ds/Button';
+import { Dialog } from '@/components/ds/Dialog';
+import { InlineNotice } from '@/components/ds/InlineNotice';
+import { Toggle } from '@/components/ds/Toggle';
+import { cn } from '@/lib/cn';
 
 export type ClickFriendOption = { connectionId: string; userId: string; name: string };
 
@@ -114,7 +118,7 @@ export default function CreateVerifiedClickDialog({
 
   const submit = async () => {
     if (duplicateMemberSet) {
-      setErr('You already have a verified click with this group.');
+      setErr('You already have a verified group with these people.');
       return;
     }
     setBusy(true);
@@ -139,7 +143,7 @@ export default function CreateVerifiedClickDialog({
       const raw = e instanceof Error ? e.message : 'Could not create click';
       setErr(
         raw.toLowerCase().includes('verified click already exists')
-          ? 'You already have a verified click with this group.'
+          ? 'You already have a verified group with these people.'
           : raw,
       );
     } finally {
@@ -147,104 +151,61 @@ export default function CreateVerifiedClickDialog({
     }
   };
 
-  const overlayEase = [0.22, 1, 0.36, 1] as const;
-
   return (
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="create-verified-click-overlay"
-          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-4 pb-6 pt-14 sm:items-center sm:py-10 sm:pb-10"
-          role="presentation"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.22, ease: overlayEase }}
-        >
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-click-title"
-            className="flex max-h-[min(420px,calc(100dvh-9rem))] w-full max-w-md flex-col rounded-2xl border border-border-hard bg-background p-5 shadow-2xl sm:max-h-[min(480px,calc(100dvh-10rem))]"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 56 }}
-            transition={{ duration: 0.28, ease: overlayEase }}
-            style={{ willChange: 'transform, opacity' }}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (busy ? undefined : onOpenChange(next))}
+      size="md"
+      title="New verified group"
+      description="Pick people who have all Clicked with each other. Every pair is checked before the group is created."
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="plain" onClick={() => onOpenChange(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            loading={busy}
+            disabled={selected.size === 0 || !eligibilityReady || !createOk || duplicateMemberSet}
+            onClick={() => void submit()}
           >
-            <div className="shrink-0">
-              <h2 id="create-click-title" className="text-lg font-semibold text-on-surface">
-                Create verified click
-              </h2>
-              <p className="mt-2 text-sm text-on-surface-variant">
-                Pick friends who are pairwise connected (active or kept). Server verifies every edge.
-              </p>
-              <p
-                className={`mt-2 min-h-[1.25rem] text-xs text-primary ${
-                  !eligibilityReady && friends.length > 0 ? 'visible' : 'invisible'
-                }`}
-                aria-live="polite"
-              >
-                Checking who can join…
-              </p>
-              {duplicateMemberSet ? (
-                <p className="mt-2 text-xs text-red-400">You already have a verified click with this group.</p>
-              ) : null}
-            </div>
-            <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {friends.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">No active 1:1 connections yet.</p>
-              ) : (
-                friends.map((f) => {
-                  const checked = selected.has(f.userId);
-                  const enabled = checked || (eligibilityReady && mask[f.userId] === true);
-                  return (
-                    <div
-                      key={f.connectionId}
-                      className={`flex items-center gap-3 rounded-xl border border-border-hard px-3 py-2 ${
-                        enabled ? 'bg-surface-container' : 'opacity-40'
-                      }`}
-                    >
-                      <Toggle
-                        checked={checked}
-                        disabled={!enabled}
-                        onCheckedChange={() => toggle(f.userId)}
-                        aria-label={`Select ${f.name}`}
-                      />
-                      <span className="text-sm text-on-surface">{f.name}</span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            {err ? <p className="mt-3 shrink-0 text-sm text-red-400">{err}</p> : null}
-            <div className="mt-5 flex shrink-0 justify-end gap-2">
-              <button
-                type="button"
-                className="rounded-xl px-4 py-2 text-sm text-on-surface hover:bg-surface-container"
-                onClick={() => onOpenChange(false)}
-                disabled={busy}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                disabled={
-                  busy ||
-                  selected.size === 0 ||
-                  !eligibilityReady ||
-                  !createOk ||
-                  duplicateMemberSet
-                }
-                onClick={() => void submit()}
-              >
-                {busy ? 'Creating…' : 'Create'}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
+            Create group
+          </Button>
+        </div>
+      }
+    >
+      <p className={cn('type-meta min-h-5 text-fg-tertiary', eligibilityReady || friends.length === 0 ? 'invisible' : 'visible')} aria-live="polite">
+        Checking who can join…
+      </p>
+      {duplicateMemberSet ? (
+        <InlineNotice variant="warning" className="mb-2">
+          You already have a verified group with these people.
+        </InlineNotice>
       ) : null}
-    </AnimatePresence>
+      {friends.length === 0 ? (
+        <p className="type-body py-6 text-center text-fg-secondary">No active Clicks yet.</p>
+      ) : (
+        <ul className="-mx-2 max-h-[min(50vh,360px)] overflow-y-auto">
+          {friends.map((f) => {
+            const checked = selected.has(f.userId);
+            const enabled = checked || (eligibilityReady && mask[f.userId] === true);
+            const id = `verified-group-${f.userId}`;
+            return (
+              <li key={f.connectionId} className={cn('flex h-14 items-center gap-3 rounded-md px-2', enabled ? 'hover:bg-hover' : 'opacity-40')}>
+                <Avatar seed={f.userId} name={f.name} size={40} />
+                <label htmlFor={id} className="type-body-strong min-w-0 flex-1 truncate text-fg">
+                  {f.name}
+                </label>
+                <Toggle id={id} checked={checked} disabled={!enabled} onCheckedChange={() => toggle(f.userId)} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {err ? (
+        <InlineNotice variant="destructive" live className="mt-3">
+          {err}
+        </InlineNotice>
+      ) : null}
+    </Dialog>
   );
 }

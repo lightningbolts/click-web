@@ -11,6 +11,9 @@
  * - `hubs`: hubs the caller has joined, by name or category.
  * - `hits`: plaintext message hits (same contract as GET /api/chat/search; encrypted bodies
  *   can only be searched on-device).
+ *
+ * With `mine=1` (the web command palette, which has no on-device index) it also returns
+ * `clicks` (your connections by name), `groups` (groups you're in) and `places` (listed Places).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -35,6 +38,16 @@ type EventHit = {
   imageUrl: string | null;
 };
 type HubHit = { hubId: string; name: string; category: string | null };
+type ClickHit = { connectionId: string; userId: string; name: string; avatarUrl: string | null };
+type GroupHit = { groupId: string; name: string };
+type PlaceHit = { placeId: string; slug: string; name: string; category: string | null; city: string | null };
+
+const MAX_MINE = 10;
+
+/** `%` and `_` are wildcards in ILIKE; match them literally. */
+function likeLiteral(text: string): string {
+  return text.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
 
 function displayName(row: Record<string, unknown>): string | null {
   const pick = (key: string) => (typeof row[key] === 'string' && (row[key] as string).trim()) || null;
@@ -45,8 +58,9 @@ function displayName(row: Record<string, unknown>): string | null {
 
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') ?? '').trim();
+  const mine = req.nextUrl.searchParams.get('mine') === '1';
   if (q.length < MIN_QUERY) {
-    return NextResponse.json({ people: [], events: [], hubs: [], hits: [] });
+    return NextResponse.json({ people: [], events: [], hubs: [], hits: [], ...(mine ? { clicks: [], groups: [], places: [] } : {}) });
   }
 
   const { user, supabase } = await getAuthenticatedSupabase(req);
@@ -179,6 +193,69 @@ export async function GET(req: NextRequest) {
       .map((r) => ({ hubId: r.id as string, name: r.name as string, category: (r.category as string | null) ?? null }));
   };
 
+  const clicks = async (): Promise<ClickHit[]> => {
+    const [{ data: rows }, { data: hidden }, { data: blocks }] = await Promise.all([
+      admin.from('connections').select('id, user_ids, status').contains('user_ids', [user.id]).limit(1000),
+      admin.from('connection_hidden').select('connection_id').eq('user_id', user.id),
+      admin.from('user_blocks').select('blocker_id, blocked_id').or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
+    ]);
+    const hiddenIds = new Set((hidden ?? []).map((r) => r.connection_id as string));
+    const blocked = new Set((blocks ?? []).map((b) => (b.blocker_id === user.id ? b.blocked_id : b.blocker_id) as string));
+    const peerByConnection = new Map<string, string>();
+    for (const row of rows ?? []) {
+      if (hiddenIds.has(row.id) || row.status === 'removed') continue;
+      const peer = ((row.user_ids as string[] | null) ?? []).find((id) => id && id !== user.id);
+      if (peer && !blocked.has(peer)) peerByConnection.set(row.id, peer);
+    }
+    if (peerByConnection.size === 0) return [];
+    const users = await selectInChunks([...new Set(peerByConnection.values())], async (chunk) => {
+      const { data } = await admin.from('users').select('id, name, full_name, first_name, last_name, image').in('id', chunk);
+      return data ?? [];
+    });
+    const byId = new Map((users as Record<string, unknown>[]).map((u) => [u.id as string, u]));
+    const hits: ClickHit[] = [];
+    for (const [connectionId, userId] of peerByConnection) {
+      const u = byId.get(userId);
+      const name = u ? displayName(u) : null;
+      if (!name || !name.toLowerCase().includes(needle)) continue;
+      hits.push({ connectionId, userId, name, avatarUrl: typeof u?.image === 'string' ? u.image : null });
+      if (hits.length >= MAX_MINE) break;
+    }
+    return hits;
+  };
+
+  const groups = async (): Promise<GroupHit[]> => {
+    const { data: memberships } = await supabase.from('group_members').select('group_id').eq('user_id', user.id);
+    const ids = (memberships ?? []).map((r) => r.group_id).filter((id): id is string => typeof id === 'string');
+    if (ids.length === 0) return [];
+    const rows = await selectInChunks(ids, async (chunk) => {
+      const { data } = await supabase.from('groups').select('id, name').in('id', chunk);
+      return data ?? [];
+    });
+    return rows
+      .filter((r) => typeof r.name === 'string' && (r.name as string).toLowerCase().includes(needle))
+      .slice(0, MAX_MINE)
+      .map((r) => ({ groupId: r.id as string, name: r.name as string }));
+  };
+
+  const places = async (): Promise<PlaceHit[]> => {
+    const { data } = await admin
+      .from('places')
+      .select('id, slug, name, category, city')
+      .eq('listed', true)
+      .eq('verification_status', 'verified')
+      .not('slug', 'is', null)
+      .ilike('name', `%${likeLiteral(q)}%`)
+      .limit(MAX_MINE);
+    return (data ?? []).map((p) => ({
+      placeId: p.id as string,
+      slug: p.slug as string,
+      name: p.name as string,
+      category: (p.category as string | null) ?? null,
+      city: (p.city as string | null) ?? null,
+    }));
+  };
+
   const messages = async (): Promise<unknown[]> => {
     const response = await searchMessages(req);
     if (!response.ok) return [];
@@ -195,12 +272,21 @@ export async function GET(req: NextRequest) {
     }
   };
 
-  const [peopleHits, eventHits, hubHits, messageHits] = await Promise.all([
+  const [peopleHits, eventHits, hubHits, messageHits, clickHits, groupHits, placeHits] = await Promise.all([
     settle('people', people),
     settle('events', events),
     settle('hubs', hubs),
     settle('messages', messages),
+    mine ? settle('clicks', clicks) : Promise.resolve([]),
+    mine ? settle('groups', groups) : Promise.resolve([]),
+    mine ? settle('places', places) : Promise.resolve([]),
   ]);
 
-  return NextResponse.json({ people: peopleHits, events: eventHits, hubs: hubHits, hits: messageHits });
+  return NextResponse.json({
+    people: peopleHits,
+    events: eventHits,
+    hubs: hubHits,
+    hits: messageHits,
+    ...(mine ? { clicks: clickHits, groups: groupHits, places: placeHits } : {}),
+  });
 }

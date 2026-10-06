@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { PlaygroundAvatar, VolumeBars } from '../DeviceChrome';
@@ -33,24 +33,24 @@ export default function ChatPane({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 24 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className={`flex flex-col rounded-[16px] border border-border-hard bg-surface ${
+          className={`flex flex-col rounded-[16px] border border-hairline bg-surface ${
             compact ? 'min-h-0 flex-1' : 'min-h-[420px]'
           }`}
         >
-          <div className="flex items-center gap-3 border-b border-border-hard px-3 py-3">
+          <div className="flex items-center gap-3 border-b border-hairline px-3 py-3">
             <button
               type="button"
               aria-label="Back to messages"
               onClick={() => actions.setOpenChatId(null)}
-              className="rounded-[8px] border border-border-hard p-1.5 text-on-surface-variant"
+              className="rounded-[8px] border border-hairline p-1.5 text-fg-secondary"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <PlaygroundAvatar initials={open.initials} size="sm" online={open.online} />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-on-surface">{open.name}</p>
+              <p className="text-sm font-semibold text-fg">{open.name}</p>
               {memory ? (
-                <p className="flex items-center gap-1.5 truncate text-[11px] text-on-surface-variant">
+                <p className="flex items-center gap-1.5 truncate text-[11px] text-fg-secondary">
                   {memory.label} · {memory.place} <VolumeBars count={memory.volume} />
                 </p>
               ) : null}
@@ -68,10 +68,10 @@ export default function ChatPane({
           className={compact ? 'flex h-full min-h-0 flex-col overflow-y-auto' : undefined}
         >
           <div className="mb-4">
-            <h3 className="text-lg font-bold text-on-surface">{compact ? 'Clicks' : 'Messages'}</h3>
-            <p className="text-xs text-on-surface-variant">Chat with your Clicks</p>
+            <h3 className="text-lg font-bold text-fg">{compact ? 'Clicks' : 'Messages'}</h3>
+            <p className="text-xs text-fg-secondary">Chat with your Clicks</p>
           </div>
-          <div className="mb-4 inline-flex items-center gap-1.5 rounded-2xl border border-border-hard bg-surface-container p-1.5">
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-2xl border border-hairline bg-surface-raised p-1.5">
             {(['active', 'archived'] as const).map((tab) => {
               const selected = listTab === tab;
               const count = tab === 'active' ? connected.length : 0;
@@ -81,19 +81,19 @@ export default function ChatPane({
                   type="button"
                   onClick={() => setListTab(tab)}
                   className={`relative rounded-xl px-4 py-2 text-sm ${
-                    selected ? 'text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+                    selected ? 'text-fg' : 'text-fg-secondary hover:text-fg'
                   }`}
                 >
                   {selected ? (
                     <motion.span
                       layoutId={compact ? 'playground-clicks-tabPill' : 'playground-chatListTabPill'}
-                      className="absolute inset-0 rounded-xl border border-primary/35 bg-primary/15"
+                      className="absolute inset-0 rounded-xl border border-action/35 bg-action/15"
                       transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                     />
                   ) : null}
                   <span className="relative z-10 flex items-center gap-2 capitalize">
                     {tab}
-                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[11px]">{count}</span>
+                    <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px]">{count}</span>
                   </span>
                 </button>
               );
@@ -108,11 +108,11 @@ export default function ChatPane({
               transition={{ duration: 0.2 }}
             >
               {listTab === 'archived' ? (
-                <p className="rounded-[16px] border border-border-hard bg-surface px-4 py-8 text-center text-sm text-on-surface-variant">
+                <p className="rounded-[16px] border border-hairline bg-surface px-4 py-8 text-center text-sm text-fg-secondary">
                   No archived chats in this demo.
                 </p>
               ) : (
-                <ul className="divide-y divide-border-hard overflow-hidden rounded-[16px] border border-border-hard bg-surface">
+                <ul className="divide-y divide-hairline overflow-hidden rounded-[16px] border border-hairline bg-surface">
                   {connected.map((person) => {
                     const thread = state.messages[person.id] ?? [];
                     const fresh = thread.length > 0 && isNewClick(thread);
@@ -127,19 +127,19 @@ export default function ChatPane({
                             if (compact) actions.setDashboardTab('chat');
                           }}
                           data-testid={`playground-chat-${person.id}`}
-                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-container"
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised"
                         >
                           <PlaygroundAvatar initials={person.initials} online={person.online} />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="truncate text-sm font-semibold text-on-surface">{person.name}</p>
+                              <p className="truncate text-sm font-semibold text-fg">{person.name}</p>
                               {fresh ? (
-                          <span className="rounded-full bg-primary-container px-1.5 py-0.5 text-[10px] font-bold text-on-primary-container">48h left</span>
+                          <span className="rounded-full bg-selection px-1.5 py-0.5 text-[10px] font-bold text-accent">48h left</span>
                         ) : (
-                          <span className="text-[11px] text-on-surface-variant">{person.chatTime}</span>
+                          <span className="text-[11px] text-fg-secondary">{person.chatTime}</span>
                         )}
                             </div>
-                            <p className={`truncate text-xs ${fresh ? 'font-semibold text-primary' : 'text-on-surface-variant'}`}>{preview}</p>
+                            <p className={`truncate text-xs ${fresh ? 'font-semibold text-accent' : 'text-fg-secondary'}`}>{preview}</p>
                           </div>
                         </button>
                       </li>

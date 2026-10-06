@@ -1,5 +1,9 @@
 "use client";
 
+import { Plus, X } from "lucide-react";
+import { Button } from "@/components/ds/Button";
+import { IconButton } from "@/components/ds/IconButton";
+import { Toggle } from "@/components/ds/Toggle";
 import { WEEKDAYS } from "@/lib/places/hours";
 import type { PlaceHours, Weekday } from "@/lib/places/types";
 
@@ -14,10 +18,12 @@ const DAY_LABELS: Record<Weekday, string> = {
 };
 
 const DEFAULT_INTERVAL: [string, string] = ["09:00", "17:00"];
+const timeCls =
+  "type-body tabular h-9 rounded-sm bg-surface-raised px-2 text-fg outline-none focus:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] disabled:opacity-40";
 
 /**
- * Weekly hours as people think of them: each day open or closed, with one or more time ranges.
- * A close at or before the open runs past midnight (a bar open 18:00–02:00).
+ * Weekly hours as people think of them (spec §9.5 Profile): each day open or closed, with one or
+ * more time ranges. A close at or before the open runs past midnight (a bar open 18:00–02:00).
  */
 export default function PlaceHoursEditor({
   value,
@@ -44,82 +50,74 @@ export default function PlaceHoursEditor({
   };
 
   return (
-    <div className="space-y-2">
-      {WEEKDAYS.map((day) => {
-        const intervals = value[day];
-        const open = Boolean(intervals && intervals.length > 0);
-        return (
-          <div key={day} className="flex flex-wrap items-center gap-3 rounded-[8px] border border-border-hard/30 px-3 py-2">
-            <label className="flex w-36 items-center gap-2 text-sm font-semibold text-on-surface">
-              <input
-                type="checkbox"
-                checked={open}
-                disabled={disabled}
-                onChange={(e) => setDay(day, e.target.checked ? [DEFAULT_INTERVAL] : undefined)}
-              />
-              {DAY_LABELS[day]}
-            </label>
-            {open ? (
-              <div className="flex flex-1 flex-wrap items-center gap-2">
-                {intervals!.map(([start, end], i) => (
-                  <span key={i} className="flex items-center gap-1 text-sm">
-                    <input
-                      type="time"
-                      aria-label={`${DAY_LABELS[day]} opens`}
-                      value={start}
-                      disabled={disabled}
-                      onChange={(e) => setDay(day, intervals!.map((iv, j) => (j === i ? [e.target.value, iv[1]] : iv)))}
-                      className="rounded-[6px] border border-border-hard/40 bg-surface px-2 py-1"
-                    />
-                    <span aria-hidden>–</span>
-                    <input
-                      type="time"
-                      aria-label={`${DAY_LABELS[day]} closes`}
-                      value={end}
-                      disabled={disabled}
-                      onChange={(e) => setDay(day, intervals!.map((iv, j) => (j === i ? [iv[0], e.target.value] : iv)))}
-                      className="rounded-[6px] border border-border-hard/40 bg-surface px-2 py-1"
-                    />
-                    {intervals!.length > 1 ? (
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        aria-label={`Remove ${DAY_LABELS[day]} time range`}
-                        onClick={() => setDay(day, intervals!.filter((_, j) => j !== i))}
-                        className="px-1 text-on-surface-variant hover:text-on-surface"
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </span>
-                ))}
-                {intervals!.length < 6 ? (
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => setDay(day, [...intervals!, ["18:00", "22:00"]])}
-                    className="text-xs font-semibold text-primary hover:underline"
-                  >
-                    + Add hours
-                  </button>
-                ) : null}
-                <button
-                  type="button"
+    <div>
+      <ul className="overflow-hidden rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)]">
+        {WEEKDAYS.map((day) => {
+          const intervals = value[day];
+          const open = Boolean(intervals && intervals.length > 0);
+          return (
+            <li key={day} className="flex flex-wrap items-center gap-3 px-4 py-2.5 shadow-[inset_0_1px_0_var(--hairline)] first:shadow-none">
+              <span className="flex w-40 items-center gap-3">
+                <Toggle
+                  checked={open}
                   disabled={disabled}
-                  onClick={() => copyToAll(day)}
-                  className="text-xs font-semibold text-on-surface-variant hover:underline"
-                >
-                  Copy to every day
-                </button>
-              </div>
-            ) : (
-              <span className="text-sm text-on-surface-variant">Closed</span>
-            )}
-          </div>
-        );
-      })}
-      <p className="text-xs text-on-surface-variant">
-        Times are local to your Place. A closing time earlier than the opening time runs past midnight.
+                  onCheckedChange={(on) => setDay(day, on ? [DEFAULT_INTERVAL] : undefined)}
+                  aria-label={`${DAY_LABELS[day]} open`}
+                />
+                <span className="type-body-strong text-fg">{DAY_LABELS[day]}</span>
+              </span>
+              {open ? (
+                <span className="flex flex-1 flex-wrap items-center gap-2">
+                  {intervals!.map(([start, end], i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      <input
+                        type="time"
+                        aria-label={`${DAY_LABELS[day]} opens`}
+                        value={start}
+                        disabled={disabled}
+                        onChange={(e) => setDay(day, intervals!.map((iv, j) => (j === i ? [e.target.value, iv[1]] : iv)))}
+                        className={timeCls}
+                      />
+                      <span aria-hidden className="text-fg-tertiary">
+                        –
+                      </span>
+                      <input
+                        type="time"
+                        aria-label={`${DAY_LABELS[day]} closes`}
+                        value={end}
+                        disabled={disabled}
+                        onChange={(e) => setDay(day, intervals!.map((iv, j) => (j === i ? [iv[0], e.target.value] : iv)))}
+                        className={timeCls}
+                      />
+                      {intervals!.length > 1 ? (
+                        <IconButton
+                          icon={X}
+                          size="sm"
+                          disabled={disabled}
+                          aria-label={`Remove ${DAY_LABELS[day]} time range`}
+                          onClick={() => setDay(day, intervals!.filter((_, j) => j !== i))}
+                        />
+                      ) : null}
+                    </span>
+                  ))}
+                  {intervals!.length < 6 ? (
+                    <Button size="sm" variant="plain" icon={Plus} disabled={disabled} onClick={() => setDay(day, [...intervals!, ["18:00", "22:00"]])}>
+                      Add hours
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="plain" className="text-fg-secondary" disabled={disabled} onClick={() => copyToAll(day)}>
+                    Copy to every day
+                  </Button>
+                </span>
+              ) : (
+                <span className="type-body text-fg-tertiary">Closed</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="type-meta mt-2 px-4 text-fg-tertiary">
+        Local to your Place. A closing time earlier than the opening time runs past midnight.
       </p>
     </div>
   );

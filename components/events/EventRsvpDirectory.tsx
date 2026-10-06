@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { PersonRow } from "@/components/ds/PersonRow";
+import { SegmentedControl } from "@/components/ds/SegmentedControl";
+import { StatusPill } from "@/components/ds/StatusPill";
 import { useAuth } from "@/lib/AuthContext";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
-import UserProfileModal from "@/components/UserProfileModal";
-import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
 import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
 import { fetchEventRsvpPayload } from "@/lib/events/eventRsvpClient";
+import { personHref } from "@/lib/shell/appNav";
 import { cn } from "@/lib/cn";
 
 type Attendee = {
@@ -21,6 +23,8 @@ type MutualPayload = {
   attendees: Attendee[];
 };
 
+type Sort = "best" | "az" | "clicks";
+
 const fetchMutual = async (url: string) => {
   const headers = await getFreshAuthHeaders();
   const res = await fetch(url, { headers });
@@ -28,6 +32,9 @@ const fetchMutual = async (url: string) => {
   return res.json() as Promise<MutualPayload>;
 };
 
+const byName = (a: Attendee, b: Attendee) => a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+
+/** Who's going (spec §7.6.2 "See all"): your Clicks first, A–Z, or only your Clicks. */
 export default function EventRsvpDirectory({
   beaconId,
   allowPeek = false,
@@ -38,7 +45,7 @@ export default function EventRsvpDirectory({
   className?: string;
 }) {
   const { user } = useAuth();
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [sort, setSort] = useState<Sort>("best");
   const { data } = useSWR(user ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload);
   const { data: mutual } = useSWR(
     user ? `/api/beacons/${beaconId}/mutual-attendees` : null,
@@ -47,41 +54,51 @@ export default function EventRsvpDirectory({
 
   if (!data?.attendees?.length) return null;
   if (!allowPeek && !data.current_user_signed_up) return null;
-  const attendees = data.attendees;
   const mutualIds = new Set((mutual?.attendees ?? []).map((person) => person.user_id));
+  const known = (p: Attendee) => mutualIds.has(p.user_id);
+  const attendees = [...data.attendees].sort(byName);
+  const shown =
+    sort === "clicks"
+      ? attendees.filter(known)
+      : sort === "best"
+        ? [...attendees.filter(known), ...attendees.filter((p) => !known(p))]
+        : attendees;
 
   return (
-    <div
-      className={cn("mt-5 border-t border-border-hard pt-4", className)}
-      data-testid="event-rsvp-directory"
-    >
-      <p className="text-sm font-semibold text-on-surface">Who&apos;s going</p>
-      <ul className="mt-3 space-y-2">
-        {attendees.map((person) => (
+    <div className={cn("space-y-3", className)} data-testid="event-rsvp-directory">
+      {mutualIds.size > 0 ? (
+        <SegmentedControl<Sort>
+          size="sm"
+          fullWidth
+          label="Sort guests"
+          value={sort}
+          onChange={setSort}
+          segments={[
+            { value: "best", label: "Best match" },
+            { value: "az", label: "A–Z" },
+            { value: "clicks", label: `Your Clicks · ${mutualIds.size}` },
+          ]}
+        />
+      ) : null}
+      <ul>
+        {shown.map((person) => (
           <li key={person.user_id}>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-[12px] px-2 py-1.5 text-left hover:bg-surface-container"
-              onClick={() => setProfileUserId(person.user_id)}
-            >
-              <ConnectionPeerAvatar label={person.name} imageUrl={person.avatar_url} size="sm" />
-              <span className="min-w-0 flex-1 text-sm font-medium text-on-surface">{person.name}</span>
-              {mutualIds.has(person.user_id) ? (
-                <span className="shrink-0 rounded-full bg-surface-container px-2 py-0.5 text-xs font-semibold text-on-surface-variant">
-                  You know them
-                </span>
-              ) : null}
-            </button>
+            <PersonRow
+              seed={person.user_id}
+              name={person.name}
+              src={person.avatar_url}
+              href={personHref(person.user_id)}
+              trailing={
+                known(person) ? (
+                  <StatusPill variant="tinted">Your Click</StatusPill>
+                ) : person.user_id === user?.id ? (
+                  <StatusPill variant="neutral">You</StatusPill>
+                ) : null
+              }
+            />
           </li>
         ))}
       </ul>
-      {/* Always mounted so closing plays the exit animation. */}
-      <UserProfileModal
-        userId={profileUserId}
-        getAuthHeaders={getFreshAuthHeaders}
-        onClose={() => setProfileUserId(null)}
-        currentUserId={user?.id}
-      />
     </div>
   );
 }

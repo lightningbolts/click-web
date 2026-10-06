@@ -11,11 +11,6 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
 }));
 
-jest.mock('@/components/HomeAuthenticated', () => ({
-  __esModule: true,
-  default: () => <div data-testid="home-authenticated" />,
-}));
-
 jest.mock('@/components/landing/fold-map/FoldMapHero', () => ({
   __esModule: true,
   default: ({ onJoinWaitlist, cells }: { onJoinWaitlist: () => void; cells: readonly unknown[] }) => (
@@ -48,6 +43,10 @@ jest.mock('framer-motion', () => {
     );
   return {
     motion: new Proxy({}, { get: (_target: unknown, prop: string) => Forward(prop) }),
+    m: new Proxy({}, { get: (_target: unknown, prop: string) => Forward(prop) }),
+    LazyMotion: ({ children }: { children: React.ReactNode }) => children,
+    domAnimation: {},
+    domMax: {},
     AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
     useReducedMotion: () => true,
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { toast } from 'sonner';
+import { toast } from '@/components/ds/Toast';
 
 export const ENCOUNTER_COOLDOWN_TOAST_MESSAGE =
   'You recently crossed paths with this person! Wait a bit before logging another memory.';

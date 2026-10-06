@@ -7,6 +7,8 @@ const config = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // next build aliases this to `images.loaderFile`; next/jest does not.
+    '^next/dist/shared/lib/image-loader$': '<rootDir>/lib/images/cfLoader.ts',
   },
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',

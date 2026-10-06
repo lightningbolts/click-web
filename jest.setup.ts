@@ -122,6 +122,7 @@ jest.mock(
       Marker,
       Popup,
       LngLatBounds,
+      setWorkerUrl: jest.fn(),
     };
 
     // MapLibre v6 is consumed through namespace imports in production. Export the same members at

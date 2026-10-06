@@ -22,6 +22,10 @@ jest.mock('@/lib/server/supabaseRouteAuth', () => ({
 jest.mock('@/lib/server/businessInsightsEligibility', () => ({
   userMayAccessBusinessInsights: (...args: unknown[]) => mockUserMayAccessBusinessInsights(...args),
 }));
+jest.mock('@/lib/server/places/entitlement', () => ({
+  ...jest.requireActual('@/lib/server/places/entitlement'),
+  userMayViewPlaceInsights: (...args: unknown[]) => mockUserMayAccessBusinessInsights(...args),
+}));
 
 jest.mock('@/lib/server/admin/supabaseAdmin', () => ({
   createAdminSupabaseClient: (...args: unknown[]) => mockCreateAdminSupabaseClient(...args),

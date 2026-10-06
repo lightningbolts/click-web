@@ -8,7 +8,8 @@ function read(rel: string): string {
 describe('anonymous landing JS budget', () => {
   it('does not statically import dashboard, playground, or waitlist chrome', () => {
     const landing = read('components/landing/LandingPage.tsx');
-    const navbar = read('components/Navbar.tsx');
+    const chrome = read('components/app-shell/SiteChrome.tsx');
+    const waitlist = read('components/app-shell/WaitlistButton.tsx');
     const layout = read('app/layout.tsx');
     const page = read('app/page.tsx');
 
@@ -19,11 +20,14 @@ describe('anonymous landing JS budget', () => {
     expect(landing).toContain('next/dynamic');
     expect(landing).toContain('LandingPlaygroundLazy');
 
-    expect(navbar).not.toMatch(/import LoginModal from/);
-    expect(navbar).toContain('next/dynamic');
+    // Waitlist modal stays out of the anonymous bundle until asked for.
+    expect(chrome).not.toMatch(/import WaitlistModal from/);
+    expect(waitlist).toMatch(/dynamic\(|import\(/);
 
-    expect(layout).toContain('preload: false');
-    expect(layout).toContain('getServerUser');
+    // Root layout stays static: no cookie read, one display font (spec §4.2, §11).
+    expect(layout).not.toContain('getServerUser');
+    expect(layout).not.toMatch(/Source_Serif|Inter\(/);
+    expect(layout).not.toContain('@vercel/analytics');
     expect(page).toContain('getServerUser');
     expect(page).toContain('basemaps.cartocdn.com');
 

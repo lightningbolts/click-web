@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
+import { userMayViewPlaceInsights } from "@/lib/server/places/entitlement";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -28,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!(await userMayAccessBusinessInsights(supabase, user))) {
+    if (!(await userMayViewPlaceInsights(supabase, user, venueId))) {
       return NextResponse.json(
         { error: "Forbidden: Requires verified business or active venue subscription" },
         { status: 403 },

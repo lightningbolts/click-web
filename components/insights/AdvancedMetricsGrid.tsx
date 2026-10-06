@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { Anchor, AudioLines, GitBranch, HeartHandshake, Info } from "lucide-react";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { AdvancedMetricsApiResponse } from "@/lib/insights/advancedMetrics";
@@ -40,7 +40,7 @@ function AdvancedMetricsSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="bg-surface-container rounded-2xl h-44 animate-pulse border border-border-hard" />
+        <div key={i} className="bg-surface-raised rounded-2xl h-44 animate-pulse border border-hairline" />
       ))}
     </div>
   );
@@ -85,7 +85,7 @@ export default function AdvancedMetricsGrid({
   if (isLoading && !error && !staticData) {
     return (
       <div className="space-y-3">
-        <h2 className="text-sm font-medium text-on-surface-variant tracking-wide">Advanced Social ROI</h2>
+        <h2 className="text-sm font-medium text-fg-secondary tracking-wide">Advanced Social ROI</h2>
         <AdvancedMetricsSkeleton />
       </div>
     );
@@ -99,7 +99,7 @@ export default function AdvancedMetricsGrid({
 
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-medium text-on-surface-variant tracking-wide">Advanced Social ROI</h2>
+      <h2 className="text-sm font-medium text-fg-secondary tracking-wide">Advanced Social ROI</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -108,18 +108,18 @@ export default function AdvancedMetricsGrid({
         >
           <GlassPanel className="p-6 h-full" hover glow="purple">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-primary/20 rounded-lg">
-                <HeartHandshake className="w-4 h-4 text-primary" />
+              <div className="p-2 bg-action/20 rounded-lg">
+                <HeartHandshake className="w-4 h-4 text-accent" />
               </div>
-              <span className="text-sm font-medium text-on-surface-variant">
-                Venue Loyalty Coefficient
+              <span className="text-sm font-medium text-fg-secondary">
+                Place loyalty
               </span>
             </div>
-            <div className="text-4xl font-semibold text-on-surface tabular-nums">
+            <div className="text-4xl font-semibold text-fg tabular-nums">
               {data.venueLoyaltyCoefficient.toFixed(1)}%
             </div>
-            <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">
-              Return visitors after connecting — share of guests who came back to this venue more
+            <p className="text-xs text-fg-secondary mt-3 leading-relaxed">
+              Return visitors after connecting — share of guests who came back to this Place more
               than 24 hours after their first connection here.
             </p>
             <InsightCallout
@@ -140,30 +140,30 @@ export default function AdvancedMetricsGrid({
         >
           <GlassPanel className="p-6 h-full" hover glow="blue">
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-primary/20 rounded-lg">
-                <Anchor className="w-4 h-4 text-primary" />
+              <div className="p-2 bg-action/20 rounded-lg">
+                <Anchor className="w-4 h-4 text-accent" />
               </div>
-              <span className="text-sm font-medium text-on-surface-variant">Anchor Magnetism</span>
+              <span className="text-sm font-medium text-fg-secondary">Anchor Magnetism</span>
             </div>
             {topAnchors.length === 0 ? (
-              <p className="text-sm text-on-surface-variant">
+              <p className="text-sm text-fg-secondary">
                 Link connections to NFC anchors to rank tap points by magnetism.
               </p>
             ) : (
               <ul className="space-y-3">
                 {topAnchors.map((a, i) => (
                   <li key={a.nfc_anchor_id} className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-on-surface-variant">
-                      <span className="text-on-surface truncate pr-2">
+                    <div className="flex justify-between text-xs text-fg-secondary">
+                      <span className="text-fg truncate pr-2">
                         {i + 1}. {a.name}
                       </span>
-                      <span className="tabular-nums shrink-0 text-on-surface-variant">
+                      <span className="tabular-nums shrink-0 text-fg-secondary">
                         {(a.ams_score * 100).toFixed(2)}
                       </span>
                     </div>
-                    <div className="h-2 rounded-full bg-surface-container-high overflow-hidden">
+                    <div className="h-2 rounded-full bg-surface-raised overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-primary"
+                        className="h-full rounded-full bg-action"
                         style={{ width: `${(a.ams_score / maxAms) * 100}%` }}
                       />
                     </div>
@@ -184,13 +184,13 @@ export default function AdvancedMetricsGrid({
               <div className="p-2 bg-emerald-500/20 rounded-lg">
                 <AudioLines className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
               </div>
-              <span className="text-sm font-medium text-on-surface-variant">Acoustic Conversion</span>
+              <span className="text-sm font-medium text-fg-secondary">Acoustic Conversion</span>
             </div>
-            <p className="text-lg text-on-surface font-medium">
+            <p className="text-lg text-fg font-medium">
               Optimal social noise level:{" "}
               <span className="text-emerald-700 dark:text-emerald-300">{acr?.label}</span>
             </p>
-            <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">{acr?.detail}</p>
+            <p className="text-xs text-fg-secondary mt-3 leading-relaxed">{acr?.detail}</p>
           </GlassPanel>
         </motion.div>
 
@@ -204,9 +204,9 @@ export default function AdvancedMetricsGrid({
               <div className="p-2 bg-green-500/20 rounded-lg">
                 <GitBranch className="w-4 h-4 text-green-700 dark:text-green-400" />
               </div>
-              <span className="text-sm font-medium text-on-surface-variant">Cross-Pollination</span>
+              <span className="text-sm font-medium text-fg-secondary">Cross-Pollination</span>
               <span
-                className="inline-flex items-center justify-center ml-auto text-on-surface-variant"
+                className="inline-flex items-center justify-center ml-auto text-fg-secondary"
                 title="Connections across different interest groups — share of connections where both people share at most one overlapping interest tag."
               >
                 <Info className="w-4 h-4" aria-hidden />
@@ -215,10 +215,10 @@ export default function AdvancedMetricsGrid({
                 </span>
               </span>
             </div>
-            <div className="text-4xl font-semibold text-on-surface tabular-nums">
+            <div className="text-4xl font-semibold text-fg tabular-nums">
               {data.crossPollinationRate.toFixed(1)}%
             </div>
-            <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">
+            <p className="text-xs text-fg-secondary mt-3 leading-relaxed">
               Share of connections with little or no tag overlap — bridging different circles.
             </p>
           </GlassPanel>

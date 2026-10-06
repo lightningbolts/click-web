@@ -6,32 +6,50 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { DARK_QUERY, STORAGE_KEY, THEME_COLOR, type Theme } from "./themeBoot";
 
-export type Theme = "light" | "dark";
+export { THEME_BOOT_SCRIPT, THEME_COLOR, type Theme } from "./themeBoot";
 
-const STORAGE_KEY = "click-theme";
+/** What the person chose in Settings › Appearance. System is the default (spec §4). */
+export type ThemePreference = "system" | "light" | "dark";
 
 type ThemeContextValue = {
+  /** Resolved theme (light/dark) — what maps and charts should render. */
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
+  /** Pins the opposite of the current resolved theme. */
   toggleTheme: () => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function resolveInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+export function readStoredPreference(): ThemePreference {
+  if (typeof window === "undefined") return "system";
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
     /* ignore */
   }
-  if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) return "dark";
-  return "light";
+  return "system";
+}
+
+function systemTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia?.(DARK_QUERY).matches ? "dark" : "light";
+}
+
+export function resolveTheme(preference: ThemePreference): Theme {
+  return preference === "system" ? systemTheme() : preference;
+}
+
+/** @deprecated use readStoredPreference + resolveTheme */
+export function resolveInitialTheme(): Theme {
+  return resolveTheme(readStoredPreference());
 }
 
 export function applyThemeToDocument(theme: Theme) {
@@ -40,49 +58,62 @@ export function applyThemeToDocument(theme: Theme) {
   root.dataset.theme = theme;
 
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) {
-    meta.setAttribute("content", theme === "dark" ? "#120e18" : "#f9f9f9");
-  }
+  if (meta) meta.setAttribute("content", THEME_COLOR[theme]);
 }
 
-/** Inline boot script — keep in sync with resolveInitialTheme / STORAGE_KEY. */
-export const THEME_BOOT_SCRIPT = `(function(){try{var k=${JSON.stringify(STORAGE_KEY)};var t=localStorage.getItem(k);if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}var d=document.documentElement;d.classList.toggle("dark",t==="dark");d.dataset.theme=t;}catch(e){}})();`;
+const CHANGE_EVENT = "click-theme-change";
+
+function persist(preference: ThemePreference) {
+  try {
+    if (preference === "system") window.localStorage.removeItem(STORAGE_KEY);
+    else window.localStorage.setItem(STORAGE_KEY, preference);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/** Stored preference as an external store: same-tab changes + other tabs (storage event). */
+function subscribePreference(onChange: () => void) {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY || e.key === null) onChange();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
+}
+
+function subscribeSystem(onChange: () => void) {
+  const mql = window.matchMedia?.(DARK_QUERY);
+  mql?.addEventListener("change", onChange);
+  return () => mql?.removeEventListener("change", onChange);
+}
+
+const serverPreference = (): ThemePreference => "system";
+const serverSystemTheme = (): Theme => "light";
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
+  const preference = useSyncExternalStore(subscribePreference, readStoredPreference, serverPreference);
+  const system = useSyncExternalStore(subscribeSystem, systemTheme, serverSystemTheme);
+  const theme: Theme = preference === "system" ? system : preference;
 
+  // The boot script already painted the right class; this keeps it in sync after changes.
   useEffect(() => {
-    const initial = resolveInitialTheme();
-    setThemeState(initial);
-    applyThemeToDocument(initial);
-  }, []);
+    applyThemeToDocument(theme);
+  }, [theme]);
 
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
-    applyThemeToDocument(next);
-  }, []);
+  const setPreference = useCallback((next: ThemePreference) => persist(next), []);
 
   const toggleTheme = useCallback(() => {
-    setThemeState((prev) => {
-      const next: Theme = prev === "dark" ? "light" : "dark";
-      try {
-        window.localStorage.setItem(STORAGE_KEY, next);
-      } catch {
-        /* ignore */
-      }
-      applyThemeToDocument(next);
-      return next;
-    });
+    persist(resolveTheme(readStoredPreference()) === "dark" ? "light" : "dark");
   }, []);
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme }),
-    [theme, setTheme, toggleTheme],
+    () => ({ theme, preference, setPreference, toggleTheme }),
+    [theme, preference, setPreference, toggleTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

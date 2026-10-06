@@ -14,7 +14,7 @@ import {
   sanitizeDownloadName,
 } from '@/lib/userProfile/profileMediaItems';
 
-describe('profileMediaItems helpers (moved verbatim from UserProfileModal)', () => {
+describe('profileMediaItems helpers (profile tab items)', () => {
   it('pickString/pickNumber/pickBoolean read the first usable key', () => {
     expect(pickString({ a: ' x ' }, ['missing', 'a'])).toBe('x');
     expect(pickString(null, ['a'])).toBeNull();

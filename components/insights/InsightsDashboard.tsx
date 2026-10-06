@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { useInsightsChartTheme } from "@/lib/theme/insightsChartTheme";
 import {
   LineChart,
@@ -48,7 +48,6 @@ import {
   mockInsightsHourlyDistribution,
   mockInsightsPeakHour,
 } from "@/lib/insights/mockData";
-import { DemoBanner } from "./DemoBanner";
 import { useInsightsDemo } from "./InsightsDemoContext";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { VibeMessage, TribeBubble, HeatmapZone } from "@/lib/insights/mockData";
@@ -88,27 +87,27 @@ function InsightsSkeleton() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="bg-surface-container rounded-2xl h-52 animate-pulse" />
+          <div key={i} className="bg-surface-raised rounded-2xl h-52 animate-pulse" />
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {[0, 1].map((i) => (
           <div
             key={i}
-            className="bg-surface-container rounded-2xl h-[380px] animate-pulse"
+            className="bg-surface-raised rounded-2xl h-[380px] animate-pulse"
           />
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        <div className="bg-surface-container rounded-2xl h-80 lg:col-span-2 animate-pulse" />
-        <div className="bg-surface-container rounded-2xl h-80 animate-pulse" />
+        <div className="bg-surface-raised rounded-2xl h-80 lg:col-span-2 animate-pulse" />
+        <div className="bg-surface-raised rounded-2xl h-80 animate-pulse" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="bg-surface-container rounded-2xl h-36 animate-pulse" />
+          <div key={i} className="bg-surface-raised rounded-2xl h-36 animate-pulse" />
         ))}
       </div>
-      <div className="bg-surface-container rounded-2xl h-52 animate-pulse" />
+      <div className="bg-surface-raised rounded-2xl h-52 animate-pulse" />
     </div>
   );
 }
@@ -221,20 +220,20 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+            className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
           >
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-on-surface mb-2">
-              Access Denied
+            <h1 className="text-2xl font-bold text-fg mb-2">
+              Insights aren’t on for this Place
             </h1>
-            <p className="text-on-surface-variant mb-6">
-              This dashboard is only available to verified business partners.
+            <p className="text-fg-secondary mb-6">
+              Insights are part of Click for Business for this Place.
             </p>
             <button
-              onClick={() => router.push("/")}
-              className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
+              onClick={() => router.push("/business")}
+              className="bg-action hover:brightness-90 text-on-action px-6 py-3 rounded-xl transition-colors"
             >
-              Go to your dashboard
+              Go to your Places
             </button>
           </motion.div>
         </div>
@@ -246,19 +245,19 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-on-surface mb-2">
+          <h1 className="text-2xl font-bold text-fg mb-2">
             Could not load insights
           </h1>
-          <p className="text-on-surface-variant mb-6">
+          <p className="text-fg-secondary mb-6">
             Something went wrong. Please refresh or try again later.
           </p>
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
+            className="bg-action hover:brightness-90 text-on-action px-6 py-3 rounded-xl transition-colors"
           >
             Retry
           </button>
@@ -273,19 +272,19 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border border-border-hard p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
-          <Users className="w-16 h-16 text-outline mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-on-surface mb-2">
+          <Users className="w-16 h-16 text-fg-tertiary mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-fg mb-2">
             Insufficient Data
           </h1>
-          <p className="text-on-surface-variant mb-6">
+          <p className="text-fg-secondary mb-6">
             {data.message ||
               "We need at least 5 connections to generate insights to protect user privacy."}
           </p>
           <button
-            onClick={() => router.push("/")}
-            className="bg-primary hover:brightness-90 text-on-primary px-6 py-3 rounded-xl transition-colors"
+            onClick={() => router.push("/business")}
+            className="bg-action hover:brightness-90 text-on-action px-6 py-3 rounded-xl transition-colors"
           >
             Back to your dashboard
           </button>
@@ -324,11 +323,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       animate="visible"
       className="space-y-6"
     >
-      {isDemoFallback ? (
-        <motion.div variants={itemVariants}>
-          <DemoBanner />
-        </motion.div>
-      ) : data?.status === "no_venue" && data.message ? (
+      {isDemoFallback ? null : data?.status === "no_venue" && data.message ? (
         <motion.div
           variants={itemVariants}
           className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
@@ -387,14 +382,14 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <GlassPanel className="lg:col-span-2 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/20 rounded-lg">
-                <Activity className="w-4 h-4 text-primary" />
+              <div className="p-2 bg-action/20 rounded-lg">
+                <Activity className="w-4 h-4 text-accent" />
               </div>
-              <span className="text-sm font-medium text-on-surface-variant">
+              <span className="text-sm font-medium text-fg-secondary">
                 Social Activity
               </span>
             </div>
-            <span className="text-xs text-on-surface-variant">Last 30 days</span>
+            <span className="text-xs text-fg-secondary">Last 30 days</span>
           </div>
           <div className="w-full min-w-0 overflow-hidden">
             <ResponsiveContainer
@@ -485,60 +480,60 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
       >
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-primary/20 rounded-lg">
-              <Users className="w-4 h-4 text-primary" />
+            <div className="p-2 bg-action/20 rounded-lg">
+              <Users className="w-4 h-4 text-accent" />
             </div>
-            <span className="text-sm font-medium text-on-surface-variant">
+            <span className="text-sm font-medium text-fg-secondary">
               Total Connections
             </span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">
+          <div className="text-3xl font-bold text-fg">
             {displayInsights?.totalConnections || 0}
           </div>
-          <div className="text-xs text-on-surface-variant mt-2">Last 30 days</div>
+          <div className="text-xs text-fg-secondary mt-2">Last 30 days</div>
         </GlassPanel>
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-primary/20 rounded-lg">
-              <TrendingUp className="w-4 h-4 text-primary" />
+            <div className="p-2 bg-action/20 rounded-lg">
+              <TrendingUp className="w-4 h-4 text-accent" />
             </div>
-            <span className="text-sm font-medium text-on-surface-variant">
+            <span className="text-sm font-medium text-fg-secondary">
               Retention Rate
             </span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">
+          <div className="text-3xl font-bold text-fg">
             {displayInsights?.retentionRate || "N/A"}
           </div>
-          <div className="text-xs text-on-surface-variant mt-2">Returning visitors</div>
+          <div className="text-xs text-fg-secondary mt-2">Returning visitors</div>
         </GlassPanel>
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-primary/20 rounded-lg">
-              <Calendar className="w-4 h-4 text-on-surface-variant" />
+            <div className="p-2 bg-action/20 rounded-lg">
+              <Calendar className="w-4 h-4 text-fg-secondary" />
             </div>
-            <span className="text-sm font-medium text-on-surface-variant">
+            <span className="text-sm font-medium text-fg-secondary">
               Busiest Day
             </span>
           </div>
-          <div className="text-2xl font-bold text-on-surface">
+          <div className="text-2xl font-bold text-fg">
             {displayInsights?.busiestDay || "N/A"}
           </div>
-          <div className="text-xs text-on-surface-variant mt-2">Highest activity</div>
+          <div className="text-xs text-fg-secondary mt-2">Highest activity</div>
         </GlassPanel>
 
         <GlassPanel className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-primary/20 rounded-lg">
-              <Clock className="w-4 h-4 text-primary" />
+            <div className="p-2 bg-action/20 rounded-lg">
+              <Clock className="w-4 h-4 text-accent" />
             </div>
-            <span className="text-sm font-medium text-on-surface-variant">Peak Hour</span>
+            <span className="text-sm font-medium text-fg-secondary">Peak Hour</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">
+          <div className="text-3xl font-bold text-fg">
             {displayInsights?.peakHour ?? "N/A"}:00
           </div>
-          <div className="text-xs text-on-surface-variant mt-2">Most active time</div>
+          <div className="text-xs text-fg-secondary mt-2">Most active time</div>
         </GlassPanel>
       </motion.div>
 
@@ -547,14 +542,14 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/20 rounded-lg">
-                <BarChart3 className="w-4 h-4 text-primary" />
+              <div className="p-2 bg-action/20 rounded-lg">
+                <BarChart3 className="w-4 h-4 text-accent" />
               </div>
-              <span className="text-sm font-medium text-on-surface-variant">
+              <span className="text-sm font-medium text-fg-secondary">
                 Popular Times
               </span>
             </div>
-            <span className="text-xs text-on-surface-variant">Hourly distribution</span>
+            <span className="text-xs text-fg-secondary">Hourly distribution</span>
           </div>
           <div className="w-full min-w-0 overflow-hidden">
             <ResponsiveContainer
@@ -595,9 +590,9 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 text-center text-xs text-on-surface-variant">
+          <div className="mt-4 text-center text-xs text-fg-secondary">
             Peak activity is around{" "}
-            <span className="text-primary font-bold">
+            <span className="text-accent font-bold">
               {displayInsights?.peakHour}:00
             </span>
           </div>
@@ -609,7 +604,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
 
 /**
  * InsightsDashboard - Renders the overview bento-grid content.
- * The layout shell is provided by app/insights/layout.tsx (BusinessInsightsShell).
+ * Rendered inside the Place workspace (Insights › Overview).
  * Pass venueId to fetch real data from the API.
  */
 export default function InsightsDashboard({ venueId }: { venueId?: string }) {

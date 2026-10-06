@@ -83,22 +83,22 @@ export function GifPicker({
       ref={panelRef}
       role="dialog"
       aria-label="GIF search"
-      className="absolute bottom-full left-4 right-4 z-50 mb-2 flex max-h-[min(26rem,60vh)] flex-col overflow-hidden rounded-[12px] border border-border-hard bg-surface shadow-xl sm:right-auto sm:w-[22rem]"
+      className="absolute bottom-full left-4 right-4 z-50 mb-2 flex max-h-[min(26rem,60vh)] flex-col overflow-hidden rounded-[12px] border border-hairline bg-surface shadow-xl sm:right-auto sm:w-[22rem]"
     >
-      <div className="flex items-center gap-2 border-b border-border-hard px-3 py-2">
-        <Search className="h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
+      <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
+        <Search className="h-4 w-4 shrink-0 text-fg-secondary" aria-hidden />
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search KLIPY"
           aria-label="Search KLIPY"
-          className="min-w-0 flex-1 bg-transparent text-sm text-on-surface placeholder:text-outline focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent text-sm text-fg placeholder:text-fg-tertiary focus:outline-none"
         />
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-on-surface-variant hover:text-on-surface"
+          className="shrink-0 text-fg-secondary hover:text-fg"
           aria-label="Close GIF search"
         >
           <X className="h-4 w-4" />
@@ -106,9 +106,9 @@ export function GifPicker({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {error ? (
-          <p className="px-2 py-6 text-center text-xs text-on-surface-variant">{error}</p>
+          <p className="px-2 py-6 text-center text-xs text-fg-secondary">{error}</p>
         ) : items.length === 0 && !loading ? (
-          <p className="px-2 py-6 text-center text-xs text-on-surface-variant">No GIFs found</p>
+          <p className="px-2 py-6 text-center text-xs text-fg-secondary">No GIFs found</p>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">
             {items.map((item) => {
@@ -119,7 +119,7 @@ export function GifPicker({
                   key={`${item.id}-${item.slug}`}
                   type="button"
                   onClick={() => onSelect(item, query)}
-                  className="overflow-hidden rounded-[8px] bg-surface-container ring-primary focus-visible:outline-none focus-visible:ring-2"
+                  className="overflow-hidden rounded-[8px] bg-surface-raised ring-accent focus-visible:outline-none focus-visible:ring-2"
                   style={{ aspectRatio: `${preview.width} / ${preview.height}` }}
                   title={item.title || 'Send GIF'}
                 >
@@ -138,19 +138,19 @@ export function GifPicker({
         )}
         {loading ? (
           <div className="flex justify-center py-3">
-            <Loader2 className="h-4 w-4 animate-spin text-on-surface-variant" aria-label="Loading GIFs" />
+            <Loader2 className="h-4 w-4 animate-spin text-fg-secondary" aria-label="Loading GIFs" />
           </div>
         ) : hasNext && !error ? (
           <button
             type="button"
             onClick={() => void load(query, page + 1)}
-            className="mt-2 w-full rounded-[8px] border border-border-hard py-1.5 text-xs text-on-surface-variant hover:border-primary hover:text-primary"
+            className="mt-2 w-full rounded-[8px] border border-hairline py-1.5 text-xs text-fg-secondary hover:border-action hover:text-accent"
           >
             Load more
           </button>
         ) : null}
       </div>
-      <p className="border-t border-border-hard px-3 py-1.5 text-right text-[10px] text-on-surface-variant">
+      <p className="border-t border-hairline px-3 py-1.5 text-right text-[10px] text-fg-secondary">
         Powered by KLIPY
       </p>
     </div>

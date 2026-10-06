@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
-import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
+import { userMayViewPlaceInsights } from "@/lib/server/places/entitlement";
 import { resolveInsightsVenueId } from "@/lib/server/resolveInsightsVenueId";
 import {
   parseVibeRadarRpcPayload,
@@ -10,7 +10,7 @@ import {
 
 /**
  * Aggregated availability intent clusters near the venue (no user-level data).
- * Auth: business insights + venue manager for `venue_id`.
+ * Auth: venue manager for `venue_id`, and that Place has Insights (per-Place entitlement).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,14 +19,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!(await userMayAccessBusinessInsights(supabase, user))) {
+    const venueId = await resolveInsightsVenueId(request, supabase, user);
+    // Insights are paid per Place (spec §9.7): the Place in question must be on the plan.
+    if (venueId && !(await userMayViewPlaceInsights(supabase, user, venueId))) {
       return NextResponse.json(
         { error: "Forbidden: Requires verified business or active venue subscription" },
         { status: 403 },
       );
     }
-
-    const venueId = await resolveInsightsVenueId(request, supabase, user);
     if (!venueId) {
       const body: VibeRadarApiResponse = {
         clusters: [],

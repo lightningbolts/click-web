@@ -17,16 +17,16 @@ export function PhoneChrome({
 }) {
   return (
     <div className="mx-auto w-full max-w-[300px] shrink-0">
-      <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-on-surface-variant">
+      <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-fg-secondary">
         {label}
       </p>
-      <div className="relative overflow-hidden rounded-[28px] border border-border-hard bg-surface shadow-sm">
-        <div className="flex items-center justify-center bg-surface-container py-2">
-          <div className="h-4 w-20 rounded-full bg-on-surface/15" aria-hidden />
+      <div className="relative overflow-hidden rounded-[28px] border border-hairline bg-surface shadow-sm">
+        <div className="flex items-center justify-center bg-surface-raised py-2">
+          <div className="h-4 w-20 rounded-full bg-fg/15" aria-hidden />
         </div>
-        <div className="relative h-[560px] overflow-hidden bg-background">{children}</div>
+        <div className="relative h-[560px] overflow-hidden bg-bg">{children}</div>
         <nav
-          className="grid grid-cols-5 border-t border-border-hard bg-surface px-1 py-2"
+          className="grid grid-cols-5 border-t border-hairline bg-surface px-1 py-2"
           aria-label="App tabs"
         >
           <PhoneNavButton
@@ -81,10 +81,10 @@ function PhoneNavButton({
       type="button"
       onClick={onClick}
       className={`flex min-h-11 flex-col items-center justify-center gap-0.5 px-0.5 text-center text-[14px] font-semibold leading-tight ${
-        active ? 'text-primary' : 'text-on-surface-variant'
+        active ? 'text-accent' : 'text-fg-secondary'
       }`}
     >
-      <span className={active ? 'rounded-full bg-primary/15 p-1' : 'p-1'}>{icon}</span>
+      <span className={active ? 'rounded-full bg-action/15 p-1' : 'p-1'}>{icon}</span>
       {label}
     </button>
   );
@@ -104,23 +104,23 @@ export function WebChrome({
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-on-surface-variant md:text-left">
+      <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-fg-secondary md:text-left">
         {label}
       </p>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-border-hard bg-surface shadow-sm">
-        <div className="flex items-center gap-2 border-b border-border-hard bg-surface-container px-3 py-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
-          <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
-          <span className="h-2.5 w-2.5 rounded-full bg-on-surface/25" aria-hidden />
-          <span className="ml-2 truncate rounded-[6px] bg-background px-2 py-0.5 text-sm text-on-surface-variant">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-hairline bg-surface shadow-sm">
+        <div className="flex items-center gap-2 border-b border-hairline bg-surface-raised px-3 py-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-fg/25" aria-hidden />
+          <span className="h-2.5 w-2.5 rounded-full bg-fg/25" aria-hidden />
+          <span className="h-2.5 w-2.5 rounded-full bg-fg/25" aria-hidden />
+          <span className="ml-2 truncate rounded-[6px] bg-bg px-2 py-0.5 text-sm text-fg-secondary">
             {address}
           </span>
         </div>
         <div
           className={
             lockScroll
-              ? 'flex h-[560px] flex-col overflow-hidden bg-background lg:h-[640px]'
-              : 'min-h-[420px] flex-1 overflow-auto bg-background sm:min-h-[560px] lg:min-h-[640px]'
+              ? 'flex h-[560px] flex-col overflow-hidden bg-bg lg:h-[640px]'
+              : 'min-h-[420px] flex-1 overflow-auto bg-bg sm:min-h-[560px] lg:min-h-[640px]'
           }
         >
           {children}
@@ -143,7 +143,7 @@ export function PlaygroundAvatar({
   return (
     <span className="relative inline-flex shrink-0">
       <span
-        className={`flex items-center justify-center rounded-full bg-primary font-bold text-on-primary ${dim}`}
+        className={`flex items-center justify-center rounded-full bg-action font-bold text-on-action ${dim}`}
       >
         {initials}
       </span>
@@ -161,7 +161,7 @@ export function VolumeBars({ count }: { count: 1 | 2 | 3 }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`w-[3px] rounded-sm ${i < count ? 'bg-primary' : 'bg-on-surface/20'}`}
+          className={`w-[3px] rounded-sm ${i < count ? 'bg-action' : 'bg-fg/20'}`}
           style={{ height: heights[i] }}
         />
       ))}

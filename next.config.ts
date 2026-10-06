@@ -1,4 +1,10 @@
 import type { NextConfig } from "next";
+import { version } from "./package.json";
+import { businessRedirects } from "./lib/shell/businessRedirects";
+
+/** "0.1.0 · a1b2c3d" when the build knows its commit (Workers Builds / GitHub CI). */
+const commit = (process.env.WORKERS_CI_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "").slice(0, 7);
+const buildVersion = commit ? `${version} · ${commit}` : version;
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -13,7 +19,7 @@ const securityHeaders = [
       "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; worker-src 'self'; " +
       "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; " +
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.livekit.cloud wss://*.livekit.cloud https://api.stripe.com https://*.tiles.mapbox.com https://*.cartocdn.com https://api.klipy.com;",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.tiles.mapbox.com https://*.cartocdn.com https://api.klipy.com;",
   },
   ...(process.env.NODE_ENV === 'production'
     ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' }]
@@ -23,10 +29,20 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  env: { NEXT_PUBLIC_BUILD_VERSION: buildVersion },
   // OpenNext on Workers needs an IMAGES binding (Cloudflare Images) for /_next/image.
   // Without it, optimized URLs 404; serve public assets as-is on the free plan.
   images: {
-    unoptimized: true,
+    // Supabase Storage transforms; see lib/images/cfLoader.ts (spec §11.6).
+    loader: 'custom',
+    loaderFile: './lib/images/cfLoader.ts',
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '54321', pathname: '/storage/v1/**' },
+    ],
+  },
+  async redirects() {
+    return businessRedirects();
   },
   async headers() {
     return [

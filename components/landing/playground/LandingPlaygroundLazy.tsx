@@ -21,13 +21,13 @@ function PlaygroundSkeleton() {
       aria-label="Loading product tour"
     >
       <div className="mb-6 flex flex-wrap justify-center gap-2">
-        <div className="h-9 w-20 rounded-full border border-border-hard bg-surface" />
-        <div className="h-9 w-20 rounded-full border border-border-hard bg-surface" />
-        <div className="h-9 w-24 rounded-full border border-border-hard bg-surface" />
+        <div className="h-9 w-20 rounded-full border border-hairline bg-surface" />
+        <div className="h-9 w-20 rounded-full border border-hairline bg-surface" />
+        <div className="h-9 w-24 rounded-full border border-hairline bg-surface" />
       </div>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
-        <div className="h-[560px] min-w-0 flex-1 rounded-[16px] border border-border-hard bg-surface lg:h-[640px]" />
-        <div className="h-[240px] w-full rounded-[16px] border border-border-hard bg-surface lg:h-[640px] lg:max-w-sm" />
+        <div className="h-[560px] min-w-0 flex-1 rounded-[16px] border border-hairline bg-surface lg:h-[640px]" />
+        <div className="h-[240px] w-full rounded-[16px] border border-hairline bg-surface lg:h-[640px] lg:max-w-sm" />
       </div>
     </div>
   );

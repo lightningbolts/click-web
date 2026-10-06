@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import { type ExpressionSpecification } from 'maplibre-gl';
+import * as maplibregl from '@/lib/maps/maplibre';
+import type { ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { prefersReducedMotion } from '@/lib/motion';
@@ -274,11 +274,11 @@ export default function FoldMap({ cells }: { cells: readonly PresenceHeatmapCell
         aria-hidden={Boolean(error)}
       />
       {error ? (
-        <p className="absolute right-4 top-4 z-[1] max-w-xs rounded-[8px] border border-border-hard bg-surface px-3 py-2 text-sm text-on-surface-variant shadow-sm">
+        <p className="absolute right-4 top-4 z-[1] max-w-xs rounded-[8px] border border-hairline bg-surface px-3 py-2 text-sm text-fg-secondary shadow-sm">
           {error}. The offer below still works.
         </p>
       ) : (
-        <p className="pointer-events-none absolute right-4 top-4 z-[1] max-w-[16rem] rounded-[8px] border border-border-hard bg-surface px-3 py-2 text-sm text-on-surface-variant shadow-sm">
+        <p className="pointer-events-none absolute right-4 top-4 z-[1] max-w-[16rem] rounded-[8px] border border-hairline bg-surface px-3 py-2 text-sm text-fg-secondary shadow-sm">
           Approximate handshake locations. Each glow is offset by a block so nobody can be found.
         </p>
       )}

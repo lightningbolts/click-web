@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as maplibregl from "maplibre-gl";
+import * as maplibregl from '@/lib/maps/maplibre';
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2, MapPin, Users } from "lucide-react";
 import type { VerifiedConnectionMapNode } from "@/lib/insights/connectionEncounterClustering";
@@ -199,9 +199,9 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
 
   if (nodes.length === 0) {
     return (
-      <div className="rounded-2xl border border-border-hard bg-surface p-10 text-center">
-        <MapPin className="mx-auto mb-3 h-10 w-10 text-outline" />
-        <p className="text-sm text-on-surface-variant">No verified connection coordinates yet for this venue.</p>
+      <div className="rounded-2xl border border-hairline bg-surface p-10 text-center">
+        <MapPin className="mx-auto mb-3 h-10 w-10 text-fg-tertiary" />
+        <p className="text-sm text-fg-secondary">No verified connection coordinates yet for this venue.</p>
       </div>
     );
   }
@@ -215,19 +215,19 @@ export default function InsightsMap({ nodes, venueCenter }: InsightsMapProps) {
   }
 
   return (
-    <div className="relative h-[420px] overflow-hidden rounded-2xl border border-border-hard bg-surface-container">
+    <div className="relative h-[420px] overflow-hidden rounded-2xl border border-hairline bg-surface-raised">
       {!mapLoaded && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-container">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-raised">
+          <Loader2 className="h-7 w-7 animate-spin text-accent" />
         </div>
       )}
       <div ref={containerRef} className="absolute inset-0" />
       {mapLoaded && (
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl border border-border-hard bg-background/80 px-3 py-2 text-xs text-on-surface-variant">
+        <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl border border-hairline bg-bg/80 px-3 py-2 text-xs text-fg-secondary">
           <Users className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
           <span>
             <span className="font-semibold text-cyan-700 dark:text-cyan-300">{verifiedCount}</span> verified ·{" "}
-            <span className="font-semibold text-primary">{nodes.length}</span> nodes
+            <span className="font-semibold text-accent">{nodes.length}</span> nodes
           </span>
         </div>
       )}

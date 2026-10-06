@@ -50,7 +50,7 @@ function recommendationFor(
   switch (metricKey) {
     case "sticky_score":
       if (value < 40) {
-        return "Your venue isn't creating lasting social moments yet. Try structured prompts at entry points — a question board, a shared activity, anything that gives strangers a reason to talk.";
+        return "Your Place isn't creating lasting social moments yet. Try structured prompts at entry points — a question board, a shared activity, anything that gives strangers a reason to talk.";
       }
       if (value <= 70) {
         return "Solid community foundation. Focus on the 30-minute window after peak arrival — that's when most connections form or don't.";
@@ -69,7 +69,7 @@ function recommendationFor(
         return "Few guests return after their first connection here. Consider a follow-up prompt 7 days after a connection inviting both people back to your venue.";
       }
       if (value <= 50) {
-        return "Moderate return rate. Your venue is memorable — focus on why the top 20% return and replicate that experience.";
+        return "Moderate return rate. Your Place is memorable — focus on why the top 20% return and replicate that experience.";
       }
       return "Exceptional loyalty. You're a genuine third place. This is a strong signal for sponsorship pitches.";
     case "psv_velocity":
@@ -82,7 +82,7 @@ function recommendationFor(
       return "Very sharp peak. Risk of overcrowding killing connection quality. Consider a second programming window to distribute social energy.";
     case "wri":
       if (value < 0.7) {
-        return "Bad weather hurts you significantly. You're an outdoor-dependent venue socially. Consider covered or indoor connection zones.";
+        return "Bad weather hurts you significantly. You're an outdoor-dependent Place socially. Consider covered or indoor connection zones.";
       }
       if (value <= 1.1) {
         return "Weather-neutral — your social activity is consistent. Strong signal for year-round programming.";
@@ -137,7 +137,7 @@ export function InsightCallout({
           togglePin();
         }
       }}
-      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(124,58,237,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(124,58,237,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-accent/40"
       aria-expanded={expanded}
     >
       <Lightbulb
@@ -145,13 +145,13 @@ export function InsightCallout({
         aria-hidden
       />
       <div className="min-w-0 flex-1">
-        <p className="text-xs italic leading-relaxed text-on-surface-variant md:text-sm">
+        <p className="text-xs italic leading-relaxed text-fg-secondary md:text-sm">
           {expanded ? full : collapsed}
         </p>
         {showPeer && (
-          <p className="mt-2 text-[11px] not-italic leading-relaxed text-on-surface-variant">
+          <p className="mt-2 text-[11px] not-italic leading-relaxed text-fg-secondary">
             Compared with similar venues in our network, you&apos;re near the{" "}
-            <span className="tabular-nums text-on-surface-variant">
+            <span className="tabular-nums text-fg-secondary">
               {formatOrdinal(peerPercentile)}
             </span>{" "}
             percentile for this metric.
@@ -159,13 +159,13 @@ export function InsightCallout({
               <>
                 {" "}
                 Cohort:{" "}
-                <span className="tabular-nums text-on-surface-variant">{peerCohortSize}</span> venues with
+                <span className="tabular-nums text-fg-secondary">{peerCohortSize}</span> venues with
                 enough traffic to compare.
               </>
             ) : null}
           </p>
         )}
-        <p className="mt-1 text-[10px] not-italic text-outline md:hidden">
+        <p className="mt-1 text-[10px] not-italic text-fg-tertiary md:hidden">
           Tap to {pinned ? "collapse" : "expand"}
         </p>
       </div>

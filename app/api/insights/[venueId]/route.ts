@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
-import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
+import { userMayViewPlaceInsights } from "@/lib/server/places/entitlement";
 import { parseMicroCommunitiesRpc } from '@/lib/insights/microCommunities';
 import { buildInsightsVenueAugmentation } from '@/lib/server/insightsVenueAugmentation';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
@@ -22,7 +22,7 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (!(await userMayAccessBusinessInsights(supabase, user))) {
+        if (!(await userMayViewPlaceInsights(supabase, user, venueId))) {
             return NextResponse.json(
                 { error: 'Forbidden: Requires verified_business role' },
                 { status: 403 },

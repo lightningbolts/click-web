@@ -10,6 +10,8 @@ jest.mock('next/navigation', () => ({
     throw new Error('NEXT_NOT_FOUND');
   },
 }));
+jest.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+jest.mock('@/components/places/ManagePlaceButton', () => ({ ManagePlaceButton: () => null }));
 jest.mock('@/lib/server/admin/supabaseAdmin', () => ({ createAdminSupabaseClient: () => ({}) }));
 jest.mock('@/lib/server/places/publicPlace', () => ({
   placesPublicPagesEnabled: () => process.env.PLACES_PUBLIC_PAGES_ENABLED === 'true',
@@ -110,7 +112,7 @@ describe('/p/[slug]', () => {
     process.env.PLACES_PUBLIC_PAGES_ENABLED = 'true';
     mockLoadPublicPlace.mockResolvedValue(PLACE);
     const { container } = await renderPage({ t: TOKEN });
-    expect(screen.getByTestId('place-qr-banner').textContent).toContain("You scanned Café Allegro's check-in code.");
+    expect(screen.getByTestId('place-qr-banner').textContent).toContain("You scanned Café Allegro’s check-in code.");
     const withToken = Array.from(container.querySelectorAll('a')).filter((a) => a.getAttribute('href')?.includes(TOKEN));
     expect(withToken.map((a) => a.getAttribute('href'))).toEqual([`click://p/cafe-allegro-seattle?t=${TOKEN}`]);
     expect(container.innerHTML.split(TOKEN)).toHaveLength(2);

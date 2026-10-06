@@ -26,6 +26,8 @@ describe('MessageBubble beacon messages', () => {
           message={message()}
           isMine={false}
           currentUserId="me"
+          first
+          last
           onReact={jest.fn()}
           onEdit={jest.fn()}
           onDelete={jest.fn()}

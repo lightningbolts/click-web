@@ -12,6 +12,7 @@ export type UserProfilePayload = {
     birthday?: string | null;
     image?: string | null;
     email?: string | null;
+    bio?: string | null;
   };
   tags: string[];
   availability: {

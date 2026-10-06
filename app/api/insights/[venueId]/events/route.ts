@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { userMayAccessBusinessInsights } from "@/lib/server/businessInsightsEligibility";
+import { userMayViewPlaceInsights } from "@/lib/server/places/entitlement";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
 import { countEventRsvpsByBeaconIds } from "@/lib/events/publicEvent";
 import {
@@ -30,7 +30,7 @@ export async function GET(
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (!(await userMayAccessBusinessInsights(supabase, user))) {
+    if (!(await userMayViewPlaceInsights(supabase, user, venueId))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { data: membership } = await supabase

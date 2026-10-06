@@ -1,8 +1,12 @@
 "use client";
 
+import { CircleCheck } from "lucide-react";
 import { useState } from "react";
-import { FcButton, FcField, FcInput } from "@/components/fc";
+import { Button } from "@/components/ds/Button";
+import { InlineNotice } from "@/components/ds/InlineNotice";
+import { TextField } from "@/components/ds/TextField";
 
+/** Signed-out RSVP (spec §7.6.2): name and email or phone, no account needed. */
 export default function GuestRsvpForm({ beaconId }: { beaconId: string }) {
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -22,43 +26,47 @@ export default function GuestRsvpForm({ beaconId }: { beaconId: string }) {
       const json = (await res.json()) as { error?: string };
       if (!res.ok) {
         setStatus("error");
-        setMessage(json.error || "Could not save RSVP");
+        setMessage(json.error || "Could not save your RSVP.");
         return;
       }
       setStatus("ok");
-      setMessage("You're on the list.");
     } catch {
       setStatus("error");
-      setMessage("Could not save RSVP");
+      setMessage("Could not save your RSVP.");
     }
   };
 
   if (status === "ok") {
     return (
-      <div className="rounded-[12px] border border-border-hard bg-primary-container p-4">
-        <p className="text-sm font-semibold text-on-secondary-container">{message}</p>
-        <p className="mt-1 text-sm text-on-surface-variant">We’ll keep your spot. Share the event with a friend.</p>
-      </div>
+      <InlineNotice variant="info" icon={CircleCheck} live>
+        You’re on the list. Share the event with a friend.
+      </InlineNotice>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full flex-col gap-4" data-testid="guest-rsvp-form">
-      <FcField label="Name">
-        <FcInput value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} placeholder="Your name" />
-      </FcField>
-      <FcField label="Email or phone">
-        <FcInput
-          value={contact}
-          onChange={(e) => setContact(e.target.value)}
-          required
-          placeholder="you@email.com"
-        />
-      </FcField>
-      {message ? <p className="text-sm text-error">{message}</p> : null}
-      <FcButton type="submit" className="w-full" disabled={status === "saving"}>
-        {status === "saving" ? "Saving…" : "RSVP"}
-      </FcButton>
+    <form onSubmit={onSubmit} className="flex w-full flex-col gap-3" data-testid="guest-rsvp-form">
+      <TextField
+        label="Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+        maxLength={80}
+        autoComplete="name"
+        placeholder="Your name"
+      />
+      <TextField
+        label="Email or phone"
+        value={contact}
+        onChange={(e) => setContact(e.target.value)}
+        required
+        autoComplete="email"
+        placeholder="you@email.com"
+        error={status === "error" ? message : undefined}
+      />
+      <Button variant="primary" type="submit" size="lg" fullWidth loading={status === "saving"}>
+        RSVP
+      </Button>
     </form>
   );
 }

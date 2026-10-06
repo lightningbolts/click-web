@@ -5,25 +5,21 @@ function read(rel: string): string {
   return fs.readFileSync(path.join(__dirname, "../../..", rel), "utf8");
 }
 
-describe("public event pages share EventPageShell", () => {
-  it("locks list, create, and detail to the 6xl navbar column", () => {
+describe("/events directory (spec §7.6.1)", () => {
+  it("renders server-side from tagged caches in the content column", () => {
     const list = read("app/events/page.tsx");
-    const listBody = read("components/events/EventsPageBody.tsx");
-    const create = read("app/events/new/page.tsx");
-    const detail = read("app/e/[beaconId]/page.tsx");
-    expect(list).toContain("EventsPageBody");
-    for (const src of [listBody, create, detail]) {
-      expect(src).toContain("EventPageShell");
-    }
-    expect(list).not.toContain("max-w-4xl");
-    expect(create).not.toContain("max-w-2xl");
-    expect(detail).not.toContain("max-w-5xl");
-    const shell = read("components/events/EventPageShell.tsx");
-    expect(shell).toContain("PAGE_COLUMN_CLASS");
-    expect(shell).toContain("event-page-shell");
-    expect(shell).not.toContain("opacity: 0");
-    const column = read("lib/shell/pageColumn.ts");
-    expect(column).toContain("max-w-6xl");
-    expect(column).toContain("px-4 md:px-10");
+    expect(list).toContain("container-content");
+    expect(list).toContain("tags: [PUBLIC_EVENTS_TAG]");
+    expect(list).toContain("buildEventDirectory");
+    expect(list).toContain("<Timeline");
+    // The personal strip is a client island so the public list stays shared-cacheable.
+    expect(list).toContain("<YourEventsStrip");
+    expect(read("components/events/YourEventsStrip.tsx")).toMatch(/^'use client'/);
+  });
+
+  it("drops the cached lists whenever an event is created, edited or deleted", () => {
+    expect(read("app/api/beacons/route.ts")).toContain('if (beacon_type === "event") revalidatePublicEvents(null, venueId)');
+    const item = read("app/api/beacons/[beaconId]/route.ts");
+    expect(item.match(/revalidatePublicEvents\(beaconId, /g)?.length).toBe(2);
   });
 });

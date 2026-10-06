@@ -46,16 +46,16 @@ export default async function AdminRouteLayout({
           <p className="mt-1 text-xs text-zinc-400">Signed in as {session.email}</p>
 
           <nav className="mt-6 space-y-2 text-sm">
-            <Link href="/admin#trust-safety" className="block rounded-lg px-3 py-2 text-on-surface hover:bg-zinc-800">
+            <Link href="/admin#trust-safety" className="block rounded-lg px-3 py-2 text-fg hover:bg-zinc-800">
               Trust &amp; Safety
             </Link>
-            <Link href="/admin#click-insights" className="block rounded-lg px-3 py-2 text-on-surface hover:bg-zinc-800">
+            <Link href="/admin#click-insights" className="block rounded-lg px-3 py-2 text-fg hover:bg-zinc-800">
               Click Insights
             </Link>
-            <Link href="/admin#system-health" className="block rounded-lg px-3 py-2 text-on-surface hover:bg-zinc-800">
+            <Link href="/admin#system-health" className="block rounded-lg px-3 py-2 text-fg hover:bg-zinc-800">
               System Health
             </Link>
-            <Link href="/admin/places" className="block rounded-lg px-3 py-2 text-on-surface hover:bg-zinc-800">
+            <Link href="/admin/places" className="block rounded-lg px-3 py-2 text-fg hover:bg-zinc-800">
               Click Places
             </Link>
           </nav>

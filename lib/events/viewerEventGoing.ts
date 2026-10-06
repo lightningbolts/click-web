@@ -1,4 +1,3 @@
-import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 
 /**
@@ -10,30 +9,19 @@ export type ViewerEventRsvpSnapshot =
   | { kind: "member"; going: boolean; request_status?: "pending" | "waitlisted" | "denied" | null }
   | { kind: "unknown" };
 
-export async function loadViewerEventRsvp(beaconId: string): Promise<ViewerEventRsvpSnapshot> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return { kind: "unknown" };
-  }
+/** `userId` comes from the request's shared `getServerUser()`, so the session is read once. */
+export async function loadViewerEventRsvp(
+  beaconId: string,
+  userId: string | null,
+): Promise<ViewerEventRsvpSnapshot> {
+  if (!userId) return { kind: "guest" };
   try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { kind: "guest" };
     const admin = createAdminSupabaseClient();
-    const { data } = await admin
-      .from("beacon_attendees")
-      .select("user_id")
-      .eq("beacon_id", beaconId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const [{ data }, { data: request }] = await Promise.all([
+      admin.from("beacon_attendees").select("user_id").eq("beacon_id", beaconId).eq("user_id", userId).maybeSingle(),
+      admin.from("event_rsvp_requests").select("status").eq("beacon_id", beaconId).eq("user_id", userId).maybeSingle(),
+    ]);
     if (data != null) return { kind: "member", going: true };
-    const { data: request } = await admin
-      .from("event_rsvp_requests")
-      .select("status")
-      .eq("beacon_id", beaconId)
-      .eq("user_id", user.id)
-      .maybeSingle();
     const status =
       request && typeof (request as { status?: unknown }).status === "string"
         ? (request as { status: string }).status

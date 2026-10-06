@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Bell, BellOff, Loader2, Lock, MessageSquare, Send } from 'lucide-react';
+import { ArrowUp, Bell, BellOff, Lock, MessageSquare } from 'lucide-react';
+import { Avatar } from '@/components/ds/Avatar';
+import { IconButton } from '@/components/ds/IconButton';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ds/Menu';
+import { Skeleton } from '@/components/ds/Skeleton';
+import { Spinner } from '@/components/ds/Spinner';
+import { fieldClassName } from '@/components/ds/TextField';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { eventRsvpKey } from '@/lib/events/eventRsvpKey';
@@ -20,7 +26,6 @@ import {
 import { normalizeHubMessageRow } from '@/lib/hub/hubThread';
 import { useChatMutes } from '@/components/chat/useConversationExtras';
 import { MUTE_OPTIONS } from '@/lib/chat/conversationApi';
-import { ConnectionPeerAvatar } from '@/components/dashboard/ConnectionPeerAvatar';
 import { LinkifiedText } from '@/lib/chat/linkify';
 import { cn } from '@/lib/cn';
 
@@ -40,11 +45,11 @@ function timeLabel(ms: number): string {
 function LockedState({ title, body }: { title: string; body: string }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-surface-container text-on-surface-variant">
-        <Lock className="h-5 w-5" aria-hidden />
+      <div className="mb-3 flex size-11 items-center justify-center rounded-full bg-surface-raised text-fg-secondary">
+        <Lock size={20} aria-hidden />
       </div>
-      <p className="font-semibold text-on-surface">{title}</p>
-      <p className="mt-1 max-w-xs text-sm text-on-surface-variant">{body}</p>
+      <p className="type-body-strong text-fg">{title}</p>
+      <p className="type-meta mt-1 max-w-xs text-fg-secondary">{body}</p>
     </div>
   );
 }
@@ -59,12 +64,15 @@ export default function EventChatPanel({
   creatorId,
   ended,
   initialGoing = null,
+  bare = false,
 }: {
   beaconId: string;
   creatorId: string | null;
   ended: boolean;
   /** Server-rendered RSVP state, so going guests never see the locked state first. */
   initialGoing?: boolean | null;
+  /** Inside a Sheet: no card chrome or title (the sheet has both). */
+  bare?: boolean;
 }) {
   const { user, loading: authLoading } = useAuth();
   const isHost = Boolean(user?.id && creatorId && user.id === creatorId);
@@ -85,7 +93,6 @@ export default function EventChatPanel({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [muteMenuOpen, setMuteMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const { muteFor, setMuted } = useChatMutes();
@@ -205,56 +212,45 @@ export default function EventChatPanel({
     }
   }, [draft, hubId, participantIds, sending, user]);
 
+  const subtitle = canJoin && hubId ? `${occupants} ${occupants === 1 ? 'person' : 'people'} · end-to-end encrypted` : 'For hosts and guests who RSVP';
   const header = (
-    <div className="flex items-center justify-between gap-3 border-b border-border-hard px-4 py-3">
+    <div className={cn('flex items-center justify-between gap-3 px-4', bare ? 'pb-2' : 'border-b border-hairline py-3')}>
       <div className="min-w-0">
-        <h2 className="flex items-center gap-2 text-base font-bold text-on-surface">
-          <MessageSquare className="h-4 w-4 text-primary" aria-hidden />
-          Event chat
-        </h2>
-        <p className="text-xs text-on-surface-variant">
-          {canJoin && hubId ? `${occupants} ${occupants === 1 ? 'person' : 'people'} · end-to-end encrypted` : 'For hosts and guests who RSVP'}
-        </p>
+        {bare ? null : (
+          <h2 className="type-headline flex items-center gap-2 text-fg">
+            <MessageSquare size={16} className="text-accent" aria-hidden />
+            Event chat
+          </h2>
+        )}
+        <p className="type-meta text-fg-secondary">{subtitle}</p>
       </div>
       {hubId && canJoin ? (
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setMuteMenuOpen((o) => !o)}
-            aria-expanded={muteMenuOpen}
-            aria-haspopup="menu"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-border-hard text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-            aria-label={mute ? 'Notifications muted — change' : 'Mute notifications'}
-            title={mute ? 'Muted' : 'Notifications on'}
-          >
-            {mute ? <BellOff className="h-4 w-4" aria-hidden /> : <Bell className="h-4 w-4" aria-hidden />}
-          </button>
-          {muteMenuOpen ? (
-            <div role="menu" className="absolute right-0 top-[calc(100%+0.4rem)] z-20 w-56 rounded-[12px] border border-border-hard bg-surface p-1.5 shadow-xl">
-              {(mute ? [{ label: 'Unmute', ms: null as number | null, muted: false }] : MUTE_OPTIONS.map((o) => ({ ...o, muted: true }))).map((option) => (
-                <button
-                  key={option.label}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMuteMenuOpen(false);
-                    void setMuted(hubId, option.muted, option.ms).catch(() => setSendError("Couldn't change notifications."));
-                  }}
-                  className="flex w-full rounded-[8px] px-3 py-2 text-left text-sm font-semibold text-on-surface hover:bg-surface-container-low"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <Menu>
+          <MenuTrigger asChild>
+            <IconButton
+              icon={mute ? BellOff : Bell}
+              size="sm"
+              aria-label={mute ? 'Notifications muted — change' : 'Mute notifications'}
+            />
+          </MenuTrigger>
+          <MenuContent align="end">
+            {(mute ? [{ label: 'Unmute', ms: null as number | null, muted: false }] : MUTE_OPTIONS.map((o) => ({ ...o, muted: true }))).map((option) => (
+              <MenuItem
+                key={option.label}
+                onSelect={() => void setMuted(hubId, option.muted, option.ms).catch(() => setSendError("Couldn't change notifications."))}
+              >
+                {option.label}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
       ) : null}
     </div>
   );
 
   let body: React.ReactNode;
   if (authLoading || (user && !isHost && rsvp === undefined)) {
-    body = <div className="h-40 animate-pulse bg-surface-container-low" />;
+    body = <Skeleton className="mx-4 my-3 h-40" rounded="md" />;
   } else if (!user) {
     body = <LockedState title="Sign in to join the chat" body="Guests who RSVP with a Click account can talk before, during, and after the event." />;
   } else if (!canJoin) {
@@ -276,17 +272,17 @@ export default function EventChatPanel({
             const el = e.currentTarget;
             stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
-          className="chat-thread-scroll h-[min(28rem,60vh)] space-y-1 px-3 py-3"
+          className={cn('chat-thread-scroll space-y-1 px-3 py-3', bare ? 'h-[min(32rem,60vh)]' : 'h-[min(28rem,60vh)]')}
           aria-live="polite"
         >
           {loading && messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-on-surface-variant">
-              <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading event chat" />
+            <div className="flex h-full items-center justify-center text-fg-secondary" role="status" aria-label="Loading event chat">
+              <Spinner size={20} />
             </div>
           ) : messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-              <p className="font-semibold text-on-surface">No messages yet</p>
-              <p className="mt-1 text-sm text-on-surface-variant">Say hi, share a meeting spot, or ask the host a question.</p>
+              <p className="type-body-strong text-fg">No messages yet</p>
+              <p className="type-meta mt-1 text-fg-secondary">Say hi, share a meeting spot, or ask the host a question.</p>
             </div>
           ) : (
             messages.map((m, index) => {
@@ -301,25 +297,25 @@ export default function EventChatPanel({
               return (
                 <div key={m.id}>
                   {showDay ? (
-                    <p className="py-2 text-center text-xs font-semibold text-on-surface-variant">{day}</p>
+                    <p className="type-meta py-2 text-center font-semibold text-fg-tertiary">{day}</p>
                   ) : null}
                   <div className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start', grouped ? 'mt-0.5' : 'mt-2')}>
                     {!mine ? (
                       <div className="w-8 shrink-0">
-                        {!grouped ? <ConnectionPeerAvatar label={sender} imageUrl={names[m.userId]?.image} size="sm" /> : null}
+                        {!grouped ? <Avatar seed={m.userId} name={sender} src={names[m.userId]?.image} size={32} /> : null}
                       </div>
                     ) : null}
                     <div className={cn('flex max-w-[78%] flex-col', mine ? 'items-end' : 'items-start')}>
                       {!mine && !grouped ? (
-                        <span className="mb-0.5 px-1 text-xs font-semibold text-on-surface-variant">
+                        <span className="type-meta mb-0.5 px-1 font-semibold text-fg-secondary">
                           {sender}
-                          {m.userId === creatorId ? <span className="ml-1 text-primary">· Host</span> : null}
+                          {m.userId === creatorId ? <span className="ml-1 text-accent">· Host</span> : null}
                         </span>
                       ) : null}
                       <div
                         className={cn(
-                          'rounded-2xl px-3.5 py-2 text-sm leading-relaxed break-words',
-                          mine ? 'rounded-br-sm bg-primary text-on-primary' : 'rounded-bl-sm border border-border-hard bg-surface-container text-on-surface',
+                          'type-body rounded-bubble px-3.5 py-2 break-words',
+                          mine ? 'rounded-br-sm bg-bubble-out text-white' : 'rounded-bl-sm bg-bubble-in text-fg',
                           m.pending && 'opacity-70',
                         )}
                       >
@@ -328,14 +324,14 @@ export default function EventChatPanel({
                       {reactions.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {reactions.map(([emoji, users]) => (
-                            <span key={emoji} className="rounded-full border border-border-hard bg-surface px-1.5 py-0.5 text-xs">
+                            <span key={emoji} className="type-meta rounded-full bg-surface-raised px-1.5 py-0.5">
                               {emoji} {users.length}
                             </span>
                           ))}
                         </div>
                       ) : null}
                       {!grouped || index === messages.length - 1 ? (
-                        <span className="mt-0.5 px-1 text-[11px] text-on-surface-variant">
+                        <span className="type-badge mt-0.5 px-1 font-normal text-fg-tertiary">
                           {m.pending ? 'Sending…' : timeLabel(m.createdAt)}
                           {m.edited ? ' · edited' : ''}
                         </span>
@@ -348,7 +344,7 @@ export default function EventChatPanel({
           )}
         </div>
         <form
-          className="flex items-end gap-2 border-t border-border-hard p-3"
+          className="flex items-end gap-2 border-t border-hairline p-3"
           onSubmit={(e) => {
             e.preventDefault();
             void send();
@@ -370,19 +366,18 @@ export default function EventChatPanel({
             rows={1}
             maxLength={2000}
             placeholder="Message everyone going…"
-            className="fc-input max-h-28 min-h-10 flex-1 resize-none px-3 py-2 text-sm"
+            className={cn(fieldClassName, 'max-h-28 min-h-10 flex-1 resize-none py-2')}
           />
-          <button
+          <IconButton
             type="submit"
+            icon={ArrowUp}
+            variant="action"
             disabled={!draft.trim() || sending || !hubId}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-primary text-on-primary disabled:opacity-30"
             aria-label="Send to event chat"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
+          />
         </form>
         {sendError ? (
-          <p role="alert" className="px-4 pb-3 text-sm text-error">
+          <p role="alert" className="type-meta px-4 pb-3 text-destructive">
             {sendError}
           </p>
         ) : null}
@@ -391,7 +386,11 @@ export default function EventChatPanel({
   }
 
   return (
-    <section className="overflow-hidden rounded-[16px] border border-border-hard bg-surface" data-testid="event-chat-panel" aria-label="Event chat">
+    <section
+      className={cn(!bare && 'overflow-hidden rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)]')}
+      data-testid="event-chat-panel"
+      aria-label="Event chat"
+    >
       {header}
       {body}
     </section>

@@ -3,138 +3,481 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Use @theme (NOT @theme inline) so utilities reference var(--color-*),
- * which .dark can override at runtime. @theme inline bakes light hexes
- * into utilities and breaks the theme toggle.
+ * "Quiet Presence" design tokens (DESIGN.md §Tokens, redesign spec §4).
+ *
+ * Raw roles live as plain custom properties on :root / .dark so non-Tailwind CSS
+ * (MapLibre, emoji-mart, inline styles) can read them. The @theme block maps them
+ * onto Tailwind utilities. Use @theme (NOT @theme inline) so utilities keep
+ * referencing var(--color-*), which .dark overrides at runtime.
  */
-@theme {
-  --color-background: #f9f9f9;
-  --color-foreground: #1a1c1c;
-  --color-primary: #7c3aed;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #ede9fe;
-  --color-on-primary-container: #5b21b6;
-  --color-secondary: #6d28d9;
-  --color-on-secondary: #ffffff;
-  --color-secondary-container: #f3e8ff;
-  --color-on-secondary-container: #5b21b6;
-  --color-surface: #ffffff;
-  --color-surface-container-low: #f3f3f4;
-  --color-surface-container: #eeeeee;
-  --color-surface-container-high: #e8e8e8;
-  --color-surface-container-highest: #e2e2e2;
-  --color-surface-variant: #e2e2e2;
-  --color-on-surface: #1a1c1c;
-  --color-on-surface-variant: #4a4455;
-  --color-outline: #7b7487;
-  --color-outline-variant: #ccc3d8;
-  --color-border-hard: #ccc3d8;
-  --color-error: #ba1a1a;
-  --color-surface-tint: #8b5cf6;
-  --color-inverse-primary: #d2bbff;
-  --font-sans:
-    var(--font-manrope), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-display:
-    var(--font-source-serif), ui-serif, Georgia, "Times New Roman", serif;
-}
-
-@layer theme {
-  .dark {
-    /* Purple-tinted dark (brand), still opaque Functional Clarity */
-    --color-background: #0b0a10;
-    --color-foreground: #f0f1f1;
-    --color-surface: #15121c;
-    --color-surface-container-low: #1c1826;
-    --color-surface-container: #221d2c;
-    --color-surface-container-high: #2a2436;
-    --color-surface-container-highest: #322c40;
-    --color-surface-variant: #221d2c;
-    --color-on-surface: #f0f1f1;
-    --color-on-surface-variant: #cfc4e0;
-    --color-outline: #9b8fb0;
-    --color-outline-variant: #2e2838;
-    --color-border-hard: #2e2838;
-    --color-primary-container: #2e1065;
-    --color-on-primary-container: #ede9fe;
-    --color-inverse-primary: #ddd6fe;
-    --color-secondary-container: #3b0764;
-    --color-on-secondary-container: #ddd6fe;
-  }
-}
-
-/* Aliases for non-Tailwind CSS (fc-* utilities, MapLibre, etc.) */
 :root {
-  --background: var(--color-background);
-  --foreground: var(--color-foreground);
-  --surface: var(--color-surface);
-  --surface-container-low: var(--color-surface-container-low);
-  --surface-container: var(--color-surface-container);
-  --surface-container-high: var(--color-surface-container-high);
-  --surface-container-highest: var(--color-surface-container-highest);
-  --surface-variant: var(--color-surface-variant);
-  --on-surface: var(--color-on-surface);
-  --on-surface-variant: var(--color-on-surface-variant);
-  --outline: var(--color-outline);
-  --outline-variant: var(--color-outline-variant);
-  --border-hard: var(--color-border-hard);
-  --primary: var(--color-primary);
-  --on-primary: var(--color-on-primary);
-  --primary-container: var(--color-primary-container);
-  --on-primary-container: var(--color-on-primary-container);
-  --secondary: var(--color-secondary);
-  --on-secondary: var(--color-on-secondary);
-  --secondary-container: var(--color-secondary-container);
-  --on-secondary-container: var(--color-on-secondary-container);
-  --surface-tint: var(--color-surface-tint);
-  --inverse-primary: var(--color-inverse-primary);
-  --error: var(--color-error);
-  --radius-btn: 8px;
-  --radius-field: 16px;
-  --radius-card: 16px;
-  --border-width: 1px;
-  /* Slightly under the rendered Navbar so the landing hero fills the first
-   * viewport without the next section’s heading peeking through the fold. */
-  --navbar-height: 4rem;
+  --bg: #f6f6f8;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #f2f2f5;
+  --fill-subtle: rgba(118, 118, 128, 0.12);
+  --fill-strong: rgba(120, 120, 128, 0.2);
+  --hover: rgba(118, 118, 128, 0.08);
+  --hairline: rgba(60, 60, 67, 0.16);
+  --text: #111113;
+  --text-secondary: #55555c;
+  --text-tertiary: #6c6c71;
+  --text-on-action: #ffffff;
+  --brand: #630ed4;
+  --accent: #5a00c6;
+  --action: #7c3aed;
+  --action-hover: #6d28d9;
+  --action-pressed: #5b21b6;
+  --selection: #eee5ff;
+  --bubble-out: #5b21b6;
+  --bubble-in: #e9e9eb;
+  --live: #e5251b;
+  --online: #1fa855;
+  --online-text: #157a3e;
+  /* Reactions in Activity (spec §7.9). */
+  --heart: #d6246e;
+  --warning-text: #a34a00;
+  --warning-fill: #fff1e0;
+  --destructive: #d70015;
+  --destructive-fill: #ffe5e7;
+  --read-receipt: #0a84ff;
+
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04),
+    0 8px 16px rgba(0, 0, 0, 0.06), 0 24px 48px rgba(0, 0, 0, 0.1);
+  --shadow-pin: 0 1px 3px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0, 0, 0, 0.14);
+  --overlay-scrim: rgba(0, 0, 0, 0.4);
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --d-press: 120ms;
+  --d-fast: 160ms;
+  --d-base: 240ms;
+  --d-slow: 360ms;
+
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --r-pill: 9999px;
+
+  /* Shell metrics. The top bar is 56 (52 on mobile); the tab bar is 56 + safe area. */
+  --topbar-height: 52px;
+  --tabbar-height: 0px;
+  --gutter: 16px;
+  /* Legacy name kept for pages that size against the bar. */
+  --navbar-height: var(--topbar-height);
+
+  color-scheme: light;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --gutter: 24px;
+  }
 }
 
 @media (min-width: 768px) {
   :root {
-    --navbar-height: 4.5rem;
+    --topbar-height: 56px;
   }
 }
 
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+
+/* The mobile tab bar reserves its height only while it is on screen (spec §6.2). */
+@media (max-width: 767.98px) {
+  :root:has([data-tabbar]) {
+    --tabbar-height: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+
+/* A signed-in route renders its own shell; hide the static site chrome before paint. */
+body:has([data-app-shell]) [data-site-chrome] {
+  display: none;
+}
+
+.dark {
+  --bg: #0b0b0d;
+  --bg-elevated: #141416;
+  --surface: #1c1c1e;
+  --surface-raised: #2c2c2e;
+  --fill-subtle: rgba(118, 118, 128, 0.24);
+  --fill-strong: rgba(120, 120, 128, 0.32);
+  --hover: rgba(255, 255, 255, 0.06);
+  --hairline: rgba(84, 84, 88, 0.48);
+  --text: #f5f5f7;
+  --text-secondary: #aeaeb2;
+  --text-tertiary: #98989f;
+  --accent: #c3a6ff;
+  /* Spec #8B5CF6 gives white text 4.2:1; nudged to the nearest hue that clears 4.5:1. */
+  --action-hover: #8655f4;
+  --action-pressed: #6d28d9;
+  --selection: #24133f;
+  --bubble-out: #4a1fa6;
+  --bubble-in: #232326;
+  --live: #ff453a;
+  --heart: #ff6b9a;
+  --online: #30d158;
+  --online-text: #30d158;
+  --warning-text: #ffb340;
+  --warning-fill: #3a2600;
+  --destructive: #ff453a;
+  --destructive-fill: #3b1214;
+  --read-receipt: #7dd3fc;
+
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 16px rgba(0, 0, 0, 0.3),
+    0 24px 48px rgba(0, 0, 0, 0.45);
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+@theme {
+  /* Quiet Presence roles */
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-fill-subtle: var(--fill-subtle);
+  --color-fill-strong: var(--fill-strong);
+  --color-hover: var(--hover);
+  --color-hairline: var(--hairline);
+  --color-fg: var(--text);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-tertiary: var(--text-tertiary);
+  --color-on-action: var(--text-on-action);
+  --color-brand: var(--brand);
+  --color-accent: var(--accent);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+  --color-action-pressed: var(--action-pressed);
+  --color-selection: var(--selection);
+  --color-bubble-out: var(--bubble-out);
+  --color-bubble-in: var(--bubble-in);
+  --color-live: var(--live);
+  --color-online: var(--online);
+  --color-heart: var(--heart);
+  --color-online-text: var(--online-text);
+  --color-warning-text: var(--warning-text);
+  --color-warning-fill: var(--warning-fill);
+  --color-destructive: var(--destructive);
+  --color-destructive-fill: var(--destructive-fill);
+  --color-read-receipt: var(--read-receipt);
+
+
+  --font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-display:
+    var(--font-manrope), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* Radius (spec §4.4). Legacy 2xl/3xl map onto card / hero radii. */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --radius-2xl: 20px;
+  --radius-3xl: 26px;
+  --radius-bubble: 18px;
+  --radius-pill: 9999px;
+
+  --shadow-overlay: var(--shadow-overlay);
+  --shadow-pin: var(--shadow-pin);
+
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Containers (spec §4.3) */
+  --container-narrow: 640px;
+  --container-content: 760px;
+  --container-page: 1080px;
+  --container-wide: 1280px;
+}
+
+/* ── Typography roles (spec §4.2) ─────────────────────────────────────────── */
+
+@utility type-display {
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 40px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  @media (min-width: 768px) {
+    font-size: 44px;
+    line-height: 48px;
+  }
+}
+
+@utility type-title-1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  @media (min-width: 768px) {
+    font-size: 34px;
+    line-height: 40px;
+  }
+}
+
+@utility type-title-2 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  @media (min-width: 768px) {
+    font-size: 28px;
+    line-height: 34px;
+  }
+}
+
+@utility type-title-3 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+@utility type-headline {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+}
+
+@utility type-body-strong {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+@utility type-reading {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 26px;
+  font-weight: 400;
+  text-wrap: pretty;
+}
+
+@utility type-meta {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+/* Mobile tab-bar labels only: the one exception to the 12 px floor (spec §6.2). */
+@utility type-tab-label {
+  font-size: 11px;
+  line-height: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+@utility type-badge {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Containers (spec §4.3) ───────────────────────────────────────────────── */
+
+@utility container-narrow {
+  width: 100%;
+  max-width: calc(640px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+@utility container-content {
+  width: 100%;
+  max-width: calc(760px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+@utility container-page {
+  width: 100%;
+  max-width: calc(1080px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+@utility container-wide {
+  width: 100%;
+  max-width: calc(1280px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ── Material (spec §4.5) ─────────────────────────────────────────────────── */
+
+@utility material-glass {
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  @supports not (backdrop-filter: blur(1px)) {
+    background: var(--bg-elevated);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    background: var(--bg-elevated);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@utility material-glass-dark {
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  @media (prefers-reduced-transparency: reduce) {
+    background: rgba(0, 0, 0, 0.72);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
 html {
-  caret-color: var(--color-primary);
+  caret-color: var(--accent);
   scrollbar-width: thin;
-  scrollbar-color: var(--color-outline) var(--color-background);
+  scrollbar-color: var(--fill-strong) var(--bg);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: var(--color-background);
-  color: var(--color-on-surface);
-  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 ::selection {
-  background-color: var(--color-primary-container);
-  color: var(--color-on-primary-container);
+  background-color: var(--selection);
+  color: var(--text);
 }
 
 a {
   text-underline-offset: 0.2em;
 }
 
-:where(a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 2px solid var(--color-primary);
+:where(a, button, input, textarea, select, summary, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* 16px inputs on touch devices so iOS Safari never zooms (spec §5.5). */
+@media (pointer: coarse) {
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Press feedback for capsules and icon buttons (spec §4.8). */
+.press {
+  transition:
+    transform var(--d-press) var(--ease),
+    background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease),
+    opacity var(--d-fast) var(--ease);
+}
+
+.press:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+/* Touch: keep visible icon buttons at 36 but widen the hit area to 44. */
+@media (pointer: coarse) {
+  .hit-44 {
+    position: relative;
+  }
+  .hit-44::before {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .press:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Thread backdrop (spec §7.2, iOS ChatBackground classic): wash, two seeded glows, dot grid. */
+.chat-background {
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2252%22%20height%3D%2252%22%3E%3Cg%20fill%3D%22%23000%22%20fill-opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2213%22%20cy%3D%2213%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2239%22%20r%3D%221.1%22/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 55% at 12% 8%, var(--glow-a-light), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 92% 88%, var(--glow-b-light), transparent 70%),
+    linear-gradient(180deg, #f5f3fb, #f7f7fa);
+  background-size: 52px 52px, auto, auto, auto;
+}
+
+.dark .chat-background {
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2252%22%20height%3D%2252%22%3E%3Cg%20fill%3D%22%23fff%22%20fill-opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2213%22%20cy%3D%2213%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2239%22%20r%3D%221.1%22/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 55% at 12% 8%, var(--glow-a-dark), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 92% 88%, var(--glow-b-dark), transparent 70%),
+    linear-gradient(180deg, #0e0b16, #0b0b0d);
 }
 
 .chat-thread-scroll {
   overflow-y: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: var(--color-outline-variant) transparent;
+  scrollbar-color: var(--fill-strong) transparent;
 }
 
 .chat-thread-scroll::-webkit-scrollbar {
@@ -142,122 +485,345 @@ a {
 }
 
 .chat-thread-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--color-outline-variant);
+  background-color: var(--fill-strong);
   border-radius: 999px;
 }
 
-/* Functional Clarity utilities — always opaque */
-.fc-card {
-  background-color: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-hard);
-  border-radius: var(--radius-card);
+.no-scrollbar {
+  scrollbar-width: none;
 }
 
-.fc-btn-primary {
-  display: inline-flex;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Horizontal scrollers fade at the edges that have more content (Tabs, strips). */
+.edge-fade-x {
+  mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+}
+
+/* ── Skeleton shimmer (spec §5.6) ─────────────────────────────────────────── */
+
+@keyframes ds-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  59% {
+    transform: translateX(220%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.ds-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--fill-subtle);
+}
+
+.ds-skeleton[data-shimmer="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, #fff 6%, transparent), transparent);
+  animation: ds-shimmer 2.7s var(--ease) infinite;
+}
+
+.dark .ds-skeleton[data-shimmer="true"]::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+
+/* ── Loader: Click mark pulse after 200 ms (spec §5.6) ───────────────────── */
+
+@keyframes ds-loader-pulse {
+  from {
+    transform: scale(0.88);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ds-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ds-loader {
+  animation: ds-appear 1ms linear var(--loader-delay, 200ms) both;
+}
+
+.ds-loader > * {
+  animation: ds-loader-pulse 850ms ease-in-out infinite alternate;
+}
+
+@keyframes ds-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ds-spin {
+  animation: ds-spin 0.8s linear infinite;
+}
+
+/* Typing indicator wave (spec §7.2). */
+@keyframes ds-typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.ds-typing-dot {
+  animation: ds-typing 1.2s var(--ease) infinite;
+}
+
+/* Click Drop develop (spec §7.2): each finer pixel layer blooms out from the centre. */
+@keyframes drop-bloom {
+  from {
+    mask-size: 0% 0%;
+  }
+  to {
+    mask-size: 300% 300%;
+  }
+}
+
+@keyframes drop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.drop-bloom-layer {
+  mask-image: radial-gradient(circle, #000 48%, transparent 50%);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: 0% 0%;
+  animation: drop-bloom 0.5s var(--ease) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-bloom-layer {
+    mask-image: none;
+    opacity: 0;
+    animation: drop-fade 0.3s linear forwards;
+  }
+}
+
+/* Recap story progress: one capsule fills over the slide's duration (spec §7.6.5). */
+@keyframes recap-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Overlays enter with a 0.98→1 scale + fade on the expo curve (spec §5.4). */
+@keyframes ds-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ds-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ds-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ds-sheet-right-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes ds-sheet-up-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.ds-anim-overlay[data-state="open"] {
+  animation: ds-overlay-in var(--d-slow) var(--ease-out-expo);
+}
+
+.ds-anim-dialog[data-state="open"] {
+  animation: ds-dialog-in var(--d-slow) var(--ease-out-expo);
+}
+
+.ds-anim-popover[data-state="open"],
+.ds-anim-popover[data-state="delayed-open"],
+.ds-anim-popover[data-state="instant-open"] {
+  animation: ds-popover-in var(--d-base) var(--ease-out-expo);
+}
+
+.ds-anim-sheet-right[data-state="open"] {
+  animation: ds-sheet-right-in var(--d-slow) var(--ease-out-expo);
+}
+
+.ds-anim-sheet-up[data-state="open"] {
+  animation: ds-sheet-up-in var(--d-slow) var(--ease-out-expo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-anim-dialog[data-state="open"],
+  .ds-anim-popover[data-state="open"],
+  .ds-anim-sheet-right[data-state="open"],
+  .ds-anim-sheet-up[data-state="open"] {
+    animation: ds-overlay-in 120ms linear;
+  }
+}
+
+/* ── Map pins (spec §7.5): DOM markers over MapLibre's clustering ─────────── */
+
+.map-pin {
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
-  background-color: var(--color-primary);
-  color: var(--color-on-primary);
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  border-radius: var(--radius-btn);
-  border: none;
-  transition: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--d-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
 }
-
-.fc-btn-primary:hover {
-  filter: brightness(0.92);
+.map-pin:hover,
+.map-pin[data-selected] {
+  transform: scale(1.15);
+  z-index: 2;
 }
-
-.fc-btn-primary:active {
-  filter: brightness(0.9);
-  transform: translate(2px, 2px);
+.map-pin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--r-pill);
 }
-
-.fc-btn-primary:focus-visible,
-.fc-btn-secondary:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.fc-btn-secondary {
-  display: inline-flex;
+.map-pin-face,
+.map-pin-thumb,
+.map-pin-tile {
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
-  background-color: var(--color-surface);
-  color: var(--color-on-surface);
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  border-radius: var(--radius-btn);
-  border: var(--border-width) solid var(--color-border-hard);
-  transition: none;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px #fff, var(--shadow-pin);
 }
-
-.fc-btn-secondary:hover {
-  background-color: var(--color-surface-container-low);
-}
-
-.fc-btn-secondary:active {
-  transform: translate(2px, 2px);
-}
-
-.fc-input {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  background-color: var(--color-surface);
-  color: var(--color-on-surface);
-  border: var(--border-width) solid var(--color-border-hard);
-  border-radius: var(--radius-field);
-  font-size: 14px;
-  line-height: 20px;
-  color-scheme: light;
-}
-
-.dark .fc-input {
-  color-scheme: dark;
-}
-
-.fc-input::placeholder {
-  color: var(--color-on-surface-variant);
-}
-
-.fc-input:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.fc-textarea {
-  min-height: 112px;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  resize: vertical;
-  field-sizing: content;
-}
-
-.fc-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background-color: var(--color-on-primary-container);
-  color: var(--color-primary);
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 20px;
+.map-pin-face {
+  width: 36px;
+  height: 36px;
   border-radius: 9999px;
-  border: var(--border-width) solid var(--color-border-hard);
-  padding: 0.25rem 0.75rem;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
 }
-
-.dark .fc-chip {
-  background-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-surface));
-  color: var(--color-inverse-primary);
+.map-pin-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+}
+.map-pin-place .map-pin-thumb {
+  width: 30px;
+  height: 30px;
+}
+.map-pin-tile {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+}
+.map-pin-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.map-pin-cluster {
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  background: var(--action);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 3px #fff, var(--shadow-pin);
+}
+.map-pin-count {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: var(--action);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  box-shadow: 0 0 0 2px #fff;
+}
+.map-pin-live {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: var(--live);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px #fff;
 }
 
 /* Maplibre */
@@ -292,9 +858,12 @@ a {
 }
 
 .maplibregl-ctrl-group {
-  background: var(--color-surface) !important;
-  border: 1px solid var(--color-border-hard) !important;
-  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border: none !important;
+  box-shadow: var(--shadow-overlay) !important;
+  border-radius: var(--r-md) !important;
   overflow: hidden;
 }
 
@@ -303,7 +872,7 @@ a {
 }
 
 .maplibregl-ctrl-group button:hover {
-  background-color: var(--color-surface-container) !important;
+  background-color: var(--hover) !important;
 }
 
 .maplibregl-popup-content {
@@ -325,16 +894,16 @@ a {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--color-outline);
+  background: var(--text-tertiary);
   border-radius: 3px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--color-on-surface-variant);
+  background: var(--text-secondary);
 }
 
 .scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
-  background: var(--color-outline);
+  background: var(--text-tertiary);
 }
 
 .scrollbar-track-transparent::-webkit-scrollbar-track {
@@ -343,46 +912,7 @@ a {
 
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-outline) transparent;
-}
-
-.chat-emoji-mart-host {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0%;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: contain;
-  --padding: 10px;
-  --font-size: 13px;
-  --border-radius: 8px;
-  --category-icon-size: 16px;
-  --preview-placeholder-size: 16px;
-  --preview-title-size: 0.92em;
-  --preview-subtitle-size: 0.78em;
-}
-
-.chat-emoji-mart-host > div {
-  display: flex;
-  flex: 1 1 0%;
-  flex-direction: column;
-  min-height: 0;
-  width: 100%;
-}
-
-.chat-emoji-mart-host em-emoji-picker {
-  display: block;
-  flex: 1 1 0%;
-  align-self: stretch;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  touch-action: pan-y;
-  box-shadow: none !important;
+  scrollbar-color: var(--text-tertiary) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -396,7 +926,7 @@ a {
 }
 
 /*
- * Marketing motion: Functional Clarity seams and one map settle.
+ * Marketing motion: Quiet Presence hairlines and one map settle.
  * Headings stay painted (LCP); a 1px rule draws under them.
  * The fold map canvas is opacity-0 only until JS marks it ready;
  * reduced-motion visitors see the framed city immediately.
@@ -456,7 +986,7 @@ a {
   height: 1px;
   margin-inline: 0;
   margin-top: 1rem;
-  background-color: var(--color-border-hard);
+  background-color: var(--hairline);
   transform-origin: left center;
 }
 
@@ -476,5 +1006,42 @@ a {
 
   .mkt-map-canvas.is-ready {
     animation: mkt-map-settle 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* Event page tint (spec §7.6.2): one static radial glow from the cover's first stop
+   (`--tint`) behind the top 640 px, 14% light / 20% dark, fading to the page. */
+@utility event-tint {
+  background: radial-gradient(
+    110% 100% at 50% 0%,
+    color-mix(in srgb, var(--tint) 14%, transparent) 0%,
+    transparent 72%
+  );
+  &:where(.dark, .dark *) {
+    background: radial-gradient(
+      110% 100% at 50% 0%,
+      color-mix(in srgb, var(--tint) 20%, transparent) 0%,
+      transparent 72%
+    );
+  }
+}
+
+/* ── Print (spec §7.6.5 summary report) ───────────────────────────────────── */
+
+@media print {
+  [data-topbar],
+  [data-tabbar],
+  [data-site-chrome],
+  [data-print-hidden],
+  [data-workspace-chrome] {
+    display: none !important;
+  }
+  /* A poster page prints the sheet alone. */
+  body:has([data-poster]) *:not([data-poster]):not([data-poster] *):not(:has([data-poster])) {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
   }
 }

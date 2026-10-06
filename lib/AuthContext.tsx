@@ -232,6 +232,20 @@ export function AuthProvider({
   );
 }
 
+/**
+ * Seeds auth for a server-rendered signed-in subtree. The root layout no longer reads
+ * cookies (so marketing pages stay static); routes that already know the viewer on the
+ * server wrap their client tree in this so it paints signed-in on the first frame
+ * instead of waiting for `getSession()`.
+ */
+export function AuthSeed({ user, children }: { user: User | null; children: React.ReactNode }) {
+  const ctx = useContext(AuthContext);
+  const [serverSnapshot] = useState(() => ({ user, loading: false }));
+  const seeded = ctx.loading && !ctx.user && user;
+  const value = seeded ? { ...ctx, user, loading: false, serverSnapshot } : { ...ctx, serverSnapshot };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

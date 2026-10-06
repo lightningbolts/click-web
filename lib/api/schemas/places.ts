@@ -79,6 +79,8 @@ export const placeManagerPatchBodySchema = z
     website_url: optionalText(500),
     hub_enabled: z.boolean().optional(),
     listed: z.boolean().optional(),
+    /** Owner moves a legacy `draft` Place into Click's review queue (spec §9.5). */
+    submit_for_review: z.literal(true).optional(),
     address_line: optionalText(200),
     city: optionalText(100),
     region: optionalText(100),
@@ -102,3 +104,11 @@ export const placeCreateBodySchema = z.object({
   country_code: z.string().trim().length(2).optional(),
   website_url: z.string().trim().url().max(500).startsWith('https://').optional(),
 });
+
+const managerRole = z.enum(['owner', 'manager', 'viewer']);
+
+/** `POST /api/places/[placeId]/managers` — owner invites someone by email (spec §9.5 Team). */
+export const placeManagerInviteBodySchema = z.object({ email: z.string().trim().min(3).max(320), role: managerRole }).strict();
+
+/** `PATCH /api/places/[placeId]/managers/[userId]` — owner changes a role. */
+export const placeManagerRoleBodySchema = z.object({ role: managerRole }).strict();

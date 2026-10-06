@@ -66,9 +66,9 @@ export default function HubAttachment({ message, participantIds, name }: { messa
     } catch (e) { if (mounted.current) setError((e as Error).message); }
     finally { session?.epochKeys.forEach((key) => key.fill(0)); if (mounted.current) setBusy(false); }
   }
-  if (waitingForReveal) return <p className="mt-2 text-sm text-on-surface-variant">{Number.isFinite(revealAt) ? `Photo develops on ${new Date(revealAt).toLocaleString()}` : 'Photo is still developing.'}</p>;
+  if (waitingForReveal) return <p className="mt-2 text-sm text-fg-secondary">{Number.isFinite(revealAt) ? `Photo develops on ${new Date(revealAt).toLocaleString()}` : 'Photo is still developing.'}</p>;
   return <div className="mt-2 text-sm">
-    {url ? <a href={url} download={name || 'attachment'} className="font-semibold text-primary underline">Download {name || 'attachment'}</a> : <button type="button" disabled={busy} onClick={() => void load()} className="font-semibold text-primary underline">{busy ? 'Opening attachment…' : 'Open attachment'}</button>}
+    {url ? <a href={url} download={name || 'attachment'} className="font-semibold text-accent underline">Download {name || 'attachment'}</a> : <button type="button" disabled={busy} onClick={() => void load()} className="font-semibold text-accent underline">{busy ? 'Opening attachment…' : 'Open attachment'}</button>}
     {url && imageMime ? <Image src={url} unoptimized width={800} height={600} alt={name || 'Shared image'} className="mt-2 h-auto max-h-80 max-w-full rounded-xl object-contain" /> : null}
     {url && audioMime ? <audio src={url} controls preload="metadata" className="mt-2 max-w-full" aria-label={name || 'Shared audio'} /> : null}
     {url && videoMime ? <video src={url} controls preload="metadata" className="mt-2 max-h-80 max-w-full rounded-xl" aria-label={name || 'Shared video'} /> : null}

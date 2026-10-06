@@ -19,23 +19,23 @@ export default function ClicksScene({
   const thread = open ? (state.messages[open.id] ?? []) : [];
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background" data-testid="playground-scene-clicks">
+    <div className="flex h-full flex-col overflow-hidden bg-bg" data-testid="playground-scene-clicks">
       {open ? (
         <>
-          <div className="flex items-center gap-3 border-b border-border-hard px-3 py-3">
+          <div className="flex items-center gap-3 border-b border-hairline px-3 py-3">
             <button
               type="button"
               aria-label="Back to messages"
               onClick={() => actions.setOpenChatId(null)}
-              className="rounded-[8px] border border-border-hard p-1.5 text-on-surface-variant"
+              className="rounded-[8px] border border-hairline p-1.5 text-fg-secondary"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <PlaygroundAvatar initials={open.initials} size="sm" online={open.online} />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-on-surface">{open.name}</p>
+              <p className="text-sm font-semibold text-fg">{open.name}</p>
               {memory ? (
-                <p className="flex items-center gap-1.5 truncate text-[11px] text-on-surface-variant">
+                <p className="flex items-center gap-1.5 truncate text-[11px] text-fg-secondary">
                   {memory.label} · {memory.place} <VolumeBars count={memory.volume} />
                 </p>
               ) : null}
@@ -45,9 +45,9 @@ export default function ClicksScene({
         </>
       ) : (
         <>
-          <div className="border-b border-border-hard px-4 py-3">
-            <h3 className="text-lg font-bold text-on-surface">Clicks</h3>
-            <p className="text-xs text-on-surface-variant">Chat with people you met in person</p>
+          <div className="border-b border-hairline px-4 py-3">
+            <h3 className="text-lg font-bold text-fg">Clicks</h3>
+            <p className="text-xs text-fg-secondary">Chat with people you met in person</p>
           </div>
           <ul className="flex-1 overflow-auto">
             {connected.map((person) => {
@@ -56,7 +56,7 @@ export default function ClicksScene({
                     const last = thread.at(-1);
                     const preview = fresh ? 'New Click · say hi' : last?.plan ? `📅 ${last.plan.title}` : last?.text ?? person.chatPreview;
               return (
-                <li key={person.id} className="border-b border-border-hard">
+                <li key={person.id} className="border-b border-hairline">
                   <button
                     type="button"
                     data-testid={`playground-clicks-chat-${person.id}`}
@@ -64,19 +64,19 @@ export default function ClicksScene({
                       actions.setOpenChatId(person.id);
                       actions.setDashboardTab('chat');
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-container"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised"
                   >
                     <PlaygroundAvatar initials={person.initials} online={person.online} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold text-on-surface">{person.name}</p>
+                        <p className="truncate text-sm font-semibold text-fg">{person.name}</p>
                         {fresh ? (
-                          <span className="rounded-full bg-primary-container px-1.5 py-0.5 text-[10px] font-bold text-on-primary-container">48h left</span>
+                          <span className="rounded-full bg-selection px-1.5 py-0.5 text-[10px] font-bold text-accent">48h left</span>
                         ) : (
-                          <span className="text-[11px] text-on-surface-variant">{person.chatTime}</span>
+                          <span className="text-[11px] text-fg-secondary">{person.chatTime}</span>
                         )}
                       </div>
-                      <p className={`truncate text-xs ${fresh ? 'font-semibold text-primary' : 'text-on-surface-variant'}`}>{preview}</p>
+                      <p className={`truncate text-xs ${fresh ? 'font-semibold text-accent' : 'text-fg-secondary'}`}>{preview}</p>
                     </div>
                   </button>
                 </li>

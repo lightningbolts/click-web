@@ -36,7 +36,7 @@ function tierBadgeClasses(tier: VenueTier): string {
   if (tier === 'Enterprise') return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400/30';
   if (tier === 'Nexus') return 'bg-sky-500/20 text-sky-300 border-sky-400/30';
   if (tier === 'Pulse') return 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30';
-  return 'bg-zinc-700/40 text-on-surface border-zinc-600/40';
+  return 'bg-zinc-700/40 text-fg border-zinc-600/40';
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -152,7 +152,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <th className="px-2 py-2">Fast Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.moderation.reports.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -199,7 +199,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <th className="px-2 py-2">Timestamp</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.moderation.forwardedMessages.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -228,7 +228,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           {data.moderation.graphAnomalies.length === 0 ? (
             <p className="text-sm text-zinc-400">No abnormal high-degree connection nodes detected.</p>
           ) : (
-            <ul className="space-y-2 text-sm text-on-surface">
+            <ul className="space-y-2 text-sm text-fg">
               {data.moderation.graphAnomalies.map((anomaly) => (
                 <li key={anomaly.userId} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2">
                   <span>{anomaly.userLabel}</span>
@@ -263,14 +263,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-zinc-400">
               <tr>
-                <th className="px-2 py-2">Venue</th>
+                <th className="px-2 py-2">Place</th>
                 <th className="px-2 py-2">Tier</th>
                 <th className="px-2 py-2">Subscription Status</th>
                 <th className="px-2 py-2">Managers</th>
                 <th className="px-2 py-2">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.insights.subscriptions.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -300,22 +300,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <div className="glass-panel overflow-x-auto rounded-2xl p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">Venue Verification Queue</h3>
+          <h3 className="mb-1 text-sm font-semibold text-white">Billing</h3>
+          <p className="mb-3 text-xs text-zinc-400">Plan status per Place. Verification is in Places.</p>
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-zinc-400">
               <tr>
-                <th className="px-2 py-2">Venue</th>
-                <th className="px-2 py-2">Current Status</th>
+                <th className="px-2 py-2">Place</th>
+                <th className="px-2 py-2">Plan status</th>
                 <th className="px-2 py-2">Owners/Managers</th>
                 <th className="px-2 py-2">Created</th>
                 <th className="px-2 py-2">Decision</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.insights.verificationQueue.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
-                    No pending venues in verification queue.
+                    No Places waiting on a plan decision.
                   </td>
                 </tr>
               ) : (
@@ -330,13 +331,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                         <form action={approveVenueAction}>
                           <input type="hidden" name="venue_id" value={queueItem.venueId} />
                           <button className="rounded-md border border-emerald-500/40 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10">
-                            Approve
+                            Grant trial
                           </button>
                         </form>
                         <form action={rejectVenueAction}>
                           <input type="hidden" name="venue_id" value={queueItem.venueId} />
                           <button className="rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
-                            Reject
+                            Cancel plan
                           </button>
                         </form>
                       </div>
@@ -357,14 +358,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <table className="min-w-full text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-zinc-400">
                   <tr>
-                    <th className="px-2 py-2">Venue</th>
+                    <th className="px-2 py-2">Place</th>
                     <th className="px-2 py-2">Category</th>
                     <th className="px-2 py-2">Perk</th>
                     <th className="px-2 py-2">Coordinates</th>
                     <th className="px-2 py-2">Window</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800 text-on-surface">
+                <tbody className="divide-y divide-zinc-800 text-fg">
                   {data.insights.activeBeacons.map((beacon) => (
                     <tr key={beacon.id}>
                       <td className="px-2 py-3">{beacon.venueName}</td>

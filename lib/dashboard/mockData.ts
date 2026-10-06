@@ -4,7 +4,6 @@
  */
 
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import type { TimelineChapter } from '@/components/dashboard/TimeCapsule';
 import { pluralize } from '@/lib/format/pluralize';
 import {
   extractEventContext,
@@ -142,74 +141,6 @@ export const mockConnections: ConnectionRecord[] = [
 ];
 
 // Generate mock chapters
-export const mockChapters: TimelineChapter[] = [
-  {
-    id: 'ch-1',
-    title: 'Winter Quarter 2026',
-    dateRange: {
-      start: new Date('2026-01-06'),
-      end: new Date('2026-01-31'),
-    },
-    location: 'University of Washington',
-    connectionCount: 8,
-    description: 'New semester, new connections! Started the year with energy.',
-    highlights: ['Study groups', 'Coffee chats', 'Tech meetups'],
-    connections: [mockConnections[0], mockConnections[1], mockConnections[2]],
-  },
-  {
-    id: 'ch-2',
-    title: 'Winter Break Adventures',
-    dateRange: {
-      start: new Date('2025-12-15'),
-      end: new Date('2026-01-05'),
-    },
-    location: 'Seattle',
-    connectionCount: 5,
-    description: 'Holiday gatherings and spontaneous meetups.',
-    highlights: ['Holiday parties', 'Family friends', 'New Year celebrations'],
-    connections: [mockConnections[3], mockConnections[4]],
-  },
-  {
-    id: 'ch-3',
-    title: 'Fall Quarter Finale',
-    dateRange: {
-      start: new Date('2025-11-01'),
-      end: new Date('2025-12-14'),
-    },
-    location: 'University of Washington',
-    connectionCount: 12,
-    description: 'Busy end to the quarter with projects and events.',
-    highlights: ['Hackathon', 'Thanksgiving', 'Finals study sessions'],
-    connections: [mockConnections[5], mockConnections[6]],
-  },
-  {
-    id: 'ch-4',
-    title: 'October Spooky Season',
-    dateRange: {
-      start: new Date('2025-10-01'),
-      end: new Date('2025-10-31'),
-    },
-    location: 'Seattle Area',
-    connectionCount: 7,
-    description: 'Halloween vibes and autumn adventures.',
-    highlights: ['Costume parties', 'Pumpkin picking', 'Night events'],
-    connections: [mockConnections[7], mockConnections[8]],
-  },
-  {
-    id: 'ch-5',
-    title: 'Freshman Orientation 2025',
-    dateRange: {
-      start: new Date('2025-09-15'),
-      end: new Date('2025-09-30'),
-    },
-    location: 'UW Campus',
-    connectionCount: 15,
-    description: 'The beginning of the college journey. Met so many amazing people!',
-    highlights: ['Dawg Daze', 'Dorm meetups', 'Club fairs', 'Campus tours'],
-    color: 'from-[#8338EC] to-[#FF6B6B]',
-    connections: [mockConnections[9]],
-  },
-];
 
 /**
  * Convert raw connection data to ConnectionRecord format
@@ -255,47 +186,6 @@ export function transformConnection(rawConnection: any, otherUserName?: string):
 /**
  * Generate chapters from connections automatically
  */
-export function generateChaptersFromConnections(connections: ConnectionRecord[]): TimelineChapter[] {
-  // Group by month
-  const monthGroups: Map<string, ConnectionRecord[]> = new Map();
-  
-  connections.forEach(conn => {
-    const monthKey = `${conn.dateMet.getFullYear()}-${conn.dateMet.getMonth()}`;
-    if (!monthGroups.has(monthKey)) {
-      monthGroups.set(monthKey, []);
-    }
-    monthGroups.get(monthKey)!.push(conn);
-  });
-
-  // Convert to chapters
-  const chapters: TimelineChapter[] = [];
-  monthGroups.forEach((conns, monthKey) => {
-    const [year, month] = monthKey.split('-').map(Number);
-    const monthName = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    
-    // Get unique locations
-    const locations = [...new Set(conns.map(c => c.location))];
-    
-    chapters.push({
-      id: monthKey,
-      title: monthName,
-      dateRange: {
-        start: new Date(year, month, 1),
-        end: new Date(year, month + 1, 0),
-      },
-      location: locations.length <= 2 ? locations.join(', ') : `${locations.length} locations`,
-      connectionCount: conns.length,
-      description: `${pluralize(conns.length, 'new connection')} made this month`,
-      highlights: locations.slice(0, 4),
-      connections: conns,
-    });
-  });
-
-  // Sort by date descending
-  chapters.sort((a, b) => b.dateRange.start.getTime() - a.dateRange.start.getTime());
-  
-  return chapters;
-}
 
 /**
  * Export connections to CSV format

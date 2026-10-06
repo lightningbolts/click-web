@@ -92,6 +92,8 @@ export type MapLayerToggles = {
   soundtracks: boolean;
   alertsUtilities: boolean;
   other: boolean;
+  /** Click Places pins (spec §9.8); only drawn when the Places feature is on. */
+  places: boolean;
 };
 
 export const DEFAULT_MAP_LAYER_TOGGLES: MapLayerToggles = {
@@ -101,11 +103,12 @@ export const DEFAULT_MAP_LAYER_TOGGLES: MapLayerToggles = {
   soundtracks: true,
   alertsUtilities: true,
   other: true,
+  places: true,
 };
 
 export function mapLayerForBeacon(
   beaconType: MapBeaconType,
-): Exclude<keyof MapLayerToggles, "myNetwork"> {
+): Exclude<keyof MapLayerToggles, "myNetwork" | "places"> {
   if (beaconType === "event") return "events";
   if (beaconType === "recreation") return "socialVibes";
   if (beaconType === "soundtrack") return "soundtracks";

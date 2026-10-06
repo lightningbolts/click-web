@@ -1,24 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, AlertCircle, ChevronDown, Paperclip } from 'lucide-react';
+import { Fragment, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ChevronDown, Lock, Paperclip, Pin } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
 import { notifyMessagesDelivered } from '@/lib/chat/messages';
-import MessageBubble from './MessageBubble';
+import { isAnyE2eeWireContent } from '@/lib/chat/crypto';
+import MessageBubble, { type MessageSender } from './MessageBubble';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { useAuth } from '@/lib/AuthContext';
 import { bubbleStableListKey } from '@/lib/chat/clientOptimistic';
-import { buildTimelineEntries } from '@/lib/chat/conversationTimeline';
-import { ConversationDaySeparator } from './ConversationDaySeparator';
-import { CHAT_THREAD_PANEL_CLASS } from '@/lib/chat/layout';
+import { buildTimelineEntries, messageRuns } from '@/lib/chat/conversationTimeline';
+import { ConversationDaySeparator, NewMessagesSeparator } from './ConversationDaySeparator';
+import { ChatBackground } from './ChatBackground';
 import { ChatHeader } from './ChatHeader';
-import { ChatDialogs } from './ChatDialogs';
+import { ChatDialogs, type ChatDialogState } from './ChatDialogs';
 import { ChatComposer } from './ChatComposer';
 import { klipyAppKey, klipyCustomerId } from '@/lib/chat/klipy';
-import { ChatSharedInterestsBanner } from './ChatSharedInterestsBanner';
 import { useChatEncryption } from './useChatEncryption';
 import { useChatConnectionMeta } from './useChatConnectionMeta';
 import { useMessageLoading } from './useMessageLoading';
@@ -27,22 +26,38 @@ import { useMessageActions } from './useMessageActions';
 import { useVoiceMessages } from './useVoiceMessages';
 import { useChatAttachments } from './useChatAttachments';
 import { useChatMutes, useConversationExtras } from './useConversationExtras';
+import { useConversationActions } from './useConversationActions';
+import { useThreadDrops } from './useThreadDrops';
+import { useE2eeNotice } from './useE2eeNotice';
+import { ThreadSearchBar } from './ThreadSearchBar';
+import { SayHiPanel, sayHiOpeners } from './SayHiPanel';
 import { ConversationDetailsPanel } from './ConversationDetailsPanel';
 import { PlanDialog } from './PlanDialog';
 import { ScheduleSendDialog } from './ScheduleSendDialog';
+import { chatNotify } from './chatNotify';
+import { useClickDrop } from '@/components/people/useClickDrop';
+import { InlineNotice } from '@/components/ds/InlineNotice';
+import { Button } from '@/components/ds/Button';
+import { Skeleton } from '@/components/ds/Skeleton';
+import { Spinner } from '@/components/ds/Spinner';
 import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION } from '@/lib/chat/plans';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import { readSessionCache } from '@/lib/dashboard/sessionCache';
+import { connectionRecordToArchiveRow, getArchiveCountdown } from '@/lib/dashboard/connectionStatus';
 import { chatThreadCacheKey, type ChatThreadSnapshot } from '@/components/chat/useMessageLoading';
+import { cn } from '@/lib/cn';
 
 const DETAILS_PREF_KEY = 'click:chat-details-open';
+const WIDE_QUERY = '(min-width: 1280px)';
+/** Say Hi shows until the conversation has this many messages (spec §7.2). */
+const SAY_HI_MAX_MESSAGES = 5;
 
 /** Details panel defaults open on wide screens; the reader's last choice wins after that. */
 function readDetailsPreference(): boolean {
   if (typeof window === 'undefined') return false;
   // Below xl the panel is a sheet over the thread: never open it unasked.
-  if (!window.matchMedia('(min-width: 1280px)').matches) return false;
+  if (!window.matchMedia(WIDE_QUERY).matches) return false;
   try {
     const stored = window.localStorage.getItem(DETAILS_PREF_KEY);
     if (stored === 'true' || stored === 'false') return stored === 'true';
@@ -58,6 +73,10 @@ function writeDetailsPreference(open: boolean) {
   } catch {
     /* ignore */
   }
+}
+
+function firstUnreadPeerMessage(messages: Message[], currentUserId: string): string | null {
+  return messages.find((m) => m.user_id !== currentUserId && m.message_type !== 'call_log' && m.read_at == null)?.id ?? null;
 }
 
 interface ChatViewProps {
@@ -93,18 +112,12 @@ interface ChatViewProps {
 }
 
 /**
- * ChatView - full realtime chat experience for a single connection.
+ * ChatView — the open conversation (spec §7.2): header, timeline over the conversation's
+ * backdrop, one top banner at a time, the composer, and the details column.
  *
- * Architecture:
- *  1. On mount → GET /api/chat?connectionId to get/create the chat row.
- *  2. GET /api/chat/messages?chatId to load initial messages.
- *  3. Subscribe to Supabase Realtime on `messages` and `message_reactions`
- *     filtered by chat_id for live updates.
- *  4. Send, edit, delete via POST/PATCH/DELETE to /api/chat/messages.
- *  5. React via POST /api/chat/reactions (add) or DELETE (remove own).
- *
- * The E2EE/data/action layers live in the sibling useChat* hooks; the header,
- * composer, dialogs, and banners are sibling components.
+ * Data: GET /api/chat?connectionId → chat row; GET /api/chat/messages → pages; Supabase Realtime
+ * on `messages` / `message_reactions` for live updates. The E2EE, loading, realtime and action
+ * layers live in the sibling useChat* hooks.
  */
 export default function ChatView({
   connection,
@@ -162,14 +175,8 @@ export default function ChatView({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [typingIndicator, setTypingIndicator] = useState(false);
-  const [showRenameGroupModal, setShowRenameGroupModal] = useState(false);
-  const [renameGroupInput, setRenameGroupInput] = useState('');
-  const [showGroupMemberPicker, setShowGroupMemberPicker] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [pendingDeleteMessageId, setPendingDeleteMessageId] = useState<string | null>(null);
-  const [showReportDialog, setShowReportDialog] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [actionToast, setActionToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [dialog, setDialog] = useState<ChatDialogState>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
@@ -181,8 +188,6 @@ export default function ChatView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   /** Set in layout when the thread identity changes; cleared after an open snap session completes. */
   const snapScrollToLatestOnOpenRef = useRef(false);
-  /** Glass messages card — clip portaled message menus to this region. */
-  const messagesPanelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputTextRef = useRef('');
   const programmaticListScrollRef = useRef(false);
@@ -190,12 +195,6 @@ export default function ChatView({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!actionToast) return;
-    const timeout = setTimeout(() => setActionToast(null), 2200);
-    return () => clearTimeout(timeout);
-  }, [actionToast]);
 
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => getFreshAuthHeaders(), []);
 
@@ -313,8 +312,8 @@ export default function ChatView({
     broadcastTyping,
     startEdit,
     submitEdit,
+    deleteMessage,
     handleReact,
-    confirmDeleteMessage,
   } = useMessageActions({
     connection,
     currentUserId,
@@ -335,9 +334,6 @@ export default function ChatView({
     setReplyingTo,
     mediaBusy,
     isRecording,
-    pendingDeleteMessageId,
-    setPendingDeleteMessageId,
-    setShowDeleteConfirm,
     inputRef,
     getAuthHeaders,
     appendReplyToMetadata,
@@ -359,7 +355,7 @@ export default function ChatView({
     setRecordingMs,
     setMessages,
     setReplyingTo,
-    setActionToast,
+    notify: chatNotify,
     setInputText,
     inputTextRef,
     getAuthHeaders,
@@ -387,7 +383,7 @@ export default function ChatView({
     setMediaBusy,
     isRecording,
     setReplyingTo,
-    setActionToast,
+    notify: chatNotify,
     setInputText,
     setIsDraggingAttachment,
     inputTextRef,
@@ -398,9 +394,27 @@ export default function ChatView({
     appendReplyToMetadata,
   });
 
-  // ── Conversation extras (iOS parity): mute, pins, plans, scheduled, hangouts ──
+  // Click Drop: direct chats only — a photo into the pair's shared roll that develops later.
+  const {
+    inputRef: dropInputRef,
+    status: dropStatus,
+    busy: dropBusy,
+    pick: pickDrop,
+    onFile: onDropFile,
+  } = useClickDrop(isGroupClique ? null : connection.id, currentUserId);
+  useEffect(() => {
+    if (dropStatus === 'error') chatNotify({ type: 'error', message: 'Couldn’t send that Click Drop. Try again.' });
+    if (dropStatus === 'done') chatNotify({ type: 'success', message: 'Dropped. It develops for you both later.' });
+  }, [dropStatus]);
+  const dropStateFor = useThreadDrops(messages);
+
+  // ── Conversation extras: mute, pins, plans, scheduled, hangouts ──
   const { muteFor, setMuted } = useChatMutes();
   const mute = muteFor([chatId, connection.id]);
+  const onSetMuted = useCallback(
+    (muted: boolean, ms: number | null) => setMuted(chatId ?? connection.id, muted, ms),
+    [chatId, connection.id, setMuted],
+  );
   const extras = useConversationExtras({
     chatId,
     connectionId: isGroupClique ? null : connection.id,
@@ -417,19 +431,34 @@ export default function ChatView({
   const [planOpen, setPlanOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
+  const headerTitle = isGroupClique ? (displayGroupName ?? otherUserName) : otherUserName;
+  const firstName = otherUserName.split(/\s+/)[0] || otherUserName;
+  const actions = useConversationActions({
+    connection,
+    title: headerTitle,
+    isGroupCreator: Boolean(groupCreatorId && groupCreatorId === currentUserId),
+    onClose,
+    onGroupChatChanged,
+    onAddToCore,
+    onRemoveFromCore,
+    onArchive,
+    onUnarchive,
+    onRemove,
+    onBlock,
+    onUnblock,
+  });
+
   const jumpToMessage = useCallback(
     (messageId: string) => {
       const el = scrollContainerRef.current?.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
       if (el) {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         setHighlightedMessageId(messageId);
-        window.setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 2400);
+        window.setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 1200);
       } else {
         onRequestJump?.(messageId);
       }
-      if (typeof window !== 'undefined' && !window.matchMedia('(min-width: 1280px)').matches) {
-        setDetailsOpen(false);
-      }
+      if (!window.matchMedia(WIDE_QUERY).matches) setDetailsOpen(false);
     },
     [onRequestJump],
   );
@@ -445,6 +474,7 @@ export default function ChatView({
     [currentUserId, handleReact],
   );
 
+  const messageById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
   const replySnippetById = useMemo(() => {
     const map = new Map<string, string>();
     for (const m of messages) map.set(m.id, replySnippetForSend(previewLabelForMessage(m), 140));
@@ -452,322 +482,364 @@ export default function ChatView({
   }, [messages]);
   const resolveReplySnippet = useCallback((id: string) => replySnippetById.get(id) ?? null, [replySnippetById]);
 
+  const memberById = useMemo(
+    () => new Map(groupMemberProfileRows.map((row) => [row.userId, row.label])),
+    [groupMemberProfileRows],
+  );
+  const nameFor = useCallback(
+    (userId: string) =>
+      userId === currentUserId ? 'You' : isGroupClique ? (memberById.get(userId) ?? 'Member') : otherUserName,
+    [currentUserId, isGroupClique, memberById, otherUserName],
+  );
+  const resolveReplyAuthor = useCallback(
+    (id: string) => {
+      const m = messageById.get(id);
+      return m ? nameFor(m.user_id) : null;
+    },
+    [messageById, nameFor],
+  );
+  const senderFor = (m: Message): MessageSender | null =>
+    isGroupClique && m.user_id !== currentUserId ? { id: m.user_id, name: memberById.get(m.user_id) ?? 'Member' } : null;
+
   const handleTogglePin = useCallback(
     async (message: Message) => {
       try {
         const pinned = await extras.togglePin(message.id, currentUserId);
-        setActionToast({ type: 'success', message: pinned ? 'Message pinned' : 'Message unpinned' });
+        chatNotify({ type: 'success', message: pinned ? 'Message pinned' : 'Message unpinned' });
       } catch {
-        setActionToast({ type: 'error', message: "Couldn't update the pin. Try again." });
+        chatNotify({ type: 'error', message: "Couldn't update the pin. Try again." });
       }
     },
     [currentUserId, extras],
   );
 
+  const replyTo = useCallback((m: Message) => {
+    setEditingId(null);
+    setEditText('');
+    setReplyingTo(m);
+    inputRef.current?.focus();
+  }, []);
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditText('');
+  }, []);
+  const editLast = useCallback(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.user_id !== currentUserId || m.message_type !== 'text') continue;
+      if (typeof m.content !== 'string' || isAnyE2eeWireContent(m.content)) return;
+      startEdit(m.id, m.content);
+      return;
+    }
+  }, [currentUserId, messages, startEdit]);
+
+  const e2eeNotice = useE2eeNotice({
+    chatId,
+    isGroupClique,
+    e2eKeys,
+    groupMasterKey,
+    groupKeyError,
+    getE2eeV2Session,
+    getAuthHeaders,
+  });
+
+  // "New messages" marks the first unread message from the other side, captured once per open
+  // conversation so it stays put while read receipts go out.
+  const [unreadAnchor, setUnreadAnchor] = useState<{ chatId: string; id: string | null } | null>(null);
+  if (!loading && chatId && unreadAnchor?.chatId !== chatId) {
+    setUnreadAnchor({ chatId, id: firstUnreadPeerMessage(messages, currentUserId) });
+  }
+  const unreadId = unreadAnchor?.chatId === chatId ? unreadAnchor.id : null;
+
+  // Jump-to-latest counts what arrived from others since the reader scrolled away.
+  const lastId = messages.at(-1)?.id ?? null;
+  const [scrollBaseline, setScrollBaseline] = useState<string | null>(null);
+  if (showScrollBtn && scrollBaseline === null && lastId) setScrollBaseline(lastId);
+  if (!showScrollBtn && scrollBaseline !== null) setScrollBaseline(null);
+  const unseenCount = useMemo(() => {
+    if (!scrollBaseline) return 0;
+    const at = messages.findIndex((m) => m.id === scrollBaseline);
+    return at < 0 ? 0 : messages.slice(at + 1).filter((m) => m.user_id !== currentUserId).length;
+  }, [currentUserId, messages, scrollBaseline]);
+
+  // Say Hi: a fresh direct connection that hasn't really started talking yet.
+  const [openedAtMs] = useState(() => Date.now());
+  const countdown = useMemo(
+    () => getArchiveCountdown(connectionRecordToArchiveRow(connection), openedAtMs),
+    [connection, openedAtMs],
+  );
+  const openers = useMemo(
+    () => sayHiOpeners(firstName, connection.location, sharedInterestTags),
+    [connection.location, firstName, sharedInterestTags],
+  );
+  const showSayHi =
+    !isGroupClique &&
+    !isBlocked &&
+    !loading &&
+    messages.length < SAY_HI_MAX_MESSAGES &&
+    countdown?.kind === 'initial_message' &&
+    countdown.remainingMs > 0;
+
+  const latestPin = useMemo(
+    () => [...extras.pins].sort((a, b) => Date.parse(b.pinned_at) - Date.parse(a.pinned_at))[0] ?? null,
+    [extras.pins],
+  );
+
+  const timelineEntries = useMemo(() => buildTimelineEntries(messages), [messages]);
+  const runs = useMemo(() => messageRuns(messages), [messages]);
+  const subtitle = isGroupClique
+    ? (groupHeaderSubtitle ?? `${connection.userIds?.length ?? 0} members`)
+    : connection.location
+      ? `Met at ${connection.location}`
+      : `Met ${connection.dateMet.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
   // ─────────────────────────── render ──────────────────────────────────────
 
-  const otherInitial = otherUserName.charAt(0).toUpperCase();
-  const headerTitle = isGroupClique ? (displayGroupName ?? otherUserName) : otherUserName;
-  const metDate = connection.dateMet.toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-  const timelineEntries = useMemo(() => buildTimelineEntries(messages), [messages]);
+  let banner: React.ReactNode = null;
+  if (error) {
+    banner = <InlineNotice variant="destructive" live>{error}</InlineNotice>;
+  } else if (searchOpen) {
+    banner = <ThreadSearchBar messages={messages} onJump={jumpToMessage} onClose={() => setSearchOpen(false)} />;
+  } else if (e2eeNotice) {
+    banner = (
+      <InlineNotice
+        key={e2eeNotice.key}
+        variant={e2eeNotice.variant}
+        icon={Lock}
+        live
+        className="shadow-overlay"
+        action={
+          e2eeNotice.action ? (
+            <Button size="sm" variant="plain" onClick={e2eeNotice.action.onClick}>
+              {e2eeNotice.action.label}
+            </Button>
+          ) : null
+        }
+      >
+        {e2eeNotice.text}
+      </InlineNotice>
+    );
+  } else if (showSayHi && countdown) {
+    banner = (
+      <SayHiPanel
+        hoursLeft={Math.max(1, Math.ceil(countdown.remainingMs / 3_600_000))}
+        openers={openers}
+        onPick={(text) => {
+          setInputText(text);
+          inputRef.current?.focus();
+        }}
+      />
+    );
+  } else if (latestPin) {
+    banner = (
+      <button
+        type="button"
+        onClick={() => jumpToMessage(latestPin.message_id)}
+        className="material-glass press flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left shadow-overlay"
+      >
+        <Pin size={16} aria-hidden className="shrink-0 rotate-45 text-accent" />
+        <span className="min-w-0 flex-1">
+          <span className="type-badge block text-accent">
+            Pinned{extras.pins.length > 1 ? ` · ${extras.pins.length}` : ''}
+          </span>
+          <span className="type-meta block truncate text-fg">
+            {replySnippetById.get(latestPin.message_id) ?? 'Pinned message'}
+          </span>
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div
       data-testid="chat-panel"
-      className={CHAT_THREAD_PANEL_CLASS}
+      className="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-bg"
       onDragOver={onAttachmentDragOver}
       onDragLeave={onAttachmentDragLeave}
       onDrop={onAttachmentDrop}
     >
-      <div className="relative flex min-w-0 flex-1 flex-col">
-      {isDraggingAttachment && (
-        <div
-          className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-primary/10 text-primary "
-          aria-hidden="true"
-        >
-          <Paperclip className="w-7 h-7 mb-1.5" />
-          <span className="text-sm font-medium">Drop to encrypt and send</span>
-          <span className="text-xs text-primary/80">2 MB max · E2EE per-file key</span>
-        </div>
-      )}
-      {/* ── Header (safe-area only; IME resizes the message column in the parent layout) ── */}
-      <ChatHeader
-        connection={connection}
-        currentUserId={currentUserId}
-        isGroupClique={isGroupClique}
-        otherUserName={otherUserName}
-        headerTitle={headerTitle}
-        metDate={metDate}
-        peerUserId={peerUserId}
-        peerIsOnline={peerIsOnline}
-        groupKeyError={groupKeyError}
-        groupHeaderSubtitle={groupHeaderSubtitle}
-        groupCreatorId={groupCreatorId}
-        groupMemberProfileRows={groupMemberProfileRows}
-        isCore={isCore}
-        isArchived={isArchived}
-        isBlocked={isBlocked}
-        onClose={onClose}
-        onOpenProfile={onOpenProfile}
-        muted={Boolean(mute)}
-        detailsOpen={detailsOpen}
-        onToggleDetails={toggleDetails}
-        onGroupChatChanged={onGroupChatChanged}
-        onAddToCore={onAddToCore}
-        onRemoveFromCore={onRemoveFromCore}
-        onArchive={onArchive}
-        onUnarchive={onUnarchive}
-        onRemove={onRemove}
-        onBlock={onBlock}
-        onUnblock={onUnblock}
-        setActionToast={setActionToast}
-        setShowReportDialog={setShowReportDialog}
-        setShowGroupMemberPicker={setShowGroupMemberPicker}
-        openRenameGroupModal={(currentTitle) => {
-          setRenameGroupInput(currentTitle);
-          setShowRenameGroupModal(true);
-        }}
-      />
-
-      <ChatSharedInterestsBanner
-        isGroupClique={isGroupClique}
-        sharedInterestTags={sharedInterestTags}
-        peerUserId={peerUserId}
-      />
-
-      {/* ── Messages area ── */}
-      <div
-        ref={messagesPanelRef}
-        className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface"
-      >
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="chat-thread-scroll relative z-[1] min-h-0 flex-1"
-        >
-          <div className="space-y-4 px-4 py-4 md:px-6">
-          {loadingMore && (
-            <div className="flex justify-center py-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container border border-border-hard">
-                <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-                <span className="text-xs text-on-surface-variant">Loading older messages…</span>
-              </div>
-            </div>
-          )}
-
-          {/* Initial load */}
-          {loading && (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-on-surface-variant">
-              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              </div>
-              <p className="text-sm">Loading messages…</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex flex-col items-center gap-3 text-sm text-error py-8">
-              <div className="p-3 rounded-2xl border border-error/20 bg-error/10">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {!loading && !error && messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center py-16 gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/20 text-3xl">
-                👋
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-on-surface">
-                  {isGroupClique ? `Welcome to ${otherUserName}` : `Say hello to ${otherUserName}!`}
-                </p>
-                <p className="mt-1 max-w-xs text-sm text-on-surface-variant">
-                  {isGroupClique ? (
-                    <>
-                      Everyone here is part of a <span className="font-medium text-emerald-700 dark:text-emerald-300">mathematically verified</span>{' '}
-                      clique — start the thread.
-                    </>
-                  ) : (
-                    <>
-                      You met at <span className="font-medium text-primary">{connection.location}</span>. Start the conversation!
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Message list */}
-          <AnimatePresence initial={false}>
-            {timelineEntries.map((entry) => (
-              entry.kind === 'separator' ? (
-                <ConversationDaySeparator key={entry.key} label={entry.label} />
-              ) : editingId === entry.message.id ? (
-                /* Inline edit form */
-                <motion.div
-                  key={`edit-${entry.message.id}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className={`flex ${entry.message.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className="flex gap-2 max-w-[72%]">
-                    <input
-                      autoFocus
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') submitEdit();
-                        if (e.key === 'Escape') { setEditingId(null); setEditText(''); }
-                      }}
-                      className="flex-1 rounded-[8px] border-2 border-primary bg-surface-container px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <button
-                      onClick={submitEdit}
-                      className="fc-btn-primary px-3 py-2 text-sm"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => { setEditingId(null); setEditText(''); }}
-                      className="fc-btn-secondary px-3 py-2 text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </motion.div>
-              ) : (
-                <MessageBubble
-                  key={bubbleStableListKey(entry.message)}
-                  message={entry.message}
-                  isMine={entry.message.user_id === currentUserId}
-                  currentUserId={currentUserId}
-                  mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
-                  getAuthHeaders={getAuthHeaders}
-                  getE2eeV2Session={getE2eeV2Session}
-                  highlighted={highlightedMessageId === entry.message.id}
-                  senderInitial={otherInitial}
-                  senderLabel={
-                    isGroupClique && entry.message.user_id !== currentUserId
-                      ? entry.message.user_id.replace(/-/g, '').slice(0, 2).toUpperCase()
-                      : undefined
-                  }
-                  showSenderOnline={!isGroupClique && peerIsOnline && entry.message.user_id === peerUserId}
-                  portalsBoundsRef={messagesPanelRef}
-                  onReact={handleReact}
-                  onEdit={startEdit}
-                  onReply={(msg) => {
-                    setEditingId(null);
-                    setEditText('');
-                    setReplyingTo(msg);
-                  }}
-                  onDelete={(messageId) => {
-                    setPendingDeleteMessageId(messageId);
-                    setShowDeleteConfirm(true);
-                  }}
-                  pinned={extras.pinnedIds.has(entry.message.id)}
-                  onTogglePin={(m) => void handleTogglePin(m)}
-                  onPlanRsvp={(m, going) => void handlePlanRsvp(m, going)}
-                  resolveReplySnippet={resolveReplySnippet}
-                />
-              )
-            ))}
-          </AnimatePresence>
-
-          {/* Typing indicator */}
-          <AnimatePresence>
-            {typingIndicator && (
-              <motion.div
-                key="typing"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                className="flex items-center gap-2"
-              >
-                <div className="relative h-6 w-6 shrink-0">
-                  <div
-                    className="flex h-full w-full items-center justify-center rounded-full bg-primary
-                    text-[10px] font-bold text-on-primary"
-                  >
-                    {isGroupClique ? '⋯' : otherInitial}
-                  </div>
-                  {!isGroupClique && peerIsOnline && (
-                    <span
-                      className="absolute -bottom-0.5 -right-0.5 block h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-background"
-                      aria-hidden
-                    />
-                  )}
-                </div>
-                <div className="rounded-2xl rounded-bl-sm border border-border-hard bg-surface-container px-4 py-2.5">
-                  <span className="inline-flex gap-1">
-                    {[0, 1, 2].map((i) => (
-                      <span
-                        key={i}
-                        className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary"
-                        style={{ animationDelay: `${i * 150}ms` }}
-                      />
-                    ))}
-                  </span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div ref={messagesEndRef} />
+      <section aria-label={`Conversation with ${headerTitle}`} className="relative flex min-w-0 flex-1 flex-col">
+        <ChatBackground seed={connection.id} />
+        {isDraggingAttachment ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-4 z-50 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-accent bg-selection/80 text-accent"
+          >
+            <Paperclip size={28} aria-hidden />
+            <span className="type-body-strong">Drop to send</span>
+            <span className="type-meta">Encrypted end to end · up to 2 MB</span>
           </div>
+        ) : null}
+
+        <ChatHeader
+          connection={connection}
+          isGroupClique={isGroupClique}
+          title={headerTitle}
+          peerUserId={peerUserId}
+          peerIsOnline={peerIsOnline}
+          typing={typingIndicator}
+          subtitle={subtitle}
+          isCore={isCore}
+          isArchived={isArchived}
+          isBlocked={isBlocked}
+          mute={mute}
+          onSetMuted={onSetMuted}
+          detailsOpen={detailsOpen}
+          onToggleDetails={toggleDetails}
+          searchOpen={searchOpen}
+          onToggleSearch={() => setSearchOpen((open) => !open)}
+          onPlan={() => setPlanOpen(true)}
+          onClose={onClose}
+          onOpenProfile={onOpenProfile}
+          openDialog={setDialog}
+          actions={actions}
+        />
+
+        <div className="relative min-h-0 flex-1">
+          {banner ? <div className="absolute inset-x-3 top-3 z-20 mx-auto max-w-[720px]">{banner}</div> : null}
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="chat-thread-scroll relative h-full"
+          >
+            <div className={cn('mx-auto flex min-h-full max-w-[720px] flex-col px-3 pb-3 md:px-6', banner ? 'pt-20' : 'pt-4')}>
+              {loadingMore ? (
+                <div className="flex justify-center py-2" role="status">
+                  <Spinner size={16} />
+                  <span className="sr-only">Loading older messages</span>
+                </div>
+              ) : null}
+
+              {loading ? (
+                <div aria-busy aria-label="Loading messages" className="flex flex-1 flex-col justify-end gap-2 py-4">
+                  <Skeleton className="h-9 w-48 rounded-bubble" />
+                  <Skeleton className="ml-auto h-9 w-40 rounded-bubble" />
+                  <Skeleton className="h-14 w-64 rounded-bubble" />
+                  <Skeleton className="ml-auto h-9 w-56 rounded-bubble" />
+                </div>
+              ) : null}
+
+              {!loading && !error && messages.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-end gap-1 pb-6 text-center">
+                  <p className="type-meta inline-flex items-center gap-1.5 text-fg-tertiary">
+                    <Lock size={12} aria-hidden />
+                    Messages are end-to-end encrypted.
+                  </p>
+                </div>
+              ) : null}
+
+              {!loading && messages.length > 0 ? <div className="flex-1" aria-hidden /> : null}
+
+              {timelineEntries.map((entry) => {
+                if (entry.kind === 'separator') {
+                  return <ConversationDaySeparator key={entry.key} label={entry.label} />;
+                }
+                const m = entry.message;
+                const run = runs.get(m.id) ?? { first: true, last: true };
+                return (
+                  <Fragment key={bubbleStableListKey(m)}>
+                    {m.id === unreadId ? <NewMessagesSeparator /> : null}
+                    <MessageBubble
+                      message={m}
+                      isMine={m.user_id === currentUserId}
+                      currentUserId={currentUserId}
+                      first={run.first}
+                      last={run.last}
+                      sender={senderFor(m)}
+                      mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
+                      getAuthHeaders={getAuthHeaders}
+                      getE2eeV2Session={getE2eeV2Session}
+                      highlighted={highlightedMessageId === m.id || editingId === m.id}
+                      onReact={handleReact}
+                      onEdit={startEdit}
+                      onReply={isBlocked ? undefined : replyTo}
+                      onDelete={(messageId) => setDialog({ kind: 'delete-message', messageId })}
+                      pinned={extras.pinnedIds.has(m.id)}
+                      onTogglePin={(msg) => void handleTogglePin(msg)}
+                      onPlanRsvp={(msg, going) => void handlePlanRsvp(msg, going)}
+                      resolveReplySnippet={resolveReplySnippet}
+                      resolveReplyAuthor={resolveReplyAuthor}
+                      onJumpTo={jumpToMessage}
+                      drop={dropStateFor(m)}
+                    />
+                  </Fragment>
+                );
+              })}
+
+              {typingIndicator ? (
+                <div className="mt-2 flex" role="status" aria-label={`${isGroupClique ? 'Someone' : firstName} is typing`}>
+                  <div className="flex h-9 items-center gap-1 rounded-bubble rounded-bl-xs bg-bubble-in px-3.5">
+                    {[0, 1, 2].map((i) => (
+                      <span key={i} className="ds-typing-dot size-[7px] rounded-full bg-fg-tertiary" style={{ animationDelay: `${i * 160}ms` }} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {showScrollBtn ? (
+            <button
+              type="button"
+              onClick={() => scrollToBottom()}
+              aria-label={unseenCount ? `Jump to latest, ${unseenCount} new` : 'Jump to latest'}
+              className="material-glass press absolute bottom-3 right-4 z-20 flex h-9 items-center gap-1 rounded-pill px-3 text-fg shadow-overlay"
+            >
+              {unseenCount ? <span className="type-badge tabular text-accent">{unseenCount}</span> : null}
+              <ChevronDown size={18} aria-hidden />
+            </button>
+          ) : null}
         </div>
 
-        {/* Scroll-to-bottom button */}
-        <AnimatePresence>
-          {showScrollBtn && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              onClick={() => scrollToBottom()}
-              className="absolute right-5 bottom-20 bg-primary/90 
-                rounded-full p-2.5 shadow-lg hover:bg-primary transition-colors z-10 "
-            >
-              <ChevronDown className="w-4 h-4 text-on-primary" />
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* ── Input area (overflow visible so portaled pickers align; chrome stacks above messages) ── */}
-      <ChatComposer
-        chatId={chatId}
-        isGroupClique={isGroupClique}
-        otherUserName={otherUserName}
-        inputText={inputText}
-        setInputText={setInputText}
-        inputRef={inputRef}
-        replyingTo={replyingTo}
-        setReplyingTo={setReplyingTo}
-        replyBannerText={replyBannerText}
-        editingId={editingId}
-        mediaBusy={mediaBusy}
-        isRecording={isRecording}
-        recordingMs={recordingMs}
-        photoInputRef={photoInputRef}
-        attachmentInputRef={attachmentInputRef}
-        onPhotoSelected={onPhotoSelected}
-        onAttachmentSelected={onAttachmentSelected}
-        beginVoiceRecording={beginVoiceRecording}
-        stopVoiceRecording={stopVoiceRecording}
-        cancelVoiceRecording={cancelVoiceRecording}
-        broadcastTyping={broadcastTyping}
-        sendMessage={sendMessage}
-        gifCustomerId={gifCustomerId}
-        sendGif={sendGif}
-        onPlan={() => setPlanOpen(true)}
-        onSchedule={() => setScheduleOpen(true)}
-      />
-      </div>
+        <ChatComposer
+          disabled={isBlocked || !chatId}
+          placeholder={isBlocked ? 'You blocked this conversation' : `Message ${isGroupClique ? headerTitle : firstName}`}
+          value={editingId ? editText : inputText}
+          onChange={(value) => {
+            if (editingId) {
+              setEditText(value);
+            } else {
+              setInputText(value);
+              if (value) broadcastTyping();
+            }
+          }}
+          inputRef={inputRef}
+          reply={replyingTo ? (replyBannerText ?? replySnippetById.get(replyingTo.id) ?? 'Message') : null}
+          onCancelReply={() => setReplyingTo(null)}
+          editing={Boolean(editingId)}
+          onCancelEdit={cancelEdit}
+          onSubmit={() => void (editingId ? submitEdit() : sendMessage())}
+          onEditLast={editLast}
+          mediaBusy={mediaBusy || dropBusy}
+          isRecording={isRecording}
+          recordingMs={recordingMs}
+          photoInputRef={photoInputRef}
+          attachmentInputRef={attachmentInputRef}
+          onPhotoSelected={onPhotoSelected}
+          onAttachmentSelected={onAttachmentSelected}
+          beginVoiceRecording={beginVoiceRecording}
+          stopVoiceRecording={stopVoiceRecording}
+          cancelVoiceRecording={cancelVoiceRecording}
+          gifCustomerId={gifCustomerId}
+          sendGif={sendGif}
+          onPlan={() => setPlanOpen(true)}
+          onSchedule={() => setScheduleOpen(true)}
+          onClickDrop={isGroupClique ? undefined : pickDrop}
+        />
+        {!isGroupClique ? (
+          <input
+            ref={dropInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(e) => void onDropFile(e)}
+          />
+        ) : null}
+      </section>
 
       {detailsOpen ? (
         <>
@@ -780,24 +852,21 @@ export default function ChatView({
           <aside
             id="conversation-details"
             aria-label="Conversation details"
-            className="absolute inset-y-0 right-0 z-[60] w-[min(100%,20rem)] border-l border-border-hard shadow-xl xl:static xl:z-auto xl:w-[18.5rem] xl:shrink-0 xl:shadow-none"
+            className="absolute inset-y-0 right-0 z-[60] w-[min(100%,22.5rem)] border-l border-hairline bg-surface shadow-overlay xl:static xl:z-auto xl:w-[20rem] xl:shrink-0 xl:shadow-none"
           >
             <ConversationDetailsPanel
               connection={connection}
               isGroupClique={isGroupClique}
               title={headerTitle}
-              subtitle={
-                isGroupClique
-                  ? groupHeaderSubtitle ?? `${connection.userIds?.length ?? 0} members`
-                  : `Met ${connection.location ? `at ${connection.location} · ` : ''}${metDate}`
-              }
+              subtitle={subtitle}
+              peerUserId={peerUserId}
               currentUserId={currentUserId}
               messages={messages}
               mute={mute}
-              onSetMuted={(muted, ms) => setMuted(chatId ?? connection.id, muted, ms)}
+              onSetMuted={onSetMuted}
               pins={extras.pins}
               onUnpin={(id) => {
-                const message = messages.find((m) => m.id === id);
+                const message = messageById.get(id);
                 if (message) void handleTogglePin(message);
                 else void extras.togglePin(id, currentUserId);
               }}
@@ -808,10 +877,24 @@ export default function ChatView({
               onLogHangout={() => extras.requestHangout(null)}
               onJumpToMessage={jumpToMessage}
               onPlan={() => setPlanOpen(true)}
-              onOpenProfile={peerUserId && onOpenProfile ? () => onOpenProfile(peerUserId) : undefined}
+              onSearch={() => {
+                setSearchOpen(true);
+                if (!window.matchMedia(WIDE_QUERY).matches) setDetailsOpen(false);
+              }}
+              onOpenProfile={onOpenProfile}
               onShowMembers={
-                isGroupClique && groupMemberProfileRows.length > 0 ? () => setShowGroupMemberPicker(true) : undefined
+                isGroupClique && groupMemberProfileRows.length > 0 ? () => setDialog({ kind: 'members' }) : undefined
               }
+              members={groupMemberProfileRows}
+              sharedInterests={sharedInterestTags}
+              isCore={isCore}
+              isArchived={isArchived}
+              isBlocked={isBlocked}
+              onReport={() => setDialog({ kind: 'report' })}
+              actions={actions}
+              mediaChatKey={isGroupClique ? groupMasterKey : e2eKeys}
+              getAuthHeaders={getAuthHeaders}
+              getE2eeV2Session={getE2eeV2Session}
               onClose={toggleDetails}
             />
           </aside>
@@ -821,7 +904,7 @@ export default function ChatView({
       <PlanDialog
         open={planOpen}
         onOpenChange={setPlanOpen}
-        withName={isGroupClique ? null : otherUserName.split(/\s+/)[0]}
+        withName={isGroupClique ? null : firstName}
         onSend={sendPlan}
       />
       <ScheduleSendDialog
@@ -833,7 +916,7 @@ export default function ChatView({
             const row = await scheduleMessage(sendAt);
             if (!row) return false;
             extras.addScheduled(row);
-            setActionToast({
+            chatNotify({
               type: 'success',
               message: `Scheduled for ${new Date(sendAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`,
             });
@@ -845,29 +928,18 @@ export default function ChatView({
       />
 
       <ChatDialogs
+        state={dialog}
+        onClose={() => setDialog(null)}
         connection={connection}
-        showDeleteConfirm={showDeleteConfirm}
-        setShowDeleteConfirm={setShowDeleteConfirm}
-        setPendingDeleteMessageId={setPendingDeleteMessageId}
-        confirmDeleteMessage={confirmDeleteMessage}
-        showReportDialog={showReportDialog}
-        setShowReportDialog={setShowReportDialog}
-        reportReason={reportReason}
-        setReportReason={setReportReason}
+        otherUserName={otherUserName}
+        onConfirmDeleteMessage={deleteMessage}
         onReport={onReport}
-        showRenameGroupModal={showRenameGroupModal}
-        setShowRenameGroupModal={setShowRenameGroupModal}
-        renameGroupInput={renameGroupInput}
-        setRenameGroupInput={setRenameGroupInput}
-        setDisplayGroupName={setDisplayGroupName}
+        onRenamed={setDisplayGroupName}
         onGroupChatChanged={onGroupChatChanged}
-        showGroupMemberPicker={showGroupMemberPicker}
-        setShowGroupMemberPicker={setShowGroupMemberPicker}
-        groupMemberProfileRows={groupMemberProfileRows}
+        members={groupMemberProfileRows}
         onOpenProfile={onOpenProfile}
-        actionToast={actionToast}
-        setActionToast={setActionToast}
       />
+      {actions.confirmNode}
     </div>
   );
 }

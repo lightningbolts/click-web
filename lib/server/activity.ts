@@ -186,3 +186,16 @@ export async function markActivitySeen(admin: SupabaseClient, userId: string, se
   const { error } = await admin.from('activity_seen').upsert({ user_id: userId, seen_at: clamped });
   if (error) throw new Error(`activity seen: ${error.message}`);
 }
+
+/** Which of these prior-connection requests are still waiting on the viewer (for inline Accept). */
+export async function pendingPriorRequests(admin: SupabaseClient, userId: string, connectionIds: string[]): Promise<Set<string>> {
+  if (connectionIds.length === 0) return new Set();
+  const { data, error } = await admin
+    .from('connections')
+    .select('id, responder_id')
+    .in('id', connectionIds)
+    .eq('source', 'prior')
+    .eq('status', 'pending');
+  if (error) return new Set();
+  return new Set(((data ?? []) as Array<{ id: string; responder_id: string | null }>).filter((r) => r.responder_id === userId).map((r) => r.id));
+}
