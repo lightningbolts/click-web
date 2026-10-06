@@ -3,7 +3,6 @@
 import { computeClickDropRevealTtlIso } from "@/lib/collaboration/clickDropReveal";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
 import { uploadChatMediaBlob } from "@/lib/chat/chatMediaStorage";
 
@@ -148,21 +147,15 @@ export default function PostConnectionVibePrompt({
   const rollBusy = rollStatus === "opening" || rollStatus === "uploading";
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"
+    <>
+      <div
+        className="fixed inset-0 z-[100] flex animate-[ds-overlay-in_var(--d-base)_linear] items-end justify-center bg-[var(--overlay-scrim)] p-4 sm:items-center"
         role="dialog"
         aria-labelledby="vibe-prompt-title"
         aria-modal="true"
       >
-        <motion.div
-          initial={{ y: 40, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 20, opacity: 0 }}
-          className="relative w-full max-w-md rounded-2xl border border-hairline bg-bg p-5 shadow-violet-500/10"
+        <div
+          className="relative w-full max-w-md animate-[ds-sheet-up-in_var(--d-slow)_var(--ease-out-expo)] rounded-xl bg-bg-elevated p-5 shadow-overlay"
         >
           <button
             type="button"
@@ -245,9 +238,8 @@ export default function PostConnectionVibePrompt({
             className="hidden"
             onChange={onRollPhotoSelected}
           />
-          <motion.button
+          <button
             type="button"
-            whileTap={{ scale: 0.98 }}
             onClick={openRollPicker}
             disabled={rollBusy}
             className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-violet-400/30 bg-white/[0.07] px-4 py-3 text-left shadow-lg shadow-violet-500/10 transition-colors hover:border-violet-300/50 hover:bg-white/[0.1] disabled:cursor-wait disabled:opacity-70"
@@ -265,7 +257,7 @@ export default function PostConnectionVibePrompt({
                     : "Open the camera for a time-locked shared drop."}
               </span>
             </span>
-          </motion.button>
+          </button>
 
           {status === "error" && (
             <p className="mb-3 text-sm text-red-700 dark:text-red-400">Couldn&apos;t save — try again later.</p>
@@ -294,8 +286,8 @@ export default function PostConnectionVibePrompt({
               {status === "saving" ? "Saving…" : "Share vibe"}
             </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 }

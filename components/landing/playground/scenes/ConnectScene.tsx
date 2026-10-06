@@ -107,7 +107,7 @@ export default function ConnectScene({
                 type="button"
                 data-testid="playground-tap-jordan"
                 onClick={startTap}
-                className="fc-btn-primary mt-4 w-full py-3"
+                className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 mt-4 w-full py-3"
               >
                 Tap to Click with {JORDAN.name}
               </button>
@@ -147,7 +147,7 @@ export default function ConnectScene({
                 <p className="text-[11px] text-fg-secondary">
                   Kane Hall lobby · Clear · 64°F · Loud
                 </p>
-                <button type="button" onClick={confirmMemory} className="fc-btn-primary w-full py-2.5">
+                <button type="button" onClick={confirmMemory} className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 w-full py-2.5">
                   Save memory
                 </button>
               </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { Users2, Link2, TrendingUp, Info } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/GlassPanel';
 import TribeChart from '@/components/insights/TribeChart';

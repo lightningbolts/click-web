@@ -1,10 +1,9 @@
 import Link from 'next/link';
-import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-bg text-fg">
-      <div className={`${PAGE_COLUMN_CLASS} py-20`}>
+      <div className={"container-content py-20"}>
           <h1 id="privacy-heading" data-testid="privacy-heading" className="mkt-page-title text-5xl md:text-6xl font-bold mb-6">
             Privacy <span className="text-accent">Policy</span>
           </h1>

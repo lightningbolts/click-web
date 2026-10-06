@@ -149,10 +149,10 @@ export default function DemoThread({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={`Message ${first}…`}
-          className="fc-input min-w-0 flex-1 px-3 py-2"
+          className="block w-full rounded-md bg-surface-raised text-fg outline-none placeholder:text-fg-tertiary focus:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] min-w-0 flex-1 px-3 py-2"
           aria-label="Message"
         />
-        <button type="submit" className="fc-btn-primary px-3 py-2" aria-label="Send message">
+        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 px-3 py-2" aria-label="Send message">
           <Send className="h-4 w-4" />
         </button>
       </form>

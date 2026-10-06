@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
 import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { Radar, Crosshair } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useInsightsDemo } from "@/components/insights/InsightsDemoContext";
@@ -133,7 +133,7 @@ export default function VibeRadarClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="fc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-action/35 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-pill bg-fill-subtle font-semibold text-fg transition-colors hover:bg-fill-strong disabled:cursor-not-allowed disabled:opacity-40 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-action/35 transition-colors"
         >
           <Crosshair className="w-4 h-4 text-accent" />
           Deploy beacon

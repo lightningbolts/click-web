@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { CloudRain, Sun, Zap, UsersRound } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";

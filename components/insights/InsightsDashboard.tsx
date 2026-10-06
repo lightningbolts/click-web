@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { useInsightsChartTheme } from "@/lib/theme/insightsChartTheme";
 import {
   LineChart,
@@ -220,7 +220,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="fc-card max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+            className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
           >
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-fg mb-2">
@@ -245,7 +245,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-fg mb-2">
@@ -272,7 +272,7 @@ function InsightsDashboardContent({ venueId: venueIdProp }: { venueId?: string }
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="fc-card max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
+          className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] max-w-md border border-hairline p-8 text-center" style={{ backgroundColor: "var(--color-surface)" }}
         >
           <Users className="w-16 h-16 text-fg-tertiary mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-fg mb-2">

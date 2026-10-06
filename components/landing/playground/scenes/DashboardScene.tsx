@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import {
   BookOpen,
   MapPin,
@@ -193,7 +193,7 @@ export default function DashboardScene({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name, place, or event…"
-                  className="fc-input w-full py-2.5 pl-10 pr-3"
+                  className="block w-full rounded-md bg-surface-raised text-fg outline-none placeholder:text-fg-tertiary focus:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] w-full py-2.5 pl-10 pr-3"
                   aria-label="Search connections"
                 />
               </div>

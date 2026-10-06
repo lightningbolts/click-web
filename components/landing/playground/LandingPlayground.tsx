@@ -1,6 +1,7 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { LazyMotion, domMax } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
 import CompanionPanel from './CompanionPanel';
 import { PhoneChrome, WebChrome } from './DeviceChrome';
@@ -36,7 +37,7 @@ for (const person of PLAYGROUND_PEOPLE) {
   if (person.memory) seedMemories[person.id] = person.memory;
 }
 
-export default function LandingPlayground() {
+function LandingPlaygroundInner() {
   const [scene, setScene] = useState<PlaygroundScene>('connect');
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>('memory');
   const [openChatId, setOpenChatId] = useState<string | null>(null);
@@ -266,5 +267,14 @@ export default function LandingPlayground() {
         {announcement}
       </p>
     </div>
+  );
+}
+
+/** Framer loads only its domMax feature set, and only on this route (spec §11.2). */
+export default function LandingPlayground() {
+  return (
+    <LazyMotion features={domMax}>
+      <LandingPlaygroundInner />
+    </LazyMotion>
   );
 }

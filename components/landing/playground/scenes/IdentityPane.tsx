@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { m as motion, useReducedMotion } from 'framer-motion';
 import { Check, Clock, Copy, QrCode, Share2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import DemoQr from '../DemoQr';

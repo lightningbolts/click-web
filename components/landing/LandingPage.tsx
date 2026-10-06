@@ -14,7 +14,6 @@ import {
   EMPTY_PRESENCE_HEATMAP,
   type PresenceHeatmapPayload,
 } from '@/lib/landing/presenceHeatmap';
-import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 import { cn } from '@/lib/cn';
 
 
@@ -125,7 +124,7 @@ export default function LandingPage({
           />
         ) : null}
 
-        <div className={cn(PAGE_COLUMN_CLASS, 'space-y-8 pt-10 sm:space-y-12 sm:pt-14')}>
+        <div className={cn('container-page', 'space-y-8 pt-10 sm:space-y-12 sm:pt-14')}>
           <section data-landing-reveal id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-hairline bg-surface-raised px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
             <div className="flex justify-center">
               <Image
@@ -140,7 +139,7 @@ export default function LandingPage({
             <div className="max-w-md">
               <h2 id="why-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">Connect<br />without<br />the noise.</h2>
               <p className="mt-6 max-w-sm text-base leading-relaxed text-fg-secondary">Meet in person. Tap to connect. Keep the people you meet close, without another endless feed.</p>
-              <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">See how it works <ArrowRight className="h-4 w-4" aria-hidden /></a>
+              <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 mt-7 inline-flex min-h-11 items-center gap-3 px-6">See how it works <ArrowRight className="h-4 w-4" aria-hidden /></a>
             </div>
           </section>
 
@@ -184,7 +183,7 @@ export default function LandingPage({
               <p className="mt-6 max-w-sm text-base leading-relaxed text-fg-secondary">
                 Your people are closer than you think. Find shared interests, make a connection, and take the conversation into the real world.
               </p>
-              <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">
+              <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 mt-7 inline-flex min-h-11 items-center gap-3 px-6">
                 <Radar className="h-4 w-4" aria-hidden />Explore Click<ArrowRight className="h-4 w-4" aria-hidden />
               </a>
             </div>
@@ -194,7 +193,7 @@ export default function LandingPage({
         <section
           data-landing-reveal
           id="how-it-works"
-          className={cn(PAGE_COLUMN_CLASS, 'relative z-10 py-16 sm:py-20')}
+          className={cn('container-page', 'relative z-10 py-16 sm:py-20')}
           aria-labelledby="how-it-works-heading"
         >
           <div className="overflow-hidden rounded-[28px] border border-hairline bg-surface p-4 shadow-sm sm:p-6 lg:p-8">
@@ -220,7 +219,7 @@ export default function LandingPage({
           </div>
         </section>
 
-        <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-8')}>
+        <section data-landing-reveal className={cn('container-page', 'relative z-10 pb-8')}>
           <p className="mx-auto max-w-2xl text-center text-sm text-fg-secondary">
             Running a venue, campus, or event program?{' '}
             <Link href="/enterprise" className="font-semibold text-accent hover:text-accent/80">
@@ -230,8 +229,8 @@ export default function LandingPage({
           </p>
         </section>
 
-        <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
-          <div className="fc-card px-8 py-12 text-center">
+        <section data-landing-reveal className={cn('container-page', 'relative z-10 pb-24 pt-8')}>
+          <div className="rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)] px-8 py-12 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">
               The Click beta is live on iPhone.
             </h2>
@@ -243,7 +242,7 @@ export default function LandingPage({
                 href={IOS_TESTFLIGHT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="fc-btn-primary inline-flex h-11 items-center gap-2 px-8"
+                className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 inline-flex h-11 items-center gap-2 px-8"
               >
                 <Smartphone className="h-4 w-4" aria-hidden />
                 Get the iOS beta

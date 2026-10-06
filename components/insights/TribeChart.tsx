@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { Users2, Info } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { useInsightsChartTheme } from '@/lib/theme/insightsChartTheme';

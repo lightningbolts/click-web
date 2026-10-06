@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CardVisual } from "@/components/ds/CardVisual";
 import { ABOUT_TEAM } from "@/components/about/team";
-import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
 
 export const metadata: Metadata = {
   title: "About Click",
@@ -13,7 +12,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="flex-1 py-20">
-      <div className={PAGE_COLUMN_CLASS}>
+      <div className="container-page">
           <h1
             id="about-heading"
             data-testid="about-heading"

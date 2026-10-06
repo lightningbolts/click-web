@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, Users, Link2, Sparkles } from 'lucide-react';
 import { GlassPanel } from './GlassPanel';
 import { InsightCallout } from './InsightCallout';

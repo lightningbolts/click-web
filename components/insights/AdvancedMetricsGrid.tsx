@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import useSWR from "swr";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { Anchor, AudioLines, GitBranch, HeartHandshake, Info } from "lucide-react";
 import { fetchInsightsApiJson } from "@/lib/insights/fetchInsightsApi";
 import type { AdvancedMetricsApiResponse } from "@/lib/insights/advancedMetrics";

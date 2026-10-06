@@ -1,4 +1,3 @@
-import { PAGE_COLUMN_CLASS } from "@/lib/shell/pageColumn";
 import { cn } from "@/lib/cn";
 
 export function EventCardSkeleton({ featured = false }: { featured?: boolean }) {
@@ -34,7 +33,7 @@ export default function EventRouteLoading({
     variant === "detail" ? "Loading event" : variant === "form" ? "Loading event form" : "Loading events";
 
   return (
-    <div className={cn(PAGE_COLUMN_CLASS, "py-10")} role="status" aria-label={label} data-testid="event-route-loading">
+    <div className={cn('container-content', "py-10")} role="status" aria-label={label} data-testid="event-route-loading">
       <div className="mb-6 space-y-2">
         <div className="h-8 w-40 animate-pulse rounded bg-surface-raised" />
         <div className="h-4 w-72 max-w-full animate-pulse rounded bg-surface-raised" />

@@ -190,7 +190,7 @@ export default function EventsScene({
               type="button"
               data-testid={`playground-rsvp-${open.id}`}
               onClick={toggleRsvp}
-              className={`py-2.5 text-xs ${rsvped ? 'fc-btn-secondary' : 'fc-btn-primary'}`}
+              className={`py-2.5 text-xs ${rsvped ? 'inline-flex items-center justify-center gap-2 rounded-pill bg-fill-subtle font-semibold text-fg transition-colors hover:bg-fill-strong disabled:cursor-not-allowed disabled:opacity-40' : 'inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40'}`}
             >
               {rsvped ? 'Cancel RSVP' : 'RSVP'}
             </button>

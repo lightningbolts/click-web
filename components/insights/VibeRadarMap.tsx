@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from '@/lib/maps/maplibre';
 import "maplibre-gl/dist/maplibre-gl.css";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { Loader2, MapPin, Layers } from "lucide-react";
 import type { VibeRadarCluster } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";

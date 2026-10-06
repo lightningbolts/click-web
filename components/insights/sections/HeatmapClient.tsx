@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import useSWR from 'swr';
 import { MapPin, Flame, TrendingUp, BarChart2 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/GlassPanel';

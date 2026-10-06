@@ -1,5 +1,6 @@
 'use client';
 
+import { LazyMotion, domAnimation } from 'framer-motion';
 import { useState } from 'react';
 import {
   CalendarDays,
@@ -48,7 +49,7 @@ const COMPANION: Record<TabId, { title: string; body: string; signal: string }> 
   },
 };
 
-export default function EnterprisePlayground() {
+function EnterprisePlaygroundInner() {
   const [tab, setTab] = useState<TabId>('overview');
   const active = TABS.find((item) => item.id === tab) ?? TABS[0];
 
@@ -132,5 +133,14 @@ export default function EnterprisePlayground() {
         </aside>
       </div>
     </div>
+  );
+}
+
+/** Framer loads only its domAnimation feature set, and only on this route (spec §11.2). */
+export default function EnterprisePlayground() {
+  return (
+    <LazyMotion features={domAnimation}>
+      <EnterprisePlaygroundInner />
+    </LazyMotion>
   );
 }

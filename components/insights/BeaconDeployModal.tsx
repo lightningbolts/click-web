@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { X, Radio, Sparkles } from "lucide-react";
 import type { VibeRadarCategoryTotal, VenuePopUpHubBeacon } from "@/lib/insights/vibeRadar";
 import { vibeCategoryColor } from "@/lib/insights/vibeRadar";
@@ -225,7 +225,7 @@ export default function BeaconDeployModal({
                       id="beacon-category"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="fc-input w-full rounded-xl px-3 py-2.5 text-sm"
+                      className="block w-full rounded-md bg-surface-raised text-fg outline-none placeholder:text-fg-tertiary focus:bg-surface focus:shadow-[0_0_0_2px_var(--accent)] w-full rounded-xl px-3 py-2.5 text-sm"
                     >
                       {categoryOptions.map((c) => (
                         <option key={c} value={c} className="bg-surface-raised">
@@ -264,7 +264,7 @@ export default function BeaconDeployModal({
                   <button
                     type="submit"
                     disabled={submitting || !venueId || demoLocked}
-                    className="fc-btn-primary w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {submitting ? (
                       "Deploying…"

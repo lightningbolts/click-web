@@ -1,9 +1,8 @@
-import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-bg text-fg">
-      <div className={`${PAGE_COLUMN_CLASS} py-20`}>
+      <div className={"container-content py-20"}>
           <h1 id="terms-heading" data-testid="terms-heading" className="mkt-page-title text-5xl md:text-6xl font-bold mb-6">
             Terms of <span className="text-accent">Service</span>
           </h1>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type ElementType } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import useSWR from 'swr';
 import {
   MessageSquare,

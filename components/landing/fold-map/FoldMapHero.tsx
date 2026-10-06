@@ -55,7 +55,7 @@ export default function FoldMapHero({
               target="_blank"
               rel="noopener noreferrer"
               data-testid="testflight-cta"
-              className="fc-btn-primary inline-flex h-11 items-center gap-2 px-6 py-2.5"
+              className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 inline-flex h-11 items-center gap-2 px-6 py-2.5"
             >
               <Smartphone className="h-4 w-4" aria-hidden />
               Join the iOS beta
