@@ -131,7 +131,7 @@ describe("EventListCard", () => {
     const actions = screen.getByTestId("event-host-card-actions");
     expect(screen.getByRole("link", { name: "Edit details" })).toHaveAttribute(
       "href",
-      "/e/55555555-5555-4555-8555-555555555555/edit",
+      "/e/55555555-5555-4555-8555-555555555555/manage/edit",
     );
     expect(screen.getByRole("link", { name: "Host settings" })).toHaveAttribute(
       "href",

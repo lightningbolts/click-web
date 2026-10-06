@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { placeRoleCanWrite, placeRoleFor, userMayManageBeacon } from "@/lib/events/beaconManageAuth";
+import { eventAccessFor, placeRoleCanWrite, placeRoleFor, userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 
 function adminWithRole(role: string | null) {
   const builder = {
@@ -44,5 +44,37 @@ describe("beaconManageAuth (spec §9 roles)", () => {
     expect(create).toContain("Viewers can't create events for this Place");
     const item = read("app/api/beacons/[beaconId]/route.ts");
     expect(item).toContain("allowPlaceManagers: true");
+  });
+});
+
+describe("eventAccessFor (spec §7.6.4 read-only viewers)", () => {
+  it.each([
+    ["owner", "manage"],
+    ["manager", "manage"],
+    ["viewer", "view"],
+    [null, null],
+  ])("Place role %s gets %s", async (role, access) => {
+    expect(await eventAccessFor(adminWithRole(role), "u2", { creator_id: "u1", venue_id: "p1" })).toBe(access);
+  });
+
+  it("gives the creator manage access and outsiders of Place-less events nothing", async () => {
+    expect(await eventAccessFor(adminWithRole(null), "u1", { creator_id: "u1", venue_id: null })).toBe("manage");
+    expect(await eventAccessFor(adminWithRole("owner"), "u2", { creator_id: "u1", venue_id: null })).toBeNull();
+  });
+
+  it("lets viewers read organizer GETs but never write", () => {
+    const read = (p: string) => fs.readFileSync(path.join(__dirname, "../../../", p), "utf8");
+    const gate = read("lib/events/requireEventManager.ts");
+    expect(gate).toContain('access === "view" && !options.allowViewers');
+    for (const route of ["rsvp/requests", "guest-list", "network-health", "recap-summary", "rsvp/guests"]) {
+      const src = read(`app/api/beacons/[beaconId]/${route}/route.ts`);
+      const getAt = src.indexOf("export async function GET");
+      const postAt = src.indexOf("export async function POST");
+      expect(src.slice(getAt, postAt > getAt ? postAt : undefined)).toContain("allowViewers: true");
+      if (postAt > getAt) expect(src.slice(postAt)).not.toContain("allowViewers");
+    }
+    for (const route of ["summary/publish", "guest-list/match"]) {
+      expect(read(`app/api/beacons/[beaconId]/${route}/route.ts`)).not.toContain("allowViewers");
+    }
   });
 });

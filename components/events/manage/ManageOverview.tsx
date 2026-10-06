@@ -1,0 +1,97 @@
+import { BarChart3, FileText, ImagePlus, PencilLine, Upload, UserCheck } from "lucide-react";
+import { ListGroup, ListRow } from "@/components/ds/ListGroup";
+import { StatTile } from "@/components/ds/StatTile";
+import { ManageShareCard } from "@/components/events/manage/ManageShareCard";
+import type { EventAccess } from "@/lib/events/beaconManageAuth";
+import type { ManageCounts } from "@/lib/events/eventManageData";
+import { eventManagePath, eventShareUrl } from "@/lib/events/eventUrls";
+import { formatEventWhen } from "@/lib/events/formatEventWhen";
+import type { PublicEventPayload } from "@/lib/events/publicEvent";
+
+type Step = { href: string; icon: typeof Upload; title: string; subtitle: string };
+
+/** What the host should do next, most urgent first. Read-only viewers get none. */
+export function manageNextSteps(args: {
+  beaconId: string;
+  counts: ManageCounts;
+  ended: boolean;
+  hasCover: boolean;
+  summaryPublished: boolean;
+}): Step[] {
+  const base = eventManagePath(args.beaconId);
+  const steps: Step[] = [];
+  const pending = args.counts.requests + args.counts.waitlist;
+  if (pending > 0) {
+    steps.push({
+      href: `${base}/guests`,
+      icon: UserCheck,
+      title: `Review ${pending} ${pending === 1 ? "request" : "requests"}`,
+      subtitle: "Approve or decline people waiting to join.",
+    });
+  }
+  if (args.ended) {
+    if (!args.summaryPublished) {
+      steps.push({ href: `${base}/recap`, icon: FileText, title: "Publish a summary", subtitle: "Share aggregate numbers with a private link." });
+    }
+    steps.push({ href: `${base}/insights`, icon: BarChart3, title: "See how it went", subtitle: "Check-ins and connections made." });
+  } else {
+    if (!args.hasCover) {
+      steps.push({ href: `${base}/edit`, icon: ImagePlus, title: "Add a cover photo", subtitle: "Events with a photo get more RSVPs." });
+    }
+    steps.push({ href: `${base}/guests#guest-list`, icon: Upload, title: "Seed the room", subtitle: "Upload a guest list to invite people already on Click." });
+    steps.push({ href: `${base}/edit`, icon: PencilLine, title: "Edit details", subtitle: "Time, place, capacity and approval." });
+  }
+  return steps;
+}
+
+export function ManageOverview({
+  event,
+  counts,
+  access,
+  ended,
+  summaryPublished,
+}: {
+  event: PublicEventPayload;
+  counts: ManageCounts;
+  access: EventAccess;
+  ended: boolean;
+  summaryPublished: boolean;
+}) {
+  const when = formatEventWhen(event.event_start_at, event.event_end_at, event.timezone);
+  const steps =
+    access === "manage"
+      ? manageNextSteps({ beaconId: event.beacon_id, counts, ended, hasCover: Boolean(event.image_url), summaryPublished })
+      : [];
+  const capacity = event.listing.event_capacity;
+
+  return (
+    <div className="flex flex-col gap-8" data-testid="manage-overview">
+      <section aria-label="At a glance">
+        {when || event.location_name ? (
+          <p className="type-body mb-3 text-fg-secondary">{[when, event.location_name].filter(Boolean).join(" · ")}</p>
+        ) : null}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatTile
+            label={ended ? "Went" : "Going"}
+            value={counts.going}
+            hint={capacity != null ? `of ${capacity} spots` : counts.guests > 0 ? `incl. ${counts.guests} without Click` : undefined}
+          />
+          <StatTile label="Requests" value={counts.requests} />
+          <StatTile label="Waitlist" value={counts.waitlist} />
+          <StatTile label="Checked in" value={counts.checkedIn} />
+        </div>
+      </section>
+
+      <div className="grid gap-8 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <ManageShareCard url={eventShareUrl(event.beacon_id)} fileName={`click-event-${event.beacon_id.slice(0, 8)}`} />
+        {steps.length > 0 ? (
+          <ListGroup header="Next steps">
+            {steps.map((s) => (
+              <ListRow key={s.title} href={s.href} icon={s.icon} title={s.title} subtitle={s.subtitle} strong />
+            ))}
+          </ListGroup>
+        ) : null}
+      </div>
+    </div>
+  );
+}

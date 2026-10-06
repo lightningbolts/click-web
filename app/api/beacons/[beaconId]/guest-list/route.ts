@@ -22,7 +22,7 @@ export async function GET(
 ) {
   try {
     const { beaconId } = await params;
-    const auth = await requireEventManager(request, beaconId);
+    const auth = await requireEventManager(request, beaconId, { allowViewers: true });
     if (!auth.ok) return auth.response;
     const status = await loadLatestGuestListStatus(auth.admin, beaconId);
     return NextResponse.json(status ?? { uploaded: 0, matched: 0, teasers: 0, entries: [] });

@@ -1,0 +1,59 @@
+"use client";
+
+import { Copy, Download } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { useRef } from "react";
+import { Button } from "@/components/ds/Button";
+import { cardClassName } from "@/components/ds/Card";
+import { toast } from "@/components/ds/Toast";
+
+/** Share link and event QR (spec §7.6.4 Overview). The QR stays dark on white so it scans in dark mode. */
+export function ManageShareCard({ url, fileName }: { url: string; fileName: string }) {
+  const qrRef = useRef<SVGSVGElement>(null);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Couldn’t copy the link.");
+    }
+  };
+
+  const download = () => {
+    const svg = qrRef.current;
+    if (!svg) return;
+    const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `${fileName}-qr.svg`;
+    a.click();
+    URL.revokeObjectURL(href);
+  };
+
+  return (
+    <section aria-labelledby="manage-share-heading" className={cardClassName({ className: "flex flex-col gap-5 sm:flex-row sm:items-center" })}>
+      <div className="w-fit shrink-0 rounded-md bg-white p-3">
+        <QRCodeSVG ref={qrRef} value={url} size={128} marginSize={0} title="Event QR code" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h2 id="manage-share-heading" className="type-headline text-fg">
+          Share your event
+        </h2>
+        <p className="type-meta mt-0.5 text-fg-secondary">Anyone with the link can see the event and RSVP.</p>
+        <div className="mt-3 flex min-w-0 items-center gap-2 rounded-md bg-fill-subtle py-1 pl-3 pr-1">
+          <span className="type-meta min-w-0 flex-1 truncate text-fg" data-testid="manage-share-url">
+            {url}
+          </span>
+          <Button size="sm" variant="plain" icon={Copy} onClick={() => void copy()}>
+            Copy
+          </Button>
+        </div>
+        <Button size="sm" variant="plain" icon={Download} className="-ml-3 mt-2" onClick={download}>
+          Download QR
+        </Button>
+      </div>
+    </section>
+  );
+}

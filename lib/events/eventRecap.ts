@@ -28,7 +28,7 @@ function otherUserId(userIds: string[], viewerId: string): string | null {
   return userIds.find((id) => id && id !== viewerId) ?? null;
 }
 
-async function loadProfiles(
+export async function loadUserProfiles(
   admin: SupabaseClient,
   userIds: string[],
 ): Promise<Map<string, UserProfileRow>> {
@@ -95,7 +95,7 @@ export async function loadAttendeeRecap(
     }
   }
 
-  const profiles = await loadProfiles(
+  const profiles = await loadUserProfiles(
     admin,
     pairs.map((p) => p.other_id),
   );

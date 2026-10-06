@@ -3,7 +3,7 @@ import { activityHref } from '@/lib/activity/activityHref';
 describe('activityHref', () => {
   it('routes event rows to the event, RSVP requests to manage', () => {
     expect(activityHref({ type: 'event_rsvp', data: { beacon_id: 'b1' } })).toBe('/e/b1');
-    expect(activityHref({ type: 'event_rsvp_request', data: { beacon_id: 'b1' } })).toBe('/e/b1/manage');
+    expect(activityHref({ type: 'event_rsvp_request', data: { beacon_id: 'b1' } })).toBe('/e/b1/manage/guests');
   });
 
   it('routes connection rows to the thread, then the actor, then Activity', () => {

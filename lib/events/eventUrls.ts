@@ -17,7 +17,7 @@ export function eventManagePath(beaconId: string): string {
 }
 
 export function eventEditPath(beaconId: string): string {
-  return `/e/${beaconId}/edit`;
+  return `/e/${beaconId}/manage/edit`;
 }
 
 export function eventShareUrl(beaconId: string, origin = publicOrigin()): string {

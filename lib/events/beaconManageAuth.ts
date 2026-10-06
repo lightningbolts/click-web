@@ -65,3 +65,20 @@ export async function userMayManageBeacon(
   if (!beacon.venue_id) return false;
   return placeRoleCanWrite(await placeRoleFor(admin, userId, beacon.venue_id));
 }
+
+export type EventAccess = "manage" | "view";
+
+/**
+ * What a user may do on an event's manage page (spec §7.6.4): the creator and Place
+ * owners / managers manage; Place viewers see it read-only; everyone else gets nothing.
+ */
+export async function eventAccessFor(
+  admin: SupabaseClient,
+  userId: string,
+  beacon: Pick<BeaconManageRow, "creator_id" | "venue_id">,
+): Promise<EventAccess | null> {
+  if (beacon.creator_id === userId) return "manage";
+  if (!beacon.venue_id) return null;
+  const role = await placeRoleFor(admin, userId, beacon.venue_id);
+  return placeRoleCanWrite(role) ? "manage" : role === "viewer" ? "view" : null;
+}
