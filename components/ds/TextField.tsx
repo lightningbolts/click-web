@@ -101,15 +101,43 @@ function describedBy(
 }
 
 type InputProps = Omit<ComponentPropsWithoutRef<"input">, "className"> &
-  FieldChrome & { inputClassName?: string };
+  FieldChrome & {
+    inputClassName?: string;
+    /** Inside the field's right edge, e.g. a show/hide IconButton. */
+    trailing?: ReactNode;
+  };
 
 /** 44 px filled field, label above, help/error below (spec §5.5). */
 export const TextField = forwardRef<HTMLInputElement, InputProps>(
   function TextField(
-    { label, hideLabel, help, error, className, inputClassName, id, ...rest },
+    {
+      label,
+      hideLabel,
+      help,
+      error,
+      className,
+      inputClassName,
+      id,
+      trailing,
+      ...rest
+    },
     ref,
   ) {
     const ids = useFieldIds(id);
+    const input = (
+      <input
+        ref={ref}
+        id={ids.fieldId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(
+          { help, error },
+          ids,
+          rest["aria-describedby"],
+        )}
+        className={cn(fieldClassName, "h-11", trailing && "pr-12", inputClassName)}
+        {...rest}
+      />
+    );
     return (
       <Chrome
         {...ids}
@@ -119,18 +147,16 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(
         error={error}
         className={className}
       >
-        <input
-          ref={ref}
-          id={ids.fieldId}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(
-            { help, error },
-            ids,
-            rest["aria-describedby"],
-          )}
-          className={cn(fieldClassName, "h-11", inputClassName)}
-          {...rest}
-        />
+        {trailing ? (
+          <div className="relative">
+            {input}
+            <div className="absolute inset-y-0 right-1 flex items-center">
+              {trailing}
+            </div>
+          </div>
+        ) : (
+          input
+        )}
       </Chrome>
     );
   },

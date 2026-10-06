@@ -13,11 +13,7 @@ describe("shared page column", () => {
     expect(column).toContain("PAGE_COLUMN_CLASS");
   });
 
-  it("puts Navbar, Insights chrome, and Footer on PAGE_COLUMN_CLASS without extra bar padding", () => {
-    const navbar = read("components/Navbar.tsx");
-    expect(navbar).toContain("PAGE_COLUMN_CLASS");
-    expect(navbar).not.toMatch(/bg-surface px-4 py-3 text-on-surface md:px-10/);
-
+  it("puts Insights chrome and Footer on PAGE_COLUMN_CLASS without extra bar padding", () => {
     const insights = read("components/shell/ProductAppShell.tsx");
     expect(insights).toContain("PAGE_COLUMN_CLASS");
     expect(insights).not.toMatch(/bg-surface px-4 py-3 md:px-10/);

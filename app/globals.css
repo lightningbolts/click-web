@@ -87,6 +87,18 @@
   }
 }
 
+/* The mobile tab bar reserves its height only while it is on screen (spec §6.2). */
+@media (max-width: 767.98px) {
+  :root:has([data-tabbar]) {
+    --tabbar-height: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+
+/* A signed-in route renders its own shell; hide the static site chrome before paint. */
+body:has([data-app-shell]) [data-site-chrome] {
+  display: none;
+}
+
 .dark {
   --bg: #0b0b0d;
   --bg-elevated: #141416;
@@ -299,6 +311,13 @@
   font-weight: 400;
 }
 
+/* Mobile tab-bar labels only: the one exception to the 12 px floor (spec §6.2). */
+@utility type-tab-label {
+  font-size: 11px;
+  line-height: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 @utility type-badge {
   font-family: var(--font-sans);
   font-size: 12px;

@@ -11,4 +11,3 @@ export {
 } from './ConnectionTable';
 export { default as TimeCapsule, type TimelineChapter } from './TimeCapsule';
 export { default as QRIdentityCard } from './QRIdentityCard';
-export { default as StatsOverview, AchievementBadge, MilestoneProgress } from './StatsOverview';

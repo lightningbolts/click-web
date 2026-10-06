@@ -31,6 +31,8 @@ export type EventRowProps = {
   photoUrl?: string | null;
   className?: string;
   trailing?: ReactNode;
+  /** 64 px thumbnail for dense lists (Home "Saved & upcoming"). */
+  compact?: boolean;
 };
 
 /** Event list card (spec §5.7). The whole card is the link. */
@@ -46,6 +48,7 @@ export function EventRow({
   going,
   photoUrl,
   className,
+  compact,
 }: EventRowProps) {
   return (
     <Link
@@ -108,8 +111,8 @@ export function EventRow({
         seed={id}
         photoUrl={photoUrl}
         radius="md"
-        sizes="96px"
-        className="size-20 shrink-0 sm:size-24"
+        sizes={compact ? "64px" : "96px"}
+        className={compact ? "size-16 shrink-0" : "size-20 shrink-0 sm:size-24"}
       />
     </Link>
   );

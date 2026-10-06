@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
-import { Users } from 'lucide-react';
 import useSWR from 'swr';
 import dynamic from 'next/dynamic';
 import { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
@@ -19,38 +18,18 @@ import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 const ConnectionMap = dynamic(() => import('@/components/dashboard/ConnectionMap'), { ssr: false });
 
 // Digital Memory Box components
-import {
-  ConnectionTable,
-  TimeCapsule,
-  QRIdentityCard,
-  StatsOverview,
-  AchievementBadge,
-  MilestoneProgress,
-} from '@/components/dashboard';
-import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
-import HomeExplore from './dashboard/HomeExplore';
-import HomeSocialFeed from '@/components/dashboard/HomeSocialFeed';
-import HomeConnectionInsights from '@/components/dashboard/HomeConnectionInsights';
+import { QRIdentityCard } from '@/components/dashboard';
 import CommunityHubs from '@/components/dashboard/CommunityHubs';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import UserProfileModal, { type DecryptedProfileMessage } from '@/components/UserProfileModal';
 import type { Message } from '@/lib/chat/types';
 import PostConnectionVibePrompt from '@/components/dashboard/PostConnectionVibePrompt';
 import {
-  downloadCSV,
-  generateChaptersFromConnections
-} from '@/lib/dashboard/mockData';
-import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   loadNotificationPreferences,
   saveNotificationPreferences,
   type NotificationPreferences,
 } from '@/lib/notifications/preferences';
-import {
-  buildDashboardMetrics,
-  getNextMilestone,
-  getAllAchievements,
-} from '@/lib/dashboard/userMetrics';
 import { isActiveChatListStatus } from '@/lib/dashboard/connectionStatus';
 import { useVerifiedCliques } from '@/components/dashboard/useVerifiedCliques';
 import { useChatListMetadata } from '@/components/dashboard/useChatListMetadata';
@@ -63,7 +42,6 @@ import { DashboardGroupModals } from '@/components/dashboard/DashboardGroupModal
 import { messagesForProfileConnection } from '@/lib/userProfile/profileChatContext';
 import {
   dashboardTabHref,
-  parseDashboardTab,
   type DashboardTab,
 } from '@/lib/shell/personalProductNav';
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
@@ -72,6 +50,8 @@ import { useSessionCachedState, writeSessionCache } from '@/lib/dashboard/sessio
 
 interface DashboardViewProps {
   user: any;
+  /** The pane this route shows (spec §6.3: panes are routes, not `?tab=`). */
+  routeTab: DashboardTab;
   onReady?: () => void;
 }
 
@@ -83,21 +63,16 @@ interface DashboardViewProps {
  * components/dashboard/use* hooks; this component owns shared state and
  * the tab pane under the global Navbar.
  */
-export default function DashboardView({ user, onReady }: DashboardViewProps) {
+export default function DashboardView({ user, routeTab, onReady }: DashboardViewProps) {
   const { user: sessionUser, loading: authLoading, onlineUserIds } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
-    parseDashboardTab(searchParams.get('tab')),
-  );
+  const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState<DashboardTab>(routeTab);
   const userId: string | undefined = user?.id;
   const [connectionRecords, setConnectionRecords] = useSessionCachedState<ConnectionRecord[]>(userId, 'connections', []);
   /** Full history for the memory map (active + archived lifecycle), excluding `connection_hidden` only. */
   const [mapConnectionRecords, setMapConnectionRecords] = useSessionCachedState<ConnectionRecord[]>(userId, 'mapConnections', []);
-  const chapters = useMemo(
-    () => generateChaptersFromConnections(connectionRecords),
-    [connectionRecords],
-  );
   /** The connection whose chat is currently open, or null */
   const [selectedConnection, setSelectedConnection] = useSessionCachedState<ConnectionRecord | null>(userId, 'selectedConnection', null);
   const [chatListTab, setChatListTab] = useSessionCachedState<'active' | 'archived'>(userId, 'chatListTab', 'active');
@@ -111,7 +86,7 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   const [createClickOpen, setCreateClickOpen] = useState(false);
   const [notificationPreferences, setNotificationPreferences] = useSessionCachedState<NotificationPreferences>(userId, 'notificationPreferences', DEFAULT_NOTIFICATION_PREFERENCES);
   /** Re-render countdown labels periodically */
-  const [archiveCountdownTick, setArchiveCountdownTick] = useState(() => Date.now());
+  const [_archiveCountdownTick, setArchiveCountdownTick] = useState(() => Date.now());
   const activeTabRef = useRef<DashboardTab>(activeTab);
   /** Tabs whose panes have mounted at least once (map/chat are kept alive after that). */
   const [visitedTabs, setVisitedTabs] = useState<ReadonlySet<DashboardTab>>(() => new Set([activeTab]));
@@ -156,14 +131,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
   }, [activeTab]);
 
   useEffect(() => {
-    setActiveTab(parseDashboardTab(searchParams.get('tab')));
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (activeTab === 'events') {
-      router.replace('/events');
-    }
-  }, [activeTab, router]);
+    setActiveTab(routeTab);
+  }, [routeTab]);
 
   useEffect(() => {
     selectedConnectionRef.current = selectedConnection;
@@ -311,43 +280,14 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     loadConnections,
   });
 
-  // Handle CSV export
-  const handleExport = useCallback(() => {
-    downloadCSV(connectionRecords, `click-connections-${user.email?.split('@')[0] || 'user'}`);
-  }, [connectionRecords, user]);
-
   // Shared handler: open chat for a specific connection
   const handleOpenChat = useCallback((conn: ConnectionRecord, messageId?: string | null) => {
     setSelectedConnection(conn);
     setTargetMessageId(messageId?.trim() ? messageId.trim() : null);
     setActiveTab('chat');
-    // Keep the URL (and the Navbar's active tab) in step with the pane.
-    if (parseDashboardTab(new URLSearchParams(window.location.search).get('tab')) !== 'chat') {
-      window.history.pushState(null, '', dashboardTabHref('chat'));
-    }
-  }, [setSelectedConnection]);
-
-  const connectionRecordsWithChatPreview = useMemo(
-    () =>
-      connectionRecords.map((c) => ({
-        ...c,
-        chatPreview: chatMetadataByConnectionId[c.id]?.preview ?? c.chatPreview ?? null,
-      })),
-    [chatMetadataByConnectionId, connectionRecords],
-  );
-
-  const homeAvailabilityOverlapLines = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const c of connectionRecords) {
-      if (!c.otherUserId || !c.intentOverlapLabel || blockedUserIds.has(c.otherUserId) || !isActiveChatListStatus(c.status)) continue;
-      if (seen.has(c.otherUserId)) continue;
-      seen.add(c.otherUserId);
-      const first = c.name.trim().split(/\s+/)[0] || 'them';
-      out.push(`You and ${first} are both available right now!`);
-    }
-    return out;
-  }, [connectionRecords, blockedUserIds]);
+    // Keep the URL (and the top bar's current section) in step with the pane.
+    if (pathname !== dashboardTabHref('chat')) router.push(dashboardTabHref('chat'));
+  }, [setSelectedConnection, pathname, router]);
 
   const userName =
     displayNameFromUserMetadata(user?.user_metadata) || user?.email?.split('@')[0] || 'User';
@@ -430,27 +370,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
     });
   }, [archivedConnectionIds, chatCandidates]);
 
-  const dashboardMetrics = useMemo(
-    () => buildDashboardMetrics(connectionRecords),
-    [connectionRecords]
-  );
-
-  const achievementStatuses = useMemo(
-    () => getAllAchievements(dashboardMetrics),
-    [dashboardMetrics]
-  );
-
   const shellHeader = useMemo(() => {
     switch (activeTab) {
-      case 'memory':
-        return {
-          title: (
-            <>
-              Welcome back, <span className="text-primary">{userName}</span>
-            </>
-          ),
-          subtitle: 'Make plans, keep in touch, and remember your moments.',
-        };
       case 'events':
         return {
           title: 'Events',
@@ -477,11 +398,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
         return { title: userName, subtitle: undefined };
     }
   }, [activeTab, userName]);
-
-  const nextMilestone = useMemo(
-    () => getNextMilestone(dashboardMetrics.totalConnections),
-    [dashboardMetrics.totalConnections]
-  );
 
   const visibleChatConnections = chatListTab === 'active' ? activeConnections : archivedConnections;
 
@@ -542,8 +458,8 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
       className={cn(
         'flex min-h-0 flex-col bg-background text-on-surface',
         fillViewport
-          ? 'h-[calc(100dvh-var(--navbar-height))] overflow-hidden'
-          : 'min-h-[calc(100dvh-var(--navbar-height))]',
+          ? 'h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] overflow-hidden'
+          : 'min-h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))]',
       )}
     >
       {hideHeader ? null : (
@@ -592,109 +508,6 @@ export default function DashboardView({ user, onReady }: DashboardViewProps) {
           {activeTab === 'hubs' ? (
             <CommunityHubs key={user.id} userId={user.id} initialHubId={searchParams.get('hub')} />
           ) : null}
-          {activeTab === 'memory' ? (
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="min-w-0 space-y-6">
-                <HomeSocialFeed
-                  key={user.id}
-                  userId={user.id}
-                  name={userName}
-                  now={archiveCountdownTick}
-                  connections={[...connectionRecordsWithChatPreview, ...groupCliqueRecords].filter((c) => !c.otherUserId || !blockedUserIds.has(c.otherUserId))}
-                  onOpenChat={handleOpenChat}
-                  onOpenProfile={(id, connectionId) => { setProfileConnectionId(connectionId); setProfileUserId(id); }}
-                >
-                <MyAvailabilityIntentsCard getAuthHeaders={getAuthHeaders} />
-
-                {homeAvailabilityOverlapLines.length > 0 ? (
-                  <div className="space-y-1.5 rounded-[16px] border border-primary/30 bg-primary-container p-4">
-                    {homeAvailabilityOverlapLines.map((line, i) => (
-                      <p key={`${line}-${i}`} className="text-sm font-semibold text-on-primary-container">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-
-                </HomeSocialFeed>
-                <HomeExplore key={user.id} userId={user.id} now={archiveCountdownTick} />
-                <HomeConnectionInsights
-                  key={`insights-${user.id}`}
-                  userId={user.id}
-                  connections={activeConnections.filter((c) => !c.otherUserId || !blockedUserIds.has(c.otherUserId))}
-                  now={archiveCountdownTick}
-                  onOpenChat={handleOpenChat}
-                />
-                <section aria-label="Your stats">
-                  <StatsOverview
-                    totalConnections={dashboardMetrics.totalConnections}
-                    thisMonth={dashboardMetrics.thisMonth}
-                    streak={dashboardMetrics.streak}
-                    retentionRate={dashboardMetrics.retentionRate}
-                    totalNetworkGrowthPercent={dashboardMetrics.totalNetworkGrowthPercent}
-                    thisMonthTrendPercent={dashboardMetrics.thisMonthTrendPercent}
-                  />
-                </section>
-
-                <section className="fc-card rounded-[16px] border border-border-hard p-5 md:p-6">
-                  <TimeCapsule chapters={chapters} onConnectionClick={handleOpenChat} />
-                </section>
-
-                <section className="fc-card rounded-[16px] border border-border-hard p-5 md:p-6">
-                  <div className="mb-5 flex items-center gap-3">
-                    <div className="rounded-[10px] bg-primary-container p-2">
-                      <Users className="h-5 w-5 text-on-primary-container" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold">People I&apos;ve Met</h2>
-                      <p className="text-sm text-on-surface-variant">Your connection history</p>
-                    </div>
-                  </div>
-                  <ConnectionTable
-                    connections={connectionRecordsWithChatPreview}
-                    onExport={handleExport}
-                    onSelect={handleOpenChat}
-                    onOpenProfile={(id, connectionId) => {
-                      setProfileConnectionId(connectionId ?? null);
-                      setProfileUserId(id);
-                    }}
-                  />
-                </section>
-
-                <p className="py-2 text-center text-xs text-outline">
-                  🔒 Your data belongs to you. Export anytime, delete anytime.
-                </p>
-              </div>
-
-              <aside className="space-y-4 lg:sticky lg:top-6" aria-label="Right now">
-                <section className="space-y-2">
-                  <h3 className="text-sm font-bold text-on-surface-variant">Next milestone</h3>
-                  <MilestoneProgress
-                    current={dashboardMetrics.totalConnections}
-                    target={nextMilestone.target}
-                    label={nextMilestone.label}
-                    reward={nextMilestone.reward}
-                  />
-                </section>
-
-                <section className="space-y-2">
-                  <h3 className="text-sm font-bold text-on-surface-variant">Achievements</h3>
-                  <div className="space-y-2">
-                    {achievementStatuses.map((achievement) => (
-                      <AchievementBadge
-                        key={achievement.id}
-                        title={achievement.title}
-                        description={achievement.description}
-                        icon={achievement.icon}
-                        unlocked={achievement.unlocked}
-                      />
-                    ))}
-                  </div>
-                </section>
-              </aside>
-            </div>
-          ) : null}
-
           {/* Map and chat stay mounted after their first visit: MapLibre and an open
               thread are expensive to rebuild, and remounting them was the visible
               flash when switching tabs. Hidden panes do not mark messages read. */}

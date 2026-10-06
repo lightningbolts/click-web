@@ -1,9 +1,7 @@
 import {
+  dashboardTabForPath,
   dashboardTabHref,
-  isSignedInProductPath,
   parseDashboardTab,
-  personalProductNavItems,
-  productNavItemIsActive,
 } from '@/lib/shell/personalProductNav';
 import { eventBackHref } from '@/components/events/EventBackLink';
 
@@ -14,35 +12,24 @@ describe('personalProductNav', () => {
     expect(parseDashboardTab('events')).toBe('events');
   });
 
-  it('builds hrefs for every dashboard tab', () => {
+  it('builds route hrefs (no ?tab=) for every pane', () => {
     expect(dashboardTabHref('events')).toBe('/events');
-    expect(dashboardTabHref('memory')).toBe('/?tab=memory');
-    expect(personalProductNavItems().map((item) => item.id)).toEqual([
-      'memory',
-      'events',
-      'map',
-      'chat',
-      'hubs',
-      'identity',
-      'settings',
-    ]);
+    expect(dashboardTabHref('memory')).toBe('/');
+    expect(dashboardTabHref('chat')).toBe('/clicks');
+    expect(dashboardTabHref('hubs')).toBe('/clicks?filter=hubs');
+    expect(dashboardTabHref('map')).toBe('/map');
+    expect(dashboardTabHref('identity')).toBe('/add');
+    expect(dashboardTabHref('settings')).toBe('/settings');
   });
 
-  it('marks Events current on event routes', () => {
-    const events = personalProductNavItems().find((item) => item.id === 'events')!;
-    const memory = personalProductNavItems().find((item) => item.id === 'memory')!;
-    expect(productNavItemIsActive(events, '/events', null)).toBe(true);
-    expect(productNavItemIsActive(events, '/e/abc', null)).toBe(true);
-    expect(productNavItemIsActive(memory, '/', 'memory')).toBe(true);
-    expect(productNavItemIsActive(memory, '/events', null)).toBe(false);
-  });
-
-  it('treats event routes as signed-in product chrome', () => {
-    expect(isSignedInProductPath('/')).toBe(true);
-    expect(isSignedInProductPath('/events')).toBe(true);
-    expect(isSignedInProductPath('/events/new')).toBe(true);
-    expect(isSignedInProductPath('/e/abc')).toBe(true);
-    expect(isSignedInProductPath('/about')).toBe(false);
+  it('maps app routes back to panes', () => {
+    expect(dashboardTabForPath('/clicks')).toBe('chat');
+    expect(dashboardTabForPath('/clicks', 'hubs')).toBe('hubs');
+    expect(dashboardTabForPath('/map')).toBe('map');
+    expect(dashboardTabForPath('/add')).toBe('identity');
+    expect(dashboardTabForPath('/settings')).toBe('settings');
+    expect(dashboardTabForPath('/me')).toBeNull();
+    expect(dashboardTabForPath('/')).toBeNull();
   });
 });
 

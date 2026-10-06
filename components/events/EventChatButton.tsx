@@ -15,7 +15,7 @@ export default function EventChatButton({ beaconId }: { beaconId: string }) {
     setBusy(true); setError('');
     try {
       const { hub_id } = await hubRequest<{ hub_id: string }>(`/api/beacons/${encodeURIComponent(beaconId)}/event-chat`);
-      router.push(`/?tab=hubs&hub=${encodeURIComponent(hub_id)}`);
+      router.push(`/clicks?filter=hubs&hub=${encodeURIComponent(hub_id)}`);
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }

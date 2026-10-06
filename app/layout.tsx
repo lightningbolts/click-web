@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Suspense } from "react";
 import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
-import Navbar from "@/components/Navbar";
+import { SiteChrome } from "@/components/app-shell/SiteChrome";
+import { ShellProvider } from "@/components/app-shell/ShellContext";
 import Footer from "@/components/Footer";
 import { AppToaster } from "@/components/ds/Toast";
 import { TooltipProvider } from "@/components/ds/Tooltip";
@@ -79,12 +79,12 @@ export default function RootLayout({
           <AuthProvider>
             <ProductChromeProvider>
               <TooltipProvider>
-                <Suspense fallback={null}>
-                  <Navbar />
-                </Suspense>
-                <main className="flex flex-1 flex-col">{children}</main>
-                <Footer />
-                <AppToaster />
+                <ShellProvider>
+                  <SiteChrome />
+                  <main className="flex flex-1 flex-col">{children}</main>
+                  <Footer />
+                  <AppToaster />
+                </ShellProvider>
               </TooltipProvider>
             </ProductChromeProvider>
           </AuthProvider>

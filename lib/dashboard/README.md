@@ -13,14 +13,13 @@ Transform raw Supabase `connections` + embedded `connection_encounters` into UI-
 ## Architecture
 
 ```
-DashboardView.tsx (orchestrator)
+DashboardView.tsx (legacy panes for /clicks, /map, /add, /settings; Home is components/home)
     │
     ├─ ConnectionTable.tsx      — sortable list, archive, chat entry
     ├─ ConnectionMap.tsx        — MapLibre + beacons (lib/map)
     ├─ TimeCapsule / timeline   — moment chapters
     ├─ QRIdentityCard.tsx       — GET /api/qr
-    ├─ StatsOverview / AchievementBadge / MilestoneProgress
-    ├─ CurrentAvailabilitySection / MyAvailabilityIntentsCard
+    ├─ CurrentAvailabilitySection
     ├─ PostConnectionVibePrompt.tsx
     └─ ConnectionPeerAvatar.tsx
             │
@@ -95,10 +94,10 @@ This module **is** the consumer web dashboard. Most post-connection mobile featu
 | Event chat | `HubChatView` | `EventChatPanel` on `/e/{id}` | Hub E2EE v2 scope; reactions read-only on web (no fake coordinates) |
 | Voice/video calls | Removed on iOS | Frontend removed; `/api/livekit/token`, `CallOverlay`, `useDashboardCalls` kept dormant | Backend/API/schema intact for future work |
 | QR identity card | `QrCodeView` | `QRIdentityCard` | Web issues token via `/api/qr` |
-| Availability intents | Home + settings | `MyAvailabilityIntentsCard` | UI parity; match alerts push to mobile |
+| Availability intents | Home + settings | `components/home/AvailabilityCard` | UI parity; match alerts push to mobile |
 | Post-connection vibe | Connection sheets | `PostConnectionVibePrompt` | Same `venue-vibe` API |
-| Stats / achievements | `HomeScreen` stats | `StatsOverview`, `AchievementBadge` | Partial — see gap below |
-| Home connection insights | `HomeViewModel` + `ReconnectHelper` | `HomeConnectionInsights` | Mobile 7/14/30-day activity thresholds |
+| Stats / recap | `HomeScreen` stats | `components/home/RecapCard` (Day/Week) | Achievements move to `/me/history` |
+| Home nudges | `HomeViewModel` + `ReconnectHelper` | `components/home/OpportunityCard` (one promoted item) | Same `/api/me/nudges` priority |
 | 48h archive | Archive tab | Archive tab in dashboard | Full parity |
 | Global search | Unified search sheet | Dashboard search input | Full parity |
 | Collaboration / disposable rolls | Native camera UI | Chat collab after bump | Backend parity; camera UX differs |
@@ -107,7 +106,7 @@ This module **is** the consumer web dashboard. Most post-connection mobile featu
 | Deep links | `click://`, App Clip | `/c/[userId]`, `/connect/[userId]` | Web universal links |
 | B2B insights | N/A (consumer) | Separate `/insights/*` app | Not part of this module |
 
-Home also includes the native Swift app's prioritized `HomeSocialFeed`, `HomeExplore`, `HomeActivityRecap`, paginated `HomeSavedEvents`, contextual encrypted icebreakers, connections grouped by place, and the most urgent archive warning. Social actions include wave replies, hangout confirmation/decline, dismissal and direct/group chat routing. See `docs/ios-web-parity.md` for the mobile references and verification limits.
+Signed-in Home (`/`) is server-rendered from `lib/server/home/loadHome.ts` into `components/home/*`: one promoted opportunity (live event, say-hi deadline, today's event, or top nudge), new Clicks, shared drops, saved & upcoming events, nearby counts, Day/Week recap, memories, availability, Core and an Activity preview. Nudge actions cover wave replies, hangout confirmation/decline, dismissal and chat routing. See `docs/ios-web-parity.md` for the mobile references and verification limits.
 
 Connections are **created** on mobile (Tri-Factor) or via web/mobile QR; see `lib/connections/README.md` for handshake paths.
 
@@ -160,4 +159,4 @@ Connections are **created** on mobile (Tri-Factor) or via web/mobile QR; see `li
 - **Web dashboard** — **This module IS the web dashboard**.
 - **Business insights** — Separate `/insights` app area.
 - **Event reminders** — Push to creators.
-- **Achievements & stats** — StatsOverview, AchievementBadge, MilestoneProgress.
+- **Recap** — `components/home/RecapCard` (server-loaded Day/Week rollups).

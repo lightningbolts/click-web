@@ -6,7 +6,7 @@ import { FcButton, FcField, FcInput } from '@/components/fc';
 import { FcDialog } from '@/components/fc/FcDialog';
 import { WAITLIST_EMAIL_ERROR, waitlistEmailSchema } from '@/lib/validation/waitlistEmail';
 
-export type WaitlistSource = 'homepage_hero' | 'enterprise_landing';
+export type WaitlistSource = 'homepage_hero' | 'enterprise_landing' | 'top_bar';
 
 export default function WaitlistModal({
   open,

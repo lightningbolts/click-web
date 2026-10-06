@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
 import { hasSupabaseAuthCookie } from '@/lib/auth/authCookie';
+import { isSignedInAppPath } from '@/lib/shell/appRoutes';
+import { legacyTabRedirect } from '@/lib/shell/legacyTabRedirect';
 import { shouldApplyReadHeavyRateLimit } from '@/lib/server/readHeavyRateLimit';
 import {
   CONNECTIONS_RATE_LIMIT,
@@ -80,12 +82,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request: { headers: request.headers } });
   }
 
+  if (pathname === '/') {
+    const legacy = legacyTabRedirect(request.nextUrl.searchParams);
+    if (legacy) return NextResponse.redirect(new URL(legacy, request.url), 308);
+  }
+
   const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const insightsRoute = pathname === '/insights' || pathname.startsWith('/insights/');
+  const appRoute = isSignedInAppPath(pathname);
+  const toLogin = () => {
+    const url = new URL('/login', request.url);
+    url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(url);
+  };
 
   // Anonymous visitors have nothing to refresh or verify: no network, no Supabase client.
   if (!hasSupabaseAuthCookie(request.cookies.getAll().map((c) => c.name))) {
-    return adminRoute ? NextResponse.redirect(new URL('/', request.url)) : supabaseResponse;
+    if (adminRoute) return NextResponse.redirect(new URL('/', request.url));
+    if (appRoute) return toLogin();
+    return supabaseResponse;
   }
 
   const supabase = createServerClient(
@@ -128,6 +143,10 @@ export async function middleware(request: NextRequest) {
     });
     return redirect;
   };
+
+  if (appRoute && !claims) {
+    return withCookies(toLogin());
+  }
 
   if (adminRoute) {
     const role = (claims?.app_metadata as { role?: unknown } | undefined)?.role;

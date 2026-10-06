@@ -14,6 +14,7 @@ export default function Footer() {
 
   return (
     <footer
+      data-site-chrome
       className="relative z-50 border-t border-border-hard bg-surface py-12 text-on-surface"
       style={{ backgroundColor: "var(--color-surface)" }}
     >

@@ -1,14 +1,7 @@
-import {
-  BookOpen,
-  CalendarDays,
-  MapPin,
-  MessageCircle,
-  QrCode,
-  Settings,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
-
+/**
+ * Legacy dashboard panes, now addressed by route (spec §6.3) instead of `/?tab=`.
+ * Phase 2 replaces the panes themselves; until then `(app)` routes host them.
+ */
 export const DASHBOARD_TABS = [
   'memory',
   'events',
@@ -28,53 +21,25 @@ export function parseDashboardTab(raw: string | null | undefined): DashboardTab 
   return 'memory';
 }
 
+const TAB_HREF: Record<DashboardTab, string> = {
+  memory: '/',
+  events: '/events',
+  map: '/map',
+  chat: '/clicks',
+  hubs: '/clicks?filter=hubs',
+  identity: '/add',
+  settings: '/settings',
+};
+
 export function dashboardTabHref(tab: DashboardTab): string {
-  if (tab === 'events') return '/events';
-  return `/?tab=${tab}`;
+  return TAB_HREF[tab];
 }
 
-const NAV: { id: DashboardTab; label: string; icon: LucideIcon }[] = [
-  { id: 'memory', label: 'Memory Box', icon: BookOpen },
-  { id: 'events', label: 'Events', icon: CalendarDays },
-  { id: 'map', label: 'Map', icon: MapPin },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
-  { id: 'hubs', label: 'Hubs', icon: Users },
-  { id: 'identity', label: 'QR Identity', icon: QrCode },
-  { id: 'settings', label: 'Settings', icon: Settings },
-];
-
-export function personalProductNavItems(): {
-  id: DashboardTab;
-  label: string;
-  icon: LucideIcon;
-  href: string;
-}[] {
-  return NAV.map((item) => ({
-    id: item.id,
-    label: item.label,
-    icon: item.icon,
-    href: dashboardTabHref(item.id),
-  }));
-}
-
-/** Routes where the signed-in Navbar shows product tabs instead of marketing links. */
-export function isSignedInProductPath(pathname: string): boolean {
-  return (
-    pathname === '/' ||
-    pathname === '/dashboard' ||
-    pathname.startsWith('/events') ||
-    pathname.startsWith('/e/')
-  );
-}
-
-export function productNavItemIsActive(
-  item: { id: DashboardTab; href: string },
-  pathname: string,
-  tab: string | null | undefined,
-): boolean {
-  if (item.id === 'events') {
-    return pathname === '/events' || pathname.startsWith('/events/') || pathname.startsWith('/e/');
-  }
-  if (pathname !== '/' && pathname !== '/dashboard') return false;
-  return parseDashboardTab(tab) === item.id;
+/** Which legacy pane an `(app)` route shows, or null when the route has its own page. */
+export function dashboardTabForPath(pathname: string, filter?: string | null): DashboardTab | null {
+  if (pathname === '/clicks') return filter === 'hubs' ? 'hubs' : 'chat';
+  if (pathname === '/map') return 'map';
+  if (pathname === '/add') return 'identity';
+  if (pathname === '/settings') return 'settings';
+  return null;
 }

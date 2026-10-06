@@ -17,8 +17,6 @@ import {
 import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 import { cn } from '@/lib/cn';
 
-const loadHomeAuthenticated = () => import('@/components/HomeAuthenticated');
-const HomeAuthenticated = dynamic(loadHomeAuthenticated, { ssr: false });
 
 const loadWaitlistModal = () => import('@/components/marketing/WaitlistModal');
 const WaitlistModal = dynamic(loadWaitlistModal, { ssr: false });
@@ -105,10 +103,6 @@ export default function LandingPage({
 
     return () => observer.disconnect();
   }, []);
-
-  if (user) {
-    return <HomeAuthenticated user={user} />;
-  }
 
   return (
     <>

@@ -1,5 +1,6 @@
 import { render, screen, act, waitFor } from '@testing-library/react';
 import DashboardView from '@/components/DashboardView';
+import type { DashboardTab } from '@/lib/shell/personalProductNav';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 
 /* ------------------------------------------------------------------ */
@@ -87,19 +88,8 @@ jest.mock('@/components/chat/CallOverlay', () => {
 
 jest.mock('@/components/dashboard', () => ({
   ConnectionTable: () => <div data-testid="connection-table" />,
-  TimeCapsule: () => <div data-testid="time-capsule" />,
   QRIdentityCard: () => <div data-testid="qr-identity-card" />,
-  StatsOverview: () => <div data-testid="stats-overview" />,
-  AchievementBadge: ({ title }: { title: string }) => (
-    <div data-testid="achievement-badge">{title}</div>
-  ),
-  MilestoneProgress: () => <div data-testid="milestone-progress" />,
   ConnectionMap: () => <div data-testid="connection-map" />,
-}));
-
-jest.mock('@/components/dashboard/MyAvailabilityIntentsCard', () => ({
-  __esModule: true,
-  default: () => <div data-testid="my-availability-intents" />,
 }));
 
 jest.mock('@/lib/dashboard/mockData', () => ({
@@ -185,12 +175,15 @@ function buildMockUser(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function renderDashboard(user: Record<string, unknown> = buildMockUser()) {
+async function renderDashboard(
+  user: Record<string, unknown> = buildMockUser(),
+  routeTab: DashboardTab = 'settings',
+) {
   let result: ReturnType<typeof render>;
   await act(async () => {
     result = render(
       <ThemeProvider>
-        <DashboardView user={user} />
+        <DashboardView user={user} routeTab={routeTab} />
       </ThemeProvider>,
     );
   });
@@ -233,70 +226,16 @@ describe('DashboardView', () => {
     expect(container).toBeTruthy();
   });
 
-  it('displays the user name in the welcome header', async () => {
-    await renderDashboard();
-    expect((await screen.findAllByText(/Alice Smith/)).length).toBeGreaterThan(0);
-  });
-
-  it('falls back to the email prefix when full_name is absent', async () => {
-    await renderDashboard(
-      buildMockUser({ user_metadata: {}, email: 'bob@example.com' }),
-    );
-    expect((await screen.findAllByText(/bob/)).length).toBeGreaterThan(0);
-  });
-
-  it('prefers first_name and last_name in user_metadata over full_name', async () => {
-    await renderDashboard(
-      buildMockUser({
-        user_metadata: {
-          first_name: 'Pat',
-          last_name: 'Lee',
-          full_name: 'Ignored Legacy',
-        },
-      }),
-    );
-    expect((await screen.findAllByText(/Pat Lee/)).length).toBeGreaterThan(0);
-  });
-
   it('does not render product tabs inside the dashboard pane', async () => {
     await renderDashboard();
     expect(screen.queryByTestId('dashboard-tab-memory')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dashboard-tab-events')).not.toBeInTheDocument();
   });
 
-  it('shows the Memory Box tab content by default (stats + milestones)', async () => {
-    await renderDashboard();
-
-    expect(await screen.findByTestId('stats-overview')).toBeInTheDocument();
-    expect(screen.getByTestId('milestone-progress')).toBeInTheDocument();
-    expect(screen.getByTestId('time-capsule')).toBeInTheDocument();
-    expect(screen.getByTestId('connection-table')).toBeInTheDocument();
-  });
-
-  it('redirects ?tab=events to /events', async () => {
-    searchState.tab = 'events';
-    await act(async () => {
-      render(
-        <ThemeProvider>
-          <DashboardView user={buildMockUser()} />
-        </ThemeProvider>,
-      );
-    });
-    await waitFor(() => {
-      expect(navFns.replace).toHaveBeenCalledWith('/events');
-    });
-    expect(screen.queryByTestId('dashboard-events-module')).not.toBeInTheDocument();
-  });
-
-  it('lists achievement badges on the Memory Box tab', async () => {
-    await renderDashboard();
-    expect(await screen.findByText('Achievements')).toBeInTheDocument();
-    expect(screen.getByTestId('achievement-badge')).toHaveTextContent('First Connection');
-  });
-
-  it('renders the data sovereignty notice', async () => {
-    await renderDashboard();
-    expect(await screen.findByText(/Your data belongs to you/)).toBeInTheDocument();
+  it('renders the pane for the route it is given', async () => {
+    await renderDashboard(buildMockUser(), 'identity');
+    expect(await screen.findByTestId('qr-identity-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('stats-overview')).not.toBeInTheDocument();
   });
 
   it('does not mount calling UI (voice/video are out of the web product; the API stays)', async () => {
@@ -314,7 +253,7 @@ describe('DashboardView', () => {
     await act(async () => {
       render(
         <ThemeProvider>
-          <DashboardView user={buildMockUser()} />
+          <DashboardView user={buildMockUser()} routeTab="settings" />
         </ThemeProvider>,
       );
     });

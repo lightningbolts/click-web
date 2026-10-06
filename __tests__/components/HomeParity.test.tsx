@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
-import HomeActivityRecap from '@/components/dashboard/HomeActivityRecap';
+import { RecapCard } from '@/components/home/RecapCard';
+import type { ActivityRecap } from '@/lib/me/activityRecap';
 import CommunityHubs from '@/components/dashboard/CommunityHubs';
 import { resolveWebHubE2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
@@ -17,21 +18,23 @@ function mount(component: React.ReactNode) {
 function response(body: unknown, ok = true) { return { ok, json: async () => body } as Response; }
 afterEach(() => { global.fetch = originalFetch; jest.clearAllMocks(); });
 
-test('keeps the previous recap correctly labelled while changing windows', async () => {
-  let resolveDay!: (value: Response) => void;
-  global.fetch = jest.fn(async (url) => {
-    if (String(url).includes('window=day')) return new Promise<Response>((resolve) => { resolveDay = resolve; });
-    return response({ recap: { window: 'week', connections_formed: 5, messages_sent: 0, messages_received: 0, beacons_created: 0, events_rsvped: 0, events_checked_in: 0, events_saved: 0 } });
-  });
-  mount(<HomeActivityRecap userId="user-1" />);
-  await screen.findByText('5');
-  fireEvent.click(screen.getByRole('button', { name: 'Day' }));
+const recap = (window: 'day' | 'week', connections_formed: number): ActivityRecap => ({
+  window, since: '2026-10-01T00:00:00.000Z', connections_formed, messages_sent: 0, messages_received: 0,
+  beacons_created: 0, events_rsvped: 0, events_checked_in: 0, events_saved: 0,
+});
+
+test('switches recap windows from server data without refetching', () => {
+  global.fetch = jest.fn();
+  mount(<RecapCard recap={{ day: recap('day', 2), week: recap('week', 5) }} />);
   expect(screen.getByText('5')).toBeInTheDocument();
-  expect(screen.getByText(/Past 7 days/)).toBeInTheDocument();
-  await waitFor(() => expect(resolveDay).toBeDefined());
-  resolveDay(response({ recap: { window: 'day', connections_formed: 2, messages_sent: 0, messages_received: 0, beacons_created: 0, events_rsvped: 0, events_checked_in: 0, events_saved: 0 } }));
-  await screen.findByText('Past 24 hours');
+  fireEvent.click(screen.getByRole('radio', { name: 'Day' }));
   expect(screen.getByText('2')).toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('shows a calm empty recap', () => {
+  mount(<RecapCard recap={{ day: recap('day', 0), week: recap('week', 0) }} />);
+  expect(screen.getByText(/A quiet week so far/)).toBeInTheDocument();
 });
 
 test('does not ask for location before the user chooses nearby discovery', async () => {
