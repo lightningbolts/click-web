@@ -1,4 +1,4 @@
-import { threadHref } from './appNav';
+import { hubThreadHref, threadHref } from './appNav';
 
 /**
  * `/?tab=…` deep links from before panes became routes (spec §6.3). The native apps still open
@@ -10,7 +10,7 @@ export function legacyTabRedirect(searchParams: URLSearchParams): string | null 
   if (tab == null) return null;
   const id = (key: string) => {
     const v = searchParams.get(key)?.trim();
-    return v ? encodeURIComponent(v) : null;
+    return v || null;
   };
   switch (tab) {
     case 'chat': {
@@ -19,7 +19,7 @@ export function legacyTabRedirect(searchParams: URLSearchParams): string | null 
     }
     case 'hubs': {
       const hub = id('hub');
-      return hub ? `/clicks?filter=hubs&hub=${hub}` : '/clicks?filter=hubs';
+      return hub ? hubThreadHref(hub) : '/clicks?filter=hubs';
     }
     case 'map':
       return '/map';

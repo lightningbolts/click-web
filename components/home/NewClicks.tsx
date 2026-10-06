@@ -10,7 +10,7 @@ import { TimeLeft } from './OpportunityCard';
 export function NewClicks({ items, nowMs }: { items: HomeSayHi[]; nowMs: number }) {
   return (
     <section aria-labelledby="home-new-clicks">
-      <SectionHeader id="home-new-clicks" title="New Clicks" href="/clicks?filter=new" />
+      <SectionHeader id="home-new-clicks" title="New Clicks" href="/clicks" />
       <ListGroup>
         {items.slice(0, 3).map((c) => (
           <ListRow

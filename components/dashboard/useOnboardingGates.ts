@@ -22,7 +22,7 @@ export function useOnboardingGates({
   setProfileConnectionId: Dispatch<SetStateAction<string | null>>;
 }) {
   const [needsTagging, setNeedsTagging] = useState<boolean | null>(null);
-  /** OAuth / incomplete `public.users.birthday` — blocks dashboard until saved (see UserProfileModal). */
+  /** OAuth / incomplete `public.users.birthday` — blocks the app until saved (see BirthdayGate). */
   // A birthday already confirmed this tab session does not block a remount on the network.
   const [birthdayProfileGateResolved, setBirthdayProfileGateResolved] = useState(
     () => readSessionCache<boolean>(user?.id, 'birthdayPresent') === true,

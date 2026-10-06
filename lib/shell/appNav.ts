@@ -35,7 +35,7 @@ export function activeAppSection(pathname: string): AppNavId | 'add' | 'me' | nu
  */
 export function hidesTabBar(pathname: string): boolean {
   return (
-    /^\/clicks\/[cgh]\/[^/]+/.test(pathname) ||
+    isThreadPath(pathname) ||
     pathname === '/events/new' ||
     /^\/e\/[^/]+\/(edit|manage)/.test(pathname)
   );
@@ -55,6 +55,21 @@ export function loginHref(next?: string | null): string {
 /** A 1:1 Click thread (spec §6.3). */
 export function threadHref(connectionId: string): string {
   return `/clicks/c/${encodeURIComponent(connectionId)}`;
+}
+
+/** A verified group thread (spec §6.3). */
+export function groupThreadHref(groupId: string): string {
+  return `/clicks/g/${encodeURIComponent(groupId)}`;
+}
+
+/** A community hub thread (spec §6.3). */
+export function hubThreadHref(hubId: string): string {
+  return `/clicks/h/${encodeURIComponent(hubId)}`;
+}
+
+/** Full-screen thread routes: no mobile top or tab bar, the thread header carries Back. */
+export function isThreadPath(pathname: string): boolean {
+  return /^\/clicks\/[cgh]\/[^/]+/.test(pathname);
 }
 
 /** Someone you've met (spec §7.3). */

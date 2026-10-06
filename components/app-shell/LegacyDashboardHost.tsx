@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { Skeleton } from '@/components/ds/Skeleton';
 import { useAuth } from '@/lib/AuthContext';
@@ -12,15 +12,13 @@ import { dashboardTabForPath } from '@/lib/shell/personalProductNav';
 const DashboardView = dynamic(() => import('@/components/DashboardView'), { ssr: false, loading: () => null });
 
 /**
- * Transitional host (spec §13 phase 1): the legacy panes live in the `(app)` layout so map and
- * chat stay mounted while moving between `/clicks`, `/map`, `/add` and `/settings`. Phase 2
- * replaces each pane with its own route page.
+ * Transitional host (spec §13): the legacy map and settings panes live in the `(app)` layout so
+ * the map stays mounted between visits. Phases 4 and 6 replace them with their own pages.
  */
 export function LegacyDashboardHost() {
   const pathname = usePathname();
-  const filter = useSearchParams().get('filter');
   const { user } = useAuth();
-  const tab = dashboardTabForPath(pathname, filter);
+  const tab = dashboardTabForPath(pathname);
   const [ready, setReady] = useState(() => (user ? readSessionCache<boolean>(user.id, 'booted') === true : false));
   const onReady = useCallback(() => setReady(true), []);
 

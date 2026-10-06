@@ -12,7 +12,7 @@ export function CoreStrip({ people }: { people: HomePerson[] }) {
   const { onlineUserIds } = useAuth();
   return (
     <section aria-labelledby="home-core">
-      <SectionHeader id="home-core" title="Core" href="/clicks?filter=core" linkLabel="Manage" />
+      <SectionHeader id="home-core" title="Core" href="/clicks" linkLabel="Manage" />
       <ul className="-mx-[var(--gutter)] flex gap-4 overflow-x-auto px-[var(--gutter)] pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-3 lg:px-0">
         {people.map((p) => {
           const online = onlineUserIds.has(p.id);

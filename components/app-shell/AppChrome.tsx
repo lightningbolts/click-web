@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { AuthSeed } from '@/lib/AuthContext';
 import { ProductChromeOn } from '@/lib/shell/ProductChromeContext';
 import { useShellBootstrap } from '@/lib/shell/useShellBootstrap';
 import type { SessionBootstrap } from '@/lib/shell/sessionBootstrap';
 import { TIME_ZONE_COOKIE } from '@/lib/time/viewerTimeZone';
+import { hidesTabBar } from '@/lib/shell/appNav';
+import { cn } from '@/lib/cn';
+import { useShellHeader } from './ShellContext';
 import { MobileTabBar } from './MobileTabBar';
+import { OnboardingGates } from './OnboardingGates';
 import { TopBar } from './TopBar';
 
 function Bars({ initial }: { initial: SessionBootstrap }) {
@@ -39,6 +43,14 @@ function useTimeZoneCookie() {
   }, [router]);
 }
 
+/** Reserves room for the mobile tab bar only while it is showing. */
+function Content({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const header = useShellHeader();
+  const tabBar = !hidesTabBar(pathname) && !header?.hideTabBar;
+  return <div className={cn('flex flex-1 flex-col', tabBar && 'pb-[var(--tabbar-height)]')}>{children}</div>;
+}
+
 /**
  * Signed-in shell (spec §6): server bootstrap in, complete bars on first paint. `data-app-shell`
  * tells CSS to hide the root `SiteChrome` and the marketing footer before hydration.
@@ -58,8 +70,9 @@ export function AppChrome({
       <ProductChromeOn />
       <div data-app-shell className="flex min-h-[calc(100dvh)] flex-1 flex-col">
         <Bars initial={bootstrap} />
-        <div className="flex flex-1 flex-col pb-[var(--tabbar-height)]">{children}</div>
+        <Content>{children}</Content>
       </div>
+      <OnboardingGates />
     </AuthSeed>
   );
 }

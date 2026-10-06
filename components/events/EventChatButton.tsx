@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { hubRequest } from '@/lib/hub/client';
+import { hubThreadHref } from '@/lib/shell/appNav';
 
 export default function EventChatButton({ beaconId }: { beaconId: string }) {
   const { user } = useAuth();
@@ -15,7 +16,7 @@ export default function EventChatButton({ beaconId }: { beaconId: string }) {
     setBusy(true); setError('');
     try {
       const { hub_id } = await hubRequest<{ hub_id: string }>(`/api/beacons/${encodeURIComponent(beaconId)}/event-chat`);
-      router.push(`/clicks?filter=hubs&hub=${encodeURIComponent(hub_id)}`);
+      router.push(hubThreadHref(hub_id));
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }

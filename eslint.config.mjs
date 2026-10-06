@@ -11,6 +11,7 @@ const REDESIGNED = [
   'components/home/**',
   'components/clicks/**',
   'components/people/**',
+  'components/add/**',
   'components/me/**',
   'components/place/**',
   'app/(app)/**',
@@ -23,7 +24,7 @@ const classLiteral = (regex, message) => [
 
 const tokenOnlyClasses = [
   ...classLiteral('text-\\[(9|10|11)px\\]', 'Below type-badge (12px) is not allowed. Use type-meta / type-badge.'),
-  ...classLiteral('rounded-\\[', 'Use the radius scale (rounded-xs…xl, rounded-pill).'),
+  ...classLiteral('rounded-\\[', 'Use the radius scale (rounded-xs…xl, rounded-bubble, rounded-pill).'),
   ...classLiteral('(^|\\s)backdrop-blur', 'Use material-glass / material-glass-dark.'),
 ];
 

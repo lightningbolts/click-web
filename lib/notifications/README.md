@@ -42,7 +42,6 @@ Storage key: `click:web-notification-preferences:{userId}`
 | Caller | Trigger | `data.type` |
 |--------|---------|-------------|
 | `app/api/chat/messages/route.ts` | New message (recipient offline) | `new_message` |
-| `components/dashboard/useDashboardCalls.ts` | Outgoing web call | `incoming_call` |
 | `cron-hourly-maintenance` | Disposable reveal | `disposable_reveal` |
 | `cron-hourly-maintenance` | Event reminder | `event_reminder` |
 | `cron-hourly-maintenance` | Seed-a-Room teaser (24–48h before start) | `event_teaser` |
@@ -53,7 +52,7 @@ All server callers use service role bearer to invoke the Edge Function.
 
 ### `incoming_call` payload contract (mobile parity)
 
-Defined in `lib/calls/incomingCallPushPayload.ts` → `buildIncomingCallPushPayload`:
+Built by the native apps (the web builder was removed with the web call UI):
 
 ```typescript
 {
@@ -103,12 +102,9 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 
 | Path | Role |
 |------|------|
-| `lib/calls/incomingCallPushPayload.ts` | `buildIncomingCallPushPayload` (KMP parity) |
-| `components/dashboard/useDashboardCalls.ts` | Call push invoke |
 | `app/api/chat/messages/route.ts` | New message push |
 | `app/api/user/push-tokens/route.ts` | Device token storage |
-| `app/api/livekit/token/route.ts` | Room token before call push |
-| `components/chat/CallOverlay.tsx` | WebRTC UI |
+| `app/api/livekit/token/route.ts` | Room token for native-app calls (web has no call UI) |
 | `supabase/functions/cron-hourly-maintenance/index.ts` | Scheduled pushes |
 | `click-web/README.md` | Cross-platform push parity note |
 
@@ -143,7 +139,7 @@ supabase.functions.invoke('send-push-notification', { body: buildIncomingCallPus
 - **Google/email auth** — Account for push targeting.
 - **Push notifications** — **Core module**.
 - **Deep links & App Clip** — Push `data` opens correct screen.
-- **Web dashboard** — Web calls trigger mobile push.
+- **Web** — no call UI; calls are native-only.
 - **Business insights** — No consumer pushes.
 - **Event reminders** — **event_reminder** push.
 - **Seed a Room teasers** — **event_teaser** push (pref `event_teaser_push_enabled`).

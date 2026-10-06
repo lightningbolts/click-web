@@ -28,7 +28,7 @@ import { deleteCliqueRpc, leaveCliqueRpc } from '@/lib/chat/createVerifiedClick'
 /**
  * Chat header: back button (narrow layouts), avatar/profile entry, title, status badge,
  * the details-panel toggle, and the actions menu. Voice/video controls were removed from the
- * web product; the LiveKit/API support stays in place (see `useDashboardCalls`, `CallOverlay`).
+ * web product (spec §7.2); `/api/livekit/token` stays for the native apps.
  */
 export function ChatHeader({
   connection,

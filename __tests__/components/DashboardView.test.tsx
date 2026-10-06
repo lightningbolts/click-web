@@ -41,12 +41,6 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchState.tab ? `tab=${searchState.tab}` : ''),
 }));
 
-jest.mock('livekit-client', () => ({
-  Room: jest.fn(),
-  RoomEvent: {},
-  Track: { Source: { Camera: 'camera' } },
-}));
-
 jest.mock('framer-motion', () => {
   const React = require('react');
   const Forward = (tag: string) =>
@@ -77,18 +71,8 @@ jest.mock('@/components/InterestTagging', () => {
   };
 });
 
-jest.mock('@/components/chat/CallOverlay', () => {
-  const MockCallOverlay = () => <div data-testid="call-overlay" />;
-  MockCallOverlay.displayName = 'CallOverlay';
-  return {
-    __esModule: true,
-    default: MockCallOverlay,
-  };
-});
-
 jest.mock('@/components/dashboard', () => ({
   ConnectionTable: () => <div data-testid="connection-table" />,
-  QRIdentityCard: () => <div data-testid="qr-identity-card" />,
   ConnectionMap: () => <div data-testid="connection-map" />,
 }));
 
@@ -233,14 +217,9 @@ describe('DashboardView', () => {
   });
 
   it('renders the pane for the route it is given', async () => {
-    await renderDashboard(buildMockUser(), 'identity');
-    expect(await screen.findByTestId('qr-identity-card')).toBeInTheDocument();
-    expect(screen.queryByTestId('stats-overview')).not.toBeInTheDocument();
-  });
-
-  it('does not mount calling UI (voice/video are out of the web product; the API stays)', async () => {
-    await renderDashboard();
-    expect(screen.queryByTestId('call-overlay')).not.toBeInTheDocument();
+    await renderDashboard(buildMockUser(), 'settings');
+    expect(await screen.findByTestId('settings-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-view')).not.toBeInTheDocument();
   });
 
   it('does not crash when user has no email or metadata', async () => {

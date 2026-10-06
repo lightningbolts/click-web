@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import * as maplibregl from '@/lib/maps/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { dropSameOriginMapRequest } from '@/lib/map/dropSameOriginMapRequest';
+import { cn } from '@/lib/cn';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { FC_PRIMARY, FC_SECONDARY, mapStyleForTheme } from '@/lib/theme/mapStyles';
 
@@ -124,7 +125,7 @@ export default function PinMap({
     return (
       <div
         data-testid={testId}
-        className={`flex h-64 items-center justify-center rounded-[16px] border border-border-hard bg-surface-container text-sm text-on-surface-variant ${className}`}
+        className={cn('flex h-64 items-center justify-center rounded-[16px] border border-border-hard bg-surface-container text-sm text-on-surface-variant', className)}
       >
         Location pin is not available yet.
       </div>
@@ -134,7 +135,7 @@ export default function PinMap({
   return (
     <div
       data-testid={testId}
-      className={`relative h-64 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container ${className}`}
+      className={cn('relative h-64 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container', className)}
     >
       <div ref={containerRef} className="absolute inset-0" />
     </div>

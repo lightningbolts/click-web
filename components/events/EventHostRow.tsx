@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { ConnectionPeerAvatar } from "@/components/dashboard/ConnectionPeerAvatar";
-import UserProfileModal from "@/components/UserProfileModal";
 import { useAuth } from "@/lib/AuthContext";
-import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
+import { personHref } from "@/lib/shell/appNav";
 
 export default function EventHostRow({
   creatorId,
@@ -17,7 +15,6 @@ export default function EventHostRow({
   avatarUrl: string | null;
 }) {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
   const label = name?.trim() || "Host";
   if (!name?.trim() && !creatorId) return null;
 
@@ -30,22 +27,9 @@ export default function EventHostRow({
 
   if (user && creatorId) {
     return (
-      <>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 text-left hover:underline"
-        >
-          {inner}
-        </button>
-        {/* Always mounted so closing plays the exit animation. */}
-        <UserProfileModal
-          userId={open ? creatorId : null}
-          getAuthHeaders={getFreshAuthHeaders}
-          onClose={() => setOpen(false)}
-          currentUserId={user.id}
-        />
-      </>
+      <Link href={personHref(creatorId)} className="inline-flex items-center gap-2 hover:underline">
+        {inner}
+      </Link>
     );
   }
 

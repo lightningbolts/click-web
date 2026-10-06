@@ -2,16 +2,23 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 import { RecapCard } from '@/components/home/RecapCard';
 import type { ActivityRecap } from '@/lib/me/activityRecap';
-import CommunityHubs from '@/components/dashboard/CommunityHubs';
+import { HubsList } from '@/components/clicks/HubsList';
+import { HubThread } from '@/components/clicks/HubThread';
 import { resolveWebHubE2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 jest.mock('@/lib/auth/freshAuthHeaders', () => ({ getFreshAuthHeaders: async () => ({ Authorization: 'Bearer test' }) }));
 jest.mock('@/lib/supabase', () => ({ getSupabaseClient: () => null }));
-jest.mock('@/components/UserProfileModal', () => ({ __esModule: true, default: () => null }));
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn() }) }));
 jest.mock('@/lib/chat/e2eeV2Client', () => ({
   resolveWebHubE2eeV2Session: jest.fn(), encryptWebE2eeV2Message: jest.fn(), decryptWebE2eeV2Message: jest.fn(),
 }));
 const originalFetch = global.fetch;
+beforeAll(() => {
+  window.matchMedia ??= ((query: string) => ({
+    matches: false, media: query, onchange: null,
+    addEventListener: jest.fn(), removeEventListener: jest.fn(), addListener: jest.fn(), removeListener: jest.fn(), dispatchEvent: jest.fn(),
+  })) as unknown as typeof window.matchMedia;
+});
 function mount(component: React.ReactNode) {
   return render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>{component}</SWRConfig>);
 }
@@ -40,7 +47,7 @@ test('shows a calm empty recap', () => {
 test('does not ask for location before the user chooses nearby discovery', async () => {
   const getCurrentPosition = jest.fn();
   Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition } });
-  mount(<CommunityHubs userId="user-1" />);
+  mount(<HubsList selectedHubId={null} />);
   expect(getCurrentPosition).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Find nearby hubs' }));
   expect(getCurrentPosition).toHaveBeenCalledTimes(1);
@@ -51,11 +58,12 @@ test('retains the draft and never falls back to plaintext when hub key resolutio
     ? response({ messages: [], participant_ids: ['user-1'], occupant_count: 1 })
     : response({ hub: { id: 'hub-1', name: 'Event room', category: 'event', event_beacon_id: 'event-1' } }));
   jest.mocked(resolveWebHubE2eeV2Session).mockRejectedValue(new Error('Device not approved'));
-  mount(<CommunityHubs userId="user-1" initialHubId="hub-1" />);
+  mount(<HubThread hubId="hub-1" userId="user-1" onBack={jest.fn()} />);
   await screen.findByText('No messages yet. Say hello to the room.');
-  fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Private message' } });
+  await screen.findByText('Event room');
+  fireEvent.change(screen.getByRole('textbox', { name: 'Message Event room' }), { target: { value: 'Private message' } });
   fireEvent.click(screen.getByRole('button', { name: 'Send' }));
-  await screen.findByRole('alert');
-  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Private message');
+  await screen.findByText('Device not approved');
+  expect(screen.getByRole('textbox', { name: 'Message Event room' })).toHaveValue('Private message');
   expect(jest.mocked(global.fetch).mock.calls.some(([url, options]) => String(url) === '/api/hub/messages' && options?.method === 'POST')).toBe(false);
 });

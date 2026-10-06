@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { AddClick } from '@/components/add/AddClick';
 
-export const metadata: Metadata = { title: 'Add Click · Click' };
+export const metadata: Metadata = { title: 'Add Click · Click', robots: { index: false } };
 
-/** Rendered by the `(app)` layout's legacy pane host until its phase lands (spec §13). */
 export default function Page() {
-  return null;
+  return (
+    <Suspense>
+      <AddClick />
+    </Suspense>
+  );
 }

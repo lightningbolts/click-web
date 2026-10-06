@@ -10,7 +10,7 @@ import { ClickMark } from '@/components/ds/ClickMark';
 import { CountBadge } from '@/components/ds/CountBadge';
 import { IconButton } from '@/components/ds/IconButton';
 import { Tooltip } from '@/components/ds/Tooltip';
-import { activeAppSection, appNavItems, loginHref, type AppNavItem } from '@/lib/shell/appNav';
+import { activeAppSection, appNavItems, isThreadPath, loginHref, type AppNavItem } from '@/lib/shell/appNav';
 import type { SessionBootstrap } from '@/lib/shell/sessionBootstrap';
 import { AccountMenu } from './AccountMenu';
 import { useShellHeader } from './ShellContext';
@@ -109,6 +109,8 @@ export function TopBar({ auth, onOpenMarketingMenu }: { auth: TopBarAuth; onOpen
         className={cn(
           'material-glass sticky top-0 z-[60] h-[var(--topbar-height)] border-b border-transparent transition-[border-color] duration-[var(--d-base)]',
           'data-[scrolled]:border-hairline',
+          // A phone thread is full screen; its own glass header carries Back (spec §7.2).
+          isThreadPath(pathname) && 'max-md:hidden',
         )}
       >
         <div

@@ -209,6 +209,7 @@ body:has([data-app-shell]) [data-site-chrome] {
   --radius-xl: 26px;
   --radius-2xl: 20px;
   --radius-3xl: 26px;
+  --radius-bubble: 18px;
   --radius-pill: 9999px;
 
   --shadow-overlay: var(--shadow-overlay);
@@ -476,6 +477,24 @@ a {
   .press:active:not(:disabled) {
     transform: none;
   }
+}
+
+/* Thread backdrop (spec §7.2, iOS ChatBackground classic): wash, two seeded glows, dot grid. */
+.chat-background {
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2252%22%20height%3D%2252%22%3E%3Cg%20fill%3D%22%23000%22%20fill-opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2213%22%20cy%3D%2213%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2239%22%20r%3D%221.1%22/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 55% at 12% 8%, var(--glow-a-light), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 92% 88%, var(--glow-b-light), transparent 70%),
+    linear-gradient(180deg, #f5f3fb, #f7f7fa);
+  background-size: 52px 52px, auto, auto, auto;
+}
+
+.dark .chat-background {
+  background-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2252%22%20height%3D%2252%22%3E%3Cg%20fill%3D%22%23fff%22%20fill-opacity%3D%22.16%22%3E%3Ccircle%20cx%3D%2213%22%20cy%3D%2213%22%20r%3D%221.1%22/%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2239%22%20r%3D%221.1%22/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 55% at 12% 8%, var(--glow-a-dark), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 92% 88%, var(--glow-b-dark), transparent 70%),
+    linear-gradient(180deg, #0e0b16, #0b0b0d);
 }
 
 .chat-thread-scroll {

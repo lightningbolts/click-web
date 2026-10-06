@@ -16,7 +16,8 @@ describe('legacyTabRedirect', () => {
     ['tab=chat', '/clicks'],
     ['tab=chat&c=abc', '/clicks/c/abc'],
     ['tab=hubs', '/clicks?filter=hubs'],
-    ['tab=hubs&hub=h%201', '/clicks?filter=hubs&hub=h%201'],
+    ['tab=hubs&hub=h%201', '/clicks/h/h%201'],
+    ['tab=chat&c=a%2Fb', '/clicks/c/a%2Fb'],
     ['tab=memory', '/'],
     ['tab=whatever', '/'],
   ])('%s → %s', (query, target) => {

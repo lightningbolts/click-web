@@ -10,4 +10,3 @@ export {
   type ConnectionEncounterBrief,
 } from './ConnectionTable';
 export { default as TimeCapsule, type TimelineChapter } from './TimeCapsule';
-export { default as QRIdentityCard } from './QRIdentityCard';
