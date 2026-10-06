@@ -652,6 +652,16 @@ a {
   }
 }
 
+/* Recap story progress: one capsule fills over the slide's duration (spec §7.6.5). */
+@keyframes recap-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* Overlays enter with a 0.98→1 scale + fade on the expo curve (spec §5.4). */
 @keyframes ds-overlay-in {
   from {
@@ -1042,5 +1052,20 @@ a {
       color-mix(in srgb, var(--tint) 20%, transparent) 0%,
       transparent 72%
     );
+  }
+}
+
+/* ── Print (spec §7.6.5 summary report) ───────────────────────────────────── */
+
+@media print {
+  [data-topbar],
+  [data-tabbar],
+  [data-site-chrome],
+  [data-print-hidden] {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
   }
 }

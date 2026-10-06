@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cache } from 'react';
 import { cookies } from 'next/headers';
+import { unstable_rethrow } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
 
@@ -30,6 +31,8 @@ export const getServerUser = cache(async (): Promise<User | null> => {
     } = await supabase.auth.getUser();
     return user ?? null;
   } catch (err) {
+    // Let Next's own signals (dynamic usage during prerender, redirects) through.
+    unstable_rethrow(err);
     console.error('Server session check failed:', err);
     return null;
   }

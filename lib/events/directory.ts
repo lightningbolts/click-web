@@ -96,6 +96,32 @@ function dayTitle(ms: number, timeZone: string, nowMs: number): { title: string;
   return { title, subtitle: weekday };
 }
 
+export type DayGroup<T> = { key: string; title: string; subtitle: string | null; events: T[] };
+
+/**
+ * Consecutive items grouped by their start day in `timeZone` ("Today", "Tomorrow", "Oct 9"),
+ * keeping the input order; undated items fall under "Date to be announced".
+ */
+export function groupByDay<T>(
+  items: readonly T[],
+  startIso: (item: T) => string | null | undefined,
+  { timeZone, nowMs }: { timeZone: string; nowMs: number },
+): DayGroup<T>[] {
+  const days: DayGroup<T>[] = [];
+  for (const item of items) {
+    const s = Date.parse(startIso(item) ?? '');
+    const key = Number.isFinite(s) ? dayKey(s, timeZone) : 'tba';
+    let day = days.at(-1);
+    if (!day || day.key !== key) {
+      const label = Number.isFinite(s) ? dayTitle(s, timeZone, nowMs) : { title: 'Date to be announced', subtitle: null };
+      day = { key, ...label, events: [] };
+      days.push(day);
+    }
+    day.events.push(item);
+  }
+  return days;
+}
+
 /**
  * The `/events` directory (spec §7.6.1): filter, sort, at most one featured event, then a
  * day-grouped timeline (ascending for Upcoming, descending for Past), paged 30 at a time.
@@ -135,22 +161,12 @@ export function buildEventDirectory(
   const limit = query.page * DIRECTORY_PAGE_SIZE;
   const page = rest.slice(0, limit);
 
-  const days: DirectoryDay[] = [];
-  if (query.sort !== 'date') {
-    if (page.length) days.push({ key: 'all', title: '', subtitle: null, events: page });
-  } else {
-    for (const e of page) {
-      const s = startMs(e);
-      const key = Number.isFinite(s) ? dayKey(s, timeZone) : 'tba';
-      let day = days.at(-1);
-      if (!day || day.key !== key) {
-        const label = Number.isFinite(s) ? dayTitle(s, timeZone, nowMs) : { title: 'Date to be announced', subtitle: null };
-        day = { key, ...label, events: [] };
-        days.push(day);
-      }
-      day.events.push(e);
-    }
-  }
+  const days: DirectoryDay[] =
+    query.sort !== 'date'
+      ? page.length
+        ? [{ key: 'all', title: '', subtitle: null, events: page }]
+        : []
+      : groupByDay(page, (e) => e.event_start_at, { timeZone, nowMs });
 
   return {
     featured,
