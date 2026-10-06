@@ -140,7 +140,8 @@ describe('/api/chat/devices', () => {
     }));
     // Registering again only marks an active row seen; it never touches revoked_at.
     const activeOnly = jest.fn().mockResolvedValue({ error: null });
-    const filters = { eq: jest.fn(() => filters), is: activeOnly };
+    type Filters = { eq: jest.Mock; is: jest.Mock };
+    const filters: Filters = { eq: jest.fn((): Filters => filters), is: activeOnly };
     const update = jest.fn(() => filters);
     const upsert = jest.fn();
     mockCreateAdmin.mockReturnValue({ from: jest.fn(() => ({ insert, update, upsert })) });

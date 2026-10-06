@@ -9,7 +9,7 @@ import { toast } from '@/components/ds/Toast';
 import { authedJson } from '@/lib/api/authedJson';
 import { cn } from '@/lib/cn';
 import type { WorkspacePlace } from './PlaceWorkspaceContext';
-import { placeBase } from './WorkspaceHeader';
+import { placeBase } from '@/lib/places/workspace';
 
 export type ChecklistStep = {
   id: 'photo' | 'hours' | 'description' | 'verification' | 'live' | 'qr' | 'event';

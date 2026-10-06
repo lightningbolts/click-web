@@ -44,3 +44,17 @@ export function safeWorkspaceSuffix(to: string | null | undefined): string {
     INSIGHTS_SECTIONS.some((s) => clean === `insights/${s}`);
   return ok ? `/${clean}` : '';
 }
+
+/** A Place workspace's base path; tabs append to it. Shared by server pages and client tabs. */
+export function placeBase(id: string): string {
+  return `/business/places/${id}`;
+}
+
+/** What paid Insights adds (the explainer and Billing list the same things). */
+export const INSIGHTS_FEATURES = [
+  '90-day and full stats',
+  'Event engagement',
+  'Network health',
+  'Vibe Radar',
+  'Crowd composition',
+] as const;
