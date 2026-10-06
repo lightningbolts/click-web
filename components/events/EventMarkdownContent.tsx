@@ -34,7 +34,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       nodes.push(
         <code
           key={key}
-          className="rounded bg-surface-container-high px-1.5 py-0.5 font-mono text-[0.9em] text-on-surface"
+          className="rounded-sm bg-surface-raised px-1.5 py-0.5 font-mono text-[0.9em] text-fg"
         >
           {token.slice(1, -1)}
         </code>,
@@ -47,7 +47,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
           <a
             key={key}
             href={href}
-            className="font-semibold text-primary underline-offset-2 hover:underline"
+            className="font-semibold text-accent underline-offset-2 hover:underline"
             {...(href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}
           >
             {link?.[1]}
@@ -76,6 +76,25 @@ function renderLines(lines: string[], keyPrefix: string): ReactNode[] {
   });
 }
 
+function lineKind(line: string): "ul" | "ol" | "text" {
+  if (/^\s*[-+*]\s+/.test(line)) return "ul";
+  if (/^\s*\d+\.\s+/.test(line)) return "ol";
+  return "text";
+}
+
+/** "**What to bring**" followed directly by bullets: split a block where lists start or stop. */
+function splitListRuns(block: string): string[] {
+  const runs: string[][] = [];
+  let prev: string | null = null;
+  for (const line of block.split("\n")) {
+    const kind = lineKind(line);
+    if (kind !== prev) runs.push([]);
+    runs[runs.length - 1].push(line);
+    prev = kind;
+  }
+  return runs.map((run) => run.join("\n"));
+}
+
 export default function EventMarkdownContent({
   children,
   className,
@@ -83,12 +102,12 @@ export default function EventMarkdownContent({
   const source = children.trim();
   if (!source) return null;
 
-  const blocks = source.split(/\n{2,}/);
+  const blocks = source.split(/\n{2,}/).flatMap(splitListRuns);
 
   return (
     <div
       className={cn(
-        "max-w-prose space-y-3 text-base leading-relaxed text-on-surface-variant",
+        "type-reading max-w-[68ch] space-y-3 text-fg",
         className,
       )}
       data-testid="event-description"
@@ -131,7 +150,7 @@ export default function EventMarkdownContent({
           return (
             <blockquote
               key={key}
-              className="border-l-2 border-border-hard pl-4 text-on-surface-variant"
+              className="border-l-2 border-hairline pl-4 text-fg-secondary"
             >
               {renderLines(
                 lines.map((line) => line.replace(/^\s*>\s?/, "")),
@@ -147,13 +166,13 @@ export default function EventMarkdownContent({
           const body = renderInline(heading[2], `${key}-heading`);
           const headingNode =
             level === 1 ? (
-              <h2 className="font-display text-2xl font-semibold leading-tight text-on-surface">
+              <h2 className="type-title-3 text-fg">
                 {body}
               </h2>
             ) : level === 2 ? (
-              <h3 className="text-lg font-bold leading-snug text-on-surface">{body}</h3>
+              <h3 className="type-headline text-fg">{body}</h3>
             ) : (
-              <h4 className="text-base font-bold leading-snug text-on-surface">{body}</h4>
+              <h4 className="type-body-strong text-fg">{body}</h4>
             );
           const remainder = lines.slice(1);
           return (

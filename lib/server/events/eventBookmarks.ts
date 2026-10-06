@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadUserDisplayNames, parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
-import { parseEventCategoryTags } from "@/lib/events/connectionEventRecommendation";
+import { parseEventCategoryTags } from "@/lib/events/eventCategoryTags";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);

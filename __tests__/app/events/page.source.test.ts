@@ -20,6 +20,6 @@ describe("/events directory (spec §7.6.1)", () => {
   it("drops the cached lists whenever an event is created, edited or deleted", () => {
     expect(read("app/api/beacons/route.ts")).toContain('if (beacon_type === "event") revalidatePublicEvents()');
     const item = read("app/api/beacons/[beaconId]/route.ts");
-    expect(item.match(/revalidatePublicEvents\(\)/g)?.length).toBe(2);
+    expect(item.match(/revalidatePublicEvents\(beaconId\)/g)?.length).toBe(2);
   });
 });

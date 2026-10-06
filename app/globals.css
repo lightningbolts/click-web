@@ -1027,3 +1027,20 @@ a {
     animation: mkt-map-settle 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }
+
+/* Event page tint (spec §7.6.2): one static radial glow from the cover's first stop
+   (`--tint`) behind the top 640 px, 14% light / 20% dark, fading to the page. */
+@utility event-tint {
+  background: radial-gradient(
+    110% 100% at 50% 0%,
+    color-mix(in srgb, var(--tint) 14%, transparent) 0%,
+    transparent 72%
+  );
+  &:where(.dark, .dark *) {
+    background: radial-gradient(
+      110% 100% at 50% 0%,
+      color-mix(in srgb, var(--tint) 20%, transparent) 0%,
+      transparent 72%
+    );
+  }
+}

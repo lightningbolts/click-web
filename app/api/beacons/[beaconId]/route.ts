@@ -348,7 +348,7 @@ export async function PATCH(
         lng: beacon.lng,
         metadata: beacon.metadata,
       });
-      revalidatePublicEvents();
+      revalidatePublicEvents(beaconId);
     }
 
     return NextResponse.json({ beacon });
@@ -394,7 +394,7 @@ export async function DELETE(
       return NextResponse.json({ error: deleteError.message }, { status: 400 });
     }
 
-    revalidatePublicEvents();
+    revalidatePublicEvents(beaconId);
     return NextResponse.json({ ok: true, id: beaconId });
   } catch (e) {
     console.error("DELETE /api/beacons/[beaconId]:", e);

@@ -66,7 +66,7 @@ export default async function PublicEventsPage({
           <p className="type-body mt-1 text-fg-secondary">Gatherings you can open without an account.</p>
         </div>
         {user ? (
-          <Button href="/events/new" icon={Plus}>
+          <Button variant="primary" href="/events/new" icon={Plus}>
             Create event
           </Button>
         ) : (
@@ -108,7 +108,7 @@ export default async function PublicEventsPage({
             title="No upcoming events yet"
             body="Public events show up here for anyone with the link."
             action={
-              <Button href={user ? "/events/new" : "/login?next=%2Fevents%2Fnew"} icon={Plus}>
+              <Button variant="primary" href={user ? "/events/new" : "/login?next=%2Fevents%2Fnew"} icon={Plus}>
                 Create the first one
               </Button>
             }
