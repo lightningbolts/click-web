@@ -188,3 +188,8 @@ export const alertConfirmBodySchema = z.object({
 export const beaconReportBodySchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
+
+/** Host scan of a Click Pass: the QR's text as read (full URL or bare token). */
+export const passScanBodySchema = z.object({
+  credential: z.string().trim().min(1).max(512),
+});

@@ -30,7 +30,7 @@ describe('event payload place (§5.11.1)', () => {
       { id: 'e3', venue_id: null },
     ]);
     expect(items.map((i) => i.place)).toEqual([
-      { id: IDS.cafe, slug: 'cafe-allegro-seattle', name: 'Café Allegro', category: 'cafe' },
+      { id: IDS.cafe, slug: 'cafe-allegro-seattle', name: 'Café Allegro', category: 'cafe', photo_url: null, city: 'Seattle' },
       null,
       null,
     ]);
@@ -52,6 +52,8 @@ describe('event payload place (§5.11.1)', () => {
       slug: 'cafe-allegro-seattle',
       name: 'Café Allegro',
       category: 'cafe',
+      photo_url: null,
+      city: 'Seattle',
     });
     expect((await loadPublicEventPayload(asClient(db), 'ev-2'))?.place).toBeNull();
   });

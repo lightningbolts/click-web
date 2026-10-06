@@ -1,3 +1,5 @@
+import { eventDropSchedule } from '@/lib/events/eventDropSchedule';
+
 /**
  * Event-hub membership policy.
  *
@@ -11,11 +13,20 @@ export const EVENT_HUB_ACCESS = {
   requireRsvp: true,
 } as const;
 
-/** Hub stays open this long after the event's scheduled end. */
-export const EVENT_HUB_TTL_AFTER_END_MS = 24 * 60 * 60 * 1000;
+/**
+ * Event chat lifetime: open from the moment the event is created, through the event and the
+ * next-morning Click Drops reveal, then archived a day after that reveal — long enough to swap
+ * photos and plan the after-hang. Until then its messages are kept (the rolling 24-hour purge
+ * covers community hubs only); once archived the chat closes and its history is cleared.
+ */
+export const EVENT_HUB_ARCHIVE_AFTER_REVEAL_MS = 24 * 60 * 60 * 1000;
 
-export function eventHubExpiresAtIso(eventEndEpochMs: number): string {
-  return new Date(eventEndEpochMs + EVENT_HUB_TTL_AFTER_END_MS).toISOString();
+export function eventHubExpiresAtIso(
+  schedule: { startEpochMs: number; endEpochMs: number },
+  timeZone: string | null | undefined,
+): string {
+  const { revealAtMs } = eventDropSchedule({ startMs: schedule.startEpochMs, endMs: schedule.endEpochMs, timeZone });
+  return new Date(revealAtMs + EVENT_HUB_ARCHIVE_AFTER_REVEAL_MS).toISOString();
 }
 
 export type EventHubAccessPolicy = {

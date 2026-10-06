@@ -179,3 +179,12 @@ export const encounterAltitudeBodySchema = z.object({
   barometric_accuracy_m: z.number().finite().nullish(),
   barometric_precision_m: z.number().finite().nullish(),
 });
+
+export const encounterLocationBodySchema = z.object({
+  connection_ids: z.array(z.string().uuid()).min(1).max(20),
+  connection_moment: z.string().min(1).max(64),
+  observed_at: z.string().min(1).max(64),
+  gps_lat: z.number().finite(),
+  gps_lon: z.number().finite(),
+  gps_horizontal_accuracy_m: z.number().finite(),
+});

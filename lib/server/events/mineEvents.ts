@@ -40,7 +40,13 @@ export async function loadMineEvents(admin: SupabaseClient, userId: string): Pro
       .eq("beacon_type", "event")
       .order("created_at", { ascending: false })
       .limit(50),
-    admin.from("beacon_attendees").select("beacon_id").eq("user_id", userId).limit(50),
+    admin
+      .from("beacon_attendees")
+      .select("beacon_id")
+      .eq("user_id", userId)
+      // Newest RSVPs first, so the cap never drops the events coming up (the iOS Live Activity reads these).
+      .order("signed_up_at", { ascending: false })
+      .limit(50),
   ]);
 
   if (createdErr) throw new Error(`mine events: ${createdErr.message}`);

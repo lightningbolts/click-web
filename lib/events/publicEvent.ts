@@ -3,6 +3,7 @@ import { loadPlaceRefs, type PlaceRef } from "@/lib/server/places/placeRefs";
 import { parseEventCategoryTags } from "@/lib/events/eventCategoryTags";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
 import {
+  eventAddressFromMetadata,
   eventDescriptionFromMetadata,
   eventEndAtFromMetadata,
   eventImageFromMetadata,
@@ -43,6 +44,8 @@ export type PublicEventPayload = {
   latitude: number | null;
   longitude: number | null;
   location_name: string | null;
+  /** Street address, when the host set one (the Click Pass and directions use it). */
+  address: string | null;
   rsvp_count: number;
   rsvp_enabled: boolean;
   expires_at: string | null;
@@ -294,6 +297,7 @@ export async function loadPublicEventPayload(
     latitude: Number.isFinite(coords.lat) ? coords.lat : null,
     longitude: Number.isFinite(coords.lng) ? coords.lng : null,
     location_name: eventLocationNameFromMetadata(meta),
+    address: eventAddressFromMetadata(meta),
     rsvp_count: rsvpCount,
     rsvp_enabled: rsvpEnabledFromMetadata(meta),
     expires_at: typeof data.expires_at === "string" ? data.expires_at : null,
