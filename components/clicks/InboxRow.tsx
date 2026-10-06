@@ -117,7 +117,7 @@ export const InboxRow = memo(function InboxRow({
         data-testid={`conversation-row-${conn.id}`}
         aria-current={state.selected ? 'page' : undefined}
         className={cn(
-          'group flex h-[72px] items-center gap-3 rounded-md px-3 pr-10 transition-colors duration-[var(--d-fast)]',
+          'group flex h-[72px] items-center gap-3 rounded-md px-3 max-md:pr-10 transition-colors duration-[var(--d-fast)]',
           state.selected ? 'bg-selection' : 'hover:bg-hover',
         )}
       >
@@ -135,6 +135,8 @@ export const InboxRow = memo(function InboxRow({
               <span
                 className={cn(
                   'type-meta tabular ml-auto shrink-0 pl-2',
+                  // On desktop the row's menu takes the timestamp's place while it's in use.
+                  'md:[li:hover_&]:invisible md:[li:focus-within_&]:invisible md:[li:has([data-state=open])_&]:invisible',
                   unread > 0 ? 'font-semibold text-accent' : 'text-fg-tertiary',
                 )}
               >
@@ -167,6 +169,8 @@ export const InboxRow = memo(function InboxRow({
           aria-label={`Actions for ${conn.name}`}
           className={cn(
             'press absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-fg-secondary hover:bg-fill-subtle hover:text-fg',
+            // Desktop: over the timestamp, on the name line.
+            'md:right-3.5 md:top-2 md:translate-y-0',
             'md:opacity-0 md:focus-visible:opacity-100 md:[li:hover_&]:opacity-100 md:data-[state=open]:opacity-100',
           )}
         >
