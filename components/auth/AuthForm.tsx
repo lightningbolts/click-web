@@ -185,7 +185,7 @@ export function AuthForm({ mode, next: rawNext }: { mode: AuthMode; next?: strin
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate={false}>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate={false} data-testid="auth-form">
         {signup ? (
           <>
             <div className="grid grid-cols-2 gap-3">
@@ -211,6 +211,7 @@ export function AuthForm({ mode, next: rawNext }: { mode: AuthMode; next?: strin
           autoComplete="email"
           inputMode="email"
           required
+          data-testid="login-email"
         />
         <TextField
           label="Password"
@@ -220,6 +221,7 @@ export function AuthForm({ mode, next: rawNext }: { mode: AuthMode; next?: strin
           autoComplete={signup ? 'new-password' : 'current-password'}
           minLength={signup ? 8 : undefined}
           required
+          data-testid="login-password"
           trailing={
             <IconButton
               icon={showPassword ? EyeOff : Eye}
@@ -242,7 +244,7 @@ export function AuthForm({ mode, next: rawNext }: { mode: AuthMode; next?: strin
           </InlineNotice>
         ) : null}
 
-        <Button type="submit" size="lg" fullWidth loading={busy === 'email'} disabled={busy !== null}>
+        <Button type="submit" size="lg" fullWidth loading={busy === 'email'} disabled={busy !== null} data-testid="login-submit">
           {signup ? 'Create account' : 'Log in'}
         </Button>
       </form>

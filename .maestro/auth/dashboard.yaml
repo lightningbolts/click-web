@@ -1,30 +1,40 @@
 url: http://localhost:3000
-name: Authenticated dashboard chrome
+name: Signed-in app chrome
 tags:
   - auth
   - web
 env:
   BASE_URL: http://localhost:3000
 ---
+# The signed-in app is real routes behind one top bar (spec §6): Home, Clicks, Map, Settings.
 - runFlow:
     file: ../subflows/open_origin.yaml
 - runFlow:
     file: ../subflows/login.yaml
 - extendedWaitUntil:
     visible:
-      css: "[data-testid='dashboard-root']"
+      css: "[data-testid='home-root']"
     timeout: 30000
 - assertVisible:
-    css: "[data-testid='dashboard-chrome']"
+    css: "[data-testid='nav-clicks']"
 - tapOn:
-    css: "[data-testid='dashboard-tab-map']"
-- assertNotVisible: "Loading your connections"
+    css: "[data-testid='nav-clicks']"
+- extendedWaitUntil:
+    visible:
+      css: "[data-testid='clicks-workspace']"
+    timeout: 15000
 - tapOn:
-    css: "[data-testid='dashboard-tab-chat']"
-- assertNotVisible: "Loading your connections"
+    css: "[data-testid='nav-map']"
+- extendedWaitUntil:
+    visible:
+      css: "[data-testid='map-screen']"
+    timeout: 15000
+- launchApp:
+    appId: ${BASE_URL}/settings
+- assertVisible: "Settings"
 - tapOn:
-    css: "[data-testid='dashboard-tab-settings']"
-- assertNotVisible: "Loading your connections"
-- tapOn:
-    css: "[data-testid='dashboard-tab-memory']"
-- assertNotVisible: "Loading your connections"
+    css: "[data-testid='nav-home']"
+- extendedWaitUntil:
+    visible:
+      css: "[data-testid='home-root']"
+    timeout: 15000

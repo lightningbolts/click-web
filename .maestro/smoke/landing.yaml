@@ -22,6 +22,9 @@ env:
     id: waitlist-cta
 - runFlow:
     file: ../subflows/open_login.yaml
-- tapOn:
-    css: "[data-testid='login-modal-close']"
-- assertVisible: "Stop scrolling. Start living."
+# Back to the landing page from the login page.
+- runFlow:
+    file: ../subflows/open_origin.yaml
+- extendedWaitUntil:
+    visible: "Stop scrolling. Start living."
+    timeout: 15000

@@ -2,8 +2,11 @@ url: http://localhost:3000
 tags:
   - subflow
 ---
+# Log in is a page now (/login?next=…), not a modal (spec §7.11).
 - tapOn:
     css: "[data-testid='nav-login']"
-- assertVisible:
-    css: "[data-testid='login-modal']"
-- assertVisible: "Welcome Back"
+- extendedWaitUntil:
+    visible:
+      css: "[data-testid='auth-form']"
+    timeout: 15000
+- assertVisible: "Welcome back"

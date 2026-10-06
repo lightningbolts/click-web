@@ -62,7 +62,9 @@ export default async function PublicEventsPage({
     <div className="container-content pb-24 pt-8 md:pt-12">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="type-title-1 text-fg">Events</h1>
+          <h1 className="type-title-1 text-fg" data-testid="events-heading">
+            Events
+          </h1>
           <p className="type-body mt-1 text-fg-secondary">Gatherings you can open without an account.</p>
         </div>
         {user ? (
