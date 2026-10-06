@@ -1,11 +1,12 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseEventScheduleFromMetadata } from '@/lib/map/eventSchedule';
+import { eventTimezoneFromMetadata } from '@/lib/events/eventMetadata';
 import { resolveCheckInRadiusMeters } from '@/lib/server/eventEngagement';
 import { eventHubExpiresAtIso } from '@/lib/server/eventHubAccess';
 import { resolveBeaconHubId } from '@/lib/map/mapBeacons';
 
-export { EVENT_HUB_TTL_AFTER_END_MS, eventHubExpiresAtIso } from '@/lib/server/eventHubAccess';
+export { EVENT_HUB_ARCHIVE_AFTER_REVEAL_MS, eventHubExpiresAtIso } from '@/lib/server/eventHubAccess';
 
 export function newEventHubId(): string {
   return `hub_${randomUUID().replace(/-/g, '')}`;
@@ -61,7 +62,7 @@ export async function createHubForEventBeacon(
   const hubId = newEventHubId();
   const name = eventTitleFromMetadata(args.metadata);
   const { radiusMeters } = resolveCheckInRadiusMeters(args.metadata);
-  const expiresAt = eventHubExpiresAtIso(schedule.endEpochMs);
+  const expiresAt = eventHubExpiresAtIso(schedule, eventTimezoneFromMetadata(args.metadata));
 
   const { error: hubErr } = await admin.from('hub_venues').insert({
     id: hubId,
@@ -121,7 +122,7 @@ export async function syncEventHubFromBeacon(
     radius_meters: Math.round(radiusMeters),
   };
   if (schedule != null) {
-    patch.expires_at = eventHubExpiresAtIso(schedule.endEpochMs);
+    patch.expires_at = eventHubExpiresAtIso(schedule, eventTimezoneFromMetadata(args.metadata));
   }
   const { error } = await admin.from('hub_venues').update(patch).eq('id', hub.id);
   if (error) {

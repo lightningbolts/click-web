@@ -1,6 +1,6 @@
 import {
   EVENT_HUB_ACCESS,
-  EVENT_HUB_TTL_AFTER_END_MS,
+  EVENT_HUB_ARCHIVE_AFTER_REVEAL_MS,
   evaluateEventHubAccess,
   eventHubExpiresAtIso,
 } from '@/lib/server/eventHubAccess';
@@ -77,10 +77,20 @@ describe('evaluateEventHubAccess', () => {
 });
 
 describe('eventHubExpiresAtIso', () => {
-  it('is 24 hours after event end', () => {
-    const end = Date.parse('2026-08-30T20:00:00.000Z');
-    expect(eventHubExpiresAtIso(end)).toBe(
-      new Date(end + EVENT_HUB_TTL_AFTER_END_MS).toISOString(),
-    );
+  it('archives a day after the Click Drops reveal (10:00 local the morning after)', () => {
+    // 7–10 PM in Seattle on Aug 30 → reveal Aug 31 10:00 PDT → archive Sep 1 10:00 PDT.
+    const schedule = {
+      startEpochMs: Date.parse('2026-08-31T02:00:00.000Z'),
+      endEpochMs: Date.parse('2026-08-31T05:00:00.000Z'),
+    };
+    expect(eventHubExpiresAtIso(schedule, 'America/Los_Angeles')).toBe('2026-09-01T17:00:00.000Z');
+    expect(Date.parse(eventHubExpiresAtIso(schedule, 'America/Los_Angeles')) - Date.parse('2026-08-31T17:00:00.000Z'))
+      .toBe(EVENT_HUB_ARCHIVE_AFTER_REVEAL_MS);
+  });
+
+  it('falls back to UTC for a missing or unknown zone', () => {
+    const schedule = { startEpochMs: Date.parse('2026-08-30T18:00:00.000Z'), endEpochMs: Date.parse('2026-08-30T20:00:00.000Z') };
+    expect(eventHubExpiresAtIso(schedule, null)).toBe('2026-09-01T10:00:00.000Z');
+    expect(eventHubExpiresAtIso(schedule, 'Not/AZone')).toBe('2026-09-01T10:00:00.000Z');
   });
 });

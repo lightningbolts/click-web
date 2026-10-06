@@ -124,7 +124,8 @@ export type PlaceDetail = PlaceSummary & {
   today_hours_label: string | null;
   directions: { apple_maps_url: string; google_maps_url: string };
   pattern: PulsePattern | null;
-  upcoming_events: (PlaceEventRef & { cover_theme_id: string | null })[];
+  /** `image_url`: the event's own picture, so the Place page can show it (else its cover). */
+  upcoming_events: (PlaceEventRef & { cover_theme_id: string | null; image_url: string | null })[];
   here_now_connections: PlacePerson[];
   clicks_been_here: { count: number; names: string[] } | null;
   you_met_here: { total: number; people: (PlacePerson & { last_met_at: string })[] } | null;

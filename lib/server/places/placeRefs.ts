@@ -1,11 +1,20 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PlaceCategory } from '@/lib/places/types';
+import { placePhotoUrl } from '@/lib/server/places/serialize';
 
 /**
  * The Place an event or encounter belongs to, as other payloads carry it (§5.11). Only listed,
  * verified Places are ever surfaced; anything else is `null`, so older clients see nothing new.
  */
-export type PlaceRef = { id: string; slug: string; name: string; category: PlaceCategory };
+export type PlaceRef = {
+  id: string;
+  slug: string;
+  name: string;
+  category: PlaceCategory;
+  /** The Place's photo, so an event it hosts can wear its face as the host. */
+  photo_url: string | null;
+  city: string | null;
+};
 
 export async function loadPlaceRefs(
   admin: SupabaseClient,
@@ -16,7 +25,7 @@ export async function loadPlaceRefs(
   if (unique.length === 0) return out;
   const { data, error } = await admin
     .from('places')
-    .select('id, slug, name, category, listed, verification_status')
+    .select('id, slug, name, category, photo_path, city, listed, verification_status')
     .in('id', unique)
     .eq('listed', true)
     .eq('verification_status', 'verified');
@@ -24,8 +33,17 @@ export async function loadPlaceRefs(
     console.warn('[places] loadPlaceRefs:', error.message);
     return out;
   }
-  for (const row of (data ?? []) as Array<{ id: string; slug: string | null; name: string; category: PlaceCategory | null }>) {
-    if (row.slug && row.category) out.set(row.id, { id: row.id, slug: row.slug, name: row.name, category: row.category });
+  type Row = { id: string; slug: string | null; name: string; category: PlaceCategory | null; photo_path: string | null; city: string | null };
+  for (const row of (data ?? []) as Row[]) {
+    if (!row.slug || !row.category) continue;
+    out.set(row.id, {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      category: row.category,
+      photo_url: placePhotoUrl(row.photo_path),
+      city: row.city?.trim() || null,
+    });
   }
   return out;
 }
