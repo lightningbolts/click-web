@@ -3,7 +3,7 @@
 **Visual system:** Neo-brutalist Functional Clarity — opaque surfaces, 1px outline-variant borders, interactive accent `#7c3aed`, no glass/blur/gradients on chrome.
 **Mobile source of truth:** [`click/docs/design-assets/functional_clarity/DESIGN.md`](../../../click/docs/design-assets/functional_clarity/DESIGN.md), [`Color.kt`](../../../click/composeApp/src/commonMain/kotlin/compose/project/click/click/ui/theme/Color.kt)  
 **Web tokens:** [`app/globals.css`](../../app/globals.css) — use `@theme` (not `@theme inline`) so light/dark can override `--color-*` at runtime.  
-**Primitives:** [`components/fc/`](../../components/fc/)  
+**Primitives:** [`components/ds/`](../../components/ds/)  
 **Theme:** [`lib/theme/ThemeProvider.tsx`](../../lib/theme/ThemeProvider.tsx)  
 **Surfaces:** [02 landing](./02-landing.md) · [03 dashboard](./03-dashboard.md) · [04 insights](./04-insights.md) · [05 events](./05-events.md)
 
@@ -75,13 +75,13 @@ Manrope only. Scale: display 48 / headline 32 / headline-md 24 / body-lg 18 / bo
 | `FcPageShell` | Flat background page wrapper |
 | `FcSectionHeader` | Oversized headline + muted support line |
 | Call overlay | Full-screen Grid / Speaker (`components/chat/CallOverlay.tsx`) — `bg-[#101212]`, `border border-border-hard`, primary active border; layout policy in `lib/calls/callLayoutPolicy.ts` |
-| `ProductAppShell` | Insights chrome: identity row + wrapping tool nav in [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts), plus animated mobile drawer. Personal dashboard uses the same [`Navbar`](../../components/Navbar.tsx) as marketing. |
+| `ProductAppShell` | Insights chrome: identity row + wrapping tool nav in [`PAGE_COLUMN_CLASS`](../../app/globals.css), plus animated mobile drawer. Personal dashboard uses the same [`Navbar`](../../components/app-shell/TopBar.tsx) as marketing. |
 
 ---
 
 ## Product vs marketing chrome
 
-One horizontal [`Navbar`](../../components/Navbar.tsx) for logged-in and logged-out visitors (`data-navbar-root="true"`). Logged-out: Events, How it works, Enterprise, About, Login. Signed-in: Memory Box, Events (`/events`), Map, Chat, QR Identity, Settings, plus Create event and an account menu. Insights (`/insights/*`) keeps [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) as its own top bar so venue tools stay scoped; marketing Navbar is hidden there only. Every nav bar and page body uses the same [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts) (`max-w-6xl` + `px-4 md:px-10`). Do not pad the bar and then pad the column again.
+One horizontal [`Navbar`](../../components/app-shell/TopBar.tsx) for logged-in and logged-out visitors (`data-navbar-root="true"`). Logged-out: Events, How it works, Enterprise, About, Login. Signed-in: Memory Box, Events (`/events`), Map, Chat, QR Identity, Settings, plus Create event and an account menu. Insights (`/insights/*`) keeps [`ProductAppShell`](../../components/app-shell/AppShell.tsx) as its own top bar so venue tools stay scoped; marketing Navbar is hidden there only. Every nav bar and page body uses the same [`PAGE_COLUMN_CLASS`](../../app/globals.css) (`max-w-6xl` + `px-4 md:px-10`). Do not pad the bar and then pad the column again.
 
 ---
 

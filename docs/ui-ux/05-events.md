@@ -6,7 +6,7 @@ Pending for the web redesign (backend shipped, iOS shipped): Click Pass, Add to 
 
 ## Create (auth)
 
-Shared form: [`components/events/EventCreateForm.tsx`](../../components/events/EventCreateForm.tsx) → `POST /api/beacons` with `kind: "event"`. Cover upload uses `POST /api/beacons/image`. Location is a place search (plus an icon-button “Use my location” that reverse-geocodes a label), not raw latitude/longitude fields. Lat/lng are still submitted with the beacon. Create also writes listing columns (`event_visibility`, `event_capacity`, `approval_required`, `guest_list_visibility`, `cover_theme_id`) and dual-writes `starts_at` / `ends_at` / `event_timezone` beside metadata.
+Shared form: [`components/events/EventForm.tsx`](../../components/events/EventForm.tsx) → `POST /api/beacons` with `kind: "event"`. Cover upload uses `POST /api/beacons/image`. Location is a place search (plus an icon-button “Use my location” that reverse-geocodes a label), not raw latitude/longitude fields. Lat/lng are still submitted with the beacon. Create also writes listing columns (`event_visibility`, `event_capacity`, `approval_required`, `guest_list_visibility`, `cover_theme_id`) and dual-writes `starts_at` / `ends_at` / `event_timezone` beside metadata.
 
 | Surface | Route |
 |---------|--------|

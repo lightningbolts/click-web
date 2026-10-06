@@ -1,21 +1,21 @@
 # Personal dashboard — Functional Clarity (Web)
 
 **Mount:** `/` when authenticated (`DashboardView`). `/dashboard` redirects.  
-**File:** [`components/DashboardView.tsx`](../../components/DashboardView.tsx)  
+**File:** [`components/home/HomeView.tsx`](../../components/home/HomeView.tsx)  
 **Modules:** [`components/dashboard/`](../../components/dashboard/)
 
 ---
 
 ## Shell
 
-- Shared horizontal [`Navbar`](../../components/Navbar.tsx): same top bar as marketing. Signed-in items come from `personalProductNavItems()` (`data-testid="dashboard-tab-{id}"`). Tab state is URL-synced via `/?tab=` except Events, which lives at `/events` (`parseDashboardTab` / `dashboardTabHref` in [`lib/shell/personalProductNav.ts`](../../lib/shell/personalProductNav.ts)). Missing or unknown `tab` defaults to Memory Box. `/?tab=events` redirects to `/events`.
-- Page column: [`PAGE_COLUMN_CLASS`](../../lib/shell/pageColumn.ts) (`max-w-6xl` + `px-4 md:px-10`) for Memory Box, settings, identity, chat, and map. Navbar uses the same inner wrapper with no extra bar padding so card edges line up with the logo and account row. Chat is one bordered `rounded-[16px]` panel (`CHAT_PANEL_CLASS`) inside that column.
-- Mobile: [`MobileNavDrawer`](../../components/shell/MobileNavDrawer.tsx) stays mounted so open/close can animate (overlay fade + panel slide). `prefers-reduced-motion` uses `motion-reduce:transition-none`.
-- Events: [`DashboardEventsModule`](../../components/dashboard/DashboardEventsModule.tsx) on `/events` (hosted + attending) above the public Discover list. Hosted cards put **Edit details** / **Host settings** as top-right icon buttons, not a footer strip.
+- Shared horizontal [`Navbar`](../../components/app-shell/TopBar.tsx): same top bar as marketing. Signed-in items come from `personalProductNavItems()` (`data-testid="dashboard-tab-{id}"`). Tab state is URL-synced via `/?tab=` except Events, which lives at `/events` (`parseDashboardTab` / `dashboardTabHref` in [`lib/shell/appNav.ts`](../../lib/shell/appNav.ts)). Missing or unknown `tab` defaults to Memory Box. `/?tab=events` redirects to `/events`.
+- Page column: [`PAGE_COLUMN_CLASS`](../../app/globals.css) (`max-w-6xl` + `px-4 md:px-10`) for Memory Box, settings, identity, chat, and map. Navbar uses the same inner wrapper with no extra bar padding so card edges line up with the logo and account row. Chat is one bordered `rounded-[16px]` panel (`CHAT_PANEL_CLASS`) inside that column.
+- Mobile: [`MobileNavDrawer`](../../components/app-shell/MobileTabBar.tsx) stays mounted so open/close can animate (overlay fade + panel slide). `prefers-reduced-motion` uses `motion-reduce:transition-none`.
+- Events: [`DashboardEventsModule`](../../components/events/YourEventsStrip.tsx) on `/events` (hosted + attending) above the public Discover list. Hosted cards put **Edit details** / **Host settings** as top-right icon buttons, not a footer strip.
 - Sign out is a button in the Navbar account menu. It clears the session, `router.replace('/')`, and `router.refresh()`. The dashboard unmounts as soon as `useAuth().user` is null.
-- Login lands on `/` (legacy `/dashboard` redirects there). [`HomeAuthenticated`](../../components/HomeAuthenticated.tsx) holds **one** `LoadingScreen` until connections and the birthday gate resolve, so the logo does not remount/flash. TOKEN_REFRESHED does not re-set auth user. Anonymous `/` still SSR-renders marketing HTML.
+- Login lands on `/` (legacy `/dashboard` redirects there). [`HomeAuthenticated`](../../components/home/HomeView.tsx) holds **one** `LoadingScreen` until connections and the birthday gate resolve, so the logo does not remount/flash. TOKEN_REFRESHED does not re-set auth user. Anonymous `/` still SSR-renders marketing HTML.
 - Footer stays hidden while signed in (`ProductChromeOn` + `user`).
-- Insights is the only remaining [`ProductAppShell`](../../components/shell/ProductAppShell.tsx) consumer (horizontal bar, not a desktop sidebar).
+- Insights is the only remaining [`ProductAppShell`](../../components/app-shell/AppShell.tsx) consumer (horizontal bar, not a desktop sidebar).
 
 ### Chat tab — message search
 
