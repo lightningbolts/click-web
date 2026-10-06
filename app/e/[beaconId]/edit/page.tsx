@@ -1,60 +1,64 @@
-import { notFound } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/server/supabaseServer";
-import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { EVENT_BEACON_UUID_RE } from "@/lib/events/eventMetadata";
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { Lock } from "lucide-react";
+import { Button } from "@/components/ds/Button";
+import { EmptyState } from "@/components/ds/EmptyState";
+import EventForm from "@/components/events/EventForm";
 import { loadBeaconManageRow, userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 import { loadEventEditDraft } from "@/lib/events/eventEditDraft";
-import EventCreateForm from "@/components/events/EventCreateForm";
-import EventEditSignIn from "@/components/events/EventEditSignIn";
-import EventPageShell from "@/components/events/EventPageShell";
-import EventBackLink from "@/components/events/EventBackLink";
-import { eventSharePath } from "@/lib/events/eventUrls";
-import { FcSectionHeader } from "@/components/fc";
+import { EVENT_BEACON_UUID_RE } from "@/lib/events/eventMetadata";
+import { eventEditPath, eventSharePath } from "@/lib/events/eventUrls";
+import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { getServerUser } from "@/lib/server/getServerUser";
+import { loginHref } from "@/lib/shell/appNav";
+import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Edit event · Click", robots: { index: false } };
 
-export default async function EventEditPage({
-  params,
-}: {
-  params: Promise<{ beaconId: string }>;
-}) {
+export default async function EventEditPage({ params }: { params: Promise<{ beaconId: string }> }) {
   const { beaconId } = await params;
   if (!EVENT_BEACON_UUID_RE.test(beaconId)) notFound();
 
-  let userId: string | null = null;
-  try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    userId = user?.id ?? null;
-  } catch {
-    userId = null;
-  }
-
-  if (!userId) {
-    return <EventEditSignIn beaconId={beaconId} />;
-  }
+  const user = await getServerUser();
+  if (!user) redirect(loginHref(eventEditPath(beaconId)));
 
   const admin = createAdminSupabaseClient();
   const beacon = await loadBeaconManageRow(admin, beaconId);
   if (beacon == null || beacon.beacon_type !== "event") notFound();
-  if (!(await userMayManageBeacon(admin, userId, beacon))) {
+  // Creator, or an owner / manager of the event's Place. Place viewers can't edit (spec §9.6).
+  if (!(await userMayManageBeacon(admin, user.id, beacon))) {
     return (
-      <EventPageShell className="py-10">
-        <p className="text-error">You need to be the organizer to edit this event.</p>
-      </EventPageShell>
+      <div className="container-content py-16">
+        <EmptyState
+          icon={Lock}
+          title="Only hosts can edit this event"
+          body="Ask the host or a manager of its Place to make changes."
+          action={
+            <Button variant="secondary" href={eventSharePath(beaconId)}>
+              View event
+            </Button>
+          }
+        />
+      </div>
     );
   }
 
-  const draft = await loadEventEditDraft(admin, beaconId);
+  const [draft, jar] = await Promise.all([loadEventEditDraft(admin, beaconId), cookies()]);
   if (draft == null) notFound();
+  // eslint-disable-next-line react-hooks/purity -- server component, rendered per request
+  const nowMs = Date.now();
 
   return (
-    <EventPageShell className="py-10">
-      <EventBackLink href={eventSharePath(beaconId)} />
-      <FcSectionHeader title="Edit event" subtitle="Update the details guests see on the event page." />
-      <EventCreateForm beaconId={beaconId} initial={draft} />
-    </EventPageShell>
+    <div className="container-page pb-16 pt-6 md:pt-10">
+      <h1 className="type-title-1 mb-6 text-fg md:mb-8">Edit event</h1>
+      <EventForm
+        beaconId={beaconId}
+        initial={draft}
+        defaultTimeZone={validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value)}
+        nowMs={nowMs}
+      />
+    </div>
   );
 }

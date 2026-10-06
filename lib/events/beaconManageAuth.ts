@@ -32,6 +32,30 @@ export async function loadBeaconManageRow(
   };
 }
 
+/** Place roles that may write (create, edit, run) the Place's events. Viewers are read-only (spec §9). */
+export const PLACE_WRITE_ROLES = ["owner", "manager"] as const;
+export type PlaceRole = "owner" | "manager" | "viewer";
+
+export async function placeRoleFor(
+  admin: SupabaseClient,
+  userId: string,
+  placeId: string,
+): Promise<PlaceRole | null> {
+  const { data } = await admin
+    .from("place_managers")
+    .select("role")
+    .eq("place_id", placeId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const role = isRecord(data) ? data.role : null;
+  return role === "owner" || role === "manager" || role === "viewer" ? role : null;
+}
+
+export function placeRoleCanWrite(role: PlaceRole | null): boolean {
+  return role === "owner" || role === "manager";
+}
+
+/** Creator, or an owner/manager of the hosting Place. Place viewers can't manage. */
 export async function userMayManageBeacon(
   admin: SupabaseClient,
   userId: string,
@@ -39,11 +63,5 @@ export async function userMayManageBeacon(
 ): Promise<boolean> {
   if (beacon.creator_id === userId) return true;
   if (!beacon.venue_id) return false;
-  const { data } = await admin
-    .from("place_managers")
-    .select("id")
-    .eq("place_id", beacon.venue_id)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return data != null;
+  return placeRoleCanWrite(await placeRoleFor(admin, userId, beacon.venue_id));
 }

@@ -21,23 +21,24 @@ export const EVENT_COVER_THEME_IDS = [
   "theme:magenta",
 ] as const;
 
+/** Matches iOS `CreateBeaconSheet` so both apps offer the same list (spec §7.6.3). */
 export const EVENT_CATEGORY_OPTIONS = [
   "Social",
-  "School Event",
-  "Networking",
-  "Music",
-  "Arts",
-  "Sports",
-  "Food & Drink",
-  "Nightlife",
-  "Outdoors",
-  "Wellness",
   "Tech",
-  "Workshop",
-  "Volunteering",
-  "Community",
-  "Promotional",
+  "Music",
+  "Sports",
+  "Food",
+  "Study",
+  "Arts",
+  "Outdoors",
+  "Networking",
+  "Party",
+  "Wellness",
+  "Gaming",
 ] as const;
+
+/** iOS `BeaconFormRules.maxCategories`. Older events may carry more; they still read back. */
+export const MAX_EVENT_CATEGORIES = 3;
 
 export const DEFAULT_EVENT_LISTING_OPTIONS: EventListingOptions = {
   event_visibility: "public",

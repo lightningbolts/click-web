@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseLatLngFromLocationField } from "@/lib/map/mapBeaconApiShared";
 import {
   DEFAULT_EVENT_LISTING_OPTIONS,
-  EVENT_COVER_THEME_IDS,
   eventCategoriesFromMetadata,
   parseEventListingOptions,
 } from "@/lib/events/eventOptions";
@@ -52,10 +51,8 @@ export async function loadEventEditDraft(
     eventInstantFromRowOrMeta(data.starts_at, eventStartAtFromMetadata(meta)) ?? fallback.startIso;
   const endIso =
     eventInstantFromRowOrMeta(data.ends_at, eventEndAtFromMetadata(meta)) ?? fallback.endIso;
-  const coverThemeId =
-    listing.cover_theme_id && (EVENT_COVER_THEME_IDS as readonly string[]).includes(listing.cover_theme_id)
-      ? listing.cover_theme_id
-      : EVENT_COVER_THEME_IDS[0];
+  // Keep "no theme" as "" so the preview stays seeded by the event id, as published.
+  const coverThemeId = listing.cover_theme_id ?? "";
   const scaleRaw = meta.venue_scale ?? meta.venueScale;
   const venueScale: EventVenueScale = isVenueScale(scaleRaw) ? scaleRaw : DEFAULT_VENUE_SCALE;
 

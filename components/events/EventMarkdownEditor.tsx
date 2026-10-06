@@ -110,20 +110,20 @@ export default function EventMarkdownEditor({
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3">
         <div>
-          <label htmlFor="event-description" className="text-sm font-semibold text-on-surface">
+          <label htmlFor="event-description" className="type-body-strong text-fg">
             Description
           </label>
-          <p className="text-xs text-on-surface-variant">Markdown supported</p>
+          <p className="type-meta text-fg-secondary">Markdown supported</p>
         </div>
-        <div className="flex rounded-[8px] border border-border-hard bg-surface-container-low p-0.5">
+        <div className="flex rounded-sm border border-hairline bg-fill-subtle p-0.5">
           <button
             type="button"
             onClick={() => setMode("write")}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-xs font-semibold transition-colors",
+              "inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 type-meta font-semibold transition-colors",
               mode === "write"
-                ? "bg-surface text-on-surface shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface",
+                ? "bg-surface text-fg shadow-sm"
+                : "text-fg-secondary hover:text-fg",
             )}
             aria-pressed={mode === "write"}
           >
@@ -134,10 +134,10 @@ export default function EventMarkdownEditor({
             type="button"
             onClick={() => setMode("preview")}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-xs font-semibold transition-colors",
+              "inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 type-meta font-semibold transition-colors",
               mode === "preview"
-                ? "bg-surface text-on-surface shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface",
+                ? "bg-surface text-fg shadow-sm"
+                : "text-fg-secondary hover:text-fg",
             )}
             aria-pressed={mode === "preview"}
           >
@@ -147,16 +147,16 @@ export default function EventMarkdownEditor({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[12px] border border-border-hard bg-surface">
+      <div className="overflow-hidden rounded-md border border-hairline bg-surface">
         {mode === "write" ? (
           <>
-            <div className="flex flex-wrap gap-1 border-b border-border-hard bg-surface-container-low px-2 py-1.5">
+            <div className="flex flex-wrap gap-1 border-b border-hairline bg-fill-subtle px-2 py-1.5">
               {toolbar.map(({ label, icon: Icon, onClick }) => (
                 <button
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-on-surface-variant transition-colors hover:bg-surface hover:text-on-surface"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-fg-secondary transition-colors hover:bg-surface-raised hover:text-fg"
                   aria-label={label}
                   title={label}
                 >
@@ -173,7 +173,7 @@ export default function EventMarkdownEditor({
               maxLength={maxLength}
               rows={7}
               placeholder={"What should people know?\n\nUse **bold**, *italic*, lists, headings, links, and quotes."}
-              className="min-h-40 w-full resize-y bg-transparent px-3 py-3 text-sm leading-relaxed text-on-surface outline-none placeholder:text-on-surface-variant"
+              className="min-h-40 w-full resize-y bg-transparent px-3 py-3 type-body text-fg outline-none placeholder:text-fg-secondary"
             />
           </>
         ) : (
@@ -181,11 +181,11 @@ export default function EventMarkdownEditor({
             {value.trim() ? (
               <EventMarkdownContent>{value}</EventMarkdownContent>
             ) : (
-              <p className="text-sm text-on-surface-variant">Nothing to preview yet.</p>
+              <p className="type-body text-fg-secondary">Nothing to preview yet.</p>
             )}
           </div>
         )}
-        <div className="border-t border-border-hard px-3 py-1.5 text-right text-xs text-on-surface-variant">
+        <div className="border-t border-hairline px-3 py-1.5 text-right type-meta text-fg-secondary">
           {value.length}/{maxLength}
         </div>
       </div>

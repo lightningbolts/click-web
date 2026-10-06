@@ -1,3 +1,4 @@
+import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 import {
   enrichSoundtrackMetadata,
   isAllowedMusicShareUrl,
@@ -31,6 +32,7 @@ async function resolveBeaconAndVerifyCreator(
   admin: ReturnType<typeof createAdminSupabaseClient>,
   beaconId: string,
   userId: string,
+  options: { allowPlaceManagers?: boolean } = {},
 ) {
   const { data, error } = await admin
     .from("map_beacons")
@@ -49,7 +51,14 @@ async function resolveBeaconAndVerifyCreator(
   }
 
   const row = data as Record<string, unknown>;
-  if (row.creator_id !== userId) {
+  // Events can also be edited by an owner/manager of the hosting Place (spec §7.6.4).
+  const asPlaceManager =
+    options.allowPlaceManagers &&
+    row.creator_id !== userId &&
+    row.beacon_type === "event" &&
+    typeof row.venue_id === "string" &&
+    (await userMayManageBeacon(admin, userId, { creator_id: String(row.creator_id), venue_id: row.venue_id }));
+  if (row.creator_id !== userId && !asPlaceManager) {
     return {
       row: null,
       errorResponse: NextResponse.json(
@@ -68,7 +77,7 @@ async function resolveBeaconAndVerifyCreator(
     }
   }
 
-  return { row, errorResponse: null };
+  return { row, errorResponse: null, asPlaceManager: Boolean(asPlaceManager) };
 }
 
 async function enrichBeaconRow(
@@ -181,8 +190,9 @@ export async function PATCH(
     const body = parsed.data as Record<string, unknown>;
 
     const admin = createAdminSupabaseClient();
-    const { row, errorResponse } = await resolveBeaconAndVerifyCreator(admin, beaconId, user.id);
-    if (errorResponse != null) return errorResponse;
+    const resolved = await resolveBeaconAndVerifyCreator(admin, beaconId, user.id, { allowPlaceManagers: true });
+    if (resolved.errorResponse != null) return resolved.errorResponse;
+    const row = resolved.row;
     if (row == null) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -320,11 +330,13 @@ export async function PATCH(
       return NextResponse.json({ error: "No patchable fields provided" }, { status: 400 });
     }
 
-    const { data: updated, error: updateError } = await supabase
+    // The creator writes through RLS; a Place manager was authorized above, so the write
+    // goes through the admin client scoped to this beacon and its (unchanged) creator.
+    const { data: updated, error: updateError } = await (resolved.asPlaceManager ? admin : supabase)
       .from("map_beacons")
       .update(patch)
       .eq("id", beaconId)
-      .eq("creator_id", user.id)
+      .eq("creator_id", resolved.asPlaceManager ? String(row.creator_id) : user.id)
       .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
       .maybeSingle();
 
@@ -348,7 +360,7 @@ export async function PATCH(
         lng: beacon.lng,
         metadata: beacon.metadata,
       });
-      revalidatePublicEvents(beaconId);
+      revalidatePublicEvents(beaconId, typeof row.venue_id === "string" ? row.venue_id : null);
     }
 
     return NextResponse.json({ beacon });
@@ -394,7 +406,7 @@ export async function DELETE(
       return NextResponse.json({ error: deleteError.message }, { status: 400 });
     }
 
-    revalidatePublicEvents(beaconId);
+    revalidatePublicEvents(beaconId, typeof row.venue_id === "string" ? row.venue_id : null);
     return NextResponse.json({ ok: true, id: beaconId });
   } catch (e) {
     console.error("DELETE /api/beacons/[beaconId]:", e);

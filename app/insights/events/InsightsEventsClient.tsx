@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import EventCreateForm from "@/components/events/EventCreateForm";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ds/Button";
 import { EventListCard, type EventListItem } from "@/components/events/EventListCard";
 import { FcCard, FcPageShell, FcSectionHeader } from "@/components/fc";
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
@@ -52,7 +53,11 @@ export default function InsightsEventsClient() {
         <p className="text-on-surface-variant">Select a venue to create and manage events.</p>
       ) : (
         <div className="grid gap-8 lg:grid-cols-2">
-          <EventCreateForm venueId={venueId} />
+          <div>
+            <Button variant="primary" icon={Plus} href={`/events/new?host=place:${venueId}`}>
+              Create event
+            </Button>
+          </div>
           <div className="space-y-4">
             {trend.length >= 2 ? (
               <FcCard className="p-4">
@@ -71,7 +76,7 @@ export default function InsightsEventsClient() {
             ) : null}
             {events.length === 0 ? (
               <FcCard className="p-6 text-sm text-on-surface-variant">
-                No events at this venue yet. Create one with the form on the left.
+                No events at this venue yet. Create one to get started.
               </FcCard>
             ) : (
               <div className="space-y-3">

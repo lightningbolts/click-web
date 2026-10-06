@@ -4,6 +4,8 @@ import type { PublicEventListItem } from '@/lib/events/publicEvent';
 export const DIRECTORY_PAGE_SIZE = 30;
 /** `unstable_cache` tag on the public event lists; revalidated when an event changes. */
 export const PUBLIC_EVENTS_TAG = 'events:public';
+/** Cache tag for a Place's event list on `/p/[slug]` (spec §7.6.3). */
+export const placeEventsTag = (placeId: string) => `place:${placeId}:events`;
 
 export type DirectoryTab = 'upcoming' | 'past';
 export type DirectorySort = 'date' | 'going' | 'host';
