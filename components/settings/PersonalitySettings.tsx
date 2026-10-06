@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Chip } from '@/components/ds/Chip';
 import { toast } from '@/components/ds/Toast';
@@ -12,6 +13,7 @@ const FORM_ID = 'settings-personality-form';
 
 /** Personality (spec §7.8): exactly five traits, grouped, with a running "3 of 5". */
 export function PersonalitySettings({ userId, initial }: { userId: string; initial: string[] }) {
+  const router = useRouter();
   const [saved, setSaved] = useState(initial);
   const [picked, setPicked] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -31,6 +33,7 @@ export function PersonalitySettings({ userId, initial }: { userId: string; initi
         fallback: 'Couldn’t save your traits.',
       });
       setSaved(picked);
+      router.refresh();
       toast.success('Personality saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Couldn’t save your traits.');
