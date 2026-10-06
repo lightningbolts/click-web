@@ -1,34 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { Manrope, Source_Serif_4 } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
-import { Analytics } from "@vercel/analytics/next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import AppToaster from "@/components/AppToaster";
-import MapLibreWorkerInit from "@/components/MapLibreWorkerInit";
-import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/lib/theme/ThemeProvider";
+import { AppToaster } from "@/components/ds/Toast";
+import { TooltipProvider } from "@/components/ds/Tooltip";
+import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import { THEME_BOOT_SCRIPT, THEME_COLOR } from "@/lib/theme/themeBoot";
 import { ProductChromeProvider } from "@/lib/shell/ProductChromeContext";
-import { getServerUser } from "@/lib/server/getServerUser";
+import CloudflareAnalytics from "@/components/CloudflareAnalytics";
 import { publicOrigin } from "@/lib/events/eventUrls";
 import { brandShareImage } from "@/lib/brand/shareImage";
 
+/**
+ * Manrope is the display face only (titles, 700–800). Body text uses the system
+ * stack (spec §4.2, D2), so this is the only font request on any page.
+ */
 const manrope = Manrope({
   subsets: ["latin"],
   display: "swap",
+  weight: ["700", "800"],
+  preload: true,
+  adjustFontFallback: true,
   variable: "--font-manrope",
-  // Apply className on <body> so font-family is set directly — variable alone
-  // can fall through to the browser/system sans (often Inter-like) if theme
-  // resolution of var(--font-manrope) fails.
-});
-
-const sourceSerif = Source_Serif_4({
-  subsets: ["latin"],
-  display: "swap",
-  // Event titles only — do not compete with Manrope on landing LCP.
-  preload: false,
-  variable: "--font-source-serif",
 });
 
 export const metadata: Metadata = {
@@ -42,7 +38,9 @@ export const metadata: Metadata = {
       { url: "/icon.png", type: "image/png", sizes: "512x512" },
       { url: "/brand/logo-icon.svg", type: "image/svg+xml" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   manifest: "/site.webmanifest",
   openGraph: {
@@ -55,42 +53,43 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     images: [brandShareImage().url],
   },
-  other: {
-    "theme-color": "#f9f9f9",
-  },
 };
 
-export default async function RootLayout({
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
+
+/**
+ * The root layout never reads cookies: marketing and public pages render static,
+ * and signed-in routes seed auth from their own server read (see `AuthSeed`).
+ */
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialUser = await getServerUser();
-  const initialHasSession = Boolean(initialUser);
-
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={manrope.variable} suppressHydrationWarning>
       <head>
+        <meta name="theme-color" content={THEME_COLOR.light} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        <meta name="theme-color" content="#f9f9f9" />
       </head>
-      <body
-        className={`${manrope.variable} ${sourceSerif.variable} ${manrope.className} font-sans antialiased bg-background text-on-surface flex flex-col min-h-screen`}
-      >
-        <MapLibreWorkerInit />
+      <body className="flex min-h-dvh flex-col bg-bg font-sans text-fg antialiased">
         <ThemeProvider>
-          <AuthProvider initialUser={initialUser}>
+          <AuthProvider>
             <ProductChromeProvider>
-              <Suspense fallback={null}>
-                <Navbar initialHasSession={initialHasSession} />
-              </Suspense>
-              <main className="flex-1 flex flex-col">{children}</main>
-              <Footer />
-              <AppToaster />
+              <TooltipProvider>
+                <Suspense fallback={null}>
+                  <Navbar />
+                </Suspense>
+                <main className="flex flex-1 flex-col">{children}</main>
+                <Footer />
+                <AppToaster />
+              </TooltipProvider>
             </ProductChromeProvider>
           </AuthProvider>
         </ThemeProvider>
-        <Analytics />
+        <CloudflareAnalytics />
       </body>
     </html>
   );

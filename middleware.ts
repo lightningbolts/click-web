@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { userMayAccessBusinessInsights } from '@/lib/server/businessInsightsEligibility';
-import { isAdminUser } from '@/lib/server/adminRole';
+import { hasSupabaseAuthCookie } from '@/lib/auth/authCookie';
 import { shouldApplyReadHeavyRateLimit } from '@/lib/server/readHeavyRateLimit';
 import {
   CONNECTIONS_RATE_LIMIT,
@@ -75,13 +75,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // API routes authenticate in each Route Handler (`requireUser` / `getSupabaseFromRouteRequest`).
-  // Running `getUser()` here duplicates a network round-trip on every `/api/*` request.
+  // The matcher only sends rate-limited API prefixes here.
   if (pathname.startsWith('/api/')) {
-    return NextResponse.next({
-      request: {
-        headers: request.headers,
-      },
-    });
+    return NextResponse.next({ request: { headers: request.headers } });
+  }
+
+  const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
+  const insightsRoute = pathname === '/insights' || pathname.startsWith('/insights/');
+
+  // Anonymous visitors have nothing to refresh or verify: no network, no Supabase client.
+  if (!hasSupabaseAuthCookie(request.cookies.getAll().map((c) => c.name))) {
+    return adminRoute ? NextResponse.redirect(new URL('/', request.url)) : supabaseResponse;
   }
 
   const supabase = createServerClient(
@@ -111,44 +115,68 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // `getClaims()` verifies the access token locally against the project JWKS (asymmetric
+  // keys) and only refreshes it when it has expired, so a signed-in page request no
+  // longer pays an Auth round-trip (spec §11.4). It falls back to `getUser()` for
+  // legacy symmetric-key projects.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims ?? null;
 
-  const adminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
+  const withCookies = (redirect: NextResponse) => {
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      redirect.cookies.set(c.name, c.value);
+    });
+    return redirect;
+  };
 
   if (adminRoute) {
-    if (!user || !isAdminUser(user)) {
-      const redirect = NextResponse.redirect(new URL('/', request.url));
-      supabaseResponse.cookies.getAll().forEach((c) => {
-        redirect.cookies.set(c.name, c.value);
-      });
-      return redirect;
+    const role = (claims?.app_metadata as { role?: unknown } | undefined)?.role;
+    if (!claims || role !== 'admin') {
+      return withCookies(NextResponse.redirect(new URL('/', request.url)));
     }
   }
 
-  if (pathname === '/insights' || pathname.startsWith('/insights/')) {
-    const signupUrl = new URL('/business/signup', request.url);
-
-    if (!user) {
-      return supabaseResponse;
-    }
-
-    const allowed = await userMayAccessBusinessInsights(supabase, user);
+  if (insightsRoute && claims?.sub) {
+    const allowed = await userMayAccessBusinessInsights(supabase, {
+      id: claims.sub,
+      email: typeof claims.email === 'string' ? claims.email : undefined,
+    });
     if (!allowed) {
-      const redirect = NextResponse.redirect(signupUrl);
-      supabaseResponse.cookies.getAll().forEach((c) => {
-        redirect.cookies.set(c.name, c.value);
-      });
-      return redirect;
+      return withCookies(NextResponse.redirect(new URL('/business/signup', request.url)));
     }
   }
 
   return supabaseResponse;
 }
 
+/**
+ * Narrow matcher (spec §11.4): only gated or signed-in surfaces refresh the session here,
+ * plus the rate-limited API prefixes. Public pages (`/events`, `/e/*`, `/p/*`, `/c/*`,
+ * marketing) never run middleware. `/` is included so a signed-in visitor's expired
+ * token is refreshed before `app/page.tsx` decides landing vs Home; anonymous `/`
+ * returns before creating a client.
+ *
+ * Stays `middleware.ts` (Edge) rather than Next 16 `proxy.ts`: `proxy` always runs on
+ * Node.js, which @opennextjs/cloudflare rejects at build time.
+ */
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/',
+    '/admin/:path*',
+    '/business/:path*',
+    '/insights/:path*',
+    '/clicks/:path*',
+    '/map/:path*',
+    '/add/:path*',
+    '/me/:path*',
+    '/settings/:path*',
+    '/activity/:path*',
+    '/people/:path*',
+    '/api/connections/:path*',
+    '/api/beacons/:path*',
+    '/api/map/beacons/:path*',
+    '/api/hub/nearby/:path*',
+    '/api/livekit/token/:path*',
+    '/api/drops/:path*',
   ],
 };

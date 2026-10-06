@@ -22,8 +22,10 @@ describe('anonymous landing JS budget', () => {
     expect(navbar).not.toMatch(/import LoginModal from/);
     expect(navbar).toContain('next/dynamic');
 
-    expect(layout).toContain('preload: false');
-    expect(layout).toContain('getServerUser');
+    // Root layout stays static: no cookie read, one display font (spec §4.2, §11).
+    expect(layout).not.toContain('getServerUser');
+    expect(layout).not.toMatch(/Source_Serif|Inter\(/);
+    expect(layout).not.toContain('@vercel/analytics');
     expect(page).toContain('getServerUser');
     expect(page).toContain('basemaps.cartocdn.com');
 

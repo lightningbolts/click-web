@@ -135,10 +135,10 @@ export default function LandingPage({
           <section data-landing-reveal id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
             <div className="flex justify-center">
               <Image
-                src="/landing/consumer-add-click.png"
+                src="/landing/consumer-add-click.webp"
                 alt="Click’s Add Click screen with Tap to Connect and QR sharing"
-                width={472}
-                height={1024}
+                width={560}
+                height={1212}
                 sizes="(max-width: 640px) 220px, 260px"
                 className="h-auto w-[220px] rounded-[28px] border-2 border-border-hard sm:w-[260px]"
               />
@@ -153,10 +153,10 @@ export default function LandingPage({
           <section data-landing-reveal className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
             <div className="flex justify-center py-2">
               <Image
-                src="/landing/consumer-event-detail.png"
+                src="/landing/consumer-event-detail.webp"
                 alt="Click event details with a map, attendees, and Join Event Route"
-                width={472}
-                height={1024}
+                width={560}
+                height={1214}
                 sizes="(max-width: 640px) 220px, 260px"
                 className="h-auto w-[220px] -rotate-3 rounded-[28px] border-2 border-white/30 sm:w-[260px]"
               />
@@ -177,8 +177,8 @@ export default function LandingPage({
               <Image
                 src="/landing/consumer-friend-profile.webp"
                 alt="A friend’s profile in Click showing shared interests, a Close friendship level, and a map of the spots you’ve hung out"
-                width={923}
-                height={2000}
+                width={560}
+                height={1213}
                 sizes="(max-width: 640px) 220px, 260px"
                 className="h-auto w-[220px] rotate-2 rounded-[28px] border-2 border-primary/40 sm:w-[260px]"
               />

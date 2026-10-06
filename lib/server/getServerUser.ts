@@ -5,18 +5,12 @@ import { cookies } from 'next/headers';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseServerClient } from '@/lib/server/supabaseServer';
 
-/**
- * True when the request carries a Supabase SSR session cookie (including
- * chunked `*.0` / `*.1` blobs). PKCE verifier cookies are not a session.
- */
-export function hasSupabaseAuthCookie(cookieNames: readonly string[]): boolean {
-  return cookieNames.some(
-    (name) => name.includes('-auth-token') && !name.includes('code-verifier'),
-  );
-}
+import { hasSupabaseAuthCookie } from '@/lib/auth/authCookie';
+
+export { hasSupabaseAuthCookie };
 
 /**
- * One Auth round-trip per request, shared by root layout + `/`.
+ * One Auth round-trip per request (React `cache`), shared by every server caller.
  * Anonymous visitors with no session cookie skip the network call entirely.
  */
 export const getServerUser = cache(async (): Promise<User | null> => {

@@ -7,12 +7,16 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { Users } from 'lucide-react';
 import useSWR from 'swr';
+import dynamic from 'next/dynamic';
 import { MINE_EVENTS_KEY, fetchMineEvents } from '@/components/dashboard/DashboardEventsModule';
 import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
 import { CreateVerifiedClickDialog } from '@/components/chat';
 import InterestTagging from '@/components/InterestTagging';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
+
+// MapLibre loads only when the map pane renders (spec §11.2).
+const ConnectionMap = dynamic(() => import('@/components/dashboard/ConnectionMap'), { ssr: false });
 
 // Digital Memory Box components
 import {
@@ -22,7 +26,6 @@ import {
   StatsOverview,
   AchievementBadge,
   MilestoneProgress,
-  ConnectionMap,
 } from '@/components/dashboard';
 import MyAvailabilityIntentsCard from '@/components/dashboard/MyAvailabilityIntentsCard';
 import HomeExplore from './dashboard/HomeExplore';

@@ -11,12 +11,14 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
-import data from '@emoji-mart/data';
 import { motion, AnimatePresence } from 'framer-motion';
 import { REACTION_EMOJIS } from '@/lib/chat/types';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { clampBarLeftToBubble, clampLeftEdge, clampTop } from '@/lib/chat/portalBounds';
 import { CHAT_HOVER_ANCHOR_ATTR, pointerMovesWithinHoverGroup } from '@/lib/chat/hoverGroup';
+
+/** emoji-mart fetches its ~400 KB dataset only when the full picker opens (spec §11.2). */
+const loadEmojiData = () => import('@emoji-mart/data').then((m) => m.default);
 
 const Picker = dynamic(() => import('@emoji-mart/react').then((m) => m.default), {
   ssr: false,
@@ -530,7 +532,7 @@ export default function ReactionPicker({
                     className="chat-emoji-mart-host box-border min-h-0 flex-1 basis-0 rounded-xl px-1 py-0.5"
                   >
                     <Picker
-                      data={data}
+                      data={loadEmojiData}
                       theme={theme}
                       dynamicWidth
                       previewPosition="none"

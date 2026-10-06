@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from '@/components/ds/Toast';
 import { ImagePlus } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { FcButton } from "@/components/fc";

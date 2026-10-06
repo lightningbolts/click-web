@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import * as maplibregl from 'maplibre-gl';
+import * as maplibregl from '@/lib/maps/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { dropSameOriginMapRequest } from '@/lib/map/dropSameOriginMapRequest';
 import { useTheme } from '@/lib/theme/ThemeProvider';

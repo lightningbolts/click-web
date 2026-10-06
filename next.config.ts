@@ -26,7 +26,13 @@ const nextConfig: NextConfig = {
   // OpenNext on Workers needs an IMAGES binding (Cloudflare Images) for /_next/image.
   // Without it, optimized URLs 404; serve public assets as-is on the free plan.
   images: {
-    unoptimized: true,
+    // Supabase Storage transforms; see lib/images/cfLoader.ts (spec §11.6).
+    loader: 'custom',
+    loaderFile: './lib/images/cfLoader.ts',
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co', pathname: '/storage/v1/**' },
+      { protocol: 'http', hostname: '127.0.0.1', port: '54321', pathname: '/storage/v1/**' },
+    ],
   },
   async headers() {
     return [

@@ -2,6 +2,7 @@ import HomeAuthenticated from '@/components/HomeAuthenticated';
 import LandingPage from '@/components/landing/LandingPage';
 import { EMPTY_PRESENCE_HEATMAP } from '@/lib/landing/presenceHeatmap';
 import { getServerUser } from '@/lib/server/getServerUser';
+import { AuthSeed } from '@/lib/AuthContext';
 import { loadPresenceHeatmap } from '@/lib/server/presenceHeatmap';
 
 async function landingHeatmap() {
@@ -30,7 +31,11 @@ function CartoPreconnect() {
 export default async function Home() {
   const user = await getServerUser();
   if (user) {
-    return <HomeAuthenticated user={user} />;
+    return (
+      <AuthSeed user={user}>
+        <HomeAuthenticated user={user} />
+      </AuthSeed>
+    );
   }
 
   return (

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import { type ExpressionSpecification } from 'maplibre-gl';
+import * as maplibregl from '@/lib/maps/maplibre';
+import type { ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { prefersReducedMotion } from '@/lib/motion';

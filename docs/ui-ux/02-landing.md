@@ -18,7 +18,7 @@ Centered Click mark, “Click: from handshake to friendship.”, short tagline, 
 5. **Business** — short link to `/enterprise`.
 6. **Waitlist** — Fall 2026 launch and “No ads. No feed. Built at UW.”
 
-The connection and event images are existing site assets. The IRL card displays `consumer-friend-profile.webp` (923 × 2000), a user-supplied iOS screenshot of a friend profile (common ground, friendship level, hangout map). The earlier `vibe-radar-enhanced.png` and `vibe-radar-prototype.png` are retained. Feature cards stack on smaller screens. The homepage no longer loads the unused presence heatmap; the Fold Map components remain available for future use.
+The connection and event images are existing site assets. The IRL card displays `consumer-friend-profile.webp` (560 × 1213 WebP), a user-supplied iOS screenshot of a friend profile (common ground, friendship level, hangout map). The earlier `vibe-radar-enhanced.webp` and `vibe-radar-prototype.png` are retained. Feature cards stack on smaller screens. The homepage no longer loads the unused presence heatmap; the Fold Map components remain available for future use.
 
 ---
 

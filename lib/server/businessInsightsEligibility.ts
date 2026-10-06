@@ -36,7 +36,7 @@ function embeddedVenueSubscription(row: {
  */
 export async function userMayAccessBusinessInsights(
   supabase: SupabaseClient,
-  user: User,
+  user: Pick<User, 'id' | 'email'>,
 ): Promise<boolean> {
   const email = (user.email ?? '').toLowerCase();
   if (email && businessInsightsDevEmails().includes(email)) {

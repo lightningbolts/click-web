@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import { MapPin, Flame, TrendingUp, BarChart2 } from 'lucide-react';
 import { GlassPanel } from '@/components/insights/GlassPanel';
 import HeatmapView from '@/components/insights/HeatmapView';
-import InsightsMap from '@/components/insights/InsightsMap';
+import dynamic from 'next/dynamic';
 import { mockVenueInsights, type HeatmapZone } from '@/lib/insights/mockData';
 import type { VerifiedConnectionMapNode } from '@/lib/insights/connectionEncounterClustering';
 import { DemoBanner } from '@/components/insights/DemoBanner';
@@ -25,6 +25,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+
+const InsightsMap = dynamic(() => import('@/components/insights/InsightsMap'), { ssr: false });
 
 interface InsightsHeatmapPayload {
   heatmapZones?: unknown[];
