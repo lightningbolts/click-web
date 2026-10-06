@@ -1,7 +1,7 @@
 # Design System — Functional Clarity (Web)
 
 **Visual system:** Neo-brutalist Functional Clarity — opaque surfaces, 1px outline-variant borders, interactive accent `#7c3aed`, no glass/blur/gradients on chrome.
-**Mobile source of truth:** [`click/docs/design-assets/functional_clarity/DESIGN.md`](../../../click/docs/design-assets/functional_clarity/DESIGN.md), [`Color.kt`](../../../click/composeApp/src/commonMain/kotlin/compose/project/click/click/ui/theme/Color.kt)  
+**Mobile source of truth:** [`click/docs/design-assets/functional_clarity/DESIGN.md`](https://github.com/lightningbolts/click/blob/main/docs/design-assets/functional_clarity/DESIGN.md), [`Color.kt`](https://github.com/lightningbolts/click/blob/main/composeApp/src/commonMain/kotlin/compose/project/click/click/ui/theme/Color.kt)  
 **Web tokens:** [`app/globals.css`](../../app/globals.css) — use `@theme` (not `@theme inline`) so light/dark can override `--color-*` at runtime.  
 **Primitives:** [`components/ds/`](../../components/ds/)  
 **Theme:** [`lib/theme/ThemeProvider.tsx`](../../lib/theme/ThemeProvider.tsx)  

@@ -2,7 +2,7 @@
 
 Public event surfaces on click-web — list (`/events`), create (`/events/new`), and detail (`/e/{id}`) — share one layout language: Functional Clarity tokens, `CardVisualHero`, and a single page column that lines up with Navbar and Footer.
 
-This document is web-only. Mobile Functional Clarity (neo-brutalist 2px borders) stays in [`click/docs/design-assets/functional_clarity/DESIGN.md`](../../../click/docs/design-assets/functional_clarity/DESIGN.md). Do not copy that border language onto web.
+This document is web-only. Mobile Functional Clarity (neo-brutalist 2px borders) stays in [`click/docs/design-assets/functional_clarity/DESIGN.md`](https://github.com/lightningbolts/click/blob/main/docs/design-assets/functional_clarity/DESIGN.md). Do not copy that border language onto web.
 
 ## Brand
 
