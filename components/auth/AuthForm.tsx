@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
-import { ClickMark } from '@/components/ds/ClickMark';
 import { IconButton } from '@/components/ds/IconButton';
 import { InlineNotice } from '@/components/ds/InlineNotice';
 import { TextField } from '@/components/ds/TextField';
 import { getSupabaseClient } from '@/lib/supabase';
 import { startOAuth, type OAuthProvider } from '@/lib/auth/oauth';
 import { safeNextPath } from '@/lib/shell/appNav';
+import { AuthCard } from './AuthCard';
+
+export { AuthCard };
 
 export type AuthMode = 'login' | 'signup';
 
@@ -263,26 +265,5 @@ export function AuthForm({ mode, next: rawNext }: { mode: AuthMode; next?: strin
         .
       </p>
     </AuthCard>
-  );
-}
-
-export function AuthCard({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-1 items-start justify-center px-[var(--gutter)] py-10 sm:items-center sm:py-16">
-      <div className="w-full max-w-[400px] rounded-xl bg-surface p-6 sm:p-8 dark:shadow-[inset_0_0_0_1px_var(--hairline)]">
-        <ClickMark size={48} />
-        <h1 className="type-title-2 mt-5 text-fg">{title}</h1>
-        {subtitle ? <p className="type-body mt-1.5 text-fg-secondary">{subtitle}</p> : null}
-        <div className="mt-6">{children}</div>
-      </div>
-    </div>
   );
 }

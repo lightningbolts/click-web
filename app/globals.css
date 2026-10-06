@@ -34,6 +34,8 @@
   --live: #e5251b;
   --online: #1fa855;
   --online-text: #157a3e;
+  /* Reactions in Activity (spec §7.9). */
+  --heart: #d6246e;
   --warning-text: #a34a00;
   --warning-fill: #fff1e0;
   --destructive: #d70015;
@@ -119,6 +121,7 @@ body:has([data-app-shell]) [data-site-chrome] {
   --bubble-out: #4a1fa6;
   --bubble-in: #232326;
   --live: #ff453a;
+  --heart: #ff6b9a;
   --online: #30d158;
   --online-text: #30d158;
   --warning-text: #ffb340;
@@ -158,6 +161,7 @@ body:has([data-app-shell]) [data-site-chrome] {
   --color-bubble-in: var(--bubble-in);
   --color-live: var(--live);
   --color-online: var(--online);
+  --color-heart: var(--heart);
   --color-online-text: var(--online-text);
   --color-warning-text: var(--warning-text);
   --color-warning-fill: var(--warning-fill);

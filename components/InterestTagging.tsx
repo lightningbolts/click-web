@@ -38,7 +38,7 @@ export const INTEREST_CATEGORIES: InterestCategory[] = [
     { emoji: '🧩', label: 'Puzzles & Strategy', subs: ['Chess', 'Sudoku', 'Escape Rooms', 'Crosswords', 'Go'] },
 ];
 
-const MIN_TAGS = 3;
+export const MIN_TAGS = 3;
 
 interface InterestTaggingProps {
     onComplete: (tags: string[]) => void;

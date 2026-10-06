@@ -55,12 +55,6 @@ jest.mock('framer-motion', () => {
   };
 });
 
-jest.mock('@/components/SettingsView', () => {
-  return function MockSettingsView() {
-    return <div data-testid="settings-view" />;
-  };
-});
-
 jest.mock('@/components/chat', () => ({
   ChatView: () => <div data-testid="chat-view" />,
 }));
@@ -71,6 +65,10 @@ jest.mock('@/components/InterestTagging', () => {
   };
 });
 
+jest.mock('@/components/dashboard/ConnectionMap', () => ({
+  __esModule: true,
+  default: () => <div data-testid="connection-map" />,
+}));
 jest.mock('@/components/dashboard', () => ({
   ConnectionTable: () => <div data-testid="connection-table" />,
   ConnectionMap: () => <div data-testid="connection-map" />,
@@ -161,7 +159,7 @@ function buildMockUser(overrides: Record<string, unknown> = {}) {
 
 async function renderDashboard(
   user: Record<string, unknown> = buildMockUser(),
-  routeTab: DashboardTab = 'settings',
+  routeTab: DashboardTab = 'map',
 ) {
   let result: ReturnType<typeof render>;
   await act(async () => {
@@ -216,9 +214,9 @@ describe('DashboardView', () => {
     expect(screen.queryByTestId('dashboard-tab-events')).not.toBeInTheDocument();
   });
 
-  it('renders the pane for the route it is given', async () => {
-    await renderDashboard(buildMockUser(), 'settings');
-    expect(await screen.findByTestId('settings-view')).toBeInTheDocument();
+  it('renders the map pane for /map', async () => {
+    await renderDashboard(buildMockUser(), 'map');
+    expect(await screen.findByTestId('connection-map')).toBeInTheDocument();
     expect(screen.queryByTestId('chat-view')).not.toBeInTheDocument();
   });
 
@@ -232,7 +230,7 @@ describe('DashboardView', () => {
     await act(async () => {
       render(
         <ThemeProvider>
-          <DashboardView user={buildMockUser()} routeTab="settings" />
+          <DashboardView user={buildMockUser()} routeTab="map" />
         </ThemeProvider>,
       );
     });

@@ -4,21 +4,12 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/AuthContext';
-import { getSupabaseClient } from '@/lib/supabase';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
-import SettingsView from '@/components/SettingsView';
 import LoadingScreen from '@/components/LoadingScreen';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import {
-  DEFAULT_NOTIFICATION_PREFERENCES,
-  loadNotificationPreferences,
-  saveNotificationPreferences,
-  type NotificationPreferences,
-} from '@/lib/notifications/preferences';
 import { useConnectionsData } from '@/components/dashboard/useConnectionsData';
 import type { DashboardTab } from '@/lib/shell/personalProductNav';
 import { personHref, threadHref } from '@/lib/shell/appNav';
-import { PAGE_COLUMN_CLASS } from '@/lib/shell/pageColumn';
 import { cn } from '@/lib/cn';
 import { useSessionCachedState, writeSessionCache } from '@/lib/dashboard/sessionCache';
 
@@ -33,8 +24,8 @@ interface DashboardViewProps {
 }
 
 /**
- * The remaining legacy panes (map and settings) until phases 4 and 6 give them their own
- * pages. Clicks, hubs and Add moved to `/clicks` and `/add`; the onboarding gates are global.
+ * The remaining legacy pane (the map) until phase 6 gives it its own page. Clicks, hubs, Add and
+ * Settings have their own routes; the onboarding gates are global.
  */
 export default function DashboardView({ user, routeTab, onReady }: DashboardViewProps) {
   const { user: sessionUser, loading: authLoading } = useAuth();
@@ -47,37 +38,11 @@ export default function DashboardView({ user, routeTab, onReady }: DashboardView
   const [, setArchivedConnectionIds] = useSessionCachedState<Set<string>>(userId, 'archivedIds', () => new Set());
   const [, setCoreConnectionIds] = useSessionCachedState<Set<string>>(userId, 'coreIds', () => new Set());
   const [, setVibePromptConnection] = useState<ConnectionRecord | null>(null);
-  const [notificationPreferences, setNotificationPreferences] = useSessionCachedState<NotificationPreferences>(userId, 'notificationPreferences', DEFAULT_NOTIFICATION_PREFERENCES);
   /** The map stays mounted after its first visit: MapLibre is expensive to rebuild. */
   const [mapVisited, setMapVisited] = useState(activeTab === 'map');
   if (activeTab === 'map' && !mapVisited) setMapVisited(true);
-  const notificationPreferencesRef = useRef<NotificationPreferences>(notificationPreferences);
   const [connectionsInitialLoadComplete, setConnectionsInitialLoadComplete] = useSessionCachedState(userId, 'connectionsLoaded', false);
   const readyNotifiedRef = useRef(false);
-
-  useEffect(() => {
-    notificationPreferencesRef.current = notificationPreferences;
-  }, [notificationPreferences]);
-
-  const persistNotificationPreferences = useCallback(async (preferences: NotificationPreferences) => {
-    const previousPreferences = notificationPreferencesRef.current;
-    setNotificationPreferences(preferences);
-    if (!user?.id) return { success: true };
-    const result = await saveNotificationPreferences(getSupabaseClient(), user.id, preferences);
-    if (!result.success) setNotificationPreferences(previousPreferences);
-    return result;
-  }, [user?.id, setNotificationPreferences]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    void loadNotificationPreferences(getSupabaseClient(), user.id).then((preferences) => {
-      if (!cancelled) setNotificationPreferences(preferences);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, setNotificationPreferences]);
 
   const archiveStorageKey = user?.id ? `click:archived-connections:${user.id}` : null;
   const updateArchivedIds = useCallback((updater: (prev: Set<string>) => Set<string>) => {
@@ -126,55 +91,25 @@ export default function DashboardView({ user, routeTab, onReady }: DashboardView
     return null;
   }
 
-  const fillViewport = activeTab === 'map';
-
   return (
     <div
       data-testid="dashboard-root"
-      data-fill-viewport={fillViewport ? 'true' : undefined}
-      className={cn(
-        'flex min-h-0 flex-col bg-background text-on-surface',
-        fillViewport
-          ? 'h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] overflow-hidden'
-          : 'min-h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))]',
-      )}
+      data-fill-viewport="true"
+      className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 flex-col overflow-hidden bg-bg text-fg"
     >
-      {fillViewport ? null : (
-        <div className={cn(PAGE_COLUMN_CLASS, 'flex shrink-0 flex-wrap items-start justify-between gap-4 py-6')}>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Settings</h1>
-            <p className="mt-1 text-sm text-on-surface-variant">Profile, interests, and preferences</p>
-          </div>
-        </div>
-      )}
-      <div
-        className={cn(
-          PAGE_COLUMN_CLASS,
-          'min-h-0 min-w-0 flex-1',
-          fillViewport ? 'flex flex-col overflow-hidden py-4' : 'pb-8',
-        )}
-      >
-        {mapVisited ? (
-          <div
-            className={cn('min-h-0 flex-1 overflow-hidden', activeTab === 'map' ? 'flex' : 'hidden')}
-            aria-hidden={activeTab !== 'map'}
-          >
-            <ConnectionMap
-              connections={mapConnectionRecords}
-              onConnectionClick={(conn) => router.push(threadHref(conn.id))}
-              onOpenProfile={(otherUserId) => router.push(personHref(otherUserId))}
-              active={activeTab === 'map'}
-            />
-          </div>
-        ) : null}
-
-        {activeTab === 'settings' ? (
-          <SettingsView
-            notificationPreferences={notificationPreferences}
-            onSaveNotificationPreferences={persistNotificationPreferences}
+      {mapVisited ? (
+        <div
+          className={cn('min-h-0 flex-1 overflow-hidden', activeTab === 'map' ? 'flex' : 'hidden')}
+          aria-hidden={activeTab !== 'map'}
+        >
+          <ConnectionMap
+            connections={mapConnectionRecords}
+            onConnectionClick={(conn) => router.push(threadHref(conn.id))}
+            onOpenProfile={(otherUserId) => router.push(personHref(otherUserId))}
+            active={activeTab === 'map'}
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

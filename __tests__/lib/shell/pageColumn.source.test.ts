@@ -24,10 +24,10 @@ describe("shared page column", () => {
     expect(footer).not.toMatch(/px-6 py-12 text-on-surface md:px-12/);
   });
 
-  it("keeps chat and dashboard fill panes in the same column", () => {
+  it("keeps the map pane full-bleed and Insights out of the 1800px column", () => {
+    // The map is a full-width app pane (spec §6.1), not a page column.
     const dashboard = read("components/DashboardView.tsx");
-    expect(dashboard).toContain("PAGE_COLUMN_CLASS");
-    expect(dashboard).not.toMatch(/fillViewport \? 'flex flex-col overflow-hidden' : cn\(PAGE_COLUMN_CLASS/);
+    expect(dashboard).not.toContain("PAGE_COLUMN_CLASS");
 
     const insightsBody = read("components/insights/BusinessInsightsShell.tsx");
     expect(insightsBody).not.toContain("max-w-[1800px]");

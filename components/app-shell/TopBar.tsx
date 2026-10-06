@@ -3,7 +3,7 @@
 import Link, { useLinkStatus } from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, ChevronLeft, Menu as MenuIcon, QrCode, Search } from 'lucide-react';
+import { ChevronLeft, Menu as MenuIcon, QrCode, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ds/Button';
 import { ClickMark } from '@/components/ds/ClickMark';
@@ -12,6 +12,7 @@ import { IconButton } from '@/components/ds/IconButton';
 import { Tooltip } from '@/components/ds/Tooltip';
 import { activeAppSection, appNavItems, isThreadPath, loginHref, type AppNavItem } from '@/lib/shell/appNav';
 import type { SessionBootstrap } from '@/lib/shell/sessionBootstrap';
+import { ActivityBell } from '@/components/activity/ActivityPopover';
 import { AccountMenu } from './AccountMenu';
 import { useShellHeader } from './ShellContext';
 import { WaitlistButton } from './WaitlistButton';
@@ -174,14 +175,7 @@ export function TopBar({ auth, onOpenMarketingMenu }: { auth: TopBarAuth; onOpen
                 <Button href="/add" size="sm" icon={QrCode} className="hidden md:inline-flex" data-testid="nav-add-click">
                   Add Click
                 </Button>
-                <Tooltip content="Activity">
-                  <IconButton
-                    icon={Bell}
-                    href="/activity"
-                    aria-label={bootstrap!.hasActivity ? 'Activity, new' : 'Activity'}
-                    dot={bootstrap!.hasActivity}
-                  />
-                </Tooltip>
+                <ActivityBell hasNew={bootstrap!.hasActivity} />
                 <span className="hidden md:inline-flex">
                   <AccountMenu bootstrap={bootstrap!} />
                 </span>

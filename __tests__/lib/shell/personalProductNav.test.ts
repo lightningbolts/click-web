@@ -4,7 +4,7 @@ import { eventBackHref } from '@/components/events/EventBackLink';
 describe('personalProductNav', () => {
   it('maps the remaining legacy routes to panes', () => {
     expect(dashboardTabForPath('/map')).toBe('map');
-    expect(dashboardTabForPath('/settings')).toBe('settings');
+    expect(dashboardTabForPath('/settings')).toBeNull();
     expect(dashboardTabForPath('/clicks')).toBeNull();
     expect(dashboardTabForPath('/add')).toBeNull();
     expect(dashboardTabForPath('/me')).toBeNull();

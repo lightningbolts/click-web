@@ -10,6 +10,7 @@ import { loginHref } from '@/lib/shell/appNav';
 import { useShellBootstrap } from '@/lib/shell/useShellBootstrap';
 import { useProductChrome } from '@/lib/shell/ProductChromeContext';
 import { buttonClassName } from '@/components/ds/Button';
+import { GlobalShortcuts } from './GlobalShortcuts';
 import { MobileTabBar } from './MobileTabBar';
 import { TopBar, type TopBarAuth } from './TopBar';
 import { WaitlistButton } from './WaitlistButton';
@@ -48,7 +49,12 @@ export function SiteChrome() {
   return (
     <div data-site-chrome className="contents">
       <TopBar auth={state} onOpenMarketingMenu={() => setMenuOpen(true)} />
-      {state.state === 'signed-in' ? <MobileTabBar bootstrap={state.bootstrap} /> : null}
+      {state.state === 'signed-in' ? (
+        <>
+          <MobileTabBar bootstrap={state.bootstrap} />
+          <GlobalShortcuts />
+        </>
+      ) : null}
       {state.state === 'signed-out' ? (
         <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Menu">
           <nav aria-label="Site" className="flex flex-col gap-1 px-2 pb-4">

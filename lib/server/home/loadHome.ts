@@ -36,9 +36,9 @@ async function soft<T>(label: string, fallback: T, run: () => Promise<T>): Promi
   }
 }
 
-type ConnectionRow = Record<string, unknown> & { id: string; user_ids: unknown };
+export type ConnectionRow = Record<string, unknown> & { id: string; user_ids: unknown };
 
-function peerOf(row: ConnectionRow, viewerId: string): string | null {
+export function peerOf(row: ConnectionRow, viewerId: string): string | null {
   const ids = Array.isArray(row.user_ids) ? (row.user_ids as unknown[]) : [];
   for (const raw of ids) {
     const id = typeof raw === 'string' ? raw.trim() : '';
@@ -54,11 +54,12 @@ async function idSet(query: PromiseLike<{ data: unknown }>, column: string): Pro
   );
 }
 
-async function loadConnections(admin: SupabaseClient, viewerId: string) {
+/** The viewer's connections: every visible row (archived kept), the active list and Core ids. */
+export async function loadConnections(admin: SupabaseClient, viewerId: string) {
   const [rows, archived, hidden, core, blocked] = await Promise.all([
     admin
       .from('connections')
-      .select('id, user_ids, status, expiry_state, has_begun, created, created_utc, last_message_at')
+      .select('id, user_ids, status, expiry_state, has_begun, created, created_utc, last_message_at, source')
       .contains('user_ids', [viewerId])
       .order('created', { ascending: false })
       .limit(1000)

@@ -11,6 +11,7 @@ import { TIME_ZONE_COOKIE } from '@/lib/time/viewerTimeZone';
 import { hidesTabBar } from '@/lib/shell/appNav';
 import { cn } from '@/lib/cn';
 import { useShellHeader } from './ShellContext';
+import { GlobalShortcuts } from './GlobalShortcuts';
 import { MobileTabBar } from './MobileTabBar';
 import { OnboardingGates } from './OnboardingGates';
 import { TopBar } from './TopBar';
@@ -22,6 +23,7 @@ function Bars({ initial }: { initial: SessionBootstrap }) {
     <>
       <TopBar auth={{ state: 'signed-in', bootstrap: b }} />
       <MobileTabBar bootstrap={b} />
+      <GlobalShortcuts />
     </>
   );
 }

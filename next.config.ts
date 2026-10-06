@@ -1,4 +1,9 @@
 import type { NextConfig } from "next";
+import { version } from "./package.json";
+
+/** "0.1.0 · a1b2c3d" when the build knows its commit (Workers Builds / GitHub CI). */
+const commit = (process.env.WORKERS_CI_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "").slice(0, 7);
+const buildVersion = commit ? `${version} · ${commit}` : version;
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -23,6 +28,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  env: { NEXT_PUBLIC_BUILD_VERSION: buildVersion },
   // OpenNext on Workers needs an IMAGES binding (Cloudflare Images) for /_next/image.
   // Without it, optimized URLs 404; serve public assets as-is on the free plan.
   images: {

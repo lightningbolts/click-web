@@ -80,7 +80,7 @@ export default async function PublicEventsPage({
         <EventDirectoryControls query={query} />
       </div>
 
-      {user && query.tab === "upcoming" && !searching ? <YourEventsStrip timeZone={timeZone} /> : null}
+      {user && query.tab === "upcoming" && !searching ? <YourEventsStrip timeZone={timeZone} initialFilter={params.view === "saved" ? "saved" : null} /> : null}
 
       {dir.featured ? (
         <div className="mb-10">
