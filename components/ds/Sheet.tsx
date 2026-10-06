@@ -10,7 +10,8 @@ import { useMediaQuery } from "./useMediaQuery";
 
 /**
  * Side drawer on desktop, bottom sheet with medium/large detents below 768 px
- * (spec §5.4, mirrors iOS `.presentationDetents([.medium, .large])`).
+ * (spec §5.4, mirrors iOS `.presentationDetents([.medium, .large])`). Medium sizes to the
+ * content (40–92 % of the screen), so a short form shows whole and a long one scrolls.
  */
 export function Sheet({
   open,
@@ -67,8 +68,9 @@ export function Sheet({
                   size === "md" ? "max-w-[420px]" : "max-w-[560px]",
                 )
               : cn(
-                  "ds-anim-sheet-up inset-x-0 bottom-0 rounded-t-xl pb-[env(safe-area-inset-bottom)] transition-[height] duration-[var(--d-slow)] ease-[var(--ease-out-expo)]",
-                  detent === "medium" ? "h-[55dvh]" : "h-[92dvh]",
+                  "ds-anim-sheet-up inset-x-0 bottom-0 max-h-[92dvh] rounded-t-xl pb-[env(safe-area-inset-bottom)] transition-[height] duration-[var(--d-slow)] ease-[var(--ease-out-expo)] [interpolate-size:allow-keywords]",
+                  // Medium fits the content (never a form cut off under the fold); large fills.
+                  detent === "medium" ? "h-auto min-h-[40dvh]" : "h-[92dvh]",
                 ),
             className,
           )}

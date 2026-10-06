@@ -30,7 +30,7 @@ export function EventChatSheet({
       <Button variant="secondary" icon={MessagesSquare} onClick={() => setOpen(true)}>
         Open event chat
       </Button>
-      <Sheet open={open} onOpenChange={setOpen} title="Event chat" description="Hosts and everyone going." size="lg" padded={false}>
+      <Sheet open={open} onOpenChange={setOpen} title="Event chat" description="Hosts and everyone going." size="lg" padded={false} initialDetent="large">
         {open ? <EventChatPanel beaconId={beaconId} creatorId={creatorId} ended={ended} initialGoing={initialGoing} bare /> : null}
       </Sheet>
     </>

@@ -23,6 +23,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { cn } from '@/lib/cn';
 import { Avatar } from '@/components/ds/Avatar';
 import { Button } from '@/components/ds/Button';
 import { IconButton } from '@/components/ds/IconButton';
@@ -73,17 +74,26 @@ function Quick({ icon: Icon, label, onClick, pressed }: { icon: LucideIcon; labe
   );
 }
 
+/** A titled group, styled like `ListGroup` (Settings, Me) so the panel reads as one list. */
 function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="px-4 pt-5">
-      <div className="mb-2 flex min-h-8 items-center justify-between gap-2">
-        <h3 className="type-badge uppercase text-fg-tertiary">{title}</h3>
+    <section className="px-4 pt-6">
+      <div className="mb-2 flex min-h-5 items-center justify-between gap-2 px-4">
+        <h3 className="type-meta font-semibold text-fg-secondary">{title}</h3>
         {action}
       </div>
       {children}
     </section>
   );
 }
+
+/** The grouped card every section's rows sit in. */
+const GROUP = 'overflow-hidden rounded-lg bg-surface dark:shadow-[inset_0_0_0_1px_var(--hairline)]';
+/** A row inside `GROUP`: hairline above every row but the first. */
+const ROW = 'shadow-[inset_0_1px_0_var(--hairline)] first:shadow-none';
+/** For rows with a leading icon or avatar: the hairline starts at the text column (`ListRow`). */
+const ROW_INSET = 'group/row';
+const ROW_TEXT = 'flex min-h-[52px] min-w-0 flex-1 items-center self-stretch pr-4 shadow-[inset_0_1px_0_var(--hairline)] group-first/row:shadow-none';
 
 function MediaThumb({
   message,
@@ -110,7 +120,7 @@ function MediaThumb({
     v2Metadata: mediaV2Fields(message.metadata, message.chat_id),
   });
   return (
-    <button type="button" onClick={onOpen} aria-label="Show photo in conversation" className="press aspect-square overflow-hidden rounded-xs bg-fill-subtle">
+    <button type="button" onClick={onOpen} aria-label="Show photo in conversation" className="press aspect-square overflow-hidden bg-fill-subtle">
       {media.src ? (
         // eslint-disable-next-line @next/next/no-img-element -- decrypted object URL
         <img src={media.src} alt="" loading="lazy" className="size-full object-cover" />
@@ -291,7 +301,7 @@ export function ConversationDetailsPanel({
           <Quick icon={Search} label="Search" onClick={onSearch} />
           <Quick icon={CalendarPlus} label="Plan" onClick={onPlan} />
         </div>
-        {mute ? <p className="type-meta mt-2 text-center text-fg-tertiary">{muteStatusLabel(mute)}</p> : null}
+        {mute ? <p className="type-meta mt-2 px-4 text-center text-fg-tertiary">{muteStatusLabel(mute)}</p> : null}
 
         {notice ? (
           <div className="px-4 pt-4">
@@ -303,7 +313,7 @@ export function ConversationDetailsPanel({
 
         {!isGroupClique && sharedInterests.length > 0 ? (
           <Section title="Shared interests">
-            <ul className="flex flex-wrap gap-1.5">
+            <ul className={cn(GROUP, 'flex flex-wrap gap-1.5 p-3')}>
               {sharedInterests.map((t) => (
                 <li key={t} className="type-meta rounded-pill bg-selection px-2.5 py-1 font-semibold text-accent">
                   {t}
@@ -316,7 +326,7 @@ export function ConversationDetailsPanel({
         {hangouts.length > 0 || !isGroupClique ? (
           <Section title="Hangouts">
             {hangouts.length === 0 ? (
-              <div className="flex items-center justify-between gap-3">
+              <div className={cn(GROUP, 'flex items-center justify-between gap-3 px-4 py-3')}>
                 <p className="type-meta text-fg-secondary">Spent time together without tapping phones? Log it and they confirm.</p>
                 <Button
                   size="sm"
@@ -329,9 +339,9 @@ export function ConversationDetailsPanel({
                 </Button>
               </div>
             ) : (
-              <ul className="space-y-2">
+              <ul className={GROUP}>
                 {hangouts.map((h) => (
-                  <li key={h.id} className="rounded-md bg-surface p-3">
+                  <li key={h.id} className={cn(ROW, 'px-4 py-3')}>
                     <p className="type-body-strong text-fg">
                       {h.location_name ?? 'Hangout'} · {new Date(h.occurred_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </p>
@@ -371,13 +381,13 @@ export function ConversationDetailsPanel({
 
         {pins.length > 0 ? (
           <Section title="Pinned">
-            <ul className="space-y-1">
+            <ul className={GROUP}>
               {pins.map((pin) => {
                 const message = byId.get(pin.message_id);
                 const who = pin.pinned_by === currentUserId ? 'You' : isGroupClique ? 'Someone' : firstName;
                 return (
-                  <li key={pin.message_id} className="flex items-center gap-1 rounded-md hover:bg-hover">
-                    <button type="button" onClick={() => onJumpToMessage(pin.message_id)} className="min-w-0 flex-1 px-2 py-2 text-left">
+                  <li key={pin.message_id} className={cn(ROW, 'flex items-center gap-1 pr-2 transition-colors duration-[var(--d-fast)] hover:bg-hover')}>
+                    <button type="button" onClick={() => onJumpToMessage(pin.message_id)} className="min-w-0 flex-1 py-3 pl-4 text-left">
                       <span className="type-body line-clamp-2 text-fg">{message ? previewLabelForMessage(message) : 'Pinned message'}</span>
                       <span className="type-meta block text-fg-tertiary">Pinned by {who}</span>
                     </button>
@@ -391,15 +401,15 @@ export function ConversationDetailsPanel({
 
         {scheduled.length > 0 ? (
           <Section title="Scheduled">
-            <ul className="space-y-2">
+            <ul className={GROUP}>
               {scheduled.map((item) => (
-                <li key={item.id} className="rounded-md bg-surface p-3">
+                <li key={item.id} className={cn(ROW, 'px-4 pb-1.5 pt-3')}>
                   <p className="type-meta tabular font-semibold text-fg-secondary">{formatShort(item.sendAt)}</p>
                   <p className="type-body mt-1 line-clamp-3 text-fg">{item.text}</p>
                   <Button
                     size="sm"
                     variant="plain"
-                    className="mt-1 -ml-2 text-destructive"
+                    className="-ml-3 mt-0.5 text-destructive"
                     loading={busy === item.id}
                     onClick={() => void run(item.id, () => onCancelScheduled(item.id), 'Couldn’t cancel. It may have already been sent.')}
                   >
@@ -413,7 +423,7 @@ export function ConversationDetailsPanel({
 
         {shared.media.length > 0 ? (
           <Section title="Media">
-            <div className="grid grid-cols-3 gap-1">
+            <div className={cn(GROUP, 'grid grid-cols-3 gap-0.5')}>
               {shared.media.map((m) => (
                 <MediaThumb
                   key={m.id}
@@ -430,17 +440,19 @@ export function ConversationDetailsPanel({
 
         {shared.links.length > 0 ? (
           <Section title="Links">
-            <ul className="space-y-0.5">
+            <ul className={GROUP}>
               {shared.links.map((l, i) => (
-                <li key={`${l.id}-${i}`}>
+                <li key={`${l.id}-${i}`} className={ROW_INSET}>
                   <a
                     href={l.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="type-meta flex min-h-10 items-center gap-2 rounded-md px-2 text-accent hover:bg-hover"
+                    className="type-body flex items-center gap-3 pl-4 text-accent transition-colors duration-[var(--d-fast)] hover:bg-hover"
                   >
-                    <ExternalLink size={14} className="shrink-0" aria-hidden />
-                    <span className="truncate">{l.url.replace(/^https?:\/\//, '')}</span>
+                    <ExternalLink size={16} className="shrink-0" aria-hidden />
+                    <span className={ROW_TEXT}>
+                      <span className="truncate">{l.url.replace(/^https?:\/\//, '')}</span>
+                    </span>
                   </a>
                 </li>
               ))}
@@ -450,16 +462,18 @@ export function ConversationDetailsPanel({
 
         {shared.files.length > 0 ? (
           <Section title="Files">
-            <ul className="space-y-0.5">
+            <ul className={GROUP}>
               {shared.files.map((f) => (
-                <li key={f.id}>
+                <li key={f.id} className={ROW_INSET}>
                   <button
                     type="button"
                     onClick={() => onJumpToMessage(f.id)}
-                    className="type-meta flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-fg hover:bg-hover"
+                    className="type-body flex w-full items-center gap-3 pl-4 text-left text-fg transition-colors duration-[var(--d-fast)] hover:bg-hover"
                   >
-                    <FileText size={14} className="shrink-0 text-fg-tertiary" aria-hidden />
-                    <span className="truncate">{f.name}</span>
+                    <FileText size={16} className="shrink-0 text-fg-tertiary" aria-hidden />
+                    <span className={ROW_TEXT}>
+                      <span className="truncate">{f.name}</span>
+                    </span>
                   </button>
                 </li>
               ))}
@@ -469,16 +483,18 @@ export function ConversationDetailsPanel({
 
         {isGroupClique && members.length > 0 ? (
           <Section title={`${members.length} members`}>
-            <ul>
+            <ul className={GROUP}>
               {members.map((m) => (
-                <li key={m.userId}>
+                <li key={m.userId} className={ROW_INSET}>
                   <button
                     type="button"
                     onClick={() => onOpenProfile?.(m.userId)}
-                    className="flex min-h-12 w-full items-center gap-3 rounded-md px-2 text-left hover:bg-hover"
+                    className="flex w-full items-center gap-3 pl-4 text-left transition-colors duration-[var(--d-fast)] hover:bg-hover"
                   >
                     <Avatar seed={m.userId} name={m.label} src={m.avatarUrl ?? null} size={32} />
-                    <span className="type-body min-w-0 flex-1 truncate text-fg">{m.userId === currentUserId ? `${m.label} (you)` : m.label}</span>
+                    <span className={ROW_TEXT}>
+                      <span className="type-body truncate text-fg">{m.userId === currentUserId ? `${m.label} (you)` : m.label}</span>
+                    </span>
                   </button>
                 </li>
               ))}
@@ -508,7 +524,7 @@ export function ConversationDetailsPanel({
               <ListRow icon={UserMinus} title="Remove connection" destructive onClick={() => void actions.remove()} />
             </ListGroup>
           )}
-          {isCore && !isGroupClique ? <p className="type-meta mt-2 px-1 text-fg-tertiary">{firstName} is in your Core.</p> : null}
+          {isCore && !isGroupClique ? <p className="type-meta mt-2 px-4 text-fg-tertiary">{firstName} is in your Core.</p> : null}
         </div>
       </div>
     </div>

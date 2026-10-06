@@ -63,7 +63,7 @@ export function AvailabilitySheet({
           value={tag}
           maxLength={TAG_MAX}
           onChange={(e) => setTag(e.target.value)}
-          help={`${tag.length}/${TAG_MAX}`}
+          count={`${tag.length}/${TAG_MAX}`}
           autoFocus
         />
         <fieldset>
