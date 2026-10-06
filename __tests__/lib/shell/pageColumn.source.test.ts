@@ -21,7 +21,7 @@ describe("shared page column", () => {
 
   it("keeps the map pane full-bleed", () => {
     // The map is a full-width app pane (spec §6.1), not a page column.
-    const dashboard = read("components/DashboardView.tsx");
+    const dashboard = read("components/map/MapScreen.tsx");
     expect(dashboard).not.toContain("PAGE_COLUMN_CLASS");
   });
 });
