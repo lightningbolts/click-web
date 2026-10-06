@@ -20,6 +20,7 @@ import {
   parseEncounterObservation,
   type EncounterObservationColumns,
 } from '@/lib/server/encounterObservation';
+import { openMeteoCodeToIcon, openMeteoCodeToLabel } from '@/lib/server/weather';
 
 export const DISPLAY_LOCATION_FALLBACK = 'A new city';
 const NOMINATIM_REVERSE_TIMEOUT_MS = 3_500;
@@ -162,28 +163,6 @@ function extractSpecificLocationName(semanticLocation: Record<string, unknown>):
     address?.residential,
     address?.road,
   ]);
-}
-
-function openMeteoCodeToLabel(code: number): string {
-  if (code === 0) return 'Clear';
-  if ([1, 2, 3].includes(code)) return 'Cloudy';
-  if ([45, 48].includes(code)) return 'Foggy';
-  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle';
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'Rain';
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'Snow';
-  if ([95, 96, 99].includes(code)) return 'Storm';
-  return 'Clear';
-}
-
-function openMeteoCodeToIcon(code: number): string {
-  if (code === 0) return 'clear';
-  if ([1, 2, 3].includes(code)) return 'cloudy';
-  if ([45, 48].includes(code)) return 'fog';
-  if ([51, 53, 55, 56, 57].includes(code)) return 'drizzle';
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain';
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow';
-  if ([95, 96, 99].includes(code)) return 'thunder';
-  return 'clear';
 }
 
 export type OpenMeteoForecast = {

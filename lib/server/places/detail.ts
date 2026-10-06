@@ -15,6 +15,7 @@ import {
 import { isPlaceManager, type ConsumerPlaceRow } from '@/lib/server/places/loadPlace';
 import { cooldownUntil, editableUntil, loadNewestPulse, loadPresence } from '@/lib/server/places/pulses';
 import { placeTimezone, serializePlaceDetail, type PlaceDetailExtras } from '@/lib/server/places/serialize';
+import { eventImageFromMetadata } from '@/lib/events/eventMetadata';
 
 /**
  * PlaceDetail (§5.3). Other people appear only in the three allowed places: here-now names
@@ -40,7 +41,7 @@ async function loadPattern(admin: SupabaseClient, place: ConsumerPlaceRow, confi
 function upcomingEvents(context: EnrichContext, placeId: string): PlaceDetail['upcoming_events'] {
   return (context.eventsByPlace.get(placeId) ?? [])
     .slice(0, MAX_UPCOMING)
-    .map((e) => ({ ...eventRef(e), cover_theme_id: e.cover_theme_id }));
+    .map((e) => ({ ...eventRef(e), cover_theme_id: e.cover_theme_id, image_url: eventImageFromMetadata(e.metadata) }));
 }
 
 /** Anonymous / public detail: aggregate fields only, every viewer field null or []. */

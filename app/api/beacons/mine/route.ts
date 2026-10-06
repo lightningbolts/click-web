@@ -60,6 +60,8 @@ export async function GET(request: NextRequest) {
       .from("beacon_attendees")
       .select("beacon_id")
       .eq("user_id", user.id)
+      // Newest RSVPs first, so the cap never drops the events coming up (the iOS Live Activity reads these).
+      .order("signed_up_at", { ascending: false })
       .limit(50);
 
     const rsvpIds = (Array.isArray(rsvps) ? rsvps : [])

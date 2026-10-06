@@ -140,6 +140,11 @@ export function eventLocationNameFromMetadata(meta: Record<string, unknown>): st
   return metaString(meta, "location_name", "formatted_address", "address", "place_name");
 }
 
+/** The street address only (no venue name), for directions and the door. */
+export function eventAddressFromMetadata(meta: Record<string, unknown>): string | null {
+  return metaString(meta, "formatted_address", "address", "display_address");
+}
+
 export function rsvpEnabledFromMetadata(meta: Record<string, unknown>): boolean {
   const raw = meta.rsvp_enabled ?? meta.rsvpEnabled;
   if (raw === false || raw === "false") return false;
