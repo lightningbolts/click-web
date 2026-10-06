@@ -56,7 +56,7 @@ describe('Wallet pass artwork', () => {
     ]));
   });
 
-  it('falls back to the event colors without a picture, a binding, or a reachable picture', async () => {
+  it('falls back to the event colors without a picture, a binding, or a reachable, reasonably sized picture', async () => {
     const calls: Array<Record<string, unknown>> = [];
     const fallback = (art: Awaited<ReturnType<typeof passArt>>) => {
       expect(Object.keys(art.images)).toEqual(['background.png']);
@@ -67,6 +67,11 @@ describe('Wallet pass artwork', () => {
     env.IMAGES = fakeImages(calls);
     fallback(await passArt({ ...event, image_url: null }));
     global.fetch = jest.fn(async () => new Response('nope', { status: 404 })) as typeof fetch;
+    fallback(await passArt(event));
+    // Too big, with no content-length to warn: the read stops at the cap.
+    global.fetch = jest.fn(async () => new Response(new ReadableStream({
+      pull(controller) { controller.enqueue(new Uint8Array(1024 * 1024)); },
+    }))) as typeof fetch;
     fallback(await passArt(event));
     expect(calls).toHaveLength(0);
   });

@@ -42,6 +42,32 @@ function imagesBinding(): ImagesBinding | null {
   return binding && typeof (binding as ImagesBinding).input === 'function' ? (binding as ImagesBinding) : null;
 }
 
+/** The body, unless it's empty or runs past `max` bytes (stopped there, never fully buffered). */
+async function readCapped(response: Response, max: number): Promise<ArrayBuffer | null> {
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  if (total === 0) return null;
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes.buffer;
+}
+
 async function transformed(images: ImagesBinding, bytes: ArrayBuffer, options: Record<string, unknown>): Promise<Buffer> {
   const result = await images
     .input(new Blob([bytes]).stream())
@@ -62,8 +88,8 @@ async function photoArt(imageUrl: string | null): Promise<Record<string, Buffer>
   try {
     const response = await fetch(imageUrl, { signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS) });
     if (!response.ok || Number(response.headers.get('content-length') ?? 0) > PHOTO_MAX_BYTES) return null;
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength === 0 || bytes.byteLength > PHOTO_MAX_BYTES) return null;
+    const bytes = await readCapped(response, PHOTO_MAX_BYTES);
+    if (!bytes) return null;
     const [background, thumbnail] = await Promise.all([
       transformed(images, bytes, { width: 180, height: 220, fit: 'cover', brightness: 0.62, saturation: 1.15 }),
       // 90 pt at 3×; its own shape (Wallet takes 2:3 to 3:2), never cropped.
