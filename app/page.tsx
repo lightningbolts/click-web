@@ -62,7 +62,7 @@ async function SignedInHome() {
 
 /**
  * Root route: resolve the cookie session on the server so anonymous crawlers receive marketing
- * HTML (not LoadingScreen). Signed-in people get Home with no marketing flash.
+ * HTML (no loading gate). Signed-in people get Home with no marketing flash.
  */
 export default async function Home() {
   const user = await getServerUser();

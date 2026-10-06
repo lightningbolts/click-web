@@ -192,8 +192,8 @@ export default function LandingPlayground() {
               onClick={() => setScene(item.id)}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 selected
-                  ? 'bg-primary text-on-primary'
-                  : 'border border-border-hard bg-surface text-on-surface hover:bg-surface-container'
+                  ? 'bg-action text-on-action'
+                  : 'border border-hairline bg-surface text-fg hover:bg-surface-raised'
               }`}
             >
               {item.label}

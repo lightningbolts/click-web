@@ -42,15 +42,15 @@ export default function EventsScene({
   };
 
   return (
-    <div className="flex h-full flex-col overflow-auto bg-background" data-testid="playground-scene-events">
-      <div className="border-b border-border-hard px-4 py-3">
-        <p className="text-xs text-on-surface-variant">Good evening, Alex.</p>
-        <h3 className="text-lg font-bold text-on-surface">Ready to connect today?</h3>
+    <div className="flex h-full flex-col overflow-auto bg-bg" data-testid="playground-scene-events">
+      <div className="border-b border-hairline px-4 py-3">
+        <p className="text-xs text-fg-secondary">Good evening, Alex.</p>
+        <h3 className="text-lg font-bold text-fg">Ready to connect today?</h3>
       </div>
 
       <div className="px-3 pt-3">
-        <div className="flex items-center gap-2 rounded-full border border-border-hard bg-surface px-3 py-2 text-xs text-on-surface-variant">
-          <span className="font-semibold text-primary">Search</span>
+        <div className="flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-2 text-xs text-fg-secondary">
+          <span className="font-semibold text-accent">Search</span>
           people, events, places
         </div>
       </div>
@@ -59,31 +59,31 @@ export default function EventsScene({
         <button
           type="button"
           onClick={() => setOpenId(featured.id)}
-          className="mx-3 mt-3 rounded-[16px] border border-primary bg-primary-container p-3 text-left"
+          className="mx-3 mt-3 rounded-[16px] border border-action bg-selection p-3 text-left"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Featured</p>
-          <p className="mt-1 text-sm font-bold text-on-primary-container">{featured.title}</p>
-          <p className="text-xs text-on-primary-container">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">Featured</p>
+          <p className="mt-1 text-sm font-bold text-accent">{featured.title}</p>
+          <p className="text-xs text-accent">
             {featured.when} · {featured.venue}
           </p>
           {state.rsvpIds.has(featured.id) ? (
-            <p className="mt-1 text-[11px] font-semibold text-primary">You&apos;re going</p>
+            <p className="mt-1 text-[11px] font-semibold text-accent">You&apos;re going</p>
           ) : null}
         </button>
       ) : null}
 
       <div className="px-3 pt-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">I&apos;m down for…</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">I&apos;m down for…</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {['Coffee', 'Live music'].map((intent) => (
             <span
               key={intent}
-              className="rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-on-primary"
+              className="rounded-full bg-action px-3 py-1 text-[11px] font-semibold text-on-action"
             >
               {intent}
             </span>
           ))}
-          <span className="rounded-full border border-border-hard px-3 py-1 text-[11px] font-semibold text-on-surface-variant">
+          <span className="rounded-full border border-hairline px-3 py-1 text-[11px] font-semibold text-fg-secondary">
             Edit intents
           </span>
         </div>
@@ -99,15 +99,15 @@ export default function EventsScene({
                 type="button"
                 onClick={() => setOpenId(event.id)}
                 className={`w-full rounded-[12px] border px-3 py-2.5 text-left ${
-                  selected ? 'border-primary bg-primary-container' : 'border-border-hard bg-surface'
+                  selected ? 'border-action bg-selection' : 'border-hairline bg-surface'
                 }`}
               >
-                <p className="text-sm font-semibold text-on-surface">{event.title}</p>
-                <p className="text-xs text-on-surface-variant">
+                <p className="text-sm font-semibold text-fg">{event.title}</p>
+                <p className="text-xs text-fg-secondary">
                   {event.when} · {event.venue}
                 </p>
                 {going ? (
-                  <p className="mt-1 text-[11px] font-semibold text-primary">You&apos;re going</p>
+                  <p className="mt-1 text-[11px] font-semibold text-accent">You&apos;re going</p>
                 ) : null}
               </button>
             </li>
@@ -116,18 +116,18 @@ export default function EventsScene({
       </ul>
 
       {open ? (
-        <div className="mt-auto border-t border-border-hard bg-surface px-4 py-3">
-          <p className="text-sm font-bold text-on-surface">{open.title}</p>
-          <p className="mt-1 flex items-center gap-1 text-xs text-on-surface-variant">
+        <div className="mt-auto border-t border-hairline bg-surface px-4 py-3">
+          <p className="text-sm font-bold text-fg">{open.title}</p>
+          <p className="mt-1 flex items-center gap-1 text-xs text-fg-secondary">
             <CalendarDays className="h-3 w-3" /> {open.when}
           </p>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-on-surface-variant">
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-fg-secondary">
             <MapPin className="h-3 w-3" /> {open.venue} · Host {open.host}
           </p>
-          <p className="mt-2 text-xs text-on-surface-variant">{open.description}</p>
+          <p className="mt-2 text-xs text-fg-secondary">{open.description}</p>
           {goingPeople.length > 0 ? (
             <div className="mt-3">
-              <p className="text-[11px] font-semibold text-on-surface">
+              <p className="text-[11px] font-semibold text-fg">
                 {goingPeople.length === 1
                   ? '1 person you know is going'
                   : `${goingPeople.length} people you know are going`}
@@ -137,30 +137,30 @@ export default function EventsScene({
                   <li key={person.id}>
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-container"
+                      className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-raised"
                       onClick={() => {
                         actions.setOpenChatId(person.id);
                         actions.setDashboardTab('chat');
                       }}
                     >
                       <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
-                      <span className="text-xs font-semibold text-on-surface">{person.name}</span>
+                      <span className="text-xs font-semibold text-fg">{person.name}</span>
                     </button>
                   </li>
                 ))}
               </ul>
             </div>
           ) : (
-            <p className="mt-2 flex items-center gap-2 text-[11px] text-on-surface-variant">
-              <Users className="h-3.5 w-3.5 text-primary" />
+            <p className="mt-2 flex items-center gap-2 text-[11px] text-fg-secondary">
+              <Users className="h-3.5 w-3.5 text-accent" />
               None of your Clicks yet
             </p>
           )}
           {rsvped ? (
-            <div className="mt-3 border-t border-border-hard pt-3">
-              <p className="text-[11px] font-semibold text-on-surface">Who&apos;s going</p>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <p className="text-[11px] font-semibold text-fg">Who&apos;s going</p>
               <ul className="mt-2 space-y-1.5">
-                <li className="flex items-center gap-2 px-1 py-1 text-xs font-medium text-on-surface">
+                <li className="flex items-center gap-2 px-1 py-1 text-xs font-medium text-fg">
                   <PlaygroundAvatar initials="A" size="sm" />
                   You
                 </li>
@@ -171,14 +171,14 @@ export default function EventsScene({
                     <li key={person.id}>
                       <button
                         type="button"
-                        className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-container"
+                        className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-raised"
                         onClick={() => {
                           actions.setOpenChatId(person.id);
                           actions.setDashboardTab('chat');
                         }}
                       >
                         <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
-                        <span className="text-xs font-semibold text-on-surface">{person.name}</span>
+                        <span className="text-xs font-semibold text-fg">{person.name}</span>
                       </button>
                     </li>
                   ))}
@@ -199,8 +199,8 @@ export default function EventsScene({
               onClick={toggleRoute}
               className={`inline-flex items-center justify-center gap-1 rounded-[8px] py-2.5 text-xs font-bold ${
                 routed
-                  ? 'bg-primary text-on-primary'
-                  : 'border border-primary bg-primary-container text-primary'
+                  ? 'bg-action text-on-action'
+                  : 'border border-action bg-selection text-accent'
               }`}
             >
               <Navigation className="h-3 w-3" />

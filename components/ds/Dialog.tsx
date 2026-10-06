@@ -31,6 +31,7 @@ export function Dialog({
   className,
   trigger,
   initialFocusSelector,
+  testId,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -45,6 +46,7 @@ export function Dialog({
   trigger?: ReactNode;
   /** CSS selector inside the dialog to focus on open (e.g. the safe button). */
   initialFocusSelector?: string;
+  testId?: string;
 }) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -54,6 +56,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={overlayClassName} />
         <RadixDialog.Content
+          data-testid={testId}
           onOpenAutoFocus={
             initialFocusSelector
               ? (e) => {

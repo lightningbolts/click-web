@@ -32,22 +32,22 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
     if (s >= 80) return chart.primary;
     if (s >= 60) return chart.primary;
     if (s >= 40) return chart.axis;
-    return 'var(--color-error)';
+    return 'var(--destructive)';
   };
   
   const scoreColor = getScoreColor(score);
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-primary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
+  const trendColor = trend === 'up' ? 'text-accent' : trend === 'down' ? 'text-destructive' : 'text-fg-secondary';
 
   return (
     <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/20 rounded-lg">
-            <Sparkles className="w-4 h-4 text-primary" />
+          <div className="p-2 bg-action/20 rounded-lg">
+            <Sparkles className="w-4 h-4 text-accent" />
           </div>
-          <span className="text-sm font-medium text-on-surface-variant">Social Sticky Score</span>
+          <span className="text-sm font-medium text-fg-secondary">Social Sticky Score</span>
         </div>
         <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
           <TrendIcon className="w-3 h-3" />
@@ -97,24 +97,24 @@ export function StickyScoreCard({ data }: StickyScoreCardProps) {
             >
               {score}
             </motion.span>
-            <span className="text-xs text-on-surface-variant">/ 100</span>
+            <span className="text-xs text-fg-secondary">/ 100</span>
           </div>
         </div>
       </div>
       
       {/* Breakdown stats */}
-      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-border-hard">
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-hairline">
         <div className="text-center">
-          <p className="text-lg font-semibold text-on-surface">{breakdown.repeatVisitors}%</p>
-          <p className="text-[10px] text-on-surface-variant">Repeat</p>
+          <p className="text-lg font-semibold text-fg">{breakdown.repeatVisitors}%</p>
+          <p className="text-[10px] text-fg-secondary">Repeat</p>
         </div>
-        <div className="text-center border-x border-border-hard">
-          <p className="text-lg font-semibold text-on-surface">{breakdown.avgConnectionsPerVisit}</p>
-          <p className="text-[10px] text-on-surface-variant">Avg/Visit</p>
+        <div className="text-center border-x border-hairline">
+          <p className="text-lg font-semibold text-fg">{breakdown.avgConnectionsPerVisit}</p>
+          <p className="text-[10px] text-fg-secondary">Avg/Visit</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-semibold text-on-surface">{breakdown.communityEngagement}%</p>
-          <p className="text-[10px] text-on-surface-variant">Engaged</p>
+          <p className="text-lg font-semibold text-fg">{breakdown.communityEngagement}%</p>
+          <p className="text-[10px] text-fg-secondary">Engaged</p>
         </div>
       </div>
       {score > 0 ? (
@@ -136,7 +136,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
   const { value, totalArea, activeZones, trend } = data;
   
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? 'text-primary' : trend === 'down' ? 'text-error' : 'text-on-surface-variant';
+  const trendColor = trend === 'up' ? 'text-accent' : trend === 'down' ? 'text-destructive' : 'text-fg-secondary';
   
   // Visual density indicator
   const densityLevel = Math.min(Math.floor(value / 2), 10);
@@ -145,10 +145,10 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
     <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/20 rounded-lg">
-            <Link2 className="w-4 h-4 text-primary" />
+          <div className="p-2 bg-action/20 rounded-lg">
+            <Link2 className="w-4 h-4 text-accent" />
           </div>
-          <span className="text-sm font-medium text-on-surface-variant">Connection Density</span>
+          <span className="text-sm font-medium text-fg-secondary">Connection Density</span>
         </div>
         <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
           <TrendIcon className="w-3 h-3" />
@@ -159,11 +159,11 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
         <motion.span
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-4xl font-bold text-on-surface"
+          className="text-4xl font-bold text-fg"
         >
           {value}
         </motion.span>
-        <span className="text-sm text-on-surface-variant">per 100 sq ft</span>
+        <span className="text-sm text-fg-secondary">per 100 sq ft</span>
       </div>
       
       {/* Density bar visualization */}
@@ -176,8 +176,8 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
             transition={{ delay: i * 0.05, duration: 0.3 }}
             className={`flex-1 h-8 rounded-sm origin-bottom ${
               i < densityLevel 
-                ? 'bg-primary' 
-                : 'bg-surface-container-high'
+                ? 'bg-action' 
+                : 'bg-surface-raised'
             }`}
             style={{
               boxShadow: "none",
@@ -186,7 +186,7 @@ export function ConnectionDensityCard({ data }: ConnectionDensityCardProps) {
         ))}
       </div>
       
-      <div className="flex justify-between text-xs text-on-surface-variant mt-4 pt-4 border-t border-border-hard">
+      <div className="flex justify-between text-xs text-fg-secondary mt-4 pt-4 border-t border-hairline">
         <span>Total Area: {totalArea.toLocaleString()} sq ft</span>
         <span>{activeZones} active zones</span>
       </div>
@@ -209,7 +209,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
   
   // Color based on capacity
   const getCapacityColor = (pct: number) => {
-    if (pct >= 90) return 'var(--color-error)';
+    if (pct >= 90) return 'var(--destructive)';
     if (pct >= 70) return chart.axis;
     if (pct >= 40) return chart.primary;
     return chart.primary;
@@ -221,14 +221,14 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
     <GlassPanel className="p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/20 rounded-lg">
-            <Users className="w-4 h-4 text-primary" />
+          <div className="p-2 bg-action/20 rounded-lg">
+            <Users className="w-4 h-4 text-accent" />
           </div>
-          <span className="text-sm font-medium text-on-surface-variant">Live Count</span>
+          <span className="text-sm font-medium text-fg-secondary">Live Count</span>
         </div>
         <div className="flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-primary opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-action opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-action"></span>
         </div>
       </div>
       
@@ -242,11 +242,11 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
         >
           {current}
         </motion.span>
-        <span className="text-sm text-on-surface-variant">/ {capacity}</span>
+        <span className="text-sm text-fg-secondary">/ {capacity}</span>
       </div>
       
       {/* Capacity bar */}
-      <div className="h-2 bg-surface-container-high rounded-full overflow-hidden mb-4">
+      <div className="h-2 bg-surface-raised rounded-full overflow-hidden mb-4">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${fillPercentage}%` }}
@@ -279,7 +279,7 @@ export function LiveCountCard({ data }: LiveCountCardProps) {
         })}
       </div>
       
-      <div className="flex justify-between text-xs text-on-surface-variant pt-4 border-t border-border-hard">
+      <div className="flex justify-between text-xs text-fg-secondary pt-4 border-t border-hairline">
         <span>Peak: {peak}</span>
         <span>@ {peakTime}</span>
       </div>

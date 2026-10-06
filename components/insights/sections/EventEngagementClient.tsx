@@ -94,11 +94,11 @@ export default function EventEngagementPage({ placeId }: { placeId: string }) {
       </motion.div>
 
       {!payload && isLoading && (
-        <div className="h-40 animate-pulse rounded-2xl bg-surface-container" />
+        <div className="h-40 animate-pulse rounded-2xl bg-surface-raised" />
       )}
 
       {!payload && !isLoading && (
-        <GlassPanel className="p-6 text-on-surface-variant">
+        <GlassPanel className="p-6 text-fg-secondary">
           No event engagement yet. Host an event as this Place to see how people found it and showed up.
         </GlassPanel>
       )}
@@ -110,55 +110,55 @@ export default function EventEngagementPage({ placeId }: { placeId: string }) {
             className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5"
           >
             <GlassPanel className="p-4">
-              <div className="flex items-center gap-2 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-2 text-fg-secondary text-xs">
                 <Eye className="h-3.5 w-3.5" /> Impressions
               </div>
-              <div className="mt-1 text-2xl font-semibold text-on-surface">
+              <div className="mt-1 text-2xl font-semibold text-fg">
                 {payload.funnel.impressions}
               </div>
-              <div className="text-xs text-on-surface/50">
+              <div className="text-xs text-fg/50">
                 {payload.funnel.unique_viewers} unique viewers
               </div>
             </GlassPanel>
             <GlassPanel className="p-4">
-              <div className="flex items-center gap-2 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-2 text-fg-secondary text-xs">
                 <Bookmark className="h-3.5 w-3.5" /> Interest rate
               </div>
-              <div className="mt-1 text-2xl font-semibold text-on-surface">
+              <div className="mt-1 text-2xl font-semibold text-fg">
                 {pct(payload.funnel.interest_rate)}
               </div>
-              <div className="text-xs text-on-surface/50">
+              <div className="text-xs text-fg/50">
                 {payload.funnel.bookmarks} bookmarks
               </div>
             </GlassPanel>
             <GlassPanel className="p-4">
-              <div className="flex items-center gap-2 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-2 text-fg-secondary text-xs">
                 <Share2 className="h-3.5 w-3.5" /> Share rate
               </div>
-              <div className="mt-1 text-2xl font-semibold text-on-surface">
+              <div className="mt-1 text-2xl font-semibold text-fg">
                 {pct(payload.funnel.share_rate)}
               </div>
-              <div className="text-xs text-on-surface/50">
+              <div className="text-xs text-fg/50">
                 {payload.funnel.shares ?? 0} shares
               </div>
             </GlassPanel>
             <GlassPanel className="p-4">
-              <div className="flex items-center gap-2 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-2 text-fg-secondary text-xs">
                 <UserCheck className="h-3.5 w-3.5" /> RSVP conversion
               </div>
-              <div className="mt-1 text-2xl font-semibold text-on-surface">
+              <div className="mt-1 text-2xl font-semibold text-fg">
                 {pct(payload.funnel.rsvp_conversion)}
               </div>
-              <div className="text-xs text-on-surface/50">{payload.funnel.rsvps} RSVPs</div>
+              <div className="text-xs text-fg/50">{payload.funnel.rsvps} RSVPs</div>
             </GlassPanel>
             <GlassPanel className="p-4">
-              <div className="flex items-center gap-2 text-on-surface-variant text-xs">
+              <div className="flex items-center gap-2 text-fg-secondary text-xs">
                 <MapPin className="h-3.5 w-3.5" /> RSVP → check-in
               </div>
-              <div className="mt-1 text-2xl font-semibold text-on-surface">
+              <div className="mt-1 text-2xl font-semibold text-fg">
                 {pct(payload.funnel.rsvp_to_check_in)}
               </div>
-              <div className="text-xs text-on-surface/50">
+              <div className="text-xs text-fg/50">
                 dwell p50 {payload.dwell.p50_minutes ?? '—'}m · p90{' '}
                 {payload.dwell.p90_minutes ?? '—'}m
               </div>
@@ -167,7 +167,7 @@ export default function EventEngagementPage({ placeId }: { placeId: string }) {
 
           <motion.div variants={itemVariants} className="grid gap-4 lg:grid-cols-2">
             <GlassPanel className="p-4">
-              <h2 className="mb-3 text-sm font-medium text-on-surface/80">Funnel</h2>
+              <h2 className="mb-3 text-sm font-medium text-fg/80">Funnel</h2>
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={funnelBars}>
@@ -197,7 +197,7 @@ export default function EventEngagementPage({ placeId }: { placeId: string }) {
             </GlassPanel>
 
             <GlassPanel className="p-4">
-              <h2 className="mb-3 text-sm font-medium text-on-surface/80">
+              <h2 className="mb-3 text-sm font-medium text-fg/80">
                 Arrival vs event start (minutes)
               </h2>
               <div className="h-56">
@@ -227,11 +227,11 @@ export default function EventEngagementPage({ placeId }: { placeId: string }) {
 
           <motion.div variants={itemVariants}>
             <GlassPanel className="p-4">
-              <h2 className="mb-3 text-sm font-medium text-on-surface/80">
+              <h2 className="mb-3 text-sm font-medium text-fg/80">
                 Check-in rejects
               </h2>
               {rejectData.length === 0 ? (
-                <p className="text-sm text-on-surface/50">No rejected check-ins yet.</p>
+                <p className="text-sm text-fg/50">No rejected check-ins yet.</p>
               ) : (
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">

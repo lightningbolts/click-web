@@ -169,34 +169,6 @@ body:has([data-app-shell]) [data-site-chrome] {
   --color-destructive-fill: var(--destructive-fill);
   --color-read-receipt: var(--read-receipt);
 
-  /*
-   * Legacy "Functional Clarity" role names, aliased onto the new roles for one
-   * release so pages migrate incrementally (spec §4). Delete once
-   * `rg "surface-container|border-hard|on-surface-variant"` returns nothing.
-   */
-  --color-background: var(--bg);
-  --color-foreground: var(--text);
-  --color-primary: var(--action);
-  --color-on-primary: var(--text-on-action);
-  --color-primary-container: var(--selection);
-  --color-on-primary-container: var(--accent);
-  --color-secondary: var(--action-hover);
-  --color-on-secondary: var(--text-on-action);
-  --color-secondary-container: var(--selection);
-  --color-on-secondary-container: var(--accent);
-  --color-surface-container-low: var(--surface-raised);
-  --color-surface-container: var(--surface-raised);
-  --color-surface-container-high: var(--surface-raised);
-  --color-surface-container-highest: var(--surface-raised);
-  --color-surface-variant: var(--surface-raised);
-  --color-on-surface: var(--text);
-  --color-on-surface-variant: var(--text-secondary);
-  --color-outline: var(--text-tertiary);
-  --color-outline-variant: var(--hairline);
-  --color-border-hard: var(--hairline);
-  --color-error: var(--destructive);
-  --color-surface-tint: var(--action);
-  --color-inverse-primary: var(--accent);
 
   --font-sans:
     ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
@@ -927,16 +899,16 @@ a {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--color-outline);
+  background: var(--text-tertiary);
   border-radius: 3px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--color-on-surface-variant);
+  background: var(--text-secondary);
 }
 
 .scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
-  background: var(--color-outline);
+  background: var(--text-tertiary);
 }
 
 .scrollbar-track-transparent::-webkit-scrollbar-track {
@@ -945,7 +917,7 @@ a {
 
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-outline) transparent;
+  scrollbar-color: var(--text-tertiary) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

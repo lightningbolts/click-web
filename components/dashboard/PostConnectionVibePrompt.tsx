@@ -162,12 +162,12 @@ export default function PostConnectionVibePrompt({
           initial={{ y: 40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 20, opacity: 0 }}
-          className="relative w-full max-w-md rounded-2xl border border-border-hard bg-background p-5 shadow-violet-500/10"
+          className="relative w-full max-w-md rounded-2xl border border-hairline bg-bg p-5 shadow-violet-500/10"
         >
           <button
             type="button"
             onClick={skip}
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-fg-secondary hover:bg-surface-raised hover:text-fg"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -177,17 +177,17 @@ export default function PostConnectionVibePrompt({
               <Sparkles className="h-5 w-5 text-amber-700 dark:text-amber-300" />
             </div>
             <div>
-              <h2 id="vibe-prompt-title" className="text-lg font-semibold text-on-surface">
+              <h2 id="vibe-prompt-title" className="text-lg font-semibold text-fg">
                 How was the vibe?
               </h2>
-              <p className="text-xs text-on-surface-variant">
+              <p className="text-xs text-fg-secondary">
                 Optional — helps venues improve (and stays aggregate in Business Insights).{" "}
-                <span className="text-on-surface-variant">{venueLabel}</span>
+                <span className="text-fg-secondary">{venueLabel}</span>
               </p>
             </div>
           </div>
 
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-secondary">
             1–5 at this place
           </p>
           <div className="mb-4 flex gap-2">
@@ -198,8 +198,8 @@ export default function PostConnectionVibePrompt({
                 onClick={() => setRating(n)}
                 className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
                   rating === n
-                    ? "bg-primary text-on-primary"
-                    : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                    ? "bg-action text-on-action"
+                    : "bg-surface-raised text-fg-secondary hover:bg-surface-raised hover:text-fg"
                 }`}
               >
                 {n}
@@ -207,7 +207,7 @@ export default function PostConnectionVibePrompt({
             ))}
           </div>
 
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">Focus</p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-secondary">Focus</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {CATEGORIES.map((c) => (
               <button
@@ -217,7 +217,7 @@ export default function PostConnectionVibePrompt({
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   category === c.id
                     ? "bg-teal-500/20 text-teal-700 dark:text-teal-300 ring-1 ring-teal-500/40"
-                    : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    : "bg-surface-raised text-fg-secondary hover:bg-surface-raised"
                 }`}
               >
                 {c.label}
@@ -225,15 +225,15 @@ export default function PostConnectionVibePrompt({
             ))}
           </div>
 
-          <div className="mb-4 flex gap-2 rounded-xl border border-border-hard bg-black/20 px-3 py-2">
-            <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" />
+          <div className="mb-4 flex gap-2 rounded-xl border border-hairline bg-black/20 px-3 py-2">
+            <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-fg-secondary" />
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="One line (optional)"
               rows={2}
               maxLength={500}
-              className="min-h-[48px] w-full resize-none bg-transparent text-sm text-on-surface placeholder:text-outline outline-none"
+              className="min-h-[48px] w-full resize-none bg-transparent text-sm text-fg placeholder:text-fg-tertiary outline-none"
             />
           </div>
 
@@ -252,12 +252,12 @@ export default function PostConnectionVibePrompt({
             disabled={rollBusy}
             className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-violet-400/30 bg-white/[0.07] px-4 py-3 text-left shadow-lg shadow-violet-500/10 transition-colors hover:border-violet-300/50 hover:bg-white/[0.1] disabled:cursor-wait disabled:opacity-70"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-primary">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-300/25 bg-violet-400/15 text-accent">
               {rollBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-on-surface">Click Drop</span>
-              <span className="mt-0.5 block text-xs leading-5 text-on-surface-variant">
+              <span className="block text-sm font-semibold text-fg">Click Drop</span>
+              <span className="mt-0.5 block text-xs leading-5 text-fg-secondary">
                 {rollStatus === "uploading"
                   ? "Dropping your photo into the shared roll..."
                   : rollStatus === "done"
@@ -281,7 +281,7 @@ export default function PostConnectionVibePrompt({
             <button
               type="button"
               onClick={skip}
-              className="flex-1 rounded-xl border border-border-hard py-3 text-sm font-medium text-on-surface-variant transition-colors hover:border-white/25 hover:text-on-surface"
+              className="flex-1 rounded-xl border border-hairline py-3 text-sm font-medium text-fg-secondary transition-colors hover:border-white/25 hover:text-fg"
             >
               Skip
             </button>
@@ -289,7 +289,7 @@ export default function PostConnectionVibePrompt({
               type="button"
               onClick={submit}
               disabled={status === "saving" || (rating === null && !message.trim())}
-              className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-xl bg-action py-3 text-sm font-semibold text-on-action transition-colors hover:bg-action/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {status === "saving" ? "Saving…" : "Share vibe"}
             </button>

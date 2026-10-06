@@ -8,10 +8,10 @@ const PinMap = dynamic(() => import('./PinMap'), {
   ssr: false,
   loading: () => (
     <div
-      className="flex h-64 items-center justify-center rounded-[16px] border border-border-hard bg-surface-container"
+      className="flex h-64 items-center justify-center rounded-[16px] border border-hairline bg-surface-raised"
       data-testid="pin-map-loading"
     >
-      <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
+      <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden />
       <span className="sr-only">Loading map…</span>
     </div>
   ),

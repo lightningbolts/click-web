@@ -11,10 +11,10 @@ const PlaygroundMapLazy = dynamic(() => import('./PlaygroundMap'), {
   ssr: false,
   loading: () => (
     <div
-      className="flex h-full min-h-[240px] items-center justify-center rounded-[16px] border border-border-hard bg-surface-container"
+      className="flex h-full min-h-[240px] items-center justify-center rounded-[16px] border border-hairline bg-surface-raised"
       data-testid="playground-map-loading"
     >
-      <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
+      <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
       <span className="sr-only">Loading map...</span>
     </div>
   ),

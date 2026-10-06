@@ -1,8 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { FcButton, FcField, FcInput } from '@/components/fc';
-import { FcDialog } from '@/components/fc/FcDialog';
+import { Button } from '@/components/ds/Button';
+import { Dialog } from '@/components/ds/Dialog';
+import { fieldClassName } from '@/components/ds/TextField';
 import { makePlan, planSummary, type HangoutPlan } from '@/lib/chat/plans';
 
 function pad(n: number): string {
@@ -113,12 +114,12 @@ export function PlanDialog({
   };
 
   return (
-    <FcDialog
+    <Dialog
       open={open}
       onOpenChange={onOpenChange}
       title="Plan a hangout"
       description={withName ? `Pick a time with ${withName}. They can RSVP right in the chat.` : 'Pick a time. Everyone can RSVP right in the chat.'}
-      initialFocusRef={titleRef}
+      initialFocusSelector="[data-autofocus]"
       testId="plan-dialog"
     >
       <form
@@ -128,8 +129,11 @@ export function PlanDialog({
           void submit();
         }}
       >
-        <FcField label="What">
-          <FcInput
+        <label className="flex w-full min-w-0 flex-col gap-1.5">
+<span className="type-meta font-semibold text-fg-secondary">What</span>
+          <input
+            data-autofocus
+            className={`${fieldClassName} h-11`}
             ref={titleRef}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -137,7 +141,7 @@ export function PlanDialog({
             maxLength={80}
             required
           />
-        </FcField>
+        </label>
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Quick day">
             {QUICK_DAYS.map((d) => (
@@ -145,46 +149,50 @@ export function PlanDialog({
                 key={d.label}
                 type="button"
                 onClick={() => setDay(d.offset)}
-                className="inline-flex h-9 items-center rounded-full border border-border-hard px-3 text-sm font-semibold text-on-surface hover:bg-surface-container-low"
+                className="inline-flex h-9 items-center rounded-full border border-hairline px-3 text-sm font-semibold text-fg hover:bg-surface-raised"
               >
                 {d.label}
               </button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <FcField label="Day" className="col-span-2">
-              <FcInput type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </FcField>
-            <FcField label="Starts">
-              <FcInput type="time" value={start} onChange={(e) => setStart(e.target.value)} required />
-            </FcField>
-            <FcField label="Ends (optional)">
-              <FcInput type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
-            </FcField>
+            <label className="flex w-full min-w-0 flex-col gap-1.5 col-span-2">
+<span className="type-meta font-semibold text-fg-secondary">Day</span>
+              <input className={`${fieldClassName} h-11`} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            </label>
+            <label className="flex w-full min-w-0 flex-col gap-1.5">
+<span className="type-meta font-semibold text-fg-secondary">Starts</span>
+              <input className={`${fieldClassName} h-11`} type="time" value={start} onChange={(e) => setStart(e.target.value)} required />
+            </label>
+            <label className="flex w-full min-w-0 flex-col gap-1.5">
+<span className="type-meta font-semibold text-fg-secondary">Ends (optional)</span>
+              <input className={`${fieldClassName} h-11`} type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </label>
           </div>
         </div>
-        <FcField label="Where (optional)">
-          <FcInput value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Place or address" maxLength={120} />
-        </FcField>
+        <label className="flex w-full min-w-0 flex-col gap-1.5">
+<span className="type-meta font-semibold text-fg-secondary">Where (optional)</span>
+          <input className={`${fieldClassName} h-11`} value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Place or address" maxLength={120} />
+        </label>
         {plan ? (
-          <p className="rounded-[12px] border border-border-hard bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
+          <p className="rounded-[12px] border border-hairline bg-surface-raised px-3 py-2 text-sm text-fg-secondary">
             {planSummary(plan)}
           </p>
         ) : null}
         {error ? (
-          <p role="alert" className="text-sm text-error">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <FcButton variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
             Cancel
-          </FcButton>
-          <FcButton type="submit" disabled={!plan || busy}>
+          </Button>
+          <Button variant="primary" type="submit" disabled={!plan || busy}>
             {busy ? 'Sending…' : 'Send plan'}
-          </FcButton>
+          </Button>
         </div>
       </form>
-    </FcDialog>
+    </Dialog>
   );
 }

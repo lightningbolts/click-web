@@ -38,7 +38,7 @@ export function ConnectionPeerAvatar({
   const dim = sizeClass[size];
 
   // Core is a selected state: the one violet switch, not a second accent or a glow.
-  const coreRing = 'rounded-full p-[2px] bg-primary';
+  const coreRing = 'rounded-full p-[2px] bg-action';
 
   const avatarNode = showImg ? (
     <img src={trimmed} alt="" className={`${dim} rounded-full object-cover`} />

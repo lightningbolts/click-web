@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, Loader2, MapPin } from 'lucide-react';
 import { escapeHtml } from '@/lib/dashboard/connectionExtras';
 import { useTheme } from '@/lib/theme/ThemeProvider';
-import { Toggle } from '@/components/ui/Toggle';
+import { Toggle } from '@/components/ds/Toggle';
 import {
   applyPinStack,
   pinBorderForTheme,
@@ -354,25 +354,25 @@ export default function PlaygroundMap({
 
   if (error) {
     return (
-      <div className="rounded-[16px] border border-border-hard bg-surface p-12 text-center">
-        <MapPin className="mx-auto mb-3 h-10 w-10 text-error" />
+      <div className="rounded-[16px] border border-hairline bg-surface p-12 text-center">
+        <MapPin className="mx-auto mb-3 h-10 w-10 text-destructive" />
         <p className="font-semibold">Map Error</p>
-        <p className="text-sm text-on-surface-variant">{error}</p>
+        <p className="text-sm text-fg-secondary">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-[16px] border border-border-hard bg-surface-container ${fill ? 'h-full' : 'h-[420px] md:h-[560px]'}`}>
+    <div className={`relative overflow-hidden rounded-[16px] border border-hairline bg-surface-raised ${fill ? 'h-full' : 'h-[420px] md:h-[560px]'}`}>
       <div
-        className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-container transition-opacity duration-500 ease-out ${
+        className={`absolute inset-0 z-10 flex items-center justify-center bg-surface-raised transition-opacity duration-500 ease-out ${
           ready ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
         aria-hidden={ready}
       >
         <div className="text-center">
-          <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-on-surface-variant">Loading map...</p>
+          <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-accent" />
+          <p className="text-sm text-fg-secondary">Loading map...</p>
         </div>
       </div>
       <div
@@ -381,9 +381,9 @@ export default function PlaygroundMap({
       />
       {ready ? (
         <>
-          <div className="absolute left-4 top-4 z-[8] max-w-[220px] rounded-[16px] border border-border-hard bg-surface p-3 text-xs shadow-lg">
+          <div className="absolute left-4 top-4 z-[8] max-w-[220px] rounded-[16px] border border-hairline bg-surface p-3 text-xs shadow-lg">
             <div className="mb-2 flex items-center gap-2 font-semibold">
-              <Layers className="h-3.5 w-3.5 text-primary" />
+              <Layers className="h-3.5 w-3.5 text-accent" />
               Map layers
             </div>
             <div className="flex items-center gap-2 py-1">
@@ -392,14 +392,14 @@ export default function PlaygroundMap({
             </div>
             <div className="flex items-center gap-2 py-1">
               <Toggle checked={showEvents} onCheckedChange={setShowEvents} aria-label="Events" className="scale-75" />
-              <span className="text-primary">Events</span>
+              <span className="text-accent">Events</span>
             </div>
           </div>
-          <div className="absolute bottom-4 left-4 z-[8] rounded-xl border border-border-hard bg-surface-container/90 px-4 py-2">
-            <span className="text-sm text-on-surface-variant">
-              <span className="font-bold text-primary">{people.length}</span> connections
+          <div className="absolute bottom-4 left-4 z-[8] rounded-xl border border-hairline bg-surface-raised/90 px-4 py-2">
+            <span className="text-sm text-fg-secondary">
+              <span className="font-bold text-accent">{people.length}</span> connections
               <span className="mx-1.5">·</span>
-              <span className="font-bold text-primary">{events.length}</span> events
+              <span className="font-bold text-accent">{events.length}</span> events
             </span>
           </div>
         </>

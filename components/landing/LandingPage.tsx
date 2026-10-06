@@ -108,7 +108,7 @@ export default function LandingPage({
     <>
       <div
         ref={pageRef}
-        className="min-h-screen bg-background text-on-surface overflow-x-clip isolate"
+        className="min-h-screen bg-bg text-fg overflow-x-clip isolate"
         style={{ fontFamily: 'var(--font-manrope), ui-sans-serif, system-ui, sans-serif' }}
       >
         <FoldMapHero
@@ -126,7 +126,7 @@ export default function LandingPage({
         ) : null}
 
         <div className={cn(PAGE_COLUMN_CLASS, 'space-y-8 pt-10 sm:space-y-12 sm:pt-14')}>
-          <section data-landing-reveal id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-border-hard bg-surface-container px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
+          <section data-landing-reveal id="why" className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-hairline bg-surface-raised px-6 py-12 sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="why-heading">
             <div className="flex justify-center">
               <Image
                 src="/landing/consumer-add-click.webp"
@@ -134,17 +134,17 @@ export default function LandingPage({
                 width={560}
                 height={1212}
                 sizes="(max-width: 640px) 220px, 260px"
-                className="h-auto w-[220px] rounded-[28px] border-2 border-border-hard sm:w-[260px]"
+                className="h-auto w-[220px] rounded-[28px] border-2 border-hairline sm:w-[260px]"
               />
             </div>
             <div className="max-w-md">
               <h2 id="why-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">Connect<br />without<br />the noise.</h2>
-              <p className="mt-6 max-w-sm text-base leading-relaxed text-on-surface-variant">Meet in person. Tap to connect. Keep the people you meet close, without another endless feed.</p>
+              <p className="mt-6 max-w-sm text-base leading-relaxed text-fg-secondary">Meet in person. Tap to connect. Keep the people you meet close, without another endless feed.</p>
               <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">See how it works <ArrowRight className="h-4 w-4" aria-hidden /></a>
             </div>
           </section>
 
-          <section data-landing-reveal className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary bg-primary px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
+          <section data-landing-reveal className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-action bg-action px-6 py-12 text-white sm:px-12 lg:grid-cols-2 lg:gap-16 lg:px-16" aria-labelledby="events-heading">
             <div className="flex justify-center py-2">
               <Image
                 src="/landing/consumer-event-detail.webp"
@@ -158,13 +158,13 @@ export default function LandingPage({
             <div className="max-w-md">
               <h2 id="events-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">Discover<br />real events.</h2>
               <p className="mt-6 max-w-sm text-base leading-relaxed">Find your next gathering. See who’s going, bring your people, and show up together.</p>
-              <Link href="/events" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border-2 border-white bg-white px-6 text-sm font-bold text-primary hover:bg-white/90"><MapPin className="h-4 w-4" aria-hidden />Explore events <ArrowRight className="h-4 w-4" aria-hidden /></Link>
+              <Link href="/events" className="mt-7 inline-flex min-h-11 items-center gap-3 rounded-full border-2 border-white bg-white px-6 text-sm font-bold text-accent hover:bg-white/90"><MapPin className="h-4 w-4" aria-hidden />Explore events <ArrowRight className="h-4 w-4" aria-hidden /></Link>
             </div>
           </section>
 
           <section
             data-landing-reveal
-            className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-primary/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
+            className="grid items-center gap-10 overflow-hidden rounded-[32px] border-2 border-action/20 bg-[#f0e9ff] px-6 py-12 dark:bg-[#241a36] sm:px-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16 lg:px-16"
             aria-labelledby="irl-heading"
           >
             <div className="flex justify-center py-2">
@@ -174,14 +174,14 @@ export default function LandingPage({
                 width={560}
                 height={1213}
                 sizes="(max-width: 640px) 220px, 260px"
-                className="h-auto w-[220px] rotate-2 rounded-[28px] border-2 border-primary/40 sm:w-[260px]"
+                className="h-auto w-[220px] rotate-2 rounded-[28px] border-2 border-action/40 sm:w-[260px]"
               />
             </div>
             <div className="max-w-md">
               <h2 id="irl-heading" className="text-4xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-                IRL<br /><span className="text-primary">over URL.</span>
+                IRL<br /><span className="text-accent">over URL.</span>
               </h2>
-              <p className="mt-6 max-w-sm text-base leading-relaxed text-on-surface-variant">
+              <p className="mt-6 max-w-sm text-base leading-relaxed text-fg-secondary">
                 Your people are closer than you think. Find shared interests, make a connection, and take the conversation into the real world.
               </p>
               <a href="#how-it-works" className="fc-btn-primary mt-7 inline-flex min-h-11 items-center gap-3 px-6">
@@ -197,10 +197,10 @@ export default function LandingPage({
           className={cn(PAGE_COLUMN_CLASS, 'relative z-10 py-16 sm:py-20')}
           aria-labelledby="how-it-works-heading"
         >
-          <div className="overflow-hidden rounded-[28px] border border-border-hard bg-surface p-4 shadow-sm sm:p-6 lg:p-8">
+          <div className="overflow-hidden rounded-[28px] border border-hairline bg-surface p-4 shadow-sm sm:p-6 lg:p-8">
             <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Interactive demo</p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Interactive demo</p>
                 <h2
                   id="how-it-works-heading"
                   data-testid="landing-playground-heading"
@@ -208,11 +208,11 @@ export default function LandingPage({
                 >
                   Try Click in your browser.
                 </h2>
-                <p className="mt-3 max-w-xl text-base text-on-surface-variant">
+                <p className="mt-3 max-w-xl text-base text-fg-secondary">
                   Connect with someone, RSVP to an event, then see how the same relationship carries into the companion dashboard.
                 </p>
               </div>
-              <p className="max-w-xs text-sm leading-relaxed text-on-surface-variant">
+              <p className="max-w-xs text-sm leading-relaxed text-fg-secondary">
                 Demo state is local to this page. Nothing here changes a real account.
               </p>
             </div>
@@ -221,9 +221,9 @@ export default function LandingPage({
         </section>
 
         <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-8')}>
-          <p className="mx-auto max-w-2xl text-center text-sm text-on-surface-variant">
+          <p className="mx-auto max-w-2xl text-center text-sm text-fg-secondary">
             Running a venue, campus, or event program?{' '}
-            <Link href="/enterprise" className="font-semibold text-primary hover:text-primary/80">
+            <Link href="/enterprise" className="font-semibold text-accent hover:text-accent/80">
               See Click for Business
             </Link>
             .
@@ -232,10 +232,10 @@ export default function LandingPage({
 
         <section data-landing-reveal className={cn(PAGE_COLUMN_CLASS, 'relative z-10 pb-24 pt-8')}>
           <div className="fc-card px-8 py-12 text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-on-surface sm:text-4xl">
+            <h2 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">
               The Click beta is live on iPhone.
             </h2>
-            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-on-surface-variant sm:text-base">
+            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-fg-secondary sm:text-base">
               Install TestFlight, tap the invite, and start connecting. Android coming soon. Full launch Fall 2026. No ads. No feed. Built at UW.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -253,7 +253,7 @@ export default function LandingPage({
                 onClick={openWaitlist}
                 onPointerEnter={prefetchWaitlist}
                 onFocus={prefetchWaitlist}
-                className="h-11 rounded-[8px] border border-border-hard bg-surface px-8 text-sm font-bold text-on-surface hover:border-primary hover:text-primary"
+                className="h-11 rounded-[8px] border border-hairline bg-surface px-8 text-sm font-bold text-fg hover:border-action hover:text-accent"
               >
                 Join the Waitlist
               </button>

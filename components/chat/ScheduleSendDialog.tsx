@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { FcButton, FcField, FcInput } from '@/components/fc';
-import { FcDialog } from '@/components/fc/FcDialog';
+import { Button } from '@/components/ds/Button';
+import { Dialog } from '@/components/ds/Dialog';
+import { fieldClassName } from '@/components/ds/TextField';
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -77,7 +78,7 @@ export function ScheduleSendDialog({
   const minLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   return (
-    <FcDialog
+    <Dialog
       open={open}
       onOpenChange={onOpenChange}
       title="Schedule message"
@@ -85,7 +86,7 @@ export function ScheduleSendDialog({
       size="sm"
       testId="schedule-dialog"
     >
-      <p className="mb-4 line-clamp-3 rounded-[12px] border border-border-hard bg-surface-container-low px-3 py-2 text-sm text-on-surface">
+      <p className="mb-4 line-clamp-3 rounded-[12px] border border-hairline bg-surface-raised px-3 py-2 text-sm text-fg">
         {preview}
       </p>
       <div className="grid gap-2">
@@ -95,10 +96,10 @@ export function ScheduleSendDialog({
             type="button"
             disabled={busy}
             onClick={() => void schedule(p.at.getTime())}
-            className="flex min-h-11 items-center justify-between rounded-[8px] border border-border-hard px-3 text-left text-sm font-semibold text-on-surface hover:bg-surface-container-low disabled:opacity-40"
+            className="flex min-h-11 items-center justify-between rounded-[8px] border border-hairline px-3 text-left text-sm font-semibold text-fg hover:bg-surface-raised disabled:opacity-40"
           >
             <span>{p.label}</span>
-            <span className="font-medium text-on-surface-variant">{formatAt(p.at)}</span>
+            <span className="font-medium text-fg-secondary">{formatAt(p.at)}</span>
           </button>
         ))}
       </div>
@@ -110,18 +111,19 @@ export function ScheduleSendDialog({
           if (Number.isFinite(ms)) void schedule(ms);
         }}
       >
-        <FcField label="Custom time">
-          <FcInput type="datetime-local" min={minLocal} value={custom} onChange={(e) => setCustom(e.target.value)} />
-        </FcField>
+        <label className="flex w-full min-w-0 flex-col gap-1.5">
+<span className="type-meta font-semibold text-fg-secondary">Custom time</span>
+          <input className={`${fieldClassName} h-11`} type="datetime-local" min={minLocal} value={custom} onChange={(e) => setCustom(e.target.value)} />
+        </label>
         {error ? (
-          <p role="alert" className="text-sm text-error">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         ) : null}
-        <FcButton type="submit" className="w-full" disabled={!custom || busy}>
+        <Button variant="primary" type="submit" className="w-full" disabled={!custom || busy}>
           {busy ? 'Scheduling…' : 'Schedule'}
-        </FcButton>
+        </Button>
       </form>
-    </FcDialog>
+    </Dialog>
   );
 }

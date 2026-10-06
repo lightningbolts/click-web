@@ -137,7 +137,7 @@ export default function PinMap({
     return (
       <div
         data-testid={testId}
-        className={cn('flex h-64 items-center justify-center rounded-[16px] border border-border-hard bg-surface-container text-sm text-on-surface-variant', className)}
+        className={cn('flex h-64 items-center justify-center rounded-[16px] border border-hairline bg-surface-raised text-sm text-fg-secondary', className)}
       >
         Location pin is not available yet.
       </div>
@@ -147,7 +147,7 @@ export default function PinMap({
   return (
     <div
       data-testid={testId}
-      className={cn('relative h-64 overflow-hidden rounded-[16px] border border-border-hard bg-surface-container', className)}
+      className={cn('relative h-64 overflow-hidden rounded-[16px] border border-hairline bg-surface-raised', className)}
     >
       <div ref={containerRef} className="absolute inset-0" />
     </div>

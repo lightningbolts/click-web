@@ -107,7 +107,7 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
       {data?.status === 'insufficient_data' && data.message ? (
         <motion.div
           variants={itemVariants}
-          className="rounded-2xl border border-zinc-500/30 bg-zinc-500/10 px-4 py-3 text-sm text-on-surface"
+          className="rounded-2xl border border-zinc-500/30 bg-zinc-500/10 px-4 py-3 text-sm text-fg"
         >
           {data.message}
         </motion.div>
@@ -119,8 +119,8 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
           <Radio className="w-5 h-5 text-green-700 dark:text-green-400" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-on-surface">Live Metrics</h2>
-          <p className="text-sm text-on-surface-variant">Real-time occupancy, capacity, and crowd trends</p>
+          <h2 className="text-xl font-bold text-fg">Live Metrics</h2>
+          <p className="text-sm text-fg-secondary">Real-time occupancy, capacity, and crowd trends</p>
         </div>
       </motion.div>
 
@@ -134,7 +134,7 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
             <div className="p-2 bg-green-500/20 rounded-lg">
               <Users className="w-4 h-4 text-green-700 dark:text-green-400" />
             </div>
-            <span className="text-sm font-medium text-on-surface-variant">Capacity Usage</span>
+            <span className="text-sm font-medium text-fg-secondary">Capacity Usage</span>
           </div>
 
           {/* Large percentage display */}
@@ -158,13 +158,13 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-on-surface">{fillPct}%</span>
-                <span className="text-xs text-on-surface-variant">capacity</span>
+                <span className="text-3xl font-bold text-fg">{fillPct}%</span>
+                <span className="text-xs text-fg-secondary">capacity</span>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-between text-xs text-on-surface-variant pt-2 border-t border-border-hard">
+          <div className="flex justify-between text-xs text-fg-secondary pt-2 border-t border-hairline">
             <span>{liveCount.current} present</span>
             <span>{Math.max(0, liveCount.capacity - liveCount.current)} remaining</span>
           </div>
@@ -176,22 +176,22 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
             <div className="p-2 bg-[#8338EC]/20 rounded-lg">
               <Zap className="w-4 h-4 text-[#8338EC]" />
             </div>
-            <span className="text-sm font-medium text-on-surface-variant">Peak Stats</span>
+            <span className="text-sm font-medium text-fg-secondary">Peak Stats</span>
           </div>
           <div className="space-y-4">
             <div>
-              <div className="text-xs text-on-surface-variant mb-1">Session peak count</div>
-              <div className="text-3xl font-bold text-on-surface">{liveCount.peak}</div>
+              <div className="text-xs text-fg-secondary mb-1">Session peak count</div>
+              <div className="text-3xl font-bold text-fg">{liveCount.peak}</div>
             </div>
-            <div className="h-px bg-surface-container" />
+            <div className="h-px bg-surface-raised" />
             <div>
-              <div className="text-xs text-on-surface-variant mb-1">Peak bucket</div>
-              <div className="text-2xl font-bold text-on-surface">{liveCount.peakTime}</div>
+              <div className="text-xs text-fg-secondary mb-1">Peak bucket</div>
+              <div className="text-2xl font-bold text-fg">{liveCount.peakTime}</div>
             </div>
-            <div className="h-px bg-surface-container" />
+            <div className="h-px bg-surface-raised" />
             <div>
-              <div className="text-xs text-on-surface-variant mb-1">Estimated capacity</div>
-              <div className="text-2xl font-bold text-on-surface">{liveCount.capacity}</div>
+              <div className="text-xs text-fg-secondary mb-1">Estimated capacity</div>
+              <div className="text-2xl font-bold text-fg">{liveCount.capacity}</div>
             </div>
           </div>
         </GlassPanel>
@@ -202,8 +202,8 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-on-surface">Last-Hour Occupancy Trend</h3>
-              <p className="text-xs text-on-surface-variant mt-0.5">5-minute buckets over the last hour</p>
+              <h3 className="text-base font-semibold text-fg">Last-Hour Occupancy Trend</h3>
+              <p className="text-xs text-fg-secondary mt-0.5">5-minute buckets over the last hour</p>
             </div>
             <span className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -267,8 +267,8 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-on-surface">Hourly Distribution</h3>
-              <p className="text-xs text-on-surface-variant mt-0.5">
+              <h3 className="text-base font-semibold text-fg">Hourly Distribution</h3>
+              <p className="text-xs text-fg-secondary mt-0.5">
                 Connections by hour — peak at {peakHourDisplay >= 0 ? `${peakHourDisplay}:00` : '—'}
               </p>
             </div>
@@ -276,7 +276,7 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
               <div className="p-1.5 bg-[#8338EC]/20 rounded-lg">
                 <BarChart3 className="w-3.5 h-3.5 text-[#8338EC]" />
               </div>
-              <span className="text-xs text-on-surface-variant">Recent window</span>
+              <span className="text-xs text-fg-secondary">Recent window</span>
             </div>
           </div>
           <div className="h-[200px] w-full min-w-0">
@@ -317,7 +317,7 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-3 text-center text-xs text-on-surface-variant">
+          <div className="mt-3 text-center text-xs text-fg-secondary">
             Busiest hour:{' '}
             <span className="text-[#8338EC] font-bold">{peakHourDisplay >= 0 ? `${peakHourDisplay}:00` : "—"}</span>
             {' '}— plan staff accordingly

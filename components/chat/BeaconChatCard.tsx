@@ -5,7 +5,8 @@ import { MapPin } from 'lucide-react';
 import type { Message } from '@/lib/chat/types';
 import { eventSharePath } from '@/lib/events/eventUrls';
 import { mapBeaconPreview } from '@/lib/userProfile/profileMediaItems';
-import { CardVisualHero } from '@/components/ui/CardVisualSurface';
+import { CardVisual } from '@/components/ds/CardVisual';
+import { StatusPill } from '@/components/ds/StatusPill';
 
 function beaconTypeFromMetadata(metadata: Message['metadata']): string {
   const rec = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {};
@@ -15,7 +16,7 @@ function beaconTypeFromMetadata(metadata: Message['metadata']): string {
 
 /**
  * Compact chat-timeline card for a shared beacon (parity with KMP BeaconChatCard).
- * Cover uses CardVisualHero; width is capped at 280px like mobile.
+ * Cover uses CardVisual; width is capped at 280px like mobile.
  */
 export default function BeaconChatCard({ message }: { message: Message }) {
   const preview =
@@ -43,12 +44,13 @@ export default function BeaconChatCard({ message }: { message: Message }) {
       data-testid="beacon-chat-card"
       className="w-full max-w-[280px] overflow-hidden rounded-lg border border-hairline bg-bg-elevated text-left shadow-overlay"
     >
-      <CardVisualHero
-        id={preview.beaconId || message.id}
-        imageUrl={preview.imageUrl}
-        chipLabel={chipLabel}
-        className="h-28"
-      />
+      <CardVisual seed={preview.beaconId || message.id} photoUrl={preview.imageUrl} radius={0} className="h-28" sizes="280px">
+        {chipLabel ? (
+          <StatusPill variant="on-media" className="absolute left-2 top-2">
+            {chipLabel}
+          </StatusPill>
+        ) : null}
+      </CardVisual>
       <div className="space-y-1 px-3 py-2.5">
         <p className="type-body-strong line-clamp-2 text-fg">{preview.title}</p>
         {metaLine ? (

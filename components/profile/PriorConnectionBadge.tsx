@@ -1,17 +1,11 @@
-import { FcChip } from '@/components/fc';
-import { cn } from '@/lib/cn';
+import { StatusPill } from '@/components/ds/StatusPill';
 import { PRIOR_CONNECTION_BADGE_LABEL } from '@/lib/connections/priorConnectionMeta';
 
-/** Amber pill reused on profile header and connection list rows. */
+/** Marks someone you knew before Click (profile header and connection rows). */
 export function PriorConnectionBadge({ className }: { className?: string }) {
   return (
-    <FcChip
-      className={cn(
-        'border-amber-400/50 bg-amber-500/15 text-[11px] font-semibold text-amber-800 dark:text-amber-200',
-        className,
-      )}
-    >
+    <StatusPill variant="warning" className={className}>
       {PRIOR_CONNECTION_BADGE_LABEL}
-    </FcChip>
+    </StatusPill>
   );
 }

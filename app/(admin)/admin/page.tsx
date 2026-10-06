@@ -36,7 +36,7 @@ function tierBadgeClasses(tier: VenueTier): string {
   if (tier === 'Enterprise') return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-400/30';
   if (tier === 'Nexus') return 'bg-sky-500/20 text-sky-300 border-sky-400/30';
   if (tier === 'Pulse') return 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30';
-  return 'bg-zinc-700/40 text-on-surface border-zinc-600/40';
+  return 'bg-zinc-700/40 text-fg border-zinc-600/40';
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -152,7 +152,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <th className="px-2 py-2">Fast Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.moderation.reports.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -199,7 +199,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <th className="px-2 py-2">Timestamp</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.moderation.forwardedMessages.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -228,7 +228,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           {data.moderation.graphAnomalies.length === 0 ? (
             <p className="text-sm text-zinc-400">No abnormal high-degree connection nodes detected.</p>
           ) : (
-            <ul className="space-y-2 text-sm text-on-surface">
+            <ul className="space-y-2 text-sm text-fg">
               {data.moderation.graphAnomalies.map((anomaly) => (
                 <li key={anomaly.userId} className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2">
                   <span>{anomaly.userLabel}</span>
@@ -270,7 +270,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <th className="px-2 py-2">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.insights.subscriptions.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -312,7 +312,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <th className="px-2 py-2">Decision</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 text-on-surface">
+            <tbody className="divide-y divide-zinc-800 text-fg">
               {data.insights.verificationQueue.length === 0 ? (
                 <tr>
                   <td className="px-2 py-4 text-zinc-400" colSpan={5}>
@@ -365,7 +365,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <th className="px-2 py-2">Window</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800 text-on-surface">
+                <tbody className="divide-y divide-zinc-800 text-fg">
                   {data.insights.activeBeacons.map((beacon) => (
                     <tr key={beacon.id}>
                       <td className="px-2 py-3">{beacon.venueName}</td>

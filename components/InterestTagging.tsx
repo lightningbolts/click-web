@@ -103,22 +103,22 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                 className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto scrollbar-hide"
             >
                 <div
-                  className="fc-card border border-border-hard p-8"
+                  className="fc-card border border-hairline p-8"
                   style={{ backgroundColor: 'var(--color-surface)' }}
                 >
                     <div className="mb-6 text-center">
-                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border-hard bg-on-primary-container px-3 py-1.5">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                            <span className="text-xs font-bold text-primary">Quick Setup</span>
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-hairline bg-accent px-3 py-1.5">
+                            <Sparkles className="h-4 w-4 text-accent" />
+                            <span className="text-xs font-bold text-accent">Quick Setup</span>
                         </div>
-                        <h2 className="mb-2 text-3xl font-bold text-on-surface">What are you into?</h2>
-                        <p className="text-sm font-medium text-on-surface-variant">
+                        <h2 className="mb-2 text-3xl font-bold text-fg">What are you into?</h2>
+                        <p className="text-sm font-medium text-fg-secondary">
                             Pick at least {MIN_TAGS} interests. Tap a category to see subcategories.
                         </p>
                     </div>
 
                     <div className="mb-5 text-center">
-                        <span className={`text-xs font-bold ${selected.length >= MIN_TAGS ? 'text-primary' : 'text-on-surface-variant'}`}>
+                        <span className={`text-xs font-bold ${selected.length >= MIN_TAGS ? 'text-accent' : 'text-fg-secondary'}`}>
                             {selected.length} selected
                             {selected.length < MIN_TAGS && ` (min ${MIN_TAGS})`}
                         </span>
@@ -133,7 +133,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                     />
 
                     <div className="mt-5 space-y-2">
-                        <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Custom interests</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Custom interests</p>
                         <div className="flex gap-2">
                             <input
                                 value={customInterestInput}
@@ -145,7 +145,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                                     }
                                 }}
                                 placeholder="Add your own interest"
-                                className="fc-input flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                className="fc-input flex-1 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
                             />
                             <button
                                 onClick={addCustomInterest}
@@ -166,7 +166,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                                         {tag}
                                         <button
                                             onClick={() => removeCustomInterest(tag)}
-                                            className="rounded p-0.5 hover:bg-surface-container"
+                                            className="rounded p-0.5 hover:bg-surface-raised"
                                             aria-label={`Remove ${tag}`}
                                         >
                                             <X className="w-3 h-3" />
@@ -188,7 +188,7 @@ export default function InterestTagging({ onComplete, onSkip, canSkip = true, in
                         {canSkip && (
                             <button
                                 onClick={onSkip}
-                                className="w-full py-2.5 text-sm font-semibold text-on-surface-variant hover:text-on-surface"
+                                className="w-full py-2.5 text-sm font-semibold text-fg-secondary hover:text-fg"
                             >
                                 Skip for now
                             </button>
@@ -226,10 +226,10 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
                                 className={`relative flex w-full cursor-pointer select-none items-center gap-2 rounded-[8px] border-2 px-3 py-2.5 text-sm font-bold transition-colors ${isSelected
-                                        ? 'border-border-hard bg-on-primary-container text-primary'
+                                        ? 'border-hairline bg-accent text-accent'
                                         : hasSelectedSubs
-                                            ? 'border-primary/40 bg-surface-container text-on-surface'
-                                            : 'border-border-hard bg-surface text-on-surface hover:bg-surface-container-low'
+                                            ? 'border-action/40 bg-surface-raised text-fg'
+                                            : 'border-hairline bg-surface text-fg hover:bg-surface-raised'
                                     }`}
                             >
                                 <button
@@ -243,13 +243,13 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                 </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onToggleExpand(label); }}
-                                    className="-my-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                    className="-my-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                                     aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${label} interests`}
                                     aria-expanded={isExpanded}
                                 >
                                     {isExpanded
-                                        ? <ChevronUp className="h-3.5 w-3.5 text-on-surface-variant" />
-                                        : <ChevronDown className="h-3.5 w-3.5 text-on-surface-variant" />
+                                        ? <ChevronUp className="h-3.5 w-3.5 text-fg-secondary" />
+                                        : <ChevronDown className="h-3.5 w-3.5 text-fg-secondary" />
                                     }
                                 </button>
                                 <AnimatePresence>
@@ -258,9 +258,9 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                             initial={{ scale: 0 }}
                                             animate={{ scale: 1 }}
                                             exit={{ scale: 0 }}
-                                            className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary"
+                                            className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-action"
                                         >
-                                            <Check className="h-2.5 w-2.5 text-on-primary" />
+                                            <Check className="h-2.5 w-2.5 text-on-action" />
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
@@ -286,8 +286,8 @@ export function InterestGrid({ selected, expandedCategory, onToggleTag, onToggle
                                                         onClick={() => onToggleTag(sub)}
                                                         disabled={maxTags != null && !subSelected && selected.length >= maxTags}
                                                         className={`rounded-[8px] border-2 px-2.5 py-1 text-xs font-bold transition-colors ${subSelected
-                                                            ? 'border-border-hard bg-on-primary-container text-primary'
-                                                            : 'border-border-hard bg-surface text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface disabled:opacity-30'
+                                                            ? 'border-hairline bg-accent text-accent'
+                                                            : 'border-hairline bg-surface text-fg-secondary hover:bg-surface-raised hover:text-fg disabled:opacity-30'
                                                             }`}
                                                     >
                                                         {sub}

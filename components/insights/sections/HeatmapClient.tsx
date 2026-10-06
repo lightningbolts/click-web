@@ -62,7 +62,7 @@ function IntensityBadge({ intensity }: { intensity: number }) {
       ? 'text-red-700 dark:text-red-400 bg-red-500/10 border-red-500/20'
       : pct >= 50
       ? 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20'
-      : 'text-primary bg-primary/10 border-primary/20';
+      : 'text-accent bg-action/10 border-action/20';
   return (
     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${color}`}>
       {pct}% heat
@@ -129,8 +129,8 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
           <MapPin className="w-5 h-5 text-[#FF6B6B]" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-on-surface">Spatial Heatmap</h2>
-          <p className="text-sm text-on-surface-variant">Where people Click, area by area</p>
+          <h2 className="text-xl font-bold text-fg">Spatial Heatmap</h2>
+          <p className="text-sm text-fg-secondary">Where people Click, area by area</p>
         </div>
       </motion.div>
 
@@ -139,41 +139,41 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Flame className="w-4 h-4 text-red-700 dark:text-red-400" />
-            <span className="text-xs text-on-surface-variant">Hottest Zone</span>
+            <span className="text-xs text-fg-secondary">Hottest Zone</span>
           </div>
-          <div className="text-2xl font-bold text-on-surface">
+          <div className="text-2xl font-bold text-fg">
             {sorted[0]?.name ?? '—'}
           </div>
-          <div className="text-xs text-on-surface-variant mt-1">{sorted[0]?.connections} connections</div>
+          <div className="text-xs text-fg-secondary mt-1">{sorted[0]?.connections} connections</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <BarChart2 className="w-4 h-4 text-[#8338EC]" />
-            <span className="text-xs text-on-surface-variant">Total Connections</span>
+            <span className="text-xs text-fg-secondary">Total Connections</span>
           </div>
-          <div className="text-2xl font-bold text-on-surface">{totalConnections}</div>
-          <div className="text-xs text-on-surface-variant mt-1">across all zones</div>
+          <div className="text-2xl font-bold text-fg">{totalConnections}</div>
+          <div className="text-xs text-fg-secondary mt-1">across all zones</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <MapPin className="w-4 h-4 text-[#3A86FF]" />
-            <span className="text-xs text-on-surface-variant">Active Zones</span>
+            <span className="text-xs text-fg-secondary">Active Zones</span>
           </div>
-          <div className="text-2xl font-bold text-on-surface">{zones.length}</div>
-          <div className="text-xs text-on-surface-variant mt-1">tracked areas</div>
+          <div className="text-2xl font-bold text-fg">{zones.length}</div>
+          <div className="text-xs text-fg-secondary mt-1">tracked areas</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-green-700 dark:text-green-400" />
-            <span className="text-xs text-on-surface-variant">Avg / Zone</span>
+            <span className="text-xs text-fg-secondary">Avg / Zone</span>
           </div>
-          <div className="text-2xl font-bold text-on-surface">
+          <div className="text-2xl font-bold text-fg">
             {zones.length ? Math.round(totalConnections / zones.length) : 0}
           </div>
-          <div className="text-xs text-on-surface-variant mt-1">connections avg</div>
+          <div className="text-xs text-fg-secondary mt-1">connections avg</div>
         </GlassPanel>
       </motion.div>
 
@@ -186,8 +186,8 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
       <motion.div variants={itemVariants}>
         <GlassPanel className="p-6">
           <div className="mb-4">
-            <h3 className="text-base font-semibold text-on-surface">Verified Connection Map</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">
+            <h3 className="text-base font-semibold text-fg">Verified Connection Map</h3>
+            <p className="text-xs text-fg-secondary mt-0.5">
               Raw GPS is stored per participant; multi-user handshakes snap to a centroid here only.
             </p>
           </div>
@@ -199,25 +199,25 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Zone ranking table */}
         <GlassPanel className="p-6">
-          <h3 className="text-base font-semibold text-on-surface mb-4">Zone Rankings</h3>
+          <h3 className="text-base font-semibold text-fg mb-4">Zone Rankings</h3>
           <div className="space-y-3">
             {sorted.length === 0 ? (
-              <p className="text-sm text-on-surface-variant py-6 text-center">
+              <p className="text-sm text-fg-secondary py-6 text-center">
                 The heatmap appears once your Place has check-ins by area.
               </p>
             ) : null}
             {sorted.map((zone, i) => (
               <div key={zone.id} className="flex items-center gap-3">
-                <span className="text-xs font-bold text-on-surface-variant w-5">{i + 1}</span>
+                <span className="text-xs font-bold text-fg-secondary w-5">{i + 1}</span>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-on-surface font-medium">{zone.name}</span>
+                    <span className="text-sm text-fg font-medium">{zone.name}</span>
                     <div className="flex items-center gap-2">
                       <IntensityBadge intensity={zone.intensity} />
-                      <span className="text-xs text-on-surface-variant">{zone.connections}</span>
+                      <span className="text-xs text-fg-secondary">{zone.connections}</span>
                     </div>
                   </div>
-                  <div className="h-1.5 bg-surface-container rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-surface-raised rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${(zone.connections / maxZoneConnections) * 100}%` }}
@@ -235,8 +235,8 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
         {/* Type distribution chart */}
         <GlassPanel className="p-6">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-on-surface">Connections by Zone Type</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">Clicks by kind of area</p>
+            <h3 className="text-base font-semibold text-fg">Connections by Zone Type</h3>
+            <p className="text-xs text-fg-secondary mt-0.5">Clicks by kind of area</p>
           </div>
           <div className="h-[240px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>

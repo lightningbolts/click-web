@@ -2,8 +2,9 @@
 
 import { useRef, useState } from 'react';
 import { CheckCircle } from 'lucide-react';
-import { FcButton, FcField, FcInput } from '@/components/fc';
-import { FcDialog } from '@/components/fc/FcDialog';
+import { Button } from '@/components/ds/Button';
+import { Dialog } from '@/components/ds/Dialog';
+import { fieldClassName } from '@/components/ds/TextField';
 import { WAITLIST_EMAIL_ERROR, waitlistEmailSchema } from '@/lib/validation/waitlistEmail';
 
 export type WaitlistSource = 'homepage_hero' | 'enterprise_landing' | 'top_bar';
@@ -64,7 +65,7 @@ export default function WaitlistModal({
   };
 
   return (
-    <FcDialog
+    <Dialog
       open={open}
       onOpenChange={(next) => {
         if (!next) onClose();
@@ -73,19 +74,19 @@ export default function WaitlistModal({
       description={
         <>We&apos;ll email you when the iOS and Android app opens. No ads. No feed. Built at UW.</>
       }
-      initialFocusRef={emailRef}
+      initialFocusSelector="[data-autofocus]"
       testId="waitlist-modal"
     >
       {status === 'success' ? (
-        <div className="rounded-[16px] border border-border-hard bg-primary-container p-5 text-center">
-          <CheckCircle className="mx-auto mb-3 h-10 w-10 text-primary" aria-hidden />
-          <p className="font-bold text-on-primary-container">You&apos;re on the list</p>
-          <p role="status" className="mt-2 text-on-primary-container">
+        <div className="rounded-[16px] border border-hairline bg-selection p-5 text-center">
+          <CheckCircle className="mx-auto mb-3 h-10 w-10 text-accent" aria-hidden />
+          <p className="font-bold text-accent">You&apos;re on the list</p>
+          <p role="status" className="mt-2 text-accent">
             {message}
           </p>
-          <FcButton className="mt-5 w-full" onClick={onClose}>
+          <Button variant="primary" className="mt-5 w-full" onClick={onClose}>
             Done
-          </FcButton>
+          </Button>
         </div>
       ) : (
         <form
@@ -96,9 +97,11 @@ export default function WaitlistModal({
             void submit();
           }}
         >
-          <FcField label="Email">
-            <FcInput
+          <label className="flex w-full min-w-0 flex-col gap-1.5">
+<span className="type-meta font-semibold text-fg-secondary">Email</span>
+            <input className={`${fieldClassName} h-11`}
               ref={emailRef}
+              data-autofocus
               id="waitlist-email"
               type="email"
               name="email"
@@ -116,17 +119,17 @@ export default function WaitlistModal({
               aria-invalid={status === 'error'}
               aria-describedby={status === 'error' ? 'waitlist-email-error' : undefined}
             />
-          </FcField>
+          </label>
           {status === 'error' ? (
-            <p id="waitlist-email-error" className="text-sm text-error" role="alert">
+            <p id="waitlist-email-error" className="text-sm text-destructive" role="alert">
               {message}
             </p>
           ) : null}
-          <FcButton type="submit" disabled={status === 'loading'} className="w-full">
+          <Button variant="primary" type="submit" disabled={status === 'loading'} className="w-full">
             {status === 'loading' ? 'Joining…' : 'Join the Waitlist'}
-          </FcButton>
+          </Button>
         </form>
       )}
-    </FcDialog>
+    </Dialog>
   );
 }

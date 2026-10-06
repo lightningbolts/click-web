@@ -137,7 +137,7 @@ export function InsightCallout({
           togglePin();
         }
       }}
-      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(124,58,237,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="mt-3 flex cursor-pointer gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5 text-left shadow-[inset_0_0_0_1px_rgba(124,58,237,0.12)] outline-none transition-colors hover:border-violet-500/30 focus-visible:ring-2 focus-visible:ring-accent/40"
       aria-expanded={expanded}
     >
       <Lightbulb
@@ -145,13 +145,13 @@ export function InsightCallout({
         aria-hidden
       />
       <div className="min-w-0 flex-1">
-        <p className="text-xs italic leading-relaxed text-on-surface-variant md:text-sm">
+        <p className="text-xs italic leading-relaxed text-fg-secondary md:text-sm">
           {expanded ? full : collapsed}
         </p>
         {showPeer && (
-          <p className="mt-2 text-[11px] not-italic leading-relaxed text-on-surface-variant">
+          <p className="mt-2 text-[11px] not-italic leading-relaxed text-fg-secondary">
             Compared with similar venues in our network, you&apos;re near the{" "}
-            <span className="tabular-nums text-on-surface-variant">
+            <span className="tabular-nums text-fg-secondary">
               {formatOrdinal(peerPercentile)}
             </span>{" "}
             percentile for this metric.
@@ -159,13 +159,13 @@ export function InsightCallout({
               <>
                 {" "}
                 Cohort:{" "}
-                <span className="tabular-nums text-on-surface-variant">{peerCohortSize}</span> venues with
+                <span className="tabular-nums text-fg-secondary">{peerCohortSize}</span> venues with
                 enough traffic to compare.
               </>
             ) : null}
           </p>
         )}
-        <p className="mt-1 text-[10px] not-italic text-outline md:hidden">
+        <p className="mt-1 text-[10px] not-italic text-fg-tertiary md:hidden">
           Tap to {pinned ? "collapse" : "expand"}
         </p>
       </div>

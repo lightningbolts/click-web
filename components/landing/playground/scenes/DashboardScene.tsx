@@ -64,7 +64,7 @@ export default function DashboardScene({
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background text-on-surface" data-testid="playground-scene-dashboard">
+    <div className="flex h-full min-h-0 flex-col bg-bg text-fg" data-testid="playground-scene-dashboard">
       <div className="shrink-0 px-4 pt-5 pb-3 md:px-6">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -73,16 +73,16 @@ export default function DashboardScene({
         >
           <div>
             <h2 className="text-xl font-bold">
-              Welcome back, <span className="text-primary">{DEMO_USER_NAME.split(' ')[0]}</span>
+              Welcome back, <span className="text-accent">{DEMO_USER_NAME.split(' ')[0]}</span>
             </h2>
-            <p className="text-xs text-on-surface-variant">Your digital memory box</p>
+            <p className="text-xs text-fg-secondary">Your digital memory box</p>
           </div>
         </motion.div>
       </div>
 
       <div className="flex min-h-0 flex-1 items-stretch">
         <nav
-          className="flex w-28 shrink-0 flex-col gap-1 self-stretch border-r border-border-hard bg-surface p-2 sm:w-40"
+          className="flex w-28 shrink-0 flex-col gap-1 self-stretch border-r border-hairline bg-surface p-2 sm:w-40"
           role="tablist"
           aria-label="Dashboard tabs"
         >
@@ -101,8 +101,8 @@ export default function DashboardScene({
                 }}
                 className={`flex items-center gap-2 rounded-[8px] px-2 py-2 text-left text-xs font-semibold sm:px-3 sm:text-sm ${
                   selected
-                    ? 'bg-primary-container text-on-primary-container'
-                    : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+                    ? 'bg-selection text-accent'
+                    : 'text-fg-secondary hover:bg-surface-raised hover:text-fg'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -116,24 +116,24 @@ export default function DashboardScene({
         {state.dashboardTab === 'memory' ? (
             <div className="h-full space-y-6 overflow-y-auto">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-[16px] border border-border-hard bg-surface p-4" data-testid="playground-coming-up">
-                <p className="text-sm font-semibold text-on-surface">Coming up</p>
-                <p className="text-xs text-on-surface-variant">Plans from your chats and events you RSVP’d to</p>
+              <div className="rounded-[16px] border border-hairline bg-surface p-4" data-testid="playground-coming-up">
+                <p className="text-sm font-semibold text-fg">Coming up</p>
+                <p className="text-xs text-fg-secondary">Plans from your chats and events you RSVP’d to</p>
                 {upcoming.length === 0 ? (
-                  <p className="mt-3 text-xs text-on-surface-variant">Nothing planned yet. Send a plan from a chat.</p>
+                  <p className="mt-3 text-xs text-fg-secondary">Nothing planned yet. Send a plan from a chat.</p>
                 ) : (
                   <ul className="mt-3 space-y-2">
                     {upcoming.map((item) => (
-                      <li key={item.key} className="rounded-[12px] border border-border-hard bg-primary-container px-3 py-2">
-                        <p className="text-sm font-semibold text-on-primary-container">{item.title}</p>
-                        <p className="text-xs text-on-primary-container">{item.detail}</p>
+                      <li key={item.key} className="rounded-[12px] border border-hairline bg-selection px-3 py-2">
+                        <p className="text-sm font-semibold text-accent">{item.title}</p>
+                        <p className="text-xs text-accent">{item.detail}</p>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-              <div className="rounded-[16px] border border-border-hard bg-surface p-4">
-                <p className="text-sm font-semibold text-on-surface">Recent connections</p>
+              <div className="rounded-[16px] border border-hairline bg-surface p-4">
+                <p className="text-sm font-semibold text-fg">Recent connections</p>
                 <ul className="mt-3 space-y-2">
                   {recent.map((person) => {
                     const memory = state.memories[person.id] ?? person.memory;
@@ -145,12 +145,12 @@ export default function DashboardScene({
                             actions.setOpenChatId(person.id);
                             actions.setDashboardTab('chat');
                           }}
-                          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1 text-left hover:bg-surface-container-low"
+                          className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1 text-left hover:bg-surface-raised"
                         >
                           <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
                           <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-on-surface">{person.name}</span>
-                            <span className="block truncate text-xs text-on-surface-variant">
+                            <span className="block truncate text-sm font-semibold text-fg">{person.name}</span>
+                            <span className="block truncate text-xs text-fg-secondary">
                               {memory ? `${memory.label} · ${memory.place}` : person.dateMet}
                             </span>
                           </span>
@@ -162,33 +162,33 @@ export default function DashboardScene({
               </div>
             </div>
 
-            <div className="rounded-[16px] border border-border-hard bg-surface p-4">
-              <p className="text-sm font-semibold text-on-surface">Availability</p>
+            <div className="rounded-[16px] border border-hairline bg-surface p-4">
+              <p className="text-sm font-semibold text-fg">Availability</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-on-primary">
+                <span className="rounded-full bg-action px-3 py-1 text-[11px] font-semibold text-on-action">
                   Coffee
                 </span>
-                <span className="text-xs text-on-surface-variant">Fri afternoon</span>
+                <span className="text-xs text-fg-secondary">Fri afternoon</span>
               </div>
-              <p className="mt-2 text-xs font-medium text-on-surface">
+              <p className="mt-2 text-xs font-medium text-fg">
                 Maya Chen overlaps Friday afternoon.
               </p>
             </div>
 
-            <div className="rounded-[16px] border border-border-hard bg-surface p-4">
+            <div className="rounded-[16px] border border-hairline bg-surface p-4">
               <div className="mb-4 flex items-center gap-3">
-                <div className="rounded-xl bg-primary/20 p-2">
-                  <Users className="h-5 w-5 text-primary" />
+                <div className="rounded-xl bg-action/20 p-2">
+                  <Users className="h-5 w-5 text-accent" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">People I&apos;ve Met</h3>
-                  <p className="text-xs text-on-surface-variant">
+                  <p className="text-xs text-fg-secondary">
                     Total {connected.length} · Kept {kept} · Active {connected.length - kept}
                   </p>
                 </div>
               </div>
               <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-secondary" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -197,9 +197,9 @@ export default function DashboardScene({
                   aria-label="Search connections"
                 />
               </div>
-              <div className="overflow-x-auto rounded-[12px] border border-border-hard">
+              <div className="overflow-x-auto rounded-[12px] border border-hairline">
                 <table className="w-full min-w-[520px] text-left text-sm">
-                  <thead className="bg-surface-container text-[11px] uppercase tracking-wider text-on-surface-variant">
+                  <thead className="bg-surface-raised text-[11px] uppercase tracking-wider text-fg-secondary">
                     <tr>
                       <th className="px-3 py-2 font-medium">Name</th>
                       <th className="px-3 py-2 font-medium">Date met</th>
@@ -214,7 +214,7 @@ export default function DashboardScene({
                       return (
                         <tr
                           key={person.id}
-                          className="cursor-pointer border-t border-border-hard hover:bg-surface-container"
+                          className="cursor-pointer border-t border-hairline hover:bg-surface-raised"
                           onClick={() => {
                             actions.setOpenChatId(person.id);
                             actions.setDashboardTab('chat');
@@ -226,13 +226,13 @@ export default function DashboardScene({
                               <span className="font-semibold">{person.name}</span>
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-on-surface-variant">{person.dateMet}</td>
-                          <td className="px-3 py-2.5 text-on-surface-variant">{memory?.place ?? '-'}</td>
+                          <td className="px-3 py-2.5 text-fg-secondary">{person.dateMet}</td>
+                          <td className="px-3 py-2.5 text-fg-secondary">{memory?.place ?? '-'}</td>
                           <td className="px-3 py-2.5">
                             {memory ? (
                               <span className="flex flex-col gap-0.5 text-xs">
                                 <span>{memory.label}</span>
-                                <span className="flex items-center gap-1.5 text-on-surface-variant">
+                                <span className="flex items-center gap-1.5 text-fg-secondary">
                                   {memory.weather} <VolumeBars count={memory.volume} />
                                 </span>
                               </span>
@@ -257,7 +257,7 @@ export default function DashboardScene({
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-center text-[11px] text-outline">
+              <p className="mt-3 text-center text-[11px] text-fg-tertiary">
                 Your data belongs to you. Export anytime, delete anytime.
               </p>
             </div>

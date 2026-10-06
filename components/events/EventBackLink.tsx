@@ -54,7 +54,7 @@ export default function EventBackLink({
         );
       }}
       className={cn(
-        "mb-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline",
+        "mb-5 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline",
         className,
       )}
     >

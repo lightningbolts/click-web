@@ -109,20 +109,20 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-surface-container rounded-2xl h-32 animate-pulse" />
+            <div key={i} className="bg-surface-raised rounded-2xl h-32 animate-pulse" />
           ))}
         </div>
-        <div className="bg-surface-container rounded-2xl h-80 animate-pulse" />
+        <div className="bg-surface-raised rounded-2xl h-80 animate-pulse" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-surface-container rounded-2xl h-64 animate-pulse" />
-          <div className="bg-surface-container rounded-2xl h-64 animate-pulse" />
+          <div className="bg-surface-raised rounded-2xl h-64 animate-pulse" />
+          <div className="bg-surface-raised rounded-2xl h-64 animate-pulse" />
         </div>
       </div>
     );
   }
 
   const TrendIcon = wowChange > 0 ? ArrowUpRight : wowChange < 0 ? ArrowDownRight : Minus;
-  const trendColor = wowChange > 0 ? 'text-green-700 dark:text-green-400' : wowChange < 0 ? 'text-red-700 dark:text-red-400' : 'text-on-surface-variant';
+  const trendColor = wowChange > 0 ? 'text-green-700 dark:text-green-400' : wowChange < 0 ? 'text-red-700 dark:text-red-400' : 'text-fg-secondary';
 
   return (
     <motion.div
@@ -137,8 +137,8 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
           <Activity className="w-5 h-5 text-[#8338EC]" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-on-surface">Social Activity</h2>
-          <p className="text-sm text-on-surface-variant">Detailed connection trends over the last 30 days</p>
+          <h2 className="text-xl font-bold text-fg">Social Activity</h2>
+          <p className="text-sm text-fg-secondary">Detailed connection trends over the last 30 days</p>
         </div>
       </motion.div>
 
@@ -150,41 +150,41 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-5" glow="purple">
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-4 h-4 text-[#8338EC]" />
-            <span className="text-xs text-on-surface-variant">Total Connections</span>
+            <span className="text-xs text-fg-secondary">Total Connections</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">
+          <div className="text-3xl font-bold text-fg">
             {data?.totalConnections?.toLocaleString() ?? '—'}
           </div>
-          <div className="text-xs text-on-surface-variant mt-1">Last 30 days</div>
+          <div className="text-xs text-fg-secondary mt-1">Last 30 days</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 text-[#3A86FF]" />
-            <span className="text-xs text-on-surface-variant">Avg / Day</span>
+            <span className="text-xs text-fg-secondary">Avg / Day</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">{avgPerDay}</div>
-          <div className="text-xs text-on-surface-variant mt-1">connections per day</div>
+          <div className="text-3xl font-bold text-fg">{avgPerDay}</div>
+          <div className="text-xs text-fg-secondary mt-1">connections per day</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-amber-700 dark:text-amber-300" />
-            <span className="text-xs text-on-surface-variant">Peak Day</span>
+            <span className="text-xs text-fg-secondary">Peak Day</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">{peakDayCount}</div>
-          <div className="text-xs text-on-surface-variant mt-1">{data?.busiestDay ?? '—'}</div>
+          <div className="text-3xl font-bold text-fg">{peakDayCount}</div>
+          <div className="text-xs text-fg-secondary mt-1">{data?.busiestDay ?? '—'}</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendIcon className={`w-4 h-4 ${trendColor}`} />
-            <span className="text-xs text-on-surface-variant">Week vs Week</span>
+            <span className="text-xs text-fg-secondary">Week vs Week</span>
           </div>
           <div className={`text-3xl font-bold ${trendColor}`}>
             {wowChange > 0 ? '+' : ''}{wowChange.toFixed(1)}%
           </div>
-          <div className="text-xs text-on-surface-variant mt-1">
+          <div className="text-xs text-fg-secondary mt-1">
             {thisWeek} vs {lastWeek} last wk
           </div>
         </GlassPanel>
@@ -195,10 +195,10 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-base font-semibold text-on-surface">30-Day Connection Trend</h3>
-              <p className="text-xs text-on-surface-variant mt-0.5">Daily connection count with 7-day moving context</p>
+              <h3 className="text-base font-semibold text-fg">30-Day Connection Trend</h3>
+              <p className="text-xs text-fg-secondary mt-0.5">Daily connection count with 7-day moving context</p>
             </div>
-            <span className="text-xs text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-lg border border-border-hard">
+            <span className="text-xs text-fg-secondary bg-surface-raised px-2.5 py-1 rounded-lg border border-hairline">
               Last 30 days
             </span>
           </div>
@@ -265,8 +265,8 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
         {/* Day-of-week distribution */}
         <GlassPanel className="p-6">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-on-surface">Day-of-Week Pattern</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">Which days drive the most connections</p>
+            <h3 className="text-base font-semibold text-fg">Day-of-Week Pattern</h3>
+            <p className="text-xs text-fg-secondary mt-0.5">Which days drive the most connections</p>
           </div>
           <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
@@ -314,8 +314,8 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
         {/* Last 14 days: this-week vs last-week */}
         <GlassPanel className="p-6">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-on-surface">Week-over-Week Comparison</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">Last 7 days vs. previous 7 days</p>
+            <h3 className="text-base font-semibold text-fg">Week-over-Week Comparison</h3>
+            <p className="text-xs text-fg-secondary mt-0.5">Last 7 days vs. previous 7 days</p>
           </div>
           <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
@@ -357,13 +357,13 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex items-center gap-4 mt-3 text-xs text-on-surface-variant">
+          <div className="flex items-center gap-4 mt-3 text-xs text-fg-secondary">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm bg-[#8338EC] inline-block" />
               This week ({thisWeek})
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-surface-container border border-border-hard inline-block" />
+              <span className="w-3 h-3 rounded-sm bg-surface-raised border border-hairline inline-block" />
               Last week ({lastWeek})
             </span>
           </div>
@@ -375,8 +375,8 @@ export default function SocialActivityPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold text-on-surface">Hourly Activity Pattern</h3>
-              <p className="text-xs text-on-surface-variant mt-0.5">Connections by hour of day (peak at {data?.peakHour ?? '—'}:00)</p>
+              <h3 className="text-base font-semibold text-fg">Hourly Activity Pattern</h3>
+              <p className="text-xs text-fg-secondary mt-0.5">Connections by hour of day (peak at {data?.peakHour ?? '—'}:00)</p>
             </div>
             <span className="text-xs px-2.5 py-1 rounded-lg bg-[#8338EC]/10 border border-[#8338EC]/20 text-[#8338EC]">
               {data?.peakHour ?? '—'}:00 peak

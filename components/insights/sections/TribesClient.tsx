@@ -109,8 +109,8 @@ export default function TribesPage({ placeId }: { placeId: string }) {
           <Users2 className="w-5 h-5 text-[#C77DFF]" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-on-surface">Tribe Analysis</h2>
-          <p className="text-sm text-on-surface-variant">Interest clustering and community overlap at your Place</p>
+          <h2 className="text-xl font-bold text-fg">Tribe Analysis</h2>
+          <p className="text-sm text-fg-secondary">Interest clustering and community overlap at your Place</p>
         </div>
       </motion.div>
 
@@ -119,37 +119,37 @@ export default function TribesPage({ placeId }: { placeId: string }) {
         <GlassPanel className="p-5" glow="purple">
           <div className="flex items-center gap-2 mb-3">
             <Users2 className="w-4 h-4 text-[#C77DFF]" />
-            <span className="text-xs text-on-surface-variant">Total Tribes</span>
+            <span className="text-xs text-fg-secondary">Total Tribes</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">{tribes.length}</div>
-          <div className="text-xs text-on-surface-variant mt-1">distinct communities</div>
+          <div className="text-3xl font-bold text-fg">{tribes.length}</div>
+          <div className="text-xs text-fg-secondary mt-1">distinct communities</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Link2 className="w-4 h-4 text-[#3A86FF]" />
-            <span className="text-xs text-on-surface-variant">Total Connections</span>
+            <span className="text-xs text-fg-secondary">Total Connections</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">{totalConnections.toLocaleString()}</div>
-          <div className="text-xs text-on-surface-variant mt-1">cross-tribe networking</div>
+          <div className="text-3xl font-bold text-fg">{totalConnections.toLocaleString()}</div>
+          <div className="text-xs text-fg-secondary mt-1">cross-tribe networking</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-green-700 dark:text-green-400" />
-            <span className="text-xs text-on-surface-variant">Avg / Tribe</span>
+            <span className="text-xs text-fg-secondary">Avg / Tribe</span>
           </div>
-          <div className="text-3xl font-bold text-on-surface">{avgConnections}</div>
-          <div className="text-xs text-on-surface-variant mt-1">connections per group</div>
+          <div className="text-3xl font-bold text-fg">{avgConnections}</div>
+          <div className="text-xs text-fg-secondary mt-1">connections per group</div>
         </GlassPanel>
 
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-3">
             <Info className="w-4 h-4 text-amber-700 dark:text-amber-300" />
-            <span className="text-xs text-on-surface-variant">Most Overlap</span>
+            <span className="text-xs text-fg-secondary">Most Overlap</span>
           </div>
-          <div className="text-xl font-bold text-on-surface">{mostOverlapping?.name ?? '—'}</div>
-          <div className="text-xs text-on-surface-variant mt-1">
+          <div className="text-xl font-bold text-fg">{mostOverlapping?.name ?? '—'}</div>
+          <div className="text-xs text-fg-secondary mt-1">
             {mostOverlapping?.overlap?.length ?? 0} tribe connections
           </div>
         </GlassPanel>
@@ -158,7 +158,7 @@ export default function TribesPage({ placeId }: { placeId: string }) {
       {/* Full tribe chart */}
       <motion.div variants={itemVariants}>
         {tribes.length === 0 ? (
-          <GlassPanel className="p-8 text-center text-sm text-on-surface-variant">
+          <GlassPanel className="p-8 text-center text-sm text-fg-secondary">
             {demoMode
               ? 'Not enough people have checked in here yet to show groups. Every chart waits for real data.'
               : 'Tribe clustering and verified micro-communities appear when guests with shared interests check in at your venue.'}
@@ -172,7 +172,7 @@ export default function TribesPage({ placeId }: { placeId: string }) {
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Tribe leaderboard */}
         <GlassPanel className="p-6">
-          <h3 className="text-base font-semibold text-on-surface mb-4">Tribe Leaderboard</h3>
+          <h3 className="text-base font-semibold text-fg mb-4">Tribe Leaderboard</h3>
           <div className="space-y-3">
             {sorted.map((tribe, i) => (
               <motion.div
@@ -181,24 +181,24 @@ export default function TribesPage({ placeId }: { placeId: string }) {
                 onClick={() => setSelected(selected?.id === tribe.id ? null : tribe)}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
                   selected?.id === tribe.id
-                    ? 'bg-surface-container border border-border-hard'
-                    : 'hover:bg-surface-container'
+                    ? 'bg-surface-raised border border-hairline'
+                    : 'hover:bg-surface-raised'
                 }`}
               >
-                <span className="text-xs font-bold text-on-surface-variant w-4">{i + 1}</span>
+                <span className="text-xs font-bold text-fg-secondary w-4">{i + 1}</span>
                 <div
                   className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: tribe.color }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-on-surface font-medium truncate">{tribe.name}</span>
-                    <span className="text-xs text-on-surface-variant ml-2 flex-shrink-0">
+                    <span className="text-sm text-fg font-medium truncate">{tribe.name}</span>
+                    <span className="text-xs text-fg-secondary ml-2 flex-shrink-0">
                       {tribe.connections} connections
                     </span>
                   </div>
                   {selected?.id === tribe.id && tribe.overlap && !tribe.isMicroCommunity && (
-                    <p className="text-[10px] text-on-surface-variant mt-1">
+                    <p className="text-[10px] text-fg-secondary mt-1">
                       Overlaps with: {tribe.overlap.join(', ')}
                     </p>
                   )}
@@ -216,8 +216,8 @@ export default function TribesPage({ placeId }: { placeId: string }) {
         {/* Connection count bar chart */}
         <GlassPanel className="p-6">
           <div className="mb-5">
-            <h3 className="text-base font-semibold text-on-surface">Top Tribes by Connections</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">Connections formed within each community</p>
+            <h3 className="text-base font-semibold text-fg">Top Tribes by Connections</h3>
+            <p className="text-xs text-fg-secondary mt-0.5">Connections formed within each community</p>
           </div>
           <div className="h-[280px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>

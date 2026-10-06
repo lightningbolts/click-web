@@ -53,23 +53,23 @@ export default function IdentityPane() {
       animate={{ opacity: 1 }}
       className="relative mx-auto max-w-sm overflow-hidden rounded-[16px]"
     >
-      <div className="absolute inset-0 bg-primary/20" />
-      <div className="absolute inset-[1px] rounded-[16px] bg-surface-container" />
+      <div className="absolute inset-0 bg-action/20" />
+      <div className="absolute inset-[1px] rounded-[16px] bg-surface-raised" />
       <div className="relative space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-primary/20 p-2">
-              <QrCode className="h-5 w-5 text-primary" />
+            <div className="rounded-xl bg-action/20 p-2">
+              <QrCode className="h-5 w-5 text-accent" />
             </div>
             <div>
-              <h3 className="font-bold text-on-surface">Your Click ID</h3>
-              <p className="text-xs text-on-surface-variant">Single-use · expires in 90s</p>
+              <h3 className="font-bold text-fg">Your Click ID</h3>
+              <p className="text-xs text-fg-secondary">Single-use · expires in 90s</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => void share()}
-            className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container"
+            className="rounded-lg p-2 text-fg-secondary hover:bg-surface-raised"
             title="Share"
           >
             <Share2 className="h-4 w-4" />
@@ -78,7 +78,7 @@ export default function IdentityPane() {
 
         <div className="flex justify-center">
           <div className="relative">
-            <div className="relative rounded-2xl border border-border-hard bg-[#101212] p-4">
+            <div className="relative rounded-2xl border border-hairline bg-[#101212] p-4">
               <DemoQr size={200} />
             </div>
           </div>
@@ -89,31 +89,31 @@ export default function IdentityPane() {
           <span className="font-mono text-xs font-medium tabular-nums" style={{ color: timerColor }}>
             {secondsLeft}s
           </span>
-          <span className="text-xs text-outline">· refreshes automatically</span>
+          <span className="text-xs text-fg-tertiary">· refreshes automatically</span>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-3">
-            <code className="rounded-[8px] border border-border-hard bg-surface-container px-4 py-2 font-mono text-lg tracking-wider text-primary">
+            <code className="rounded-[8px] border border-hairline bg-surface-raised px-4 py-2 font-mono text-lg tracking-wider text-accent">
               {DEMO_CLICK_ID}
             </code>
             <button
               type="button"
               onClick={() => void copy()}
-              className="rounded-xl border border-border-hard bg-surface-container p-2 hover:bg-surface-container-high"
+              className="rounded-xl border border-hairline bg-surface-raised p-2 hover:bg-surface-raised"
               aria-label="Copy Click ID"
             >
-              {copied ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5 text-on-surface-variant" />}
+              {copied ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5 text-fg-secondary" />}
             </button>
           </div>
-          <p className="text-center text-xs text-on-surface-variant">
+          <p className="text-center text-xs text-fg-secondary">
             {copied ? 'Copied to clipboard!' : 'Share this ID or scan the QR code'}
           </p>
         </div>
 
-        <div className="border-t border-border-hard pt-4 text-center">
-          <p className="font-medium text-on-surface">{DEMO_USER_NAME}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">
+        <div className="border-t border-hairline pt-4 text-center">
+          <p className="font-medium text-fg">{DEMO_USER_NAME}</p>
+          <p className="mt-1 text-xs text-fg-secondary">
             Someone in the room scans this instead of hunting a handle.
           </p>
         </div>

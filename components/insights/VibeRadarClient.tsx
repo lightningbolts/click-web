@@ -120,12 +120,12 @@ export default function VibeRadarClient({
 
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-primary/20 rounded-xl border border-primary/35">
-            <Radar className="w-5 h-5 text-primary" />
+          <div className="p-2.5 bg-action/20 rounded-xl border border-action/35">
+            <Radar className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-on-surface">Vibe Radar</h2>
-            <p className="text-sm text-on-surface-variant">
+            <h2 className="text-xl font-bold text-fg">Vibe Radar</h2>
+            <p className="text-sm text-fg-secondary">
               What people nearby are up for, in anonymous map cells
             </p>
           </div>
@@ -133,9 +133,9 @@ export default function VibeRadarClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="fc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-primary/35 transition-colors"
+          className="fc-btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold hover:border-action/35 transition-colors"
         >
-          <Crosshair className="w-4 h-4 text-primary" />
+          <Crosshair className="w-4 h-4 text-accent" />
           Deploy beacon
         </button>
       </motion.div>
@@ -148,24 +148,24 @@ export default function VibeRadarClient({
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-12 gap-4 md:gap-6">
         <GlassPanel className="p-5 xl:col-span-3" hover={false} glow="purple">
-          <h3 className="text-sm font-semibold text-on-surface mb-1">Signal strength</h3>
-          <p className="text-xs text-on-surface-variant mb-4">
+          <h3 className="text-sm font-semibold text-fg mb-1">Signal strength</h3>
+          <p className="text-xs text-fg-secondary mb-4">
             Volume drives blob size; hue reflects intent category.
           </p>
           {showSkeleton ? (
-            <div className="h-28 rounded-xl bg-surface-container animate-pulse" />
+            <div className="h-28 rounded-xl bg-surface-raised animate-pulse" />
           ) : (
             <ul className="space-y-2">
               {categoryTotals.length === 0 ? (
-                <li className="text-sm text-on-surface-variant">No totals above the privacy floor yet.</li>
+                <li className="text-sm text-fg-secondary">No totals above the privacy floor yet.</li>
               ) : (
                 categoryTotals.map((t) => (
                   <li
                     key={t.category}
-                    className="flex justify-between text-sm border-b border-border-hard pb-2 last:border-0"
+                    className="flex justify-between text-sm border-b border-hairline pb-2 last:border-0"
                   >
-                    <span className="text-on-surface">{t.category}</span>
-                    <span className="text-on-surface-variant tabular-nums">{t.count}</span>
+                    <span className="text-fg">{t.category}</span>
+                    <span className="text-fg-secondary tabular-nums">{t.count}</span>
                   </li>
                 ))
               )}
@@ -175,7 +175,7 @@ export default function VibeRadarClient({
 
         <div className="xl:col-span-6 min-h-[420px] order-3 xl:order-none">
           {showSkeleton ? (
-            <div className="h-[min(56vh,620px)] rounded-2xl border border-border-hard bg-surface-container animate-pulse" />
+            <div className="h-[min(56vh,620px)] rounded-2xl border border-hairline bg-surface-raised animate-pulse" />
           ) : (
             <VibeRadarMap
               clusters={clusters}
@@ -187,22 +187,22 @@ export default function VibeRadarClient({
         </div>
 
         <GlassPanel className="p-5 xl:col-span-3 order-2 xl:order-none" hover={false} glow="blue">
-          <h3 className="text-sm font-semibold text-on-surface mb-1">Trending vibes around you</h3>
-          <p className="text-xs text-on-surface-variant mb-4">
+          <h3 className="text-sm font-semibold text-fg mb-1">Trending vibes around you</h3>
+          <p className="text-xs text-fg-secondary mb-4">
             Beacon density by type within the same radius as intent clusters.
           </p>
           {showSkeleton ? (
-            <div className="h-28 rounded-xl bg-surface-container animate-pulse" />
+            <div className="h-28 rounded-xl bg-surface-raised animate-pulse" />
           ) : trendingVibes.length === 0 ? (
-            <p className="text-sm text-on-surface-variant">No active community map pins in range yet.</p>
+            <p className="text-sm text-fg-secondary">No active community map pins in range yet.</p>
           ) : (
             <ul className="space-y-2">
               {trendingVibes.map((t) => (
                 <li
                   key={t.beacon_type}
-                  className="flex justify-between text-sm border-b border-border-hard pb-2 last:border-0"
+                  className="flex justify-between text-sm border-b border-hairline pb-2 last:border-0"
                 >
-                  <span className="text-on-surface capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
+                  <span className="text-fg capitalize">{t.beacon_type.replace(/_/g, " ")}</span>
                   <span className="text-cyan-700 dark:text-cyan-400/90 tabular-nums font-medium">{t.count}</span>
                 </li>
               ))}
