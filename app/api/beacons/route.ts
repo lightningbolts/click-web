@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAfterResponse } from "@/lib/server/afterResponse";
+import { revalidatePublicEvents } from "@/lib/server/events/revalidatePublicEvents";
 import { emitProductEvent } from "@/lib/server/telemetry/productEvents";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
@@ -628,9 +629,11 @@ export async function POST(request: NextRequest) {
       if (!fallbackBeacon.id) {
         return NextResponse.json({ error: "Insert failed" }, { status: 500 });
       }
+      if (beacon_type === "event") revalidatePublicEvents();
       return NextResponse.json({ beacon: fallbackBeacon, series_count: seriesCount });
     }
 
+    if (beacon_type === "event") revalidatePublicEvents();
     try {
       const admin = createAdminSupabaseClient();
       const [enriched] = await enrichBeaconCreatorNames(admin, [beacon]);

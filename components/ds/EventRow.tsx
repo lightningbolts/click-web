@@ -33,6 +33,10 @@ export type EventRowProps = {
   trailing?: ReactNode;
   /** 64 px thumbnail for dense lists (Home "Saved & upcoming"). */
   compact?: boolean;
+  /** The one promoted event on a list: 160 px thumbnail from 640 px, `title-3` title. */
+  featured?: boolean;
+  /** Heading level for the title (lists under a day heading use h3). */
+  headingLevel?: "h2" | "h3";
 };
 
 /** Event list card (spec §5.7). The whole card is the link. */
@@ -49,6 +53,8 @@ export function EventRow({
   photoUrl,
   className,
   compact,
+  featured,
+  headingLevel: H = "h3",
 }: EventRowProps) {
   return (
     <Link
@@ -64,7 +70,7 @@ export function EventRow({
           {live ? <StatusPill variant="live">LIVE</StatusPill> : null}
           <span>{timeLabel}</span>
         </div>
-        <h3 className="type-headline mt-1 line-clamp-2 text-fg">{title}</h3>
+        <H className={cn("mt-1 line-clamp-2 text-fg [text-wrap:balance]", featured ? "type-title-3" : "type-headline")}>{title}</H>
         {host ? (
           <div className="type-meta mt-1.5 flex items-center gap-1.5 text-fg-secondary">
             <Avatar
@@ -96,11 +102,13 @@ export function EventRow({
             ))}
             {going && going.count > 0 ? (
               <span className="type-meta tabular flex items-center gap-1.5 text-fg-secondary">
-                <AvatarStack
-                  people={going.people}
-                  total={going.count}
-                  size={24}
-                />
+                {going.people.length ? (
+                  <AvatarStack
+                    people={going.people}
+                    total={going.count}
+                    size={24}
+                  />
+                ) : null}
                 {going.count} going
               </span>
             ) : null}
@@ -111,8 +119,14 @@ export function EventRow({
         seed={id}
         photoUrl={photoUrl}
         radius="md"
-        sizes={compact ? "64px" : "96px"}
-        className={compact ? "size-16 shrink-0" : "size-20 shrink-0 sm:size-24"}
+        sizes={compact ? "64px" : featured ? "(max-width: 640px) 96px, 160px" : "96px"}
+        className={
+          compact
+            ? "size-16 shrink-0"
+            : featured
+              ? "size-24 shrink-0 sm:size-40"
+              : "size-20 shrink-0 sm:size-24"
+        }
       />
     </Link>
   );

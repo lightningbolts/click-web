@@ -4,6 +4,7 @@ import {
   sanitizeClientSoundtrackFields,
 } from "@/lib/map/beaconSoundtrackEnrichment";
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePublicEvents } from "@/lib/server/events/revalidatePublicEvents";
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { withPlaceRefs } from "@/lib/server/places/placeRefs";
@@ -347,6 +348,7 @@ export async function PATCH(
         lng: beacon.lng,
         metadata: beacon.metadata,
       });
+      revalidatePublicEvents();
     }
 
     return NextResponse.json({ beacon });
@@ -392,6 +394,7 @@ export async function DELETE(
       return NextResponse.json({ error: deleteError.message }, { status: 400 });
     }
 
+    revalidatePublicEvents();
     return NextResponse.json({ ok: true, id: beaconId });
   } catch (e) {
     console.error("DELETE /api/beacons/[beaconId]:", e);
