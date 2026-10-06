@@ -601,8 +601,13 @@ type HistoryBackfillItem = {
   epochs: number[];
 };
 
-/** One share pass at a time per page: the shell, Settings and a fresh approval can all ask. */
+/**
+ * One share pass at a time per page: the shell, Settings and a fresh approval can all ask. A
+ * call during a pass queues one more after it (that pass may have read the approvals before
+ * the one just made); every call during that wait shares it.
+ */
 let historyShareInFlight: Promise<number> | null = null;
+let historyShareQueued: Promise<number> | null = null;
 
 /**
  * On a device already in use: shares the chat history this browser can read with the account's
@@ -615,7 +620,16 @@ export function shareWebE2eeV2HistoryWithApprovedDevices(options: {
   currentUserId: string;
   getAuthHeaders: () => Promise<HeadersInit>;
 }): Promise<number> {
-  historyShareInFlight ??= shareHistoryOnce(options).finally(() => {
+  if (historyShareInFlight) {
+    historyShareQueued ??= historyShareInFlight
+      .catch(() => 0)
+      .then(() => {
+        historyShareQueued = null;
+        return shareWebE2eeV2HistoryWithApprovedDevices(options);
+      });
+    return historyShareQueued;
+  }
+  historyShareInFlight = shareHistoryOnce(options).finally(() => {
     historyShareInFlight = null;
   });
   return historyShareInFlight;

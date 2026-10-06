@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { InlineNoticeVariant } from '@/components/ds/InlineNotice';
+import { toast } from '@/components/ds/Toast';
 import type { DerivedKeys } from '@/lib/chat/crypto';
 import { isBrowserDeviceLabel, isMobileAppDeviceLabel } from '@/lib/chat/deviceLabel';
 import {
@@ -147,9 +148,10 @@ export function useE2eeNotice({
 
   const ask = useCallback(
     async (id: string, reopen: boolean) => {
-      const prior = device?.chatId === id ? device.state.approval : null;
+      const priorState = device?.chatId === id ? device.state : null;
+      const prior = priorState?.approval ?? null;
+      const canRead = priorState?.kind === 'checked' ? priorState.canRead : false;
       setDevice({ chatId: id, state: { kind: 'asking', approval: prior } });
-      let own: OwnRequest = null;
       try {
         const { deviceId } = await loadOrCreateWebE2eeV2Identity();
         const res = await fetch('/api/chat/devices/history-requests', {
@@ -157,11 +159,14 @@ export function useE2eeNotice({
           headers: await jsonHeaders(getAuthHeaders),
           body: JSON.stringify({ device_id: deviceId, ...(reopen ? { reopen: true } : {}) }),
         });
-        own = ((await res.json().catch(() => ({}))) as { own?: OwnRequest }).own ?? null;
+        const json = (await res.json().catch(() => ({}))) as { own?: OwnRequest };
+        if (!res.ok) throw new Error('ask failed');
+        setDevice({ chatId: id, state: { kind: 'checked', canRead, approval: { own: json.own ?? null, approvers: prior?.approvers ?? [] } } });
       } catch {
-        // Shown as "not asked yet" below; the action stays available.
+        // Back to where it was, so the action stays available, and say it didn't go through.
+        setDevice({ chatId: id, state: { kind: 'checked', canRead, approval: prior } });
+        toast.error('Couldn’t ask your other devices. Check your connection and try again.');
       }
-      setDevice({ chatId: id, state: { kind: 'checked', canRead: false, approval: { own, approvers: prior?.approvers ?? [] } } });
     },
     [device, getAuthHeaders],
   );
