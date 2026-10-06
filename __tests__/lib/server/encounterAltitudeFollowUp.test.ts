@@ -58,6 +58,7 @@ function fakeAdmin(rows: Row[]) {
 
 const row = (overrides: Row = {}): Row => ({
   id: 'enc-1',
+  connection_id: CONN,
   gps_lat: 47.66,
   gps_lon: -122.3,
   terrain_elevation_m: 17,
@@ -97,7 +98,7 @@ describe('applyAltitudeFollowUp', () => {
 
     await expect(applyAltitudeFollowUp(admin, 'user-1', input(), NOW)).resolves.toEqual({ ok: true, updated: 1 });
 
-    expect(lookups[0]).toMatchObject({ connection_id: [CONN], reporting_user_id: 'user-1' });
+    expect(lookups[0]).toMatchObject({ reporting_user_id: 'user-1' });
     expect(global.fetch).not.toHaveBeenCalled();
     expect(updates).toHaveLength(1);
     expect(updates[0].id).toBe('enc-1');
@@ -127,6 +128,17 @@ describe('applyAltitudeFollowUp', () => {
     await expect(applyAltitudeFollowUp(admin, 'user-1', input(), NOW)).resolves.toEqual({ ok: true, updated: 2 });
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(updates.map((u) => u.values.terrain_elevation_m)).toEqual([20, 20]);
+  });
+
+  it("fills a group tap's pairwise rows too, but only for a moment of a named connection", async () => {
+    const pair = row({ id: 'pair', connection_id: 'b054368e-8df5-42e9-b40e-c8e6d35b9610' });
+    const filled = fakeAdmin([row(), pair]);
+    await expect(applyAltitudeFollowUp(filled.admin, 'user-1', input(), NOW)).resolves.toEqual({ ok: true, updated: 2 });
+    expect(filled.updates.map((u) => u.id)).toEqual(['enc-1', 'pair']);
+
+    const unnamed = fakeAdmin([pair]);
+    await expect(applyAltitudeFollowUp(unnamed.admin, 'user-1', input(), NOW)).resolves.toEqual({ ok: true, updated: 0 });
+    expect(unnamed.updates).toHaveLength(0);
   });
 
   it('writes nothing for an invalid request or no matching row', async () => {
