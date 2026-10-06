@@ -8,16 +8,21 @@ const migration = fs.readFileSync(
   'utf8',
 );
 
-describe('chat epoch rotation with one phone in several member accounts', () => {
+describe('epoch rotation with one phone in several member accounts (chats, groups, hubs)', () => {
   it('treats a shared device_id as ambiguous only when its public keys differ', () => {
     expect(migration).toContain('CREATE OR REPLACE FUNCTION public.create_or_rotate_chat_epoch(');
-    expect(migration).toContain('HAVING count(DISTINCT d.identity_public_key) > 1');
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.create_or_rotate_hub_epoch(');
+    expect(migration.match(/HAVING count\(DISTINCT d\.identity_public_key\) > 1/g)).toHaveLength(2);
     expect(migration).not.toContain('HAVING count(*) > 1');
+    expect(migration).not.toContain('FOR v_item IN');
   });
 
   it('stores the one wrap for every member row sharing that device', () => {
     expect(migration).toMatch(
       /INSERT INTO public\.chat_recipient_key_envelopes[\s\S]*SELECT p_chat_id, p_epoch, d\.id, v_sender_device, item->>'envelope'[\s\S]*JOIN public\.chat_devices d/,
+    );
+    expect(migration).toMatch(
+      /INSERT INTO public\.hub_recipient_key_envelopes[\s\S]*SELECT p_hub_id, p_epoch, d\.id, v_sender_device, item->>'envelope'[\s\S]*JOIN public\.hub_participants hp/,
     );
   });
 
@@ -30,11 +35,17 @@ describe('chat epoch rotation with one phone in several member accounts', () => 
       'duplicate recipient device',
       'invalid epoch-key envelope set',
       'recipient device set does not match active chat devices',
+      'actor is not an active hub participant',
+      'all active hub participants need E2EE v2 devices',
+      'hub epoch must advance monotonically',
+      'duplicate hub recipient device',
+      'hub recipient device set does not match active hub devices',
     ]) {
       expect(migration).toContain(guard);
     }
     expect(migration).toContain('SECURITY DEFINER');
     expect(migration).toContain('FOR UPDATE;');
+    expect(migration).toContain("SET search_path = ''");
     expect(migration).not.toMatch(/^\s*(DROP TABLE|TRUNCATE|DELETE FROM)\b/im);
   });
 });
