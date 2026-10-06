@@ -104,3 +104,11 @@ export const placeCreateBodySchema = z.object({
   country_code: z.string().trim().length(2).optional(),
   website_url: z.string().trim().url().max(500).startsWith('https://').optional(),
 });
+
+const managerRole = z.enum(['owner', 'manager', 'viewer']);
+
+/** `POST /api/places/[placeId]/managers` — owner invites someone by email (spec §9.5 Team). */
+export const placeManagerInviteBodySchema = z.object({ email: z.string().trim().min(3).max(320), role: managerRole }).strict();
+
+/** `PATCH /api/places/[placeId]/managers/[userId]` — owner changes a role. */
+export const placeManagerRoleBodySchema = z.object({ role: managerRole }).strict();
