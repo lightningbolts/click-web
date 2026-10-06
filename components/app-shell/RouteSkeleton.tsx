@@ -56,8 +56,9 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
   }
   if (variant === 'settings') {
     return (
-      <div {...status} className="flex flex-col gap-8">
-        <Skeleton rounded="sm" className="h-8 w-40" />
+      <div {...status}>
+        <Skeleton rounded="sm" className="h-7 w-40" />
+        <Skeleton rounded="sm" className="mb-6 mt-1.5 h-5 w-72 max-w-full" />
         <Rows count={4} avatar={false} />
       </div>
     );
