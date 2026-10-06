@@ -28,7 +28,25 @@ const HOST_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const GUEST_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const KEY = Buffer.from('test-pass-secret', 'utf8');
 
-function world(opts: { going?: boolean; checkedIn?: boolean } = {}) {
+/** Only the single-row check-in read fails; writes still go through (the dangerous case). */
+function failingCheckInRead(client: FakeDb['client']): FakeDb['client'] {
+  return {
+    ...client,
+    from: ((table: string) => {
+      const query = client.from(table);
+      if (table !== 'event_check_ins') return query;
+      const select = query.select.bind(query);
+      query.select = ((...args: Parameters<typeof select>) => {
+        const chain = select(...args);
+        chain.maybeSingle = (async () => ({ data: null, error: { message: 'connection reset' } })) as unknown as typeof chain.maybeSingle;
+        return chain;
+      }) as typeof query.select;
+      return query;
+    }) as FakeDb['client']['from'],
+  };
+}
+
+function world(opts: { going?: boolean; checkedIn?: boolean; failCheckInRead?: boolean } = {}) {
   const db = new FakeDb({
     tables: {
       users: [{ id: GUEST_ID, first_name: 'Ada', last_name: 'Lovelace', name: null, image: 'https://img/ada.jpg' }],
@@ -42,7 +60,7 @@ function world(opts: { going?: boolean; checkedIn?: boolean } = {}) {
   });
   mockRequireEventManager.mockResolvedValue({
     ok: true,
-    admin: db.client,
+    admin: opts.failCheckInRead ? failingCheckInRead(db.client) : db.client,
     userId: HOST_ID,
     beacon: { id: BEACON_ID, creator_id: HOST_ID, venue_id: null, beacon_type: 'event' },
   });
@@ -103,6 +121,14 @@ describe('POST /api/beacons/[beaconId]/pass/scan', () => {
     const forged = url.slice(0, at) + (url[at] === 'A' ? 'B' : 'A') + url.slice(at + 1);
     expect((await (await scan(forged)).json()).result).toBe('invalid');
     expect((await (await scan('hello')).json()).result).toBe('invalid');
+  });
+
+  it('fails closed when the check-in read fails (never re-admits a shared pass)', async () => {
+    const db = world({ checkedIn: true, failCheckInRead: true });
+    const res = await scan(passURL());
+    expect(res.status).toBe(500);
+    expect(mockGrantHub).not.toHaveBeenCalled();
+    expect(db.rows('event_check_ins')[0]).toMatchObject({ checked_in_at: '2026-10-06T19:00:00.000Z', check_in_count: 1 });
   });
 
   it('defers to the manager guard', async () => {

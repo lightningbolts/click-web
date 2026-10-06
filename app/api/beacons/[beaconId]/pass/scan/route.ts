@@ -53,6 +53,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .maybeSingle(),
       admin.from('map_beacons').select('metadata').eq('id', beaconId).maybeSingle(),
     ]);
+    // A failed read must never look like "not checked in yet": that would wave a shared pass through.
+    if (existing.error || event.error) {
+      console.error('pass scan lookup:', existing.error?.message ?? event.error?.message);
+      return apiError('Check-in failed', 500);
+    }
     const attendee = { user_id: holder.userId, name: holder.name, avatar_url: holder.avatarUrl };
     if (!going) return reply('not_going', { attendee });
 

@@ -19,6 +19,9 @@ it, and a second scan reports "already checked in" with the holder's name and ph
 **API**
 - `GET /api/beacons/{id}/pass` (Bearer/cookie) → `{ credential_url, code, checked_in_at, wallet_available }`.
   403 `not_going` when the viewer has no approved RSVP (requests and waitlists get one on approval).
+  503 `pass_unavailable` when the server can't sign passes (no `EVENT_PASS_SECRET` and no service-role
+  key). UI fallback: keep the "Your Click Pass" card but show "Your pass isn't available right now —
+  your RSVP still counts; the host can check you in by name" with a Retry, and never a broken QR.
 - `GET /api/beacons/{id}/pass/wallet` → signed `.pkpass` (`application/vnd.apple.pkpass`).
   404 `wallet_unavailable` until the Pass Type ID certificate is configured (see `.env.example`).
 - `credential_url` is the event's public link with the pass attached:

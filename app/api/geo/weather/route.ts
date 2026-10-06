@@ -12,8 +12,11 @@ export const publicRoute = true;
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const lat = Number(params.get('lat'));
-  const lng = Number(params.get('lng'));
+  // Number('') is 0: an absent coordinate must not read as the Gulf of Guinea.
+  const latRaw = params.get('lat')?.trim();
+  const lngRaw = params.get('lng')?.trim();
+  const lat = latRaw ? Number(latRaw) : Number.NaN;
+  const lng = lngRaw ? Number(lngRaw) : Number.NaN;
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
     return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
   }

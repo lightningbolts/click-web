@@ -53,11 +53,13 @@ export async function loadPassHolder(
   admin: SupabaseClient,
   userId: string,
 ): Promise<{ userId: string; name: string; avatarUrl: string | null }> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from('users')
     .select('id, name, image, first_name, last_name')
     .eq('id', userId)
     .maybeSingle();
+  // The host matches this face at the door; a failed read must not pass as a nameless guest.
+  if (error) throw new Error(`event pass holder: ${error.message}`);
   const row = data as UserProfileRow | null;
   return { userId, name: displayNameFromUser(row, 'Guest'), avatarUrl: row?.image?.trim() || null };
 }
@@ -67,12 +69,13 @@ export async function activeCheckIn(
   beaconId: string,
   userId: string,
 ): Promise<string | null> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from('event_check_ins')
     .select('checked_in_at, checked_out_at')
     .eq('beacon_id', beaconId)
     .eq('user_id', userId)
     .maybeSingle();
+  if (error) throw new Error(`event pass check-in: ${error.message}`);
   const row = data as { checked_in_at: string | null; checked_out_at: string | null } | null;
   return row && row.checked_out_at == null ? row.checked_in_at : null;
 }
