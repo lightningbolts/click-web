@@ -12,6 +12,7 @@ import {
   walletConfig,
   walletPassJson,
 } from '@/lib/server/eventPass';
+import { cssRgb, passArt } from '@/lib/server/wallet/passArt';
 import { apiError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
@@ -41,9 +42,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!event) return apiError('Event not found', 404);
     if (!going) return apiError('RSVP to get a Click Pass', 403, 'not_going');
 
-    const holder = await loadPassHolder(admin, user.id);
+    const [holder, art] = await Promise.all([loadPassHolder(admin, user.id), passArt(event)]);
     const pass = issueEventPass(key, beaconId, user.id);
-    const body = await buildWalletPass(config, walletPassJson({ config, event, pass, holder }));
+    const passJson = walletPassJson({ config, event, pass, holder, backgroundColor: cssRgb(art.backgroundColor) });
+    const body = await buildWalletPass(config, passJson, art.images);
     return new Response(new Uint8Array(body), {
       headers: {
         'Content-Type': 'application/vnd.apple.pkpass',

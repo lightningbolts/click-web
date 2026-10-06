@@ -95,18 +95,30 @@ export function walletConfig(): WalletConfig | null {
   return { passTypeIdentifier, teamIdentifier, signer: { certificatePem, privateKeyPem, wwdrPem } };
 }
 
-/** Click's night palette: the pass reads as Click in a stack of airline cards. */
-const PASS_COLORS = {
-  backgroundColor: 'rgb(14, 11, 24)',
+/** White type over the event's colors; labels a step back so the values lead. */
+const PASS_TYPE_COLORS = {
   foregroundColor: 'rgb(255, 255, 255)',
-  labelColor: 'rgb(196, 181, 253)',
+  labelColor: 'rgb(222, 222, 234)',
 };
+
+/** "SEP 27" in the event's own time zone, for the stacked-pass header. */
+function headerDate(startMs: number, timeZone: string | null): string | null {
+  try {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: timeZone ?? undefined })
+      .format(new Date(startMs))
+      .toUpperCase();
+  } catch {
+    return null;
+  }
+}
 
 export function walletPassJson(args: {
   config: Pick<WalletConfig, 'passTypeIdentifier' | 'teamIdentifier'>;
   event: PublicEventPayload;
   pass: IssuedPass;
   holder: { userId: string; name: string };
+  /** The card's color under its background picture (`passArt`). */
+  backgroundColor: string;
 }): Record<string, unknown> {
   const { event, pass } = args;
   const title = eventDisplayTitle(event.title, event.location_name);
@@ -117,6 +129,7 @@ export function walletPassJson(args: {
   // A Place hosting its own event is the host people recognize.
   const hostName = event.place?.name ?? event.host_name;
 
+  const header = startMs == null ? null : headerDate(startMs, event.timezone);
   const secondary: Array<Record<string, unknown>> = [];
   if (startIso) {
     secondary.push(
@@ -144,8 +157,9 @@ export function walletPassJson(args: {
     serialNumber: `${event.beacon_id}:${args.holder.userId}`,
     organizationName: 'Click',
     description: `Click Pass · ${title}`,
-    logoText: 'Click Pass',
-    ...PASS_COLORS,
+    logoText: 'Click',
+    backgroundColor: args.backgroundColor,
+    ...PASS_TYPE_COLORS,
     ...(startIso ? { relevantDate: startIso } : {}),
     // Greys out in Wallet a few hours after the event, like a used boarding pass.
     ...(endMs != null ? { expirationDate: new Date(endMs + 6 * 3_600_000).toISOString() } : {}),
@@ -154,6 +168,7 @@ export function walletPassJson(args: {
       : {}),
     barcodes: [{ format: 'PKBarcodeFormatQR', message: pass.url, messageEncoding: 'iso-8859-1', altText: pass.code }],
     eventTicket: {
+      ...(header ? { headerFields: [{ key: 'day', label: 'DATE', value: header }] } : {}),
       primaryFields: [{ key: 'event', label: 'EVENT', value: title }],
       secondaryFields: secondary,
       auxiliaryFields: auxiliary,
@@ -162,7 +177,12 @@ export function walletPassJson(args: {
   };
 }
 
-export async function buildWalletPass(config: WalletConfig, passJson: Record<string, unknown>): Promise<Buffer> {
+/** The signed pass: its JSON, Click's icon and logo, and the event's artwork (`passArt`). */
+export async function buildWalletPass(
+  config: WalletConfig,
+  passJson: Record<string, unknown>,
+  art: Record<string, Buffer>,
+): Promise<Buffer> {
   const images = Object.fromEntries(Object.entries(PASS_IMAGES).map(([name, b64]) => [name, Buffer.from(b64, 'base64')]));
-  return buildPkpass(passJson, images, config.signer);
+  return buildPkpass(passJson, { ...images, ...art }, config.signer);
 }
