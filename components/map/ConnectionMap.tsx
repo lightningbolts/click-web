@@ -11,9 +11,6 @@ import {
   type MapLayerToggles,
   type MapBeaconRecord,
   beaconGeoJsonFeatures,
-  beaconLayerGroup,
-  displayTitleForBeacon,
-  humanizeBeaconType,
   mapLayerForBeacon,
   parseMapBeacon,
   rawBeaconRowsFromApiPayload,
@@ -29,21 +26,15 @@ import {
   spreadOverlappingConnections,
 } from '@/lib/map/connectionMapGeo';
 import Link from 'next/link';
-import { Avatar } from '@/components/ds/Avatar';
-import { CardVisual } from '@/components/ds/CardVisual';
-import { Chip } from '@/components/ds/Chip';
 import { EmptyState } from '@/components/ds/EmptyState';
 import { IconButton } from '@/components/ds/IconButton';
 import { Loader } from '@/components/ds/Loader';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ds/Popover';
-import { SearchField } from '@/components/ds/SearchField';
-import { StatusPill } from '@/components/ds/StatusPill';
 import { ToggleList, ToggleRow } from '@/components/settings/ToggleRows';
-import { categoryLabel } from '@/lib/places/categories';
-import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
 import { MapSelectionPanel, type MapSelection } from './MapSelectionPanel';
-
-type NearbyFilter = 'all' | 'events' | 'places' | 'people' | 'other';
+import { NearbyList, nearbyTotal } from './NearbyList';
+import { collectPins, hideGlPins, selectionKey, type PinSources } from './collectPins';
+import { MapMarkerLayer, pinLabel, type PinModel } from './mapMarkers';
 
 interface ConnectionMapProps {
   connections: ConnectionRecord[];
@@ -60,21 +51,14 @@ const SRC_COMMUNITY = 'beacons-community-geo';
 const SRC_HAZARDS = 'beacons-hazards-geo';
 const SRC_SELECTED = 'selected-point';
 const SRC_PLACES = 'places-geo';
+const PIN_SOURCES: PinSources = {
+  connections: SRC_CONNECTIONS,
+  beacons: [SRC_OFFICIAL, SRC_COMMUNITY, SRC_HAZARDS],
+  places: SRC_PLACES,
+};
 
 /** Every source and layer this component adds: carried across theme swaps (see `transformStyle`). */
 export const CUSTOM_SOURCE_IDS = [SRC_CONNECTIONS, SRC_OFFICIAL, SRC_COMMUNITY, SRC_HAZARDS, SRC_PLACES, SRC_SELECTED];
-
-const INTERACTIVE_LAYERS = [
-  'connection-clusters',
-  'connection-unclustered',
-  'official-beacon-clusters',
-  'official-beacon-unclustered',
-  'community-beacon-clusters',
-  'community-beacon-unclustered',
-  'hazard-beacon-clusters',
-  'hazard-beacon-unclustered',
-  'place-unclustered',
-];
 
 const CLUSTER_MAX_ZOOM = 14;
 const CLUSTER_RADIUS = 52;
@@ -99,7 +83,9 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   /** First fully idle paint (tiles + layout settled) — drives fade-in to avoid pre-tile flicker. */
   const [mapPresentationReady, setMapPresentationReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [layers, setLayers] = useState<MapLayerToggles>(() => ({ ...DEFAULT_MAP_LAYER_TOGGLES }));
+  const [layers, setLayers] = useState<MapLayerToggles>(() => ({
+    ...DEFAULT_MAP_LAYER_TOGGLES,
+  }));
   const [layersOpen, setLayersOpen] = useState(false);
   const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
   const [places, setPlaces] = useState<PlaceSummary[]>([]);
@@ -109,10 +95,20 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   /** Connections and events inside the current viewport (desktop "In view" list). */
   const [viewBounds, setViewBounds] = useState<maplibregl.LngLatBounds | null>(null);
   const [listOpenMobile, setListOpenMobile] = useState(false);
-  const [filter, setFilter] = useState<NearbyFilter>('all');
-  const [query, setQuery] = useState('');
 
   const beaconsRef = useRef<MapBeaconRecord[]>([]);
+  const placesRef = useRef<PlaceSummary[]>([]);
+  const layersRef = useRef(layers);
+  const markerLayerRef = useRef<MapMarkerLayer | null>(null);
+  const scheduleSyncRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    placesRef.current = places;
+    layersRef.current = layers;
+    scheduleSyncRef.current();
+  }, [places, layers]);
+  useEffect(() => {
+    markerLayerRef.current?.setSelected(selectionKey(selection));
+  }, [selection]);
   useEffect(() => {
     beaconsRef.current = beacons;
   }, [beacons]);
@@ -127,8 +123,10 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
         if (!c.geo_location) return false;
         const { latitude, longitude } = c.geo_location;
         return (
-          typeof latitude === 'number' && typeof longitude === 'number' &&
-          isFinite(latitude) && isFinite(longitude) &&
+          typeof latitude === 'number' &&
+          typeof longitude === 'number' &&
+          isFinite(latitude) &&
+          isFinite(longitude) &&
           !(latitude === 0 && longitude === 0)
         );
       }),
@@ -150,15 +148,14 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     mapInitCenterRef.current = mapCenter;
   }
 
-  const wantsBeaconFetch =
-    layers.events ||
-    layers.socialVibes ||
-    layers.soundtracks ||
-    layers.alertsUtilities ||
-    layers.other;
+  const wantsBeaconFetch = layers.events || layers.socialVibes || layers.soundtracks || layers.alertsUtilities || layers.other;
 
   /** Map viewport for beacon proximity — once the map exists, follows pan/zoom; until then uses connection center. */
-  const [beaconViewport, setBeaconViewport] = useState<{ lng: number; lat: number; radiusM: number } | null>(null);
+  const [beaconViewport, setBeaconViewport] = useState<{
+    lng: number;
+    lat: number;
+    radiusM: number;
+  } | null>(null);
   /** Bumps when the session is ready so we retry `/api/beacons` after sign-in. */
   const [beaconAuthEpoch, setBeaconAuthEpoch] = useState(0);
 
@@ -180,7 +177,11 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     const m = map.current;
     const syncFromMap = () => {
       const c = m.getCenter();
-      setBeaconViewport({ lng: c.lng, lat: c.lat, radiusM: radiusMetersFromBounds(m.getBounds()) });
+      setBeaconViewport({
+        lng: c.lng,
+        lat: c.lat,
+        radiusM: radiusMetersFromBounds(m.getBounds()),
+      });
       setViewBounds(m.getBounds());
     };
     syncFromMap();
@@ -219,7 +220,10 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
         radius_m: String(Math.round(beaconQueryRadiusM)),
       });
       try {
-        const res = await fetch(`/api/beacons?${q.toString()}`, { credentials: 'include', headers });
+        const res = await fetch(`/api/beacons?${q.toString()}`, {
+          credentials: 'include',
+          headers,
+        });
         // Keep the pins already on the map when a refresh fails; do not blank the layer.
         if (!res.ok || cancelled) return;
         const json: unknown = await res.json();
@@ -250,7 +254,9 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
         radius_meters: String(Math.round(Math.min(beaconQueryRadiusM, 25_000))),
       });
       try {
-        const res = await fetch(`/api/places/nearby?${q.toString()}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        const res = await fetch(`/api/places/nearby?${q.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (!res.ok || cancelled) return;
         const json = (await res.json()) as { places?: PlaceSummary[] };
         if (!cancelled) setPlaces(Array.isArray(json.places) ? json.places : []);
@@ -264,101 +270,79 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     };
   }, [layers.places, active, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
 
+  /**
+   * DOM pins (spec §7.5) over MapLibre's clustering: rebuilt when tiles or the view settle, never
+   * per frame (markers ride the camera on their own). Clicking empty map clears the selection.
+   */
   const attachMapInteractions = useCallback((mapInstance: maplibregl.Map) => {
-    const zoomIntoCluster = (sourceId: string) => (e: maplibregl.MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      if (!f || f.geometry.type !== 'Point') return;
-      const clusId = f.properties?.cluster_id;
-      const src = mapInstance.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-      if (clusId == null || !src || typeof src.getClusterExpansionZoom !== 'function') return;
-      src.getClusterExpansionZoom(clusId as number).then((z) => {
-        const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-        mapInstance.easeTo({ center: coords, zoom: z + 0.35, duration: 420 });
-      }).catch(() => {});
-    };
-
-    const onConnPointClick = (e: maplibregl.MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      const csv = f?.properties?.connIds;
-      if (typeof csv !== 'string' || !f || f.geometry.type !== 'Point') return;
-      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-      setSelection({ kind: 'connections', ids: csv.split(',').filter(Boolean), lng, lat });
-    };
-
-    const onBeaconPointClick = (e: maplibregl.MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      const id = f?.properties?.id;
-      if (typeof id !== 'string' || !id || !f || f.geometry.type !== 'Point') return;
-      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-      setSelection({ kind: 'beacon', id, lng, lat });
-    };
-
-    const hoverLabel = (e: maplibregl.MapLayerMouseEvent): string | null => {
-      const props = e.features?.[0]?.properties;
-      if (!props) return null;
-      if (props.cluster_id != null) return `${props.point_count} here · click to zoom`;
-      if (typeof props.connIds === 'string') {
-        const ids = props.connIds.split(',').filter(Boolean);
-        const first = connectionsRef.current.find((c) => c.id === ids[0]);
-        if (!first) return null;
-        return ids.length > 1 ? `${first.name} + ${ids.length - 1} more` : first.name;
-      }
-      if (typeof props.title === 'string') return props.title;
-      return null;
-    };
-    const onHover = (e: maplibregl.MapLayerMouseEvent) => {
-      mapInstance.getCanvas().style.cursor = 'pointer';
+    hideGlPins(mapInstance, CUSTOM_SOURCE_IDS, ['selected-ring']);
+    const showTip = (model: PinModel | null, at: { x: number; y: number } | null) => {
       const el = tooltipRef.current;
-      const label = hoverLabel(e);
       if (!el) return;
-      if (!label) {
+      if (!model || !at) {
         el.style.opacity = '0';
         return;
       }
-      if (el.textContent !== label) el.textContent = label;
-      el.style.transform = `translate(${e.point.x}px, ${e.point.y}px) translate(-50%, calc(-100% - 18px))`;
+      el.textContent = pinLabel(model);
+      el.style.transform = `translate(${at.x}px, ${at.y}px) translate(-50%, calc(-100% - 26px))`;
       el.style.opacity = '1';
     };
-    const onLeave = () => {
-      mapInstance.getCanvas().style.cursor = '';
-      if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
-    };
-
-    mapInstance.on('click', 'place-unclustered', (e) => {
-      const f = e.features?.[0];
-      const id = f?.properties?.id;
-      if (typeof id !== 'string' || !f || f.geometry.type !== 'Point') return;
-      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number];
-      setSelection({ kind: 'place', id, lng, lat });
+    const markers = new MapMarkerLayer(mapInstance, {
+      onHover: showTip,
+      onSelect: (pin) => {
+        showTip(null, null);
+        if (pin.kind === 'cluster') {
+          const src = mapInstance.getSource(pin.source) as maplibregl.GeoJSONSource | undefined;
+          src
+            ?.getClusterExpansionZoom(pin.clusterId)
+            .then((z) => {
+              mapInstance.easeTo({
+                center: [pin.lng, pin.lat],
+                zoom: z + 0.35,
+                duration: 420,
+              });
+            })
+            .catch(() => {});
+        } else if (pin.kind === 'person')
+          setSelection({
+            kind: 'connections',
+            ids: pin.connIds,
+            lng: pin.lng,
+            lat: pin.lat,
+          });
+        else
+          setSelection({
+            kind: pin.kind === 'place' ? 'place' : 'beacon',
+            id: pin.id,
+            lng: pin.lng,
+            lat: pin.lat,
+          });
+      },
     });
-    mapInstance.on('mousemove', 'place-unclustered', onHover);
-    mapInstance.on('mouseleave', 'place-unclustered', onLeave);
-    mapInstance.on('click', 'connection-clusters', zoomIntoCluster(SRC_CONNECTIONS));
-    mapInstance.on('click', 'connection-unclustered', onConnPointClick);
-    for (const [prefix, src] of [
-      ['official-beacon', SRC_OFFICIAL],
-      ['community-beacon', SRC_COMMUNITY],
-      ['hazard-beacon', SRC_HAZARDS],
-    ] as const) {
-      mapInstance.on('click', `${prefix}-clusters`, zoomIntoCluster(src));
-      mapInstance.on('click', `${prefix}-unclustered`, onBeaconPointClick);
-      mapInstance.on('click', `${prefix}-unclustered-icon`, onBeaconPointClick);
-      for (const layer of [`${prefix}-clusters`, `${prefix}-unclustered`]) {
-        mapInstance.on('mousemove', layer, onHover);
-        mapInstance.on('mouseleave', layer, onLeave);
-      }
-    }
-    for (const layer of ['connection-clusters', 'connection-unclustered']) {
-      mapInstance.on('mousemove', layer, onHover);
-      mapInstance.on('mouseleave', layer, onLeave);
-    }
-    // Clicking empty map clears the selection.
-    mapInstance.on('click', (e) => {
-      const hits = mapInstance.queryRenderedFeatures(e.point, {
-        layers: INTERACTIVE_LAYERS.filter((id) => mapInstance.getLayer(id)),
+    markerLayerRef.current = markers;
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        markers.sync(
+          collectPins(mapInstance, PIN_SOURCES, {
+            connections: connectionsRef.current,
+            beacons: beaconsRef.current,
+            places: placesRef.current,
+            showPeople: layersRef.current.myNetwork,
+            nowMs: Date.now(),
+          }),
+        );
       });
-      if (hits.length === 0) setSelection(null);
+    };
+    scheduleSyncRef.current = schedule;
+    mapInstance.on('moveend', schedule);
+    mapInstance.on('sourcedata', (e) => {
+      if (e.isSourceLoaded && e.sourceId && CUSTOM_SOURCE_IDS.includes(e.sourceId)) schedule();
     });
+    schedule();
+    mapInstance.on('click', () => setSelection(null));
   }, []);
 
   useEffect(() => {
@@ -467,7 +451,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
             layout: {
               'text-field': ['get', 'point_count_abbreviated'],
               'text-size': 12,
-                'text-allow-overlap': true,
+              'text-allow-overlap': true,
             },
             paint: { 'text-color': clusterColor },
           });
@@ -519,12 +503,20 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
           id: 'place-icon',
           type: 'symbol',
           source: SRC_PLACES,
-          layout: { 'text-field': '⌂', 'text-size': 13, 'text-allow-overlap': true, 'text-ignore-placement': true },
+          layout: {
+            'text-field': '⌂',
+            'text-size': 13,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+          },
           paint: { 'text-color': '#3c3c43' },
         });
 
         // Selection ring above everything.
-        mapInstance.addSource(SRC_SELECTED, { type: 'geojson', data: emptyFc() });
+        mapInstance.addSource(SRC_SELECTED, {
+          type: 'geojson',
+          data: emptyFc(),
+        });
         mapInstance.addLayer({
           id: 'selected-ring',
           type: 'circle',
@@ -573,6 +565,8 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       }
       initialFitDoneRef.current = false;
       presentedRef.current = false;
+      markerLayerRef.current?.destroy();
+      markerLayerRef.current = null;
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -607,10 +601,13 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     const m = map.current;
     if (!m || !mapInitialized) return;
     const src = m.getSource(SRC_CONNECTIONS) as maplibregl.GeoJSONSource | undefined;
-    src?.setData({ type: 'FeatureCollection', features: buildConnectionFeatures(positionedConnections) });
+    src?.setData({
+      type: 'FeatureCollection',
+      features: buildConnectionFeatures(positionedConnections),
+    });
 
     const vis = layers.myNetwork ? 'visible' : 'none';
-    ['connection-clusters', 'connection-cluster-count', 'connection-unclustered', 'connection-unclustered-count'].forEach((id) => {
+    ['connection-clusters', 'connection-unclustered'].forEach((id) => {
       if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', vis);
     });
 
@@ -628,7 +625,10 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     const m = map.current;
     if (!m || !mapInitialized) return;
     const setSrc = (id: string, feats: GeoJSON.Feature[]) => {
-      (m.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: feats });
+      (m.getSource(id) as maplibregl.GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: feats,
+      });
     };
     const visibleBeacons = beacons.filter((beacon) => layers[mapLayerForBeacon(beacon.beacon_type)]);
     setSrc(SRC_OFFICIAL, beaconGeoJsonFeatures(visibleBeacons, 'official'));
@@ -654,7 +654,16 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       selection
         ? {
             type: 'FeatureCollection',
-            features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [selection.lng, selection.lat] }, properties: {} }],
+            features: [
+              {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [selection.lng, selection.lat],
+                },
+                properties: {},
+              },
+            ],
           }
         : emptyFc(),
     );
@@ -674,8 +683,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       map.current?.resize();
     };
     window.addEventListener('resize', handleResize);
-    const resizeObserver =
-      typeof ResizeObserver !== 'undefined' && mapContainer.current ? new ResizeObserver(handleResize) : null;
+    const resizeObserver = typeof ResizeObserver !== 'undefined' && mapContainer.current ? new ResizeObserver(handleResize) : null;
     if (resizeObserver && mapContainer.current) resizeObserver.observe(mapContainer.current);
     const resizeTimer = setTimeout(handleResize, 100);
     return () => {
@@ -705,7 +713,11 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   const focusOn = (sel: MapSelection) => {
     setSelection(sel);
     setListOpenMobile(true);
-    map.current?.easeTo({ center: [sel.lng, sel.lat], zoom: Math.max(map.current.getZoom(), 15), duration: 480 });
+    map.current?.easeTo({
+      center: [sel.lng, sel.lat],
+      zoom: Math.max(map.current.getZoom(), 15),
+      duration: 480,
+    });
   };
 
   const toggle = (key: keyof MapLayerToggles) => {
@@ -715,7 +727,12 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   const locate = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => map.current?.easeTo({ center: [coords.longitude, coords.latitude], zoom: 15, duration: 600 }),
+      ({ coords }) =>
+        map.current?.easeTo({
+          center: [coords.longitude, coords.latitude],
+          zoom: 15,
+          duration: 600,
+        }),
       () => undefined,
       { enableHighAccuracy: true, timeout: 10_000 },
     );
@@ -736,8 +753,8 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
           .filter((c): c is ConnectionRecord => c != null)
           .sort((a, b) => b.dateMet.getTime() - a.dateMet.getTime())
       : [];
-  const selectedBeacon = selection?.kind === 'beacon' ? beacons.find((b) => b.id === selection.id) ?? null : null;
-  const selectedPlace = selection?.kind === 'place' ? places.find((p) => p.id === selection.id) ?? null : null;
+  const selectedBeacon = selection?.kind === 'beacon' ? (beacons.find((b) => b.id === selection.id) ?? null) : null;
+  const selectedPlace = selection?.kind === 'place' ? (places.find((p) => p.id === selection.id) ?? null) : null;
 
   const layerRows: { key: keyof MapLayerToggles; label: string }[] = [
     { key: 'myNetwork', label: 'People I met' },
@@ -749,150 +766,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     { key: 'other', label: 'Other' },
   ];
 
-  const needle = query.trim().toLowerCase();
-  const matches = (text: string | null | undefined) => !needle || (text ?? '').toLowerCase().includes(needle);
-  const rows = {
-    events: filter === 'all' || filter === 'events' ? inView.events.filter((b) => matches(displayTitleForBeacon(b))) : [],
-    places: filter === 'all' || filter === 'places' ? inView.places.filter((p) => matches(p.name)) : [],
-    people: filter === 'all' || filter === 'people' ? inView.spots.filter((s) => s.groupedConnections.some((c) => matches(c.name))) : [],
-    other: filter === 'all' || filter === 'other' ? inView.other.filter((b) => matches(displayTitleForBeacon(b))) : [],
-  };
-  const peopleInView = inView.spots.reduce((n, s) => n + s.groupedConnections.length, 0);
-  const total = inView.events.length + inView.places.length + peopleInView + inView.other.length;
-  const liveNow = inView.places.filter((p) => p.pulse.state === 'live').length;
-  const chips: { value: NearbyFilter; label: string; count: number }[] = [
-    { value: 'all', label: 'All', count: total },
-    { value: 'events', label: 'Events', count: inView.events.length },
-    { value: 'places', label: 'Places', count: inView.places.length },
-    { value: 'people', label: 'People', count: peopleInView },
-    { value: 'other', label: 'Other', count: inView.other.length },
-  ];
-  const nothing = rows.events.length + rows.places.length + rows.people.length + rows.other.length === 0;
-
-  const Row = ({
-    visual,
-    title,
-    subtitle,
-    live,
-    onSelect,
-  }: {
-    visual: React.ReactNode;
-    title: string;
-    subtitle: string;
-    live?: boolean;
-    onSelect: () => void;
-  }) => (
-    <li>
-      <button type="button" onClick={onSelect} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-hover">
-        {visual}
-        <span className="min-w-0 flex-1">
-          <span className="type-body-strong flex items-center gap-1.5 text-fg">
-            <span className="truncate">{title}</span>
-            {live ? <StatusPill variant="live">Live</StatusPill> : null}
-          </span>
-          <span className="type-meta block truncate text-fg-tertiary">{subtitle}</span>
-        </span>
-      </button>
-    </li>
-  );
-
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <section className="pb-2">
-      <h3 className="type-meta px-2 pb-1 pt-2 font-semibold text-fg-secondary">{title}</h3>
-      <ul>{children}</ul>
-    </section>
-  );
-
-  const nearbyList = (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 px-4 pb-2 pt-4">
-        <h2 className="type-title-3 text-fg">Nearby</h2>
-        <p className="type-meta tabular text-fg-tertiary">
-          {total} nearby{liveNow ? ` · ${liveNow} live now` : ''}
-        </p>
-        <SearchField value={query} onValueChange={setQuery} label="Search the map" placeholder="Search places, events, people" className="mt-3" />
-        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4" role="group" aria-label="Show">
-          {chips.map((c) => (
-            <Chip key={c.value} size="sm" selected={filter === c.value} onClick={() => setFilter(c.value)}>
-              {c.label}
-              <span className="tabular opacity-70">{c.count}</span>
-            </Chip>
-          ))}
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {!hasGeoConnections && filter !== 'events' && filter !== 'places' ? (
-          <p className="type-meta mx-2 my-2 rounded-md bg-surface-raised px-3 py-2.5 text-fg-secondary">
-            People you Click with appear where you met, once you allow location in the app.
-          </p>
-        ) : null}
-        {nothing ? <p className="type-body px-2 py-6 text-center text-fg-secondary">Nothing here. Zoom out or move the map.</p> : null}
-        {rows.events.length ? (
-          <Section title="Events">
-            {rows.events.map((b) => (
-              <Row
-                key={b.id}
-                visual={<CardVisual seed={b.id} photoUrl={beaconHeroImageUrl(b.metadata)} radius="sm" className="size-12 shrink-0" sizes="48px" />}
-                title={displayTitleForBeacon(b)}
-                subtitle={humanizeBeaconType(b.beacon_type)}
-                onSelect={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}
-              />
-            ))}
-          </Section>
-        ) : null}
-        {rows.places.length ? (
-          <Section title="Places">
-            {rows.places.map((p) => (
-              <Row
-                key={p.id}
-                visual={<CardVisual seed={p.id} photoUrl={p.photo_url} radius="sm" className="size-12 shrink-0" sizes="48px" />}
-                title={p.name}
-                subtitle={[categoryLabel(p.category), p.city].filter(Boolean).join(' · ')}
-                live={p.pulse.state === 'live'}
-                onSelect={() => focusOn({ kind: 'place', id: p.id, lng: p.longitude, lat: p.latitude })}
-              />
-            ))}
-          </Section>
-        ) : null}
-        {rows.people.length ? (
-          <Section title="People">
-            {rows.people.map((spot) => (
-              <Row
-                key={spot.connection.id}
-                visual={<Avatar seed={spot.connection.otherUserId ?? spot.connection.id} name={spot.connection.name} src={spot.connection.avatarUrl} size={48} />}
-                title={`${spot.connection.name}${spot.groupedConnections.length > 1 ? ` +${spot.groupedConnections.length - 1}` : ''}`}
-                subtitle={spot.connection.location}
-                onSelect={() =>
-                  focusOn({ kind: 'connections', ids: spot.groupedConnections.map((c) => c.id), lng: spot.markerLongitude, lat: spot.markerLatitude })
-                }
-              />
-            ))}
-          </Section>
-        ) : null}
-        {rows.other.length ? (
-          <Section title="Other">
-            {rows.other.map((b) => (
-              <Row
-                key={b.id}
-                visual={
-                  <span
-                    className="flex size-12 shrink-0 items-center justify-center rounded-sm bg-surface-raised"
-                    style={{ color: beaconRowTint(b) }}
-                    aria-hidden
-                  >
-                    <MapPin size={20} />
-                  </span>
-                }
-                title={displayTitleForBeacon(b)}
-                subtitle={humanizeBeaconType(b.beacon_type)}
-                onSelect={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}
-              />
-            ))}
-          </Section>
-        ) : null}
-      </div>
-    </div>
-  );
+  const total = nearbyTotal(inView);
 
   const panelBody = selection ? (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -907,7 +781,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       />
     </div>
   ) : (
-    nearbyList
+    <NearbyList inView={inView} hasGeoConnections={hasGeoConnections} onFocus={focusOn} />
   );
 
   return (
@@ -989,8 +863,4 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       ) : null}
     </div>
   );
-}
-
-function beaconRowTint(b: MapBeaconRecord): string {
-  return beaconGeoJsonFeatures([b], beaconLayerGroup(b))[0]?.properties?.tint ?? FC_SECONDARY;
 }

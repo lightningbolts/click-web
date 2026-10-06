@@ -719,6 +719,113 @@ a {
   }
 }
 
+/* ── Map pins (spec §7.5): DOM markers over MapLibre's clustering ─────────── */
+
+.map-pin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--d-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.map-pin:hover,
+.map-pin[data-selected] {
+  transform: scale(1.15);
+  z-index: 2;
+}
+.map-pin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--r-pill);
+}
+.map-pin-face,
+.map-pin-thumb,
+.map-pin-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px #fff, var(--shadow-pin);
+}
+.map-pin-face {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.map-pin-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+}
+.map-pin-place .map-pin-thumb {
+  width: 30px;
+  height: 30px;
+}
+.map-pin-tile {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+}
+.map-pin-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.map-pin-cluster {
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  background: var(--action);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 3px #fff, var(--shadow-pin);
+}
+.map-pin-count {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: var(--action);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  box-shadow: 0 0 0 2px #fff;
+}
+.map-pin-live {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: var(--live);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px #fff;
+}
+
 /* Maplibre */
 .maplibregl-map {
   position: absolute !important;

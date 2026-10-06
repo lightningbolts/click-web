@@ -1,74 +1,36 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import { LazyMotion, domAnimation } from "framer-motion";
-import Link from "next/link";
-import { Skeleton } from "@/components/ds/Skeleton";
-import { InsightsDemoProvider } from "@/components/insights/InsightsDemoContext";
-import { cn } from "@/lib/cn";
-import type { InsightsSection } from "@/lib/places/workspace";
+import dynamic from 'next/dynamic';
+import { LazyMotion, domAnimation } from 'framer-motion';
+import Link from 'next/link';
+import { Skeleton } from '@/components/ds/Skeleton';
+import { InsightsDemoProvider } from '@/components/insights/InsightsDemoContext';
+import { cn } from '@/lib/cn';
+import type { InsightsSection } from '@/lib/places/workspace';
 
 // recharts and MapLibre load only on Insights, one section at a time (spec §11.2).
 const loading = () => <Skeleton rounded="lg" className="h-72" />;
-const InsightsDashboard = dynamic(
-  () => import("@/components/insights/InsightsDashboard"),
-  { ssr: false, loading },
-);
-const PlaceInsights = dynamic(
-  () => import("@/components/insights/sections/PlaceInsightsClient"),
-  { ssr: false, loading },
-);
-const LiveMetrics = dynamic(
-  () => import("@/components/insights/sections/LiveMetricsClient"),
-  { ssr: false, loading },
-);
-const Heatmap = dynamic(
-  () => import("@/components/insights/sections/HeatmapClient"),
-  { ssr: false, loading },
-);
-const Tribes = dynamic(
-  () => import("@/components/insights/sections/TribesClient"),
-  { ssr: false, loading },
-);
-const SocialActivity = dynamic(
-  () => import("@/components/insights/sections/SocialActivityClient"),
-  { ssr: false, loading },
-);
-const VibeRadar = dynamic(
-  () => import("@/components/insights/VibeRadarClient"),
-  { ssr: false, loading },
-);
-const VibeStream = dynamic(
-  () => import("@/components/insights/sections/VibeStreamClient"),
-  { ssr: false, loading },
-);
-const EventEngagement = dynamic(
-  () => import("@/components/insights/sections/EventEngagementClient"),
-  { ssr: false, loading },
-);
-const NetworkHealth = dynamic(
-  () => import("@/components/insights/sections/NetworkHealthTrend"),
-  { ssr: false, loading },
-);
+const InsightsDashboard = dynamic(() => import('@/components/insights/InsightsDashboard'), { ssr: false, loading });
+const PlaceInsights = dynamic(() => import('@/components/insights/sections/PlaceInsightsClient'), { ssr: false, loading });
+const LiveMetrics = dynamic(() => import('@/components/insights/sections/LiveMetricsClient'), { ssr: false, loading });
+const Heatmap = dynamic(() => import('@/components/insights/sections/HeatmapClient'), { ssr: false, loading });
+const Tribes = dynamic(() => import('@/components/insights/sections/TribesClient'), { ssr: false, loading });
+const SocialActivity = dynamic(() => import('@/components/insights/sections/SocialActivityClient'), { ssr: false, loading });
+const VibeRadar = dynamic(() => import('@/components/insights/VibeRadarClient'), { ssr: false, loading });
+const VibeStream = dynamic(() => import('@/components/insights/sections/VibeStreamClient'), { ssr: false, loading });
+const EventEngagement = dynamic(() => import('@/components/insights/sections/EventEngagementClient'), { ssr: false, loading });
+const NetworkHealth = dynamic(() => import('@/components/insights/sections/NetworkHealthTrend'), { ssr: false, loading });
 
 export const INSIGHTS_NAV: { id: InsightsSection; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "traffic", label: "Traffic" },
-  { id: "crowd", label: "Crowd" },
-  { id: "vibe", label: "Vibe" },
-  { id: "events", label: "Events" },
+  { id: 'overview', label: 'Overview' },
+  { id: 'traffic', label: 'Traffic' },
+  { id: 'crowd', label: 'Crowd' },
+  { id: 'vibe', label: 'Vibe' },
+  { id: 'events', label: 'Events' },
 ];
 
 /** Left list from 1280 px, a chip row below it (spec §9.5). */
-export function InsightsNav({
-  placeId,
-  section,
-  query,
-}: {
-  placeId: string;
-  section: InsightsSection;
-  query: string;
-}) {
+export function InsightsNav({ placeId, section, query }: { placeId: string; section: InsightsSection; query: string }) {
   const base = `/business/places/${placeId}/insights`;
   return (
     <nav
@@ -81,13 +43,11 @@ export function InsightsNav({
           return (
             <li key={item.id} className="shrink-0">
               <Link
-                href={`${item.id === "overview" ? base : `${base}/${item.id}`}${query}`}
-                aria-current={active ? "page" : undefined}
+                href={`${item.id === 'overview' ? base : `${base}/${item.id}`}${query}`}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  "type-body inline-flex h-9 items-center rounded-pill px-3.5 font-semibold xl:flex xl:h-10 xl:rounded-md xl:px-3",
-                  active
-                    ? "bg-selection text-accent"
-                    : "bg-fill-subtle text-fg hover:bg-fill-strong xl:bg-transparent xl:hover:bg-hover",
+                  'type-body inline-flex h-9 items-center rounded-pill px-3.5 font-semibold xl:flex xl:h-10 xl:rounded-md xl:px-3',
+                  active ? 'bg-selection text-accent' : 'bg-fill-subtle text-fg hover:bg-fill-strong xl:bg-transparent xl:hover:bg-hover',
                 )}
               >
                 {item.label}
@@ -116,20 +76,20 @@ export function InsightsSectionView({
     <InsightsDemoProvider demoMode={demo}>
       <LazyMotion features={domAnimation}>
         <div className="flex min-w-0 flex-col gap-10">
-          {section === "overview" ? (
+          {section === 'overview' ? (
             <>
               <InsightsDashboard venueId={placeId} />
               <PlaceInsights placeId={placeId} range={range} />
               <LiveMetrics placeId={placeId} />
             </>
-          ) : section === "traffic" ? (
+          ) : section === 'traffic' ? (
             <Heatmap placeId={placeId} />
-          ) : section === "crowd" ? (
+          ) : section === 'crowd' ? (
             <>
               <Tribes placeId={placeId} />
               <SocialActivity placeId={placeId} />
             </>
-          ) : section === "vibe" ? (
+          ) : section === 'vibe' ? (
             <>
               <VibeRadar placeId={placeId} initialPayload={null} />
               <VibeStream placeId={placeId} />
