@@ -2,7 +2,8 @@ import type { DashboardBundle } from '@/lib/server/connections/dashboardBundle';
 
 /**
  * The Clicks inbox's first load, started by `clicks/layout.tsx` on the server and streamed with
- * the page, so the inbox doesn't wait on the browser to fetch it (spec §7.2).
+ * the page, so the inbox doesn't wait on the browser to fetch it (spec §7.2). `map/page.tsx`
+ * starts the same load: the bundle carries the map's connections too.
  */
 export type InboxPreload = {
   userId: string;

@@ -47,7 +47,10 @@ function HubRow({ hub, meta, selected, onOpen }: { hub: RecentHub; meta: string;
  */
 export function HubsList({ selectedHubId }: { selectedHubId: string | null }) {
   const router = useRouter();
-  const recent = useSyncExternalStore(subscribeRecentHubs, readRecentHubs, () => EMPTY);
+  // Recent hubs live on this device: the server can't know them, so it claims neither a list nor
+  // "No hubs yet" (`null`), and the first client render shows the real list.
+  const stored = useSyncExternalStore(subscribeRecentHubs, readRecentHubs, () => null);
+  const recent = stored ?? EMPTY;
   const [nearby, setNearby] = useState<NearbyHub[] | null>(null);
   const [busy, setBusy] = useState<'find' | 'create' | string | null>(null);
   const [error, setError] = useState('');
@@ -148,7 +151,7 @@ export function HubsList({ selectedHubId }: { selectedHubId: string | null }) {
         </section>
       ) : null}
 
-      {recent.length === 0 && !nearbyOnly?.length ? (
+      {stored && recent.length === 0 && !nearbyOnly?.length ? (
         <EmptyState
           icon={MapPin}
           title={nearby ? 'No hubs nearby yet' : 'No hubs yet'}

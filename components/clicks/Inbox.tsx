@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ds/Avatar';
 import { Button } from '@/components/ds/Button';
 import { Chip } from '@/components/ds/Chip';
 import { EmptyState } from '@/components/ds/EmptyState';
+import { Skeleton } from '@/components/ds/Skeleton';
 import { IconButton } from '@/components/ds/IconButton';
 import { SearchField } from '@/components/ds/SearchField';
 import { Tooltip } from '@/components/ds/Tooltip';
@@ -42,6 +43,25 @@ const EMPTY: Record<Exclude<ClicksFilter, 'hubs'>, { icon: typeof Users; title: 
   },
 };
 
+/** Rows at `InboxRow`'s exact size, shown until the first load says whether the list is empty. */
+function InboxSkeleton() {
+  return (
+    <ul aria-busy aria-label="Loading conversations" className="route-loading">
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        <li key={i} className="px-2">
+          <div className="flex h-[72px] items-center gap-3 px-3">
+            <Skeleton rounded="full" className="size-12 shrink-0" />
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <Skeleton rounded="sm" className="h-3.5 w-2/5" />
+              <Skeleton rounded="sm" className="h-3.5 w-4/5" />
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * The Clicks inbox pane (spec §7.2): header, local search, filter chips with unread counts,
  * the Core strip, and the conversation rows. Keyboard: ↑/↓ move, Enter opens, E archives,
@@ -52,6 +72,7 @@ export function Inbox({
   filter,
   onFilterChange,
   rows,
+  loaded,
   unreadByFilter,
   core,
   rowState,
@@ -68,6 +89,8 @@ export function Inbox({
   filter: ClicksFilter;
   onFilterChange: (filter: ClicksFilter) => void;
   rows: ChatListConnection[];
+  /** The rows' first load finished: until then an empty list is unknown, not empty. */
+  loaded: boolean;
   unreadByFilter: Partial<Record<ClicksFilter, number>>;
   core: ChatListConnection[];
   rowState: (conn: ChatListConnection) => InboxRowState;
@@ -230,7 +253,9 @@ export function Inbox({
             ) : null}
 
             {visible.length === 0 ? (
-              query ? (
+              !loaded ? (
+                <InboxSkeleton />
+              ) : query ? (
                 <p className="type-body px-6 py-10 text-center text-fg-secondary">No one matches that search.</p>
               ) : (
                 <EmptyState

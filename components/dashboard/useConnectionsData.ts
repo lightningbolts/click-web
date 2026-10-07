@@ -57,7 +57,7 @@ export function useConnectionsData({
   setConnectionsInitialLoadComplete: Dispatch<SetStateAction<boolean>>;
   updateArchivedIds: (updater: (prev: Set<string>) => Set<string>) => void;
   setVibePromptConnection: Dispatch<SetStateAction<ConnectionRecord | null>>;
-  /** Server-started first load (`clicks/layout.tsx`); used once, when it's fresh. */
+  /** Server-started first load (`clicks/layout.tsx`, `map/page.tsx`); used once, when it's fresh. */
   preload?: Promise<InboxPreload | null>;
 }) {
   const seenConnectionIdsRef = useRef<Set<string> | null>(null);

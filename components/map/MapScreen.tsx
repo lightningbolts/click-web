@@ -8,6 +8,7 @@ import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { useConnectionsData } from '@/components/dashboard/useConnectionsData';
 import { useAuth } from '@/lib/AuthContext';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
+import type { InboxPreload } from '@/lib/clicks/inboxPreload';
 import { useSessionCachedState } from '@/lib/dashboard/sessionCache';
 import { personHref, threadHref } from '@/lib/shell/appNav';
 
@@ -22,10 +23,11 @@ const ConnectionMap = dynamic(() => import('@/components/map/ConnectionMap'), {
 });
 
 /**
- * `/map` (spec §7.5): full-bleed under the top bar. Loads the viewer's connections (with where they
- * met) and hands them to the map; events and Places load from the map's own viewport.
+ * `/map` (spec §7.5): fills the top bar's frame. Loads the viewer's connections (with where they
+ * met; the first load starts on the server, see `map/page.tsx`) and hands them to the map; events
+ * and Places load from the map's own viewport.
  */
-export function MapScreen() {
+export function MapScreen({ preload }: { preload?: Promise<InboxPreload | null> }) {
   const { user } = useAuth();
   const router = useRouter();
   const userId = user?.id;
@@ -33,7 +35,7 @@ export function MapScreen() {
   const [mapConnectionRecords, setMapConnectionRecords] = useSessionCachedState<ConnectionRecord[]>(userId, 'mapConnections', []);
   const [, setArchivedConnectionIds] = useSessionCachedState<Set<string>>(userId, 'archivedIds', () => new Set());
   const [, setCoreConnectionIds] = useSessionCachedState<Set<string>>(userId, 'coreIds', () => new Set());
-  const [, setConnectionsInitialLoadComplete] = useSessionCachedState(userId, 'connectionsLoaded', false);
+  const [connectionsLoaded, setConnectionsInitialLoadComplete] = useSessionCachedState(userId, 'connectionsLoaded', false);
   const [, setVibePromptConnection] = useState<ConnectionRecord | null>(null);
 
   const archiveStorageKey = userId ? `click:archived-connections:${userId}` : null;
@@ -65,13 +67,15 @@ export function MapScreen() {
     setConnectionsInitialLoadComplete,
     updateArchivedIds,
     setVibePromptConnection,
+    preload,
   });
 
   return (
-    <div data-testid="map-screen" className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 flex-col overflow-hidden">
+    <div data-testid="map-screen" className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 flex-col overflow-hidden border-hairline md:container-frame md:border-x">
       <h1 className="sr-only">Map</h1>
       <ConnectionMap
         connections={mapConnectionRecords}
+        connectionsLoading={!connectionsLoaded}
         onConnectionClick={(conn) => router.push(threadHref(conn.id))}
         onOpenProfile={(otherUserId) => router.push(personHref(otherUserId))}
       />

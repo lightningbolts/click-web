@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ds/Avatar';
 import { CardVisual } from '@/components/ds/CardVisual';
 import { Chip } from '@/components/ds/Chip';
 import { SearchField } from '@/components/ds/SearchField';
+import { Skeleton } from '@/components/ds/Skeleton';
 import { StatusPill } from '@/components/ds/StatusPill';
 import type { PositionedConnection } from '@/lib/map/connectionMapGeo';
 import {
@@ -93,10 +94,13 @@ function BeaconRowVisual({ beacon }: { beacon: MapBeaconRecord }) {
 export function NearbyList({
   inView,
   hasGeoConnections,
+  loading,
   onFocus,
 }: {
   inView: InView;
   hasGeoConnections: boolean;
+  /** First loads are still out: show placeholders, never "Nothing here" or zero counts. */
+  loading: boolean;
   onFocus: (selection: MapSelection) => void;
 }) {
   const [filter, setFilter] = useState<NearbyFilter>('all');
@@ -121,13 +125,20 @@ export function NearbyList({
     { value: 'other', label: 'Other', count: inView.other.length },
   ];
   const nothing = rows.events.length + rows.places.length + rows.people.length + rows.other.length === 0;
+  const pending = loading && total === 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pb-2 pt-4">
         <h2 className="type-title-3 text-fg">Nearby</h2>
         <p className="type-meta tabular text-fg-tertiary">
-          {total} nearby{liveNow ? ` · ${liveNow} live now` : ''}
+          {pending ? (
+            <Skeleton rounded="sm" className="inline-block h-3 w-20 align-middle" />
+          ) : (
+            <>
+              {total} nearby{liveNow ? ` · ${liveNow} live now` : ''}
+            </>
+          )}
         </p>
         <SearchField
           value={query}
@@ -140,18 +151,32 @@ export function NearbyList({
           {chips.map((c) => (
             <Chip key={c.value} size="sm" selected={filter === c.value} onClick={() => setFilter(c.value)}>
               {c.label}
-              <span className="tabular opacity-70">{c.count}</span>
+              {pending ? null : <span className="tabular opacity-70">{c.count}</span>}
             </Chip>
           ))}
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        {!hasGeoConnections && filter !== 'events' && filter !== 'places' ? (
+        {!hasGeoConnections && !loading && filter !== 'events' && filter !== 'places' ? (
           <p className="type-meta mx-2 my-2 rounded-md bg-surface-raised px-3 py-2.5 text-fg-secondary">
             People you Click with appear where you met, once you allow location in the app.
           </p>
         ) : null}
-        {nothing ? <p className="type-body px-2 py-6 text-center text-fg-secondary">Nothing here. Zoom out or move the map.</p> : null}
+        {nothing && loading ? (
+          <ul aria-busy aria-label="Loading nearby" className="route-loading pt-2">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li key={i} className="flex items-center gap-3 px-2 py-2">
+                <Skeleton rounded="sm" className="size-12 shrink-0" />
+                <span className="flex min-w-0 flex-1 flex-col gap-2">
+                  <Skeleton rounded="sm" className="h-3.5 w-1/2" />
+                  <Skeleton rounded="sm" className="h-3 w-1/3" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : nothing ? (
+          <p className="type-body px-2 py-6 text-center text-fg-secondary">Nothing here. Zoom out or move the map.</p>
+        ) : null}
         {rows.events.length ? (
           <NearbySection title="Events">
             {rows.events.map((b) => (
