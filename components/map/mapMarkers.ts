@@ -93,17 +93,21 @@ export function isNetworkPin(model: PinModel): boolean {
 /**
  * Fills a pin element for a model (used on create and when the signature changes). Only our
  * `map-pin*` classes are swapped: the element is also the MapLibre marker, whose own classes
- * (`maplibregl-marker`: absolute position) must survive a re-render.
+ * (`maplibregl-marker`: absolute position) must survive a re-render. Everything visible sits in
+ * one `.map-pin-body`, which is what grows on hover: scaling the marker itself would also scale
+ * the inline transform MapLibre positions it with, sliding the pin out from under the pointer.
  */
 export function renderPin(el: HTMLElement, model: PinModel): void {
-  el.replaceChildren();
   el.classList.remove(...Array.from(el.classList).filter((c) => c.startsWith('map-pin')));
   el.classList.add('map-pin', `map-pin-${model.kind}`);
   el.classList.toggle('map-pin-network', isNetworkPin(model));
   el.setAttribute('aria-label', pinLabel(model));
+  const body = document.createElement('span');
+  body.className = 'map-pin-body';
+  el.replaceChildren(body);
   switch (model.kind) {
     case 'cluster': {
-      el.textContent = model.count > 999 ? '999+' : String(model.count);
+      body.textContent = model.count > 999 ? '999+' : String(model.count);
       break;
     }
     case 'person': {
@@ -115,36 +119,36 @@ export function renderPin(el: HTMLElement, model: PinModel): void {
         face.style.background = avatarFallbackColor(model.seed);
         face.textContent = avatarInitials(model.name);
       }
-      el.appendChild(face);
+      body.appendChild(face);
       if (model.count > 1) {
         const badge = document.createElement('span');
         badge.className = 'map-pin-count';
         badge.textContent = String(model.count);
-        el.appendChild(badge);
+        body.appendChild(badge);
       }
       break;
     }
     case 'event': {
-      if (model.live) el.appendChild(livePill());
-      el.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
+      if (model.live) body.appendChild(livePill());
+      body.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
       break;
     }
     case 'place': {
-      if (model.live) el.appendChild(livePill());
-      el.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
+      if (model.live) body.appendChild(livePill());
+      body.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
       break;
     }
     case 'beacon': {
       // A beacon with a picture (a soundtrack's artwork, a photo) shows it, like an event.
       if (safeImageUrl(model.imageUrl)) {
-        el.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
+        body.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
         break;
       }
       const tile = document.createElement('span');
       tile.className = 'map-pin-tile';
       tile.style.background = model.tint;
       tile.textContent = model.icon;
-      el.appendChild(tile);
+      body.appendChild(tile);
       break;
     }
   }

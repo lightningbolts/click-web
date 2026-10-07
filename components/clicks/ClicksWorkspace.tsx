@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { MessageCircle, SearchX } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
@@ -19,7 +19,8 @@ import { connectionRecordToArchiveRow, getArchiveCountdown } from '@/lib/dashboa
 import { deleteCliqueRpc, leaveCliqueRpc, renameCliqueRpc } from '@/lib/chat/createVerifiedClick';
 import { markChatUnread } from '@/lib/chat/conversationApi';
 import type { ChatSearchHit } from '@/lib/chat/searchSnippet';
-import { clicksHref, filterForThread, parseClicksFilter, parseClicksThread, type ClicksFilter } from '@/lib/clicks/route';
+import { clicksHref, filterForThread, parseClicksFilter, parseClicksThread, type ClicksFilter, type ClicksThread } from '@/lib/clicks/route';
+import { useSessionCacheHydrated } from '@/lib/dashboard/sessionCache';
 import { groupThreadHref, hubThreadHref, personHref, threadHref } from '@/lib/shell/appNav';
 import { cn } from '@/lib/cn';
 import { Inbox } from './Inbox';
@@ -45,8 +46,112 @@ const unreadOf = (rows: ChatListConnection[]) => rows.reduce((n, c) => n + (c.ch
  */
 export function ClicksWorkspace({ preload }: { preload?: Promise<InboxPreload | null> }) {
   const { user, onlineUserIds } = useAuth();
+  // The data hooks seed from the last visit's inbox (memory, or after a reload the encrypted disk
+  // snapshot), so they mount once it's read; until then the same frame shows placeholder rows.
+  const hydrated = useSessionCacheHydrated(user?.id);
   if (!user) return null;
+  if (!hydrated) return <BootWorkspace userId={user.id} />;
   return <Workspace user={user} onlineUserIds={onlineUserIds} preload={preload} />;
+}
+
+/** Inbox | conversation, shared by the workspace and its boot frame so nothing moves between them. */
+function WorkspaceFrame({
+  thread,
+  inbox,
+  conversation,
+  children,
+}: {
+  thread: ClicksThread | null;
+  inbox: ReactNode;
+  conversation: ReactNode;
+  /** Dialogs. */
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      data-testid="clicks-workspace"
+      className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 overflow-hidden border-hairline max-md:data-[thread=true]:h-dvh md:container-frame md:border-x"
+      data-thread={thread ? 'true' : undefined}
+    >
+      <aside
+        aria-label="Clicks"
+        className={cn('min-h-0 w-full shrink-0 border-hairline bg-surface md:w-80 md:border-r lg:w-[360px]', thread ? 'max-md:hidden' : 'flex flex-col')}
+      >
+        {inbox}
+      </aside>
+      <section aria-label="Conversation" className={cn('relative min-h-0 min-w-0 flex-1', !thread && 'max-md:hidden')}>
+        {conversation}
+      </section>
+      {children}
+    </div>
+  );
+}
+
+/** The conversation pane with nothing open (or the open one still loading). */
+function ConversationPlaceholder({ seed, hint }: { seed: string; hint: boolean }) {
+  return (
+    <div className="relative flex h-full items-center justify-center">
+      <ChatBackground seed={seed} />
+      {hint ? (
+        <EmptyState
+          icon={MessageCircle}
+          title="Pick up a conversation"
+          body="Choose someone from your Clicks. Plans, pinned messages and notifications live in each conversation’s details."
+        />
+      ) : null}
+    </div>
+  );
+}
+
+const noop = () => {};
+/** Inert stand-ins for the boot frame, which has no rows to describe or act on. */
+const BOOT_ROW_STATE: InboxRowState = {
+  href: '/clicks',
+  selected: false,
+  online: false,
+  core: false,
+  muted: false,
+  archived: false,
+  blocked: false,
+  groupCreator: false,
+  sayHiDeadline: null,
+};
+const NO_ONE_ONLINE: ReadonlySet<string> = new Set();
+
+/**
+ * What the server renders and the first client frame shows: the real inbox header and filters
+ * over placeholder rows. Nothing here loads data or can act on a row (there are none).
+ */
+function BootWorkspace({ userId }: { userId: string }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const thread = parseClicksThread(pathname);
+  const filter = filterForThread(thread, false) ?? parseClicksFilter(searchParams.get('filter'));
+  return (
+    <WorkspaceFrame
+      thread={thread}
+      inbox={
+        <Inbox
+          viewerId={userId}
+          filter={filter}
+          onFilterChange={noop}
+          rows={[]}
+          loaded={false}
+          unreadByFilter={{}}
+          core={[]}
+          rowState={() => BOOT_ROW_STATE}
+          nowMs={0}
+          actions={{} as InboxRowActions}
+          onlineUserIds={NO_ONE_ONLINE}
+          onNewGroup={noop}
+          search={{ query: '', setQuery: noop, busy: false, hits: [] }}
+          onOpenSearchHit={noop}
+          hubs={<HubsList selectedHubId={thread?.kind === 'h' ? thread.id : null} />}
+        />
+      }
+      conversation={<ConversationPlaceholder seed={userId} hint={!thread} />}
+    />
+  );
 }
 
 function Workspace({
@@ -111,9 +216,6 @@ function Workspace({
 
   const groups = useMemo(() => data.active.filter((c) => c.chatKind === 'group_clique'), [data.active]);
   const rows = filter === 'groups' ? groups : filter === 'archived' ? data.archived : data.active;
-  // Active mixes connections and groups; each list is empty for real only once it has loaded.
-  const rowsLoaded =
-    filter === 'groups' ? cliques.groupsLoaded : filter === 'archived' ? data.loaded : data.loaded && cliques.groupsLoaded;
   const unreadByFilter = useMemo(
     () => ({ active: unreadOf(data.active), groups: unreadOf(groups), archived: unreadOf(data.archived) }),
     [data.active, data.archived, groups],
@@ -245,21 +347,15 @@ function Workspace({
   const supabase = getSupabaseClient();
 
   return (
-    <div
-      data-testid="clicks-workspace"
-      className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 overflow-hidden border-hairline max-md:data-[thread=true]:h-dvh md:container-frame md:border-x"
-      data-thread={thread ? 'true' : undefined}
-    >
-      <aside
-        aria-label="Clicks"
-        className={cn('min-h-0 w-full shrink-0 border-hairline bg-surface md:w-80 md:border-r lg:w-[360px]', thread ? 'max-md:hidden' : 'flex flex-col')}
-      >
+    <WorkspaceFrame
+      thread={thread}
+      inbox={
         <Inbox
           viewerId={user.id}
           filter={filter}
           onFilterChange={onFilterChange}
           rows={rows}
-          loaded={rowsLoaded}
+          loaded={data.ready}
           unreadByFilter={unreadByFilter}
           core={data.core}
           rowState={rowState}
@@ -272,10 +368,9 @@ function Workspace({
           onOpenSearchHit={openSearchHit}
           hubs={<HubsList selectedHubId={thread?.kind === 'h' ? thread.id : null} />}
         />
-      </aside>
-
-      <section aria-label="Conversation" className={cn('relative min-h-0 min-w-0 flex-1', !thread && 'max-md:hidden')}>
-        {thread?.kind === 'h' ? (
+      }
+      conversation={
+        thread?.kind === 'h' ? (
           <HubThread key={thread.id} hubId={thread.id} userId={user.id} onBack={closeThread} />
         ) : thread && selected ? (
           <ChatView
@@ -312,19 +407,10 @@ function Workspace({
             />
           </div>
         ) : (
-          <div className="relative flex h-full items-center justify-center">
-            <ChatBackground seed={user.id} />
-            {thread ? null : (
-              <EmptyState
-                icon={MessageCircle}
-                title="Pick up a conversation"
-                body="Choose someone from your Clicks. Plans, pinned messages and notifications live in each conversation’s details."
-              />
-            )}
-          </div>
-        )}
-      </section>
-
+          <ConversationPlaceholder seed={user.id} hint={!thread} />
+        )
+      }
+    >
       {supabase && createOpen ? (
         <CreateVerifiedClickDialog
           open={createOpen}
@@ -376,6 +462,6 @@ function Workspace({
         />
       ) : null}
       {confirmNode}
-    </div>
+    </WorkspaceFrame>
   );
 }
