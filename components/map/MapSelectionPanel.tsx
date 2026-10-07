@@ -1,5 +1,6 @@
 'use client';
 
+import { EventMarkdownPreview } from '@/components/events/EventMarkdownContent';
 import { ArrowLeft, ArrowUpRight, CalendarDays, ExternalLink, MapPin, MessageCircle, Music, UserRound } from 'lucide-react';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { Avatar } from '@/components/ds/Avatar';
@@ -136,7 +137,11 @@ function BeaconDetail({ beacon }: { beacon: MapBeaconRecord }) {
           {place}
         </p>
       ) : null}
-      {description && description !== title ? <p className="type-body mt-3 line-clamp-4 text-fg-secondary">{description}</p> : null}
+      {description && description !== title ? (
+        <EventMarkdownPreview title={title} className="type-body mt-3 line-clamp-4 text-fg-secondary">
+          {description}
+        </EventMarkdownPreview>
+      ) : null}
       {preview && isSafeBeaconPreviewUrl(preview) ? (
         <div className="mt-3">
           <p className="type-meta mb-1 flex items-center gap-1 font-semibold text-fg-secondary">

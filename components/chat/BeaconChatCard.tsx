@@ -1,5 +1,6 @@
 'use client';
 
+import { EventMarkdownPreview } from '@/components/events/EventMarkdownContent';
 import Link from 'next/link';
 import { MapPin } from 'lucide-react';
 import type { Message } from '@/lib/chat/types';
@@ -60,7 +61,9 @@ export default function BeaconChatCard({ message }: { message: Message }) {
           </p>
         ) : null}
         {preview.description ? (
-          <p className="type-meta line-clamp-2 text-fg-tertiary">{preview.description}</p>
+          <EventMarkdownPreview title={preview.title} className="type-meta line-clamp-2 text-fg-tertiary">
+            {preview.description}
+          </EventMarkdownPreview>
         ) : null}
       </div>
     </article>

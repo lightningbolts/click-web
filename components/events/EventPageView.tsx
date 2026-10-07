@@ -26,6 +26,7 @@ import {
   eventDisplayTitle,
   eventIsPast,
   eventSubtitle,
+  withoutLeadingTitle,
   eventWhereLabel,
 } from "@/lib/events/eventMetadata";
 import { eventDeepLink, eventManagePath, eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
@@ -89,7 +90,8 @@ function RsvpSkeleton() {
 export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPayload; timeZone: string; nowMs: number }) {
   const beaconId = event.beacon_id;
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
-  const description = eventSubtitle(title, event.description);
+  const subtitle = eventSubtitle(title, event.description);
+  const description = subtitle ? withoutLeadingTitle(subtitle, title) || null : null;
   const where = eventWhereLabel(event.location_name);
   const when = eventWhenLines(event.event_start_at, event.event_end_at, timeZone, event.timezone);
   const ended = eventIsPast({ event_end_at: event.event_end_at, event_start_at: event.event_start_at });

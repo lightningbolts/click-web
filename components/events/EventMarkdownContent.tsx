@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { withoutLeadingTitle } from "@/lib/events/eventMetadata";
 
 type EventMarkdownContentProps = {
   children: string;
@@ -15,7 +16,7 @@ function safeHref(raw: string): string | null {
   return null;
 }
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+function renderInline(text: string, keyPrefix: string, links = true): ReactNode[] {
   const nodes: ReactNode[] = [];
   let cursor = 0;
   let tokenIndex = 0;
@@ -41,7 +42,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       );
     } else if (token.startsWith("[")) {
       const link = token.match(/^\[([^\]]+)\]\(([^\s)]+)\)$/);
-      const href = link ? safeHref(link[2]) : null;
+      const href = link && links ? safeHref(link[2]) : null;
       nodes.push(
         href ? (
           <a
@@ -53,7 +54,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
             {link?.[1]}
           </a>
         ) : (
-          token
+          (links ? token : link?.[1] ?? token)
         ),
       );
     } else {
@@ -187,4 +188,28 @@ export default function EventMarkdownContent({
       })}
     </div>
   );
+}
+
+/**
+ * One flowing line of a description for clamped previews (map panel, chat cards): inline
+ * formatting kept, block syntax (headings, lists, quotes) flattened, links as plain text since
+ * previews usually sit inside a link. Pass `title` to drop a leading heading that repeats it.
+ */
+export function EventMarkdownPreview({
+  children,
+  title,
+  className,
+}: {
+  children: string;
+  title?: string | null;
+  className?: string;
+}) {
+  const flat = withoutLeadingTitle(children.trim(), title)
+    .replace(/^\s{0,3}#{1,3}\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/^\s*(?:[-+*]|\d+\.)\s+/gm, "")
+    .replace(/\s*\n+\s*/g, " ")
+    .trim();
+  if (!flat) return null;
+  return <p className={className}>{renderInline(flat, "md-preview", false)}</p>;
 }

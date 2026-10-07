@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import EventMarkdownContent from "@/components/events/EventMarkdownContent";
+import EventMarkdownContent, { EventMarkdownPreview } from "@/components/events/EventMarkdownContent";
 
 describe("EventMarkdownContent", () => {
   it("renders a list that follows a line in the same paragraph", () => {
@@ -19,5 +19,25 @@ describe("EventMarkdownContent", () => {
   it("renders nothing for blank input", () => {
     const { container } = render(<EventMarkdownContent>{"  \n "}</EventMarkdownContent>);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("EventMarkdownPreview", () => {
+  it("flattens blocks, keeps inline formatting and drops a heading that repeats the title", () => {
+    const { container } = render(
+      <EventMarkdownPreview title="Run Club">
+        {"# Run Club\nJoin us for **Run Club**, a casual run on the *Burke-Gilman*.\n\n- Bring water\n- [RSVP](https://x.co)"}
+      </EventMarkdownPreview>,
+    );
+    expect(container.textContent).toBe("Join us for Run Club, a casual run on the Burke-Gilman. Bring water RSVP");
+    expect(container.querySelector("strong")?.textContent).toBe("Run Club");
+    expect(container.querySelector("em")?.textContent).toBe("Burke-Gilman");
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.textContent).not.toMatch(/[#*]/);
+  });
+
+  it("keeps a heading that isn't the title, as plain text", () => {
+    const { container } = render(<EventMarkdownPreview title="Run Club">{"## What to bring\nWater"}</EventMarkdownPreview>);
+    expect(container.textContent).toBe("What to bring Water");
   });
 });

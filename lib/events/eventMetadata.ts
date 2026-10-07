@@ -114,6 +114,18 @@ export function eventDisplayTitle(
 }
 
 /** Hide a description that merely repeats the title (list + detail). */
+/**
+ * The description without a leading `# Heading` that only repeats the title (descriptions often
+ * open with the event's name), so it isn't shown twice.
+ */
+export function withoutLeadingTitle(description: string, title: string | null | undefined): string {
+  const named = title?.trim().toLowerCase();
+  if (!named) return description;
+  const match = description.match(/^\s*#{1,3}\s+(.+?)\s*(?:\n|$)/);
+  if (!match || match[1].replace(/[*_`~]/g, "").trim().toLowerCase() !== named) return description;
+  return description.slice(match[0].length).trimStart();
+}
+
 export function eventSubtitle(
   title: string | null | undefined,
   description: string | null | undefined,
