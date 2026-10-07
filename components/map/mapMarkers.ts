@@ -13,7 +13,7 @@ export type PinModel =
   | { kind: 'person'; key: string; lng: number; lat: number; seed: string; name: string; avatarUrl: string | null; count: number; connIds: string[] }
   | { kind: 'event'; key: string; lng: number; lat: number; id: string; title: string; imageUrl: string | null; live: boolean }
   | { kind: 'place'; key: string; lng: number; lat: number; id: string; title: string; imageUrl: string | null; live: boolean }
-  | { kind: 'beacon'; key: string; lng: number; lat: number; id: string; title: string; tint: string; icon: string };
+  | { kind: 'beacon'; key: string; lng: number; lat: number; id: string; title: string; tint: string; icon: string; imageUrl: string | null };
 
 /** Hard cap on live DOM markers; clustering keeps real views far below it. */
 export const MAX_DOM_PINS = 250;
@@ -55,7 +55,7 @@ export function pinSignature(model: PinModel): string {
     case 'place':
       return `${model.kind}|${model.title}|${model.imageUrl ?? ''}|${model.live}`;
     default:
-      return `b|${model.title}|${model.tint}|${model.icon}`;
+      return `b|${model.title}|${model.tint}|${model.icon}|${model.imageUrl ?? ''}`;
   }
 }
 
@@ -124,6 +124,11 @@ export function renderPin(el: HTMLElement, model: PinModel): void {
       break;
     }
     case 'beacon': {
+      // A beacon with a picture (a soundtrack's artwork, a photo) shows it, like an event.
+      if (safeImageUrl(model.imageUrl)) {
+        el.appendChild(thumb(model.id, model.imageUrl, 'map-pin-thumb'));
+        break;
+      }
       const tile = document.createElement('span');
       tile.className = 'map-pin-tile';
       tile.style.background = model.tint;

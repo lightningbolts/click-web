@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin } from 'lucide-react';
 import { Avatar } from '@/components/ds/Avatar';
 import { CardVisual } from '@/components/ds/CardVisual';
 import { Chip } from '@/components/ds/Chip';
@@ -9,15 +8,15 @@ import { SearchField } from '@/components/ds/SearchField';
 import { StatusPill } from '@/components/ds/StatusPill';
 import type { PositionedConnection } from '@/lib/map/connectionMapGeo';
 import {
-  beaconGeoJsonFeatures,
   beaconLayerGroup,
+  beaconTint,
+  beaconUnclusteredIconChar,
   displayTitleForBeacon,
   humanizeBeaconType,
   type MapBeaconRecord,
 } from '@/lib/map/mapBeacons';
 import { categoryLabel } from '@/lib/places/categories';
 import type { PlaceSummary } from '@/lib/places/types';
-import { FC_SECONDARY } from '@/lib/theme/mapStyles';
 import { beaconHeroImageUrl } from '@/lib/ui/beaconHeroImageUrl';
 import type { MapSelection } from './MapSelectionPanel';
 
@@ -69,8 +68,25 @@ function NearbySection({ title, children }: { title: string; children: React.Rea
   );
 }
 
-function beaconRowTint(b: MapBeaconRecord): string {
-  return beaconGeoJsonFeatures([b], beaconLayerGroup(b))[0]?.properties?.tint ?? FC_SECONDARY;
+/**
+ * A beacon's row visual: its picture (a soundtrack's artwork, a photo) when it has one, else
+ * the same tinted tile and glyph as its map pin.
+ */
+function BeaconRowVisual({ beacon }: { beacon: MapBeaconRecord }) {
+  const photoUrl = beaconHeroImageUrl(beacon.metadata);
+  if (photoUrl) {
+    return <CardVisual seed={beacon.id} photoUrl={photoUrl} radius="sm" className="size-12 shrink-0" sizes="48px" />;
+  }
+  const group = beaconLayerGroup(beacon);
+  return (
+    <span
+      className="flex size-12 shrink-0 items-center justify-center rounded-sm text-[18px] leading-none text-white"
+      style={{ background: beaconTint(beacon.beacon_type, group) }}
+      aria-hidden
+    >
+      {beaconUnclusteredIconChar(beacon.beacon_type, group)}
+    </span>
+  );
 }
 
 /** The Nearby list (spec §7.5): search, filter chips with counts, and sections of what's in view. */
@@ -204,15 +220,7 @@ export function NearbyList({
             {rows.other.map((b) => (
               <NearbyRow
                 key={b.id}
-                visual={
-                  <span
-                    className="flex size-12 shrink-0 items-center justify-center rounded-sm bg-surface-raised"
-                    style={{ color: beaconRowTint(b) }}
-                    aria-hidden
-                  >
-                    <MapPin size={20} />
-                  </span>
-                }
+                visual={<BeaconRowVisual beacon={b} />}
                 title={displayTitleForBeacon(b)}
                 subtitle={humanizeBeaconType(b.beacon_type)}
                 onSelect={() => focusOn({ kind: 'beacon', id: b.id, lng: b.lng, lat: b.lat })}

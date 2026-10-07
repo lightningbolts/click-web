@@ -66,8 +66,6 @@ export function useMessageLoading({
   setHighlightedMessageId,
   scrollContainerRef,
   messagesEndRef,
-  inputRef,
-  programmaticListScrollRef,
   snapScrollToLatestOnOpenRef,
   searchFocusConsumedRef,
   readReceiptsEnabled = true,
@@ -98,8 +96,6 @@ export function useMessageLoading({
   setHighlightedMessageId: Dispatch<SetStateAction<string | null>>;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   messagesEndRef: RefObject<HTMLDivElement | null>;
-  inputRef: RefObject<HTMLTextAreaElement | null>;
-  programmaticListScrollRef: MutableRefObject<boolean>;
   snapScrollToLatestOnOpenRef: MutableRefObject<boolean>;
   searchFocusConsumedRef: MutableRefObject<string | null>;
   /** False while the thread is not on screen (hidden tab pane); nothing is marked read then. */
@@ -114,13 +110,7 @@ export function useMessageLoading({
   const isRestored = () => restoredForRef.current === (connection.groupChatId ?? null);
 
   const scrollToBottom = useCallback((smooth = true) => {
-    programmaticListScrollRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        programmaticListScrollRef.current = false;
-      });
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -442,14 +432,6 @@ export function useMessageLoading({
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-
-    if (
-      !programmaticListScrollRef.current &&
-      typeof document !== 'undefined' &&
-      document.activeElement === inputRef.current
-    ) {
-      inputRef.current?.blur();
-    }
 
     setShowScrollBtn(!isNearBottom());
 

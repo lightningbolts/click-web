@@ -553,7 +553,9 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
             value={draft}
             maxLength={4000}
             rows={1}
-            disabled={busy || !data || !!loadError}
+            disabled={!data || !!loadError}
+            // Read-only while sending, not disabled: a disabled field drops focus after every send.
+            readOnly={busy}
             placeholder={`Message ${title || 'the hub'}…`}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

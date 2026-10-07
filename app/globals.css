@@ -402,9 +402,13 @@ a {
   text-underline-offset: 0.2em;
 }
 
-:where(a, button, input, textarea, select, summary, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* In the base layer so a component's own focus treatment (`outline-none` + a ring that follows
+   its shape) wins; unlayered, this drew a square outline around rounded fields. */
+@layer base {
+  :where(a, button, input, textarea, select, summary, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 /* 16px inputs on touch devices so iOS Safari never zooms (spec §5.5). */

@@ -65,6 +65,14 @@ const CLUSTER_RADIUS = 52;
 /** Beacons uncluster at a higher zoom than connections so pins stay legible above the network layer. */
 const BEACON_CLUSTER_MAX_ZOOM = 16;
 const BEACON_CLUSTER_RADIUS = 44;
+/** `/api/beacons` page size (its maximum) and a safety ceiling for one area (10 × 500). */
+const BEACON_PAGE_SIZE = 500;
+const BEACON_MAX_PAGES = 10;
+
+/** Pages can repeat a beacon (the caller's own pins ride on the first page). */
+function dedupeById(beacons: MapBeaconRecord[]): MapBeaconRecord[] {
+  return [...new Map(beacons.map((b) => [b.id, b])).values()];
+}
 
 /**
  * MapLibre GL map for connection locations + optional map beacon layers (clustered).
@@ -214,22 +222,37 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
       const headers: HeadersInit = { Accept: 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
-      const q = new URLSearchParams({
-        lat: String(beaconQueryLat),
-        lng: String(beaconQueryLng),
-        radius_m: String(Math.round(beaconQueryRadiusM)),
-      });
+      // The API pages newest first; an area with more beacons than one page would drop the
+      // older ones (an event posted a while back). The first page shows at once and the rest
+      // fill in behind it, as on iOS. A failed later page keeps what already loaded.
+      const loaded: MapBeaconRecord[] = [];
+      let cursor: string | null = null;
       try {
-        const res = await fetch(`/api/beacons?${q.toString()}`, {
-          credentials: 'include',
-          headers,
-        });
-        // Keep the pins already on the map when a refresh fails; do not blank the layer.
-        if (!res.ok || cancelled) return;
-        const json: unknown = await res.json();
-        if (cancelled) return;
-        const list = rawBeaconRowsFromApiPayload(json);
-        setBeacons(list.map(parseMapBeacon).filter((b): b is MapBeaconRecord => b != null));
+        for (let page = 0; page < BEACON_MAX_PAGES && !cancelled; page++) {
+          const q = new URLSearchParams({
+            lat: String(beaconQueryLat),
+            lng: String(beaconQueryLng),
+            radius_m: String(Math.round(beaconQueryRadiusM)),
+            limit: String(BEACON_PAGE_SIZE),
+          });
+          if (cursor) q.set('cursor', cursor);
+          const res = await fetch(`/api/beacons?${q.toString()}`, {
+            credentials: 'include',
+            headers,
+          });
+          // Keep the pins already on the map when a refresh fails; do not blank the layer.
+          if (!res.ok || cancelled) return;
+          const json: unknown = await res.json();
+          if (cancelled) return;
+          for (const row of rawBeaconRowsFromApiPayload(json)) {
+            const beacon = parseMapBeacon(row);
+            if (beacon) loaded.push(beacon);
+          }
+          setBeacons(dedupeById(loaded));
+          const next = (json as { next_cursor?: unknown } | null)?.next_cursor;
+          cursor = typeof next === 'string' && next ? next : null;
+          if (!cursor) return;
+        }
       } catch {
         /* keep current pins */
       }
