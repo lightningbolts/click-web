@@ -48,7 +48,7 @@ export function collectPins(map: Pick<maplibregl.Map, 'querySourceFeatures' | 'g
     const id = Number(f.properties?.cluster_id);
     if (!at || !Number.isFinite(id)) return;
     const key = `${source}:c${id}`;
-    out.set(key, { kind: 'cluster', key, lng: at[0], lat: at[1], count, source, clusterId: id, label });
+    out.set(key, { kind: 'cluster', key, lng: at[0], lat: at[1], count, source, clusterId: id, label, network: source === sources.connections });
   };
 
   if (ctx.showPeople) {

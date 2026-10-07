@@ -318,6 +318,13 @@ body:has([data-app-shell]) [data-site-chrome] {
   padding-inline: var(--gutter);
 }
 
+/* The frame's content box as the element itself: app panes (Clicks, Map) that fill it edge to
+   edge, aligned with the top bar's logo and actions. */
+@utility container-frame {
+  width: min(100% - 2 * var(--gutter), 1080px);
+  margin-inline: auto;
+}
+
 @utility container-content {
   width: 100%;
   max-width: calc(1080px + 2 * var(--gutter));
@@ -908,13 +915,11 @@ a {
   border: 0;
   background: none;
   cursor: pointer;
-  transition: transform var(--d-fast) var(--ease);
   -webkit-tap-highlight-color: transparent;
 }
 .map-pin:hover,
 .map-pin[data-selected] {
-  transform: scale(1.15);
-  z-index: 2;
+  scale: 1.15;
 }
 .map-pin:focus-visible {
   outline: 2px solid var(--accent);
@@ -1025,6 +1030,23 @@ a {
 
 .maplibregl-marker {
   z-index: 2;
+}
+
+/* A pin is also its marker. MapLibre's sheet loads later, so these win on specificity, not order:
+   absolute like every marker, and `scale` (not `transform`, which MapLibre sets inline) eases. */
+.maplibregl-marker.map-pin {
+  position: absolute;
+  transition:
+    opacity 0.2s,
+    scale var(--d-fast) var(--ease);
+}
+/* Your network is the base layer: events, places and every other pin sit on top of it. The pin
+   under the pointer or selected rises above both. */
+.maplibregl-marker.map-pin-network {
+  z-index: 1;
+}
+.maplibregl-marker.map-pin:is(:hover, [data-selected]) {
+  z-index: 3;
 }
 
 .maplibregl-popup {

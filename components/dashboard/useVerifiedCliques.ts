@@ -28,6 +28,8 @@ export function useVerifiedCliques({
     'verifiedClickMemberSetKeys',
     () => new Set(),
   );
+  /** The first load finished (either way), so an empty list really means no groups. */
+  const [groupsLoaded, setGroupsLoaded] = useSessionCachedState(user?.id, 'groupCliquesLoaded', false);
   const [groupMemberPickerRows, setGroupMemberPickerRows] = useState<{ userId: string; label: string }[]>([]);
   const [showGroupMemberPicker, setShowGroupMemberPicker] = useState(false);
   const [groupMemberPickerBusy, setGroupMemberPickerBusy] = useState(false);
@@ -52,6 +54,7 @@ export function useVerifiedCliques({
     if (!supabase) {
       setGroupCliqueRecords([]);
       setVerifiedClickMemberSetKeys(new Set());
+      setGroupsLoaded(true);
       return;
     }
     let cancelled = false;
@@ -142,6 +145,8 @@ export function useVerifiedCliques({
           setGroupCliqueRecords([]);
           setVerifiedClickMemberSetKeys(new Set());
         }
+      } finally {
+        if (!cancelled) setGroupsLoaded(true);
       }
     })();
     return () => {
@@ -183,6 +188,7 @@ export function useVerifiedCliques({
 
   return {
     groupCliqueRecords,
+    groupsLoaded,
     verifiedClickMemberSetKeys,
     groupMemberPickerRows,
     showGroupMemberPicker,

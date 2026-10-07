@@ -111,6 +111,9 @@ function Workspace({
 
   const groups = useMemo(() => data.active.filter((c) => c.chatKind === 'group_clique'), [data.active]);
   const rows = filter === 'groups' ? groups : filter === 'archived' ? data.archived : data.active;
+  // Active mixes connections and groups; each list is empty for real only once it has loaded.
+  const rowsLoaded =
+    filter === 'groups' ? cliques.groupsLoaded : filter === 'archived' ? data.loaded : data.loaded && cliques.groupsLoaded;
   const unreadByFilter = useMemo(
     () => ({ active: unreadOf(data.active), groups: unreadOf(groups), archived: unreadOf(data.archived) }),
     [data.active, data.archived, groups],
@@ -244,7 +247,7 @@ function Workspace({
   return (
     <div
       data-testid="clicks-workspace"
-      className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 overflow-hidden max-md:data-[thread=true]:h-dvh"
+      className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 overflow-hidden border-hairline max-md:data-[thread=true]:h-dvh md:container-frame md:border-x"
       data-thread={thread ? 'true' : undefined}
     >
       <aside
@@ -256,6 +259,7 @@ function Workspace({
           filter={filter}
           onFilterChange={onFilterChange}
           rows={rows}
+          loaded={rowsLoaded}
           unreadByFilter={unreadByFilter}
           core={data.core}
           rowState={rowState}
@@ -297,7 +301,7 @@ function Workspace({
             onGroupChatChanged={data.reloadGroups}
             targetMessageId={targetMessageId}
           />
-        ) : thread && data.loaded ? (
+        ) : thread && (thread.kind === 'g' ? cliques.groupsLoaded : data.loaded) ? (
           <div className="relative flex h-full items-center justify-center">
             <ChatBackground seed={thread.id} />
             <EmptyState

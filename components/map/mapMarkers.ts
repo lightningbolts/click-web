@@ -9,7 +9,7 @@ import { generateCardVisual } from '@/lib/ui/generateCardVisual';
  * clusters and points in loaded tiles become elements, and elements are reused between syncs.
  */
 export type PinModel =
-  | { kind: 'cluster'; key: string; lng: number; lat: number; count: number; source: string; clusterId: number; label: string }
+  | { kind: 'cluster'; key: string; lng: number; lat: number; count: number; source: string; clusterId: number; label: string; network: boolean }
   | { kind: 'person'; key: string; lng: number; lat: number; seed: string; name: string; avatarUrl: string | null; count: number; connIds: string[] }
   | { kind: 'event'; key: string; lng: number; lat: number; id: string; title: string; imageUrl: string | null; live: boolean }
   | { kind: 'place'; key: string; lng: number; lat: number; id: string; title: string; imageUrl: string | null; live: boolean }
@@ -85,10 +85,21 @@ function livePill(): HTMLSpanElement {
   return el;
 }
 
-/** Fills a pin element for a model (used on create and when the signature changes). */
+/** People you met and their clusters: the base layer, drawn under every other pin. */
+export function isNetworkPin(model: PinModel): boolean {
+  return model.kind === 'person' || (model.kind === 'cluster' && model.network);
+}
+
+/**
+ * Fills a pin element for a model (used on create and when the signature changes). Only our
+ * `map-pin*` classes are swapped: the element is also the MapLibre marker, whose own classes
+ * (`maplibregl-marker`: absolute position) must survive a re-render.
+ */
 export function renderPin(el: HTMLElement, model: PinModel): void {
   el.replaceChildren();
-  el.className = `map-pin map-pin-${model.kind}`;
+  el.classList.remove(...Array.from(el.classList).filter((c) => c.startsWith('map-pin')));
+  el.classList.add('map-pin', `map-pin-${model.kind}`);
+  el.classList.toggle('map-pin-network', isNetworkPin(model));
   el.setAttribute('aria-label', pinLabel(model));
   switch (model.kind) {
     case 'cluster': {

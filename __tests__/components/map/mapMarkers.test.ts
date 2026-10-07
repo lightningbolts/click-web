@@ -23,7 +23,7 @@ import { MapMarkerLayer, pinLabel, renderPin, safeImageUrl, type PinModel } from
 import { collectPins, selectionKey } from '@/components/map/collectPins';
 
 const person: PinModel = { kind: 'person', key: 'conn:c1', lng: 1, lat: 2, seed: 'u1', name: 'Ada Lovelace', avatarUrl: null, count: 1, connIds: ['c1'] };
-const cluster: PinModel = { kind: 'cluster', key: 's:c7', lng: 1, lat: 2, count: 12, source: 's', clusterId: 7, label: '12 people you met here, zoom in' };
+const cluster: PinModel = { kind: 'cluster', key: 's:c7', lng: 1, lat: 2, count: 12, source: 's', clusterId: 7, label: '12 people you met here, zoom in', network: true };
 const event: PinModel = { kind: 'event', key: 'b:e1', lng: 1, lat: 2, id: 'e1', title: 'Launch', imageUrl: 'https://img/x.jpg', live: true };
 
 beforeEach(() => {
@@ -48,6 +48,28 @@ describe('map DOM pins (spec §7.5)', () => {
     expect(pinLabel(event)).toBe('Launch, live now');
     renderPin(el, cluster);
     expect(el.textContent).toBe('12');
+  });
+
+  it('keeps the marker element\'s own classes when a pin re-renders', () => {
+    const el = document.createElement('button');
+    el.classList.add('maplibregl-marker', 'maplibregl-marker-anchor-center');
+    renderPin(el, person);
+    renderPin(el, { ...event, live: false });
+    expect([...el.classList].sort()).toEqual(
+      ['map-pin', 'map-pin-event', 'maplibregl-marker', 'maplibregl-marker-anchor-center'].sort(),
+    );
+  });
+
+  it('marks people and their clusters as the network layer, under every other pin', () => {
+    const el = document.createElement('button');
+    renderPin(el, person);
+    expect(el.classList.contains('map-pin-network')).toBe(true);
+    renderPin(el, cluster);
+    expect(el.classList.contains('map-pin-network')).toBe(true);
+    renderPin(el, { ...cluster, network: false });
+    expect(el.classList.contains('map-pin-network')).toBe(false);
+    renderPin(el, event);
+    expect(el.classList.contains('map-pin-network')).toBe(false);
   });
 
   it('never puts non-http image URLs on a pin', () => {
@@ -79,7 +101,7 @@ describe('map DOM pins (spec §7.5)', () => {
     const feat = (props: Record<string, unknown>, at = [1, 2]) => ({ geometry: { type: 'Point', coordinates: at }, properties: props });
     const tiles: Record<string, unknown[]> = {
       conn: [feat({ cluster_id: 3, people: 9 }), feat({ connIds: 'c1', count: 1 }), feat({ connIds: 'c1', count: 1 })],
-      off: [feat({ id: 'e1', title: 'Launch' })],
+      off: [feat({ id: 'e1', title: 'Launch' }), feat({ cluster_id: 4, point_count: 5 })],
       places: [feat({ id: 'p1' })],
     };
     const map = { getSource: (id: string) => (tiles[id] ? {} : undefined), querySourceFeatures: (id: string) => tiles[id] ?? [] };
@@ -90,10 +112,11 @@ describe('map DOM pins (spec §7.5)', () => {
       showPeople: true,
       nowMs: 0,
     });
-    expect(pins.map((p) => p.key)).toEqual(['conn:c3', 'conn:c1', 'b:e1', 'p:p1']);
-    expect(pins[0]).toMatchObject({ kind: 'cluster', count: 9 });
-    expect(pins[1]).toMatchObject({ kind: 'person', avatarUrl: 'https://a/1.jpg' });
-    expect(pins[3]).toMatchObject({ kind: 'place', live: true });
+    expect(pins.map((p) => p.key)).toEqual(['conn:c3', 'off:c4', 'conn:c1', 'b:e1', 'p:p1']);
+    expect(pins[0]).toMatchObject({ kind: 'cluster', count: 9, network: true });
+    expect(pins[1]).toMatchObject({ kind: 'cluster', count: 5, network: false });
+    expect(pins[2]).toMatchObject({ kind: 'person', avatarUrl: 'https://a/1.jpg' });
+    expect(pins[4]).toMatchObject({ kind: 'place', live: true });
   });
 
   it('maps selections to pin keys', () => {

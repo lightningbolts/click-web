@@ -43,6 +43,8 @@ interface ConnectionMapProps {
   onOpenProfile?: (otherUserId: string, connectionId: string) => void;
   /** False while the Map tab is hidden but kept mounted. */
   active?: boolean;
+  /** The first connections load hasn't finished: Nearby shows placeholders, not "nothing here". */
+  connectionsLoading?: boolean;
 }
 
 const SRC_CONNECTIONS = 'connections-geo';
@@ -79,7 +81,13 @@ function dedupeById(beacons: MapBeaconRecord[]): MapBeaconRecord[] {
  *
  * **Data contract:** pass rows from `GET /api/connections?statusScope=map` or the `map` array from `?bundle=dashboard`.
  */
-export default function ConnectionMap({ connections, onConnectionClick, onOpenProfile, active = true }: ConnectionMapProps) {
+export default function ConnectionMap({
+  connections,
+  onConnectionClick,
+  onOpenProfile,
+  active = true,
+  connectionsLoading = false,
+}: ConnectionMapProps) {
   const { theme } = useTheme();
   const themeRef = useRef(theme);
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -97,6 +105,9 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   const [layersOpen, setLayersOpen] = useState(false);
   const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
   const [places, setPlaces] = useState<PlaceSummary[]>([]);
+  /** The first beacon / Places answer arrived (or failed), so an empty list means empty. */
+  const [beaconsSettled, setBeaconsSettled] = useState(false);
+  const [placesSettled, setPlacesSettled] = useState(false);
   const [selection, setSelection] = useState<MapSelection | null>(null);
   /** Hover label is positioned imperatively: a mousemove must not re-render the map component. */
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -158,7 +169,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
 
   const wantsBeaconFetch = layers.events || layers.socialVibes || layers.soundtracks || layers.alertsUtilities || layers.other;
 
-  /** Map viewport for beacon proximity — once the map exists, follows pan/zoom; until then uses connection center. */
+  /** Map viewport for beacon proximity: follows pan/zoom once the map exists, null until then. */
   const [beaconViewport, setBeaconViewport] = useState<{
     lng: number;
     lat: number;
@@ -180,41 +191,16 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!mapInitialized || !map.current) return undefined;
-    const m = map.current;
-    const syncFromMap = () => {
-      const c = m.getCenter();
-      setBeaconViewport({
-        lng: c.lng,
-        lat: c.lat,
-        radiusM: radiusMetersFromBounds(m.getBounds()),
-      });
-      setViewBounds(m.getBounds());
-    };
-    syncFromMap();
-    let debounceId: number | null = null;
-    const onMoveEnd = () => {
-      if (debounceId != null) window.clearTimeout(debounceId);
-      debounceId = window.setTimeout(() => {
-        syncFromMap();
-        debounceId = null;
-      }, 420) as unknown as number;
-    };
-    m.on('moveend', onMoveEnd);
-    return () => {
-      m.off('moveend', onMoveEnd);
-      if (debounceId != null) window.clearTimeout(debounceId);
-    };
-  }, [mapInitialized]);
-
-  const beaconQueryLng = beaconViewport?.lng ?? mapCenter[0];
-  const beaconQueryLat = beaconViewport?.lat ?? mapCenter[1];
-  const beaconQueryRadiusM = beaconViewport?.radiusM ?? 15_000;
+  // Pins load for the map's real viewport only: a guess before it exists (the default city) would
+  // fetch the wrong area and then be thrown away.
+  const viewportReady = beaconViewport != null;
+  const beaconQueryLng = beaconViewport?.lng ?? 0;
+  const beaconQueryLat = beaconViewport?.lat ?? 0;
+  const beaconQueryRadiusM = beaconViewport?.radiusM ?? 0;
 
   useEffect(() => {
     // With every place layer off, the layer filter already hides pins; no fetch needed.
-    if (!wantsBeaconFetch || !active) return;
+    if (!wantsBeaconFetch || !active || !viewportReady) return;
     let cancelled = false;
 
     const run = async () => {
@@ -224,7 +210,9 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       if (token) headers.Authorization = `Bearer ${token}`;
       // The API pages newest first; an area with more beacons than one page would drop the
       // older ones (an event posted a while back). The first page shows at once and the rest
-      // fill in behind it, as on iOS. A failed later page keeps what already loaded.
+      // fill in behind it, as on iOS. A failed later page keeps what already loaded. Until the
+      // last page, pins from the previous view stay (merged), so a pan never blinks events out;
+      // the complete answer then replaces them.
       const loaded: MapBeaconRecord[] = [];
       let cursor: string | null = null;
       try {
@@ -248,13 +236,17 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
             const beacon = parseMapBeacon(row);
             if (beacon) loaded.push(beacon);
           }
-          setBeacons(dedupeById(loaded));
           const next = (json as { next_cursor?: unknown } | null)?.next_cursor;
           cursor = typeof next === 'string' && next ? next : null;
+          const sofar = dedupeById(loaded);
+          setBeacons(cursor ? (prev) => dedupeById([...prev, ...sofar]) : sofar);
+          setBeaconsSettled(true);
           if (!cursor) return;
         }
       } catch {
         /* keep current pins */
+      } finally {
+        if (!cancelled) setBeaconsSettled(true);
       }
     };
 
@@ -262,11 +254,11 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
     return () => {
       cancelled = true;
     };
-  }, [wantsBeaconFetch, active, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
+  }, [wantsBeaconFetch, active, viewportReady, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
 
   // Click Places near the view (feature-flagged: a 403/404 simply means no Places layer).
   useEffect(() => {
-    if (!layers.places || !active) return;
+    if (!layers.places || !active || !viewportReady) return;
     let cancelled = false;
     const run = async () => {
       const supabase = getSupabaseClient();
@@ -285,13 +277,15 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
         if (!cancelled) setPlaces(Array.isArray(json.places) ? json.places : []);
       } catch {
         /* keep current pins */
+      } finally {
+        if (!cancelled) setPlacesSettled(true);
       }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [layers.places, active, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
+  }, [layers.places, active, viewportReady, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
 
   /**
    * DOM pins (spec §7.5) over MapLibre's clustering: rebuilt when tiles or the view settle, never
@@ -634,15 +628,47 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', vis);
     });
 
-    if (!initialFitDoneRef.current && geoConnections.length > 1) {
+    if (!initialFitDoneRef.current && geoConnections.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
       geoConnections.forEach((conn) => {
         if (conn.geo_location) bounds.extend([conn.geo_location.longitude, conn.geo_location.latitude]);
       });
-      m.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
+      // One spot: center on it at the opening zoom; several: frame them all.
+      if (geoConnections.length === 1) m.jumpTo({ center: bounds.getCenter() });
+      else m.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
       initialFitDoneRef.current = true;
     }
   }, [mapInitialized, positionedConnections, geoConnections, layers.myNetwork]);
+
+  // Declared after the fit above, so the first viewport read (and the first pin fetch) is of the
+  // framed network, not the opening camera.
+  useEffect(() => {
+    if (!mapInitialized || !map.current) return undefined;
+    const m = map.current;
+    const syncFromMap = () => {
+      const c = m.getCenter();
+      setBeaconViewport({
+        lng: c.lng,
+        lat: c.lat,
+        radiusM: radiusMetersFromBounds(m.getBounds()),
+      });
+      setViewBounds(m.getBounds());
+    };
+    syncFromMap();
+    let debounceId: number | null = null;
+    const onMoveEnd = () => {
+      if (debounceId != null) window.clearTimeout(debounceId);
+      debounceId = window.setTimeout(() => {
+        syncFromMap();
+        debounceId = null;
+      }, 420) as unknown as number;
+    };
+    m.on('moveend', onMoveEnd);
+    return () => {
+      m.off('moveend', onMoveEnd);
+      if (debounceId != null) window.clearTimeout(debounceId);
+    };
+  }, [mapInitialized]);
 
   useEffect(() => {
     const m = map.current;
@@ -790,6 +816,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
   ];
 
   const total = nearbyTotal(inView);
+  const nearbyLoading = connectionsLoading || (wantsBeaconFetch && !beaconsSettled) || (layers.places && !placesSettled);
 
   const panelBody = selection ? (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -804,7 +831,7 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
       />
     </div>
   ) : (
-    <NearbyList inView={inView} hasGeoConnections={hasGeoConnections} onFocus={focusOn} />
+    <NearbyList inView={inView} hasGeoConnections={hasGeoConnections} loading={nearbyLoading} onFocus={focusOn} />
   );
 
   return (
@@ -849,7 +876,13 @@ export default function ConnectionMap({ connections, onConnectionClick, onOpenPr
           <span aria-hidden className="h-[5px] w-9 rounded-pill bg-fill-strong" />
           {listOpenMobile || selection ? null : (
             <span className="type-body-strong text-fg">
-              Nearby · <span className="tabular">{total}</span>
+              Nearby
+              {nearbyLoading && total === 0 ? null : (
+                <>
+                  {' · '}
+                  <span className="tabular">{total}</span>
+                </>
+              )}
             </span>
           )}
         </button>

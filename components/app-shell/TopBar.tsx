@@ -90,8 +90,6 @@ export function TopBar({ auth, onOpenMarketingMenu }: { auth: TopBarAuth; onOpen
   }, []);
 
   const section = activeAppSection(pathname);
-  // Clicks and Map are full-bleed app panes; everything else sits in the wide container.
-  const fluid = section === 'clicks' || section === 'map';
   const signedIn = auth.state === 'signed-in';
   const bootstrap = signedIn ? auth.bootstrap : null;
 
@@ -114,13 +112,9 @@ export function TopBar({ auth, onOpenMarketingMenu }: { auth: TopBarAuth; onOpen
           isThreadPath(pathname) && 'max-md:hidden',
         )}
       >
-        <div
-          className={cn(
-            'flex h-full items-center gap-2 md:gap-4',
-            // Same frame as every page (container-page), so the logo sits over page titles.
-            fluid ? 'px-[var(--gutter)] md:px-6' : 'container-page',
-          )}
-        >
+        {/* Same frame on every page (Clicks and Map included), so the bar never shifts and the
+            logo sits over page titles. */}
+        <div className="container-page flex h-full items-center gap-2 md:gap-4">
           {/* Left: logo, or back + title on pushed mobile pages. */}
           {header ? (
             <div className="flex min-w-0 flex-1 items-center gap-1 md:hidden">
