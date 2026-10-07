@@ -617,7 +617,8 @@ let historyShareQueued: Promise<number> | null = null;
  * Returns how many chats were shared. iOS `shareHistoryWithApprovedDevices` parity.
  */
 export function shareWebE2eeV2HistoryWithApprovedDevices(options: {
-  currentUserId: string;
+  /** Optional for read-only history backfill; retained for existing callers and diagnostics. */
+  currentUserId?: string;
   getAuthHeaders: () => Promise<HeadersInit>;
 }): Promise<number> {
   if (historyShareInFlight) {
@@ -639,10 +640,9 @@ async function shareHistoryOnce({
   currentUserId,
   getAuthHeaders,
 }: {
-  currentUserId: string;
+  currentUserId?: string;
   getAuthHeaders: () => Promise<HeadersInit>;
 }): Promise<number> {
-  if (!currentUserId) return 0;
   const identity = await loadOrCreateWebE2eeV2Identity();
   const headers = await getAuthHeaders();
   await registerDevice(identity, headers);
@@ -658,7 +658,7 @@ async function shareHistoryOnce({
       invalidateWebE2eeV2Session(item.chat_id);
       const session = await resolveWebE2eeV2Session({
         chatId: item.chat_id,
-        participantUserIds: [currentUserId],
+        participantUserIds: currentUserId ? [currentUserId] : [],
         getAuthHeaders,
       });
       if (!session) continue;
