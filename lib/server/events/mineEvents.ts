@@ -32,7 +32,7 @@ export type MineEvent = {
 
 /** Events the user created or RSVPed to, newest start first (`GET /api/beacons/mine`, Home). */
 export async function loadMineEvents(admin: SupabaseClient, userId: string): Promise<MineEvent[]> {
-  const [{ data: created, error: createdErr }, { data: rsvps }] = await Promise.all([
+  const [{ data: created, error: createdErr }, { data: rsvps, error: rsvpsErr }] = await Promise.all([
     admin
       .from("map_beacons")
       .select("id, metadata, location, beacon_type, starts_at, ends_at")
@@ -45,11 +45,13 @@ export async function loadMineEvents(admin: SupabaseClient, userId: string): Pro
       .select("beacon_id")
       .eq("user_id", userId)
       // Newest RSVPs first, so the cap never drops the events coming up (the iOS Live Activity reads these).
-      .order("signed_up_at", { ascending: false })
+      .order("rsvpd_at", { ascending: false })
       .limit(50),
   ]);
 
   if (createdErr) throw new Error(`mine events: ${createdErr.message}`);
+  // A failed read must fail the request: an empty list reads as "not going to anything".
+  if (rsvpsErr) throw new Error(`mine rsvps: ${rsvpsErr.message}`);
 
   const rsvpIds = (Array.isArray(rsvps) ? rsvps : [])
     .map((row) => (isRecord(row) && typeof row.beacon_id === "string" ? row.beacon_id : null))
@@ -57,11 +59,12 @@ export async function loadMineEvents(admin: SupabaseClient, userId: string): Pro
 
   let rsvpBeacons: unknown[] = [];
   if (rsvpIds.length > 0) {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("map_beacons")
       .select("id, metadata, location, beacon_type, starts_at, ends_at")
       .in("id", rsvpIds)
       .eq("beacon_type", "event");
+    if (error) throw new Error(`mine rsvp events: ${error.message}`);
     rsvpBeacons = Array.isArray(data) ? data : [];
   }
 
