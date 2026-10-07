@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { SiteChrome } from "@/components/app-shell/SiteChrome";
 import { IntentPrefetch } from "@/components/app-shell/IntentPrefetch";
+import { SessionFromUrlFragment } from "@/components/auth/SessionFromUrlFragment";
 import { ShellProvider } from "@/components/app-shell/ShellContext";
 import Footer from "@/components/Footer";
 import { AppToaster } from "@/components/ds/Toast";
@@ -90,6 +91,7 @@ export default function RootLayout({
                   <Footer />
                   <AppToaster />
                   <IntentPrefetch />
+                  <SessionFromUrlFragment />
                 </ShellProvider>
               </TooltipProvider>
             </ProductChromeProvider>
