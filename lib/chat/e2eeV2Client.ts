@@ -338,6 +338,8 @@ type ResolveSessionOptions = {
    * server rejects the epoch (it always validates epoch and devices).
    */
   staleWhileRevalidate?: boolean;
+  /** Email-approval pages must not turn an arbitrary browser into another account device. */
+  registerDeviceIfNeeded?: boolean;
 };
 
 /** Read-only resolutions in flight per chat, so an inbox of N rows plus an open thread share one round trip. */
@@ -393,8 +395,9 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   const id = options.chatId;
   const headers = await options.getAuthHeaders();
   const identity = await loadOrCreateWebE2eeV2Identity();
+  const shouldRegister = options.registerDeviceIfNeeded !== false;
   const wasRegistered = registeredDeviceIds.has(identity.deviceId);
-  await registerDevice(identity, headers);
+  if (shouldRegister) await registerDevice(identity, headers);
   // Independent reads: the device list and this device's epoch envelopes, together.
   const read = () => {
     const epochState = getEpochState(id, identity.deviceId, headers, scope);
@@ -403,7 +406,7 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   };
   let reads = read();
   let devices = await reads.devices;
-  if (wasRegistered && !devices.some((device) => device.device_id === identity.deviceId)) {
+  if (shouldRegister && wasRegistered && !devices.some((device) => device.device_id === identity.deviceId)) {
     // Registered from this page under another account (or revoked since): register again, re-read once.
     registeredDeviceIds.delete(identity.deviceId);
     await registerDevice(identity, headers);
@@ -620,6 +623,8 @@ export function shareWebE2eeV2HistoryWithApprovedDevices(options: {
   /** Optional for read-only history backfill; retained for existing callers and diagnostics. */
   currentUserId?: string;
   getAuthHeaders: () => Promise<HeadersInit>;
+  /** False on email approval pages: only an already-registered browser may donate old keys. */
+  registerDeviceIfNeeded?: boolean;
 }): Promise<number> {
   if (historyShareInFlight) {
     historyShareQueued ??= historyShareInFlight
@@ -639,13 +644,15 @@ export function shareWebE2eeV2HistoryWithApprovedDevices(options: {
 async function shareHistoryOnce({
   currentUserId,
   getAuthHeaders,
+  registerDeviceIfNeeded = true,
 }: {
   currentUserId?: string;
   getAuthHeaders: () => Promise<HeadersInit>;
+  registerDeviceIfNeeded?: boolean;
 }): Promise<number> {
   const identity = await loadOrCreateWebE2eeV2Identity();
   const headers = await getAuthHeaders();
-  await registerDevice(identity, headers);
+  if (registerDeviceIfNeeded) await registerDevice(identity, headers);
   const { items = [] } = await fetchJson<{ items?: HistoryBackfillItem[] }>(
     `/api/chat/devices/history-backfill?device_id=${encodeURIComponent(identity.deviceId)}`,
     headers,
@@ -660,6 +667,7 @@ async function shareHistoryOnce({
         chatId: item.chat_id,
         participantUserIds: currentUserId ? [currentUserId] : [],
         getAuthHeaders,
+        registerDeviceIfNeeded,
       });
       if (!session) continue;
       const epochs = item.epochs.filter((epoch) => session.epochKeys.has(epoch));
