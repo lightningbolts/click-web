@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { cloneElement, isValidElement, type ComponentPropsWithoutRef, type ReactElement, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -48,11 +48,8 @@ export function MenuItem({
   destructive?: boolean;
   trailing?: ReactNode;
 }) {
-  return (
-    <Dropdown.Item
-      className={cn(itemCls, destructive && "text-destructive", className)}
-      {...rest}
-    >
+  const decorate = (label: ReactNode) => (
+    <>
       {Icon ? (
         <Icon
           size={16}
@@ -61,10 +58,23 @@ export function MenuItem({
           className={destructive ? "" : "text-fg-secondary"}
         />
       ) : null}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
       {trailing ? (
         <span className="type-meta text-fg-tertiary">{trailing}</span>
       ) : null}
+    </>
+  );
+  // With `asChild` Radix slots onto exactly one element, so the icon and label go inside it.
+  const content =
+    rest.asChild && isValidElement<{ children?: ReactNode }>(children)
+      ? cloneElement(children as ReactElement<{ children?: ReactNode }>, undefined, decorate(children.props.children))
+      : decorate(children);
+  return (
+    <Dropdown.Item
+      className={cn(itemCls, destructive && "text-destructive", className)}
+      {...rest}
+    >
+      {content}
     </Dropdown.Item>
   );
 }
