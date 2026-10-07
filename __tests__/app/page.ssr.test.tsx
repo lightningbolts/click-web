@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import Home from '@/app/(app)/page';
 import { getServerUser } from '@/lib/server/getServerUser';
-import { loadSessionBootstrap } from '@/lib/server/session';
+import { loadViewerName } from '@/lib/server/session';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 
 jest.mock('@/lib/server/getServerUser', () => ({
@@ -14,7 +14,7 @@ jest.mock('@/lib/server/presenceHeatmap', () => ({
 
 jest.mock('@/lib/server/home/loadHome', () => ({ loadHome: jest.fn().mockResolvedValue(null) }));
 jest.mock('@/lib/server/session', () => ({
-  loadSessionBootstrap: jest.fn(),
+  loadViewerName: jest.fn(),
 }));
 jest.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 jest.mock('@/components/home/HomeGreeting', () => ({
@@ -71,7 +71,7 @@ describe('Home SSR', () => {
 
   it('renders signed-in Home (not marketing) when the cookie session resolves', async () => {
     (getServerUser as jest.Mock).mockResolvedValue({ id: 'u1' });
-    (loadSessionBootstrap as jest.Mock).mockResolvedValue({ viewer: { id: 'u1', name: 'Ada Lovelace', email: null, avatarUrl: null } });
+    (loadViewerName as jest.Mock).mockResolvedValue('Ada Lovelace');
 
     const ui = (await Home()) as React.ReactElement;
     // Async server component: resolve one level and inspect the tree instead of client-rendering it.

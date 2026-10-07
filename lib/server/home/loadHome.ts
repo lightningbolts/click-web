@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { getServerUser } from '@/lib/server/getServerUser';
-import { loadSessionBootstrap } from '@/lib/server/session';
+import { loadViewerName } from '@/lib/server/session';
 import { loadActivity } from '@/lib/server/activity';
 import { loadNudges } from '@/lib/server/nudges';
 import { loadMineEvents } from '@/lib/server/events/mineEvents';
@@ -116,8 +116,8 @@ function toHomeEvents(
  * for the people those rows point at (names, avatars, current intents).
  */
 export const loadHome = cache(async (): Promise<HomeData | null> => {
-  const [user, bootstrap, jar] = await Promise.all([getServerUser(), loadSessionBootstrap(), cookies()]);
-  if (!user || !bootstrap) return null;
+  const [user, name, jar] = await Promise.all([getServerUser(), loadViewerName(), cookies()]);
+  if (!user || name == null) return null;
   const viewerId = user.id;
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? 'UTC';
   const nowMs = Date.now();
@@ -246,7 +246,7 @@ export const loadHome = cache(async (): Promise<HomeData | null> => {
     return { id: key, monthStart: `${key}-01`, count: rows.length, people };
   });
 
-  const firstName = bootstrap.viewer.name.trim().split(/\s+/)[0] ?? '';
+  const firstName = name.trim().split(/\s+/)[0] ?? '';
   return {
     viewer: { id: viewerId, firstName },
     timeZone,

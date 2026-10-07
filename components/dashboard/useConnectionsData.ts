@@ -151,104 +151,114 @@ export function useConnectionsData({
 
       let userNameMap: Record<string, string> = {};
       let userImageMap: Record<string, string | null> = {};
-      if (otherUserIds.length > 0) {
-        try {
-          const nameRes = await fetch('/api/users/display-names', {
-            method: 'POST',
-            headers: await getAuthHeaders(),
-            body: JSON.stringify({ userIds: otherUserIds }),
-          });
-          if (nameRes.ok) {
-            const payload = (await nameRes.json()) as DisplayNamesBatchResponse;
-            userNameMap = payload.names ?? {};
-            const batchImages = payload.images;
-            if (batchImages && typeof batchImages === 'object') {
-              for (const [uid, raw] of Object.entries(batchImages)) {
-                if (typeof uid !== 'string' || !uid.trim()) continue;
-                userImageMap[uid] =
-                  typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
+      const loadNames = async () => {
+        if (otherUserIds.length > 0) {
+          try {
+            const nameRes = await fetch('/api/users/display-names', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ userIds: otherUserIds }),
+            });
+            if (nameRes.ok) {
+              const payload = (await nameRes.json()) as DisplayNamesBatchResponse;
+              userNameMap = payload.names ?? {};
+              const batchImages = payload.images;
+              if (batchImages && typeof batchImages === 'object') {
+                for (const [uid, raw] of Object.entries(batchImages)) {
+                  if (typeof uid !== 'string' || !uid.trim()) continue;
+                  userImageMap[uid] =
+                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
+                }
               }
             }
+          } catch {
+            // Fall through to direct DB lookup below.
           }
-        } catch {
-          // Fall through to direct DB lookup below.
-        }
 
-        if (Object.keys(userNameMap).length === 0 && supabase) {
-          let usersData: any[] | null = null;
-          const { data: d1, error: e1 } = await supabase
-            .from('users')
-            .select('id, name, full_name, first_name, last_name, email, image')
-            .in('id', otherUserIds);
-          if (!e1 && d1) {
-            usersData = d1;
-          } else {
-            const { data: d2 } = await supabase
+          if (Object.keys(userNameMap).length === 0 && supabase) {
+            let usersData: any[] | null = null;
+            const { data: d1, error: e1 } = await supabase
               .from('users')
-              .select('id, name, email, image')
+              .select('id, name, full_name, first_name, last_name, email, image')
               .in('id', otherUserIds);
-            usersData = d2;
-          }
+            if (!e1 && d1) {
+              usersData = d1;
+            } else {
+              const { data: d2 } = await supabase
+                .from('users')
+                .select('id, name, email, image')
+                .in('id', otherUserIds);
+              usersData = d2;
+            }
 
-          if (usersData) {
-            userNameMap = Object.fromEntries(
-              usersData.map((u: any) => {
-                const fromParts = [u.first_name, u.last_name]
-                  .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
-                  .join(' ')
-                  .trim();
-                const resolvedName =
-                  fromParts ||
-                  (typeof u.full_name === 'string' && u.full_name.trim()) ||
-                  (typeof u.name === 'string' && u.name.trim()) ||
-                  (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
-                  '';
-                return [u.id, resolvedName];
-              })
-            );
-            userImageMap = Object.fromEntries(
-              usersData.map((u: any) => {
-                const img = typeof u.image === 'string' && u.image.trim() ? u.image.trim() : null;
-                return [u.id, img] as [string, string | null];
-              }),
-            );
+            if (usersData) {
+              userNameMap = Object.fromEntries(
+                usersData.map((u: any) => {
+                  const fromParts = [u.first_name, u.last_name]
+                    .filter((x: unknown) => typeof x === 'string' && (x as string).trim())
+                    .join(' ')
+                    .trim();
+                  const resolvedName =
+                    fromParts ||
+                    (typeof u.full_name === 'string' && u.full_name.trim()) ||
+                    (typeof u.name === 'string' && u.name.trim()) ||
+                    (typeof u.email === 'string' && u.email.includes('@') ? u.email.split('@')[0] : '') ||
+                    '';
+                  return [u.id, resolvedName];
+                })
+              );
+              userImageMap = Object.fromEntries(
+                usersData.map((u: any) => {
+                  const img = typeof u.image === 'string' && u.image.trim() ? u.image.trim() : null;
+                  return [u.id, img] as [string, string | null];
+                }),
+              );
+            }
           }
         }
-      }
+      };
+
 
       let selfIntentRows: AvailabilityIntentRow[] = [];
       const peerIntentByUserId = new Map<string, AvailabilityIntentRow[]>();
-      if (supabase) {
-        try {
-          const { data: mine } = await supabase
-            .from('availability_intents')
-            .select('id,timeframe,intent_tag,expires_at')
-            .eq('user_id', user.id);
-          selfIntentRows = normalizeAvailabilityIntentRows(mine ?? []);
+      const loadIntents = async () => {
+        if (supabase) {
+          try {
+            const [{ data: mine }, peers] = await Promise.all([
+              supabase.from('availability_intents').select('id,timeframe,intent_tag,expires_at').eq('user_id', user.id),
+              otherUserIds.length > 0
+                ? supabase
+                    .from('availability_intents')
+                    .select('user_id,id,timeframe,intent_tag,expires_at')
+                    .in('user_id', otherUserIds)
+                : null,
+            ]);
+            selfIntentRows = normalizeAvailabilityIntentRows(mine ?? []);
 
-          if (otherUserIds.length > 0) {
-            const { data: peerRows, error: peerIntentErr } = await supabase
-              .from('availability_intents')
-              .select('user_id,id,timeframe,intent_tag,expires_at')
-              .in('user_id', otherUserIds);
-            if (!peerIntentErr && peerRows) {
-              const acc = new Map<string, unknown[]>();
-              for (const row of peerRows as Record<string, unknown>[]) {
-                const uid = row.user_id;
-                if (typeof uid !== 'string' || !uid.trim()) continue;
-                const cur = acc.get(uid) ?? [];
-                cur.push(row);
-                acc.set(uid, cur);
-              }
-              for (const [uid, rows] of acc) {
-                peerIntentByUserId.set(uid, normalizeAvailabilityIntentRows(rows));
+            if (peers) {
+              const { data: peerRows, error: peerIntentErr } = peers;
+              if (!peerIntentErr && peerRows) {
+                const acc = new Map<string, unknown[]>();
+                for (const row of peerRows as Record<string, unknown>[]) {
+                  const uid = row.user_id;
+                  if (typeof uid !== 'string' || !uid.trim()) continue;
+                  const cur = acc.get(uid) ?? [];
+                  cur.push(row);
+                  acc.set(uid, cur);
+                }
+                for (const [uid, rows] of acc) {
+                  peerIntentByUserId.set(uid, normalizeAvailabilityIntentRows(rows));
+                }
               }
             }
+          } catch {
+            /* overlap badges are optional */
           }
-        } catch {
-          /* overlap badges are optional */
         }
-      }
+      };
+
+      // Names and availability are independent: one round trip after the bundle, not three.
+      await Promise.all([loadNames(), loadIntents()]);
 
       const mapRowToRecord = (conn: Record<string, unknown>): ConnectionRecord => {
         const userIds = (conn.user_ids as string[] | undefined) ?? [];

@@ -23,6 +23,27 @@ function viewerName(profile: ProfileRow | null, metadata: Record<string, unknown
   );
 }
 
+/** The viewer's `users` row, shared by the shell bootstrap and pages that only need a name. */
+const loadViewerProfile = cache(async (userId: string): Promise<ProfileRow | null> => {
+  try {
+    const { data } = await createAdminSupabaseClient()
+      .from('users')
+      .select('name, first_name, last_name, image')
+      .eq('id', userId)
+      .maybeSingle();
+    return (data as ProfileRow | null) ?? null;
+  } catch {
+    return null;
+  }
+});
+
+/** The viewer's display name with one query, for pages that don't need the whole bootstrap. */
+export const loadViewerName = cache(async (): Promise<string | null> => {
+  const user = await getServerUser();
+  if (!user) return null;
+  return viewerName(await loadViewerProfile(user.id), user.user_metadata, user.email);
+});
+
 /**
  * Signed-in shell bootstrap (spec §11.4.5): viewer, unread total, unseen activity and whether
  * they manage a Place, in one parallel batch. Each part degrades to its empty value so the
@@ -40,15 +61,7 @@ export const loadSessionBootstrap = cache(async (): Promise<SessionBootstrap | n
   }
 
   const [profile, unreadTotal, hasActivity, managesPlaces] = await Promise.all([
-    (async () => {
-      if (!admin) return null;
-      const { data } = await admin
-        .from('users')
-        .select('name, first_name, last_name, image')
-        .eq('id', user.id)
-        .maybeSingle();
-      return (data as ProfileRow | null) ?? null;
-    })().catch(() => null),
+    loadViewerProfile(user.id),
     (async () => {
       const supabase = await createSupabaseServerClient();
       const { data, error } = await supabase.rpc('get_inbox_previews');

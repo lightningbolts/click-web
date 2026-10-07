@@ -8,7 +8,7 @@ import { EMPTY_PRESENCE_HEATMAP } from '@/lib/landing/presenceHeatmap';
 import { getServerUser } from '@/lib/server/getServerUser';
 import { loadHome } from '@/lib/server/home/loadHome';
 import { loadPresenceHeatmap } from '@/lib/server/presenceHeatmap';
-import { loadSessionBootstrap } from '@/lib/server/session';
+import { loadViewerName } from '@/lib/server/session';
 import { TIME_ZONE_COOKIE, validTimeZone } from '@/lib/time/viewerTimeZone';
 
 async function landingHeatmap() {
@@ -42,9 +42,9 @@ async function HomeContent() {
 
 /** Signed-in Home (spec §7.1), inside the `(app)` shell: greeting paints first, modules stream in. */
 async function SignedInHome() {
-  const [bootstrap, jar] = await Promise.all([loadSessionBootstrap(), cookies()]);
+  const [name, jar] = await Promise.all([loadViewerName(), cookies()]);
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? 'UTC';
-  const firstName = bootstrap?.viewer.name.split(' ')[0] ?? '';
+  const firstName = name?.split(' ')[0] ?? '';
   return (
     <div className="mx-auto w-full max-w-[1040px] px-[var(--gutter)] pb-16 pt-6 md:pt-10">
       <div className="mb-8 lg:max-w-[680px]">
