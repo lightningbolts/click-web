@@ -59,3 +59,17 @@ export function groupActivity<T extends { created_at: string }>(
 export function requestConnectionId(item: { type: string; data: Record<string, string> }): string | null {
   return item.type === 'prior_connection_request' && item.data.connection_id ? item.data.connection_id : null;
 }
+
+/**
+ * One newest-first list from pages read at different times (the live first page, the page the
+ * server rendered, older pages): one row per item, the most recently recorded copy (a grouped
+ * item re-recorded moves to the top with new copy).
+ */
+export function mergeActivity<T extends { id: string; created_at: string }>(...pages: readonly (readonly T[])[]): T[] {
+  const byId = new Map<string, T>();
+  for (const item of pages.flat()) {
+    const known = byId.get(item.id);
+    if (!known || Date.parse(item.created_at) > Date.parse(known.created_at)) byId.set(item.id, item);
+  }
+  return [...byId.values()].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+}

@@ -13,6 +13,7 @@ import { hidesTabBar } from '@/lib/shell/appNav';
 import { cn } from '@/lib/cn';
 import { useShellHeader } from './ShellContext';
 import { GlobalShortcuts } from './GlobalShortcuts';
+import { LiveActivity } from './LiveActivity';
 import { MobileTabBar } from './MobileTabBar';
 import { OnboardingGates } from './OnboardingGates';
 import { DeviceApprovals } from './DeviceApprovals';
@@ -26,6 +27,7 @@ function Bars({ initial }: { initial: SessionBootstrap }) {
       <TopBar auth={{ state: 'signed-in', bootstrap: b }} />
       <MobileTabBar bootstrap={b} />
       <GlobalShortcuts />
+      <LiveActivity viewerId={b.viewer.id} />
     </>
   );
 }

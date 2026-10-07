@@ -1,13 +1,21 @@
+'use client';
+
 import { Bell } from 'lucide-react';
+import { useLatestActivity } from '@/components/activity/activityData';
 import { Avatar } from '@/components/ds/Avatar';
 import { ListGroup, ListRow } from '@/components/ds/ListGroup';
 import { SectionHeader } from '@/components/ds/SectionHeader';
 import { activityHref } from '@/lib/activity/activityHref';
+import { mergeActivity } from '@/lib/activity/activityView';
 import { formatRelativeShort } from '@/lib/home/format';
 import type { HomeActivityRow } from '@/lib/home/types';
 
-/** Rail: the latest five Activity rows. */
-export function ActivityPreview({ items, nowMs }: { items: HomeActivityRow[]; nowMs: number }) {
+const SHOWN = 5;
+
+/** Rail: the latest five Activity rows, live (new ones join the top while Home is open). */
+export function ActivityPreview({ items: rendered, nowMs }: { items: HomeActivityRow[]; nowMs: number }) {
+  const { data } = useLatestActivity({ items: rendered, seen_at: null, next_before: null, pending_requests: [] });
+  const items = mergeActivity(data?.items ?? [], rendered).slice(0, SHOWN);
   return (
     <section aria-labelledby="home-activity">
       <SectionHeader id="home-activity" title="Activity" href="/activity" linkLabel="Open Activity" />
