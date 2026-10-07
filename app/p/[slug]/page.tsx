@@ -108,7 +108,7 @@ export default async function PlacePage({
         />
         <CardVisual
           seed={place.id}
-          glyph={Building2}
+          glyph={<Building2 />}
           radius="lg"
           className="absolute -bottom-6 left-4 size-[72px] ring-4 ring-bg md:left-6"
         />

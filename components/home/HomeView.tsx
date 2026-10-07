@@ -25,7 +25,7 @@ function Slot({ order, className, children }: { order: string; className?: strin
 export function HomeView({ data }: { data: HomeData }) {
   const { nowMs, timeZone } = data;
   return (
-    <div className={GRID} data-testid="home-root">
+    <div className={cn('content-enter', GRID)} data-testid="home-root">
       <div className={MAIN}>
         {data.opportunity ? (
           <Slot order="max-lg:order-1">

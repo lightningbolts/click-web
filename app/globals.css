@@ -595,7 +595,8 @@ a {
   background: var(--fill-subtle);
 }
 
-.ds-skeleton[data-shimmer="true"]::after {
+.ds-skeleton[data-shimmer="true"]::after,
+.ds-shimmer::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -604,7 +605,8 @@ a {
   animation: ds-shimmer 2.7s var(--ease) infinite;
 }
 
-.dark .ds-skeleton[data-shimmer="true"]::after {
+.dark .ds-skeleton[data-shimmer="true"]::after,
+.dark .ds-shimmer::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
 
@@ -678,38 +680,48 @@ a {
   animation: ds-typing 1.2s var(--ease) infinite;
 }
 
-/* Click Drop develop (spec §7.2): each finer pixel layer blooms out from the centre. */
+/* Click Drop develop (spec §7.2, iOS `ClickDropDevelopingImage`): each finer pixel layer blooms
+   out from the centre as a soft-edged circle, eased out. At 140% the circle's solid core
+   (75% of its radius) clears the corners. Reduce Motion never plays it (`DropDevelopImage`). */
 @keyframes drop-bloom {
   from {
     mask-size: 0% 0%;
   }
   to {
-    mask-size: 300% 300%;
-  }
-}
-
-@keyframes drop-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
+    mask-size: 140% 140%;
   }
 }
 
 .drop-bloom-layer {
-  mask-image: radial-gradient(circle, #000 48%, transparent 50%);
+  mask-image: radial-gradient(circle, #000 75%, transparent 100%);
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: 0% 0%;
-  animation: drop-bloom 0.5s var(--ease) forwards;
+  animation: drop-bloom 0.5s ease-out both;
+}
+
+/* Images fade in once loaded instead of popping in (iOS `ClickMotion.subtleFade`); `revealImage`
+   marks them loaded. */
+.img-reveal {
+  opacity: 0;
+  transition: opacity 200ms ease-in-out;
+}
+.img-reveal[data-loaded] {
+  opacity: 1;
+}
+
+/* Streamed content settles in over its skeleton instead of cutting in. Backwards fill only, so
+   nothing lingers on the element (no stacking context) once it has arrived. */
+.content-enter {
+  animation: ds-appear var(--d-base) var(--ease) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .drop-bloom-layer {
-    mask-image: none;
-    opacity: 0;
-    animation: drop-fade 0.3s linear forwards;
+  .img-reveal {
+    transition: none;
+  }
+  .content-enter {
+    animation: none;
   }
 }
 
