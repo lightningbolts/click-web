@@ -14,7 +14,8 @@ import {
 } from 'react';
 import { authFailureMessage } from '@/lib/auth/freshAuthHeaders';
 import type { Message } from '@/lib/chat/types';
-import { isBeaconChatMessage, normalizeDbMessage, shouldSkipChatDecrypt } from '@/lib/chat/messages';
+import { isBeaconChatMessage, shouldSkipChatDecrypt } from '@/lib/chat/messages';
+import { THREAD_PAGE_SIZE, fetchThreadPage, takeWarmThreadFirstPage } from '@/lib/chat/threadPages';
 import { CHAT_SEARCH_FOCUS_MS } from '@/lib/chat/searchSnippet';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import {
@@ -27,7 +28,7 @@ import {
 import { decryptWebE2eeV2ForDisplay, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { writeSessionCache } from '@/lib/dashboard/sessionCache';
 
-const PAGE_SIZE = 40;
+const PAGE_SIZE = THREAD_PAGE_SIZE;
 
 /** Last loaded page of a thread, kept in the memory-only session cache (cleared on sign-out). */
 export type ChatThreadSnapshot = { chatId: string; messages: Message[]; hasMore: boolean };
@@ -228,6 +229,13 @@ export function useMessageLoading({
           setChatId(connection.groupChatId);
           return;
         }
+        // The inbox row already knows an existing chat's id (`get_inbox_previews`); only a
+        // Click with no chat yet needs the get-or-create round trip.
+        const knownChatId = (connection as ConnectionRecord & { chatId?: string | null }).chatId;
+        if (!isGroupClique && knownChatId) {
+          setChatId(knownChatId);
+          return;
+        }
         const headers = await getAuthHeaders();
         const qs = isGroupClique
           ? `groupId=${encodeURIComponent(connection.id)}`
@@ -263,23 +271,15 @@ export function useMessageLoading({
     });
   }, [loading, chatId, messages, hasMore, currentUserId, connection.id]);
 
-  const fetchMessages = useCallback(async (id: string, cursor?: number, aroundMessageId?: string) => {
-    const params = new URLSearchParams({ chatId: id, limit: String(PAGE_SIZE) });
-    if (cursor) params.set('cursor', String(cursor));
-    if (aroundMessageId) params.set('aroundMessageId', aroundMessageId);
+  /** One page as stored (ciphertext); needs no keys, so it can start before they're ready. */
+  const fetchRawMessages = useCallback(
+    (id: string, cursor?: number, aroundMessageId?: string) =>
+      fetchThreadPage(id, { cursor, aroundMessageId, getHeaders: getAuthHeaders }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/chat/messages?${params}`, { headers });
-    const json = (await res.json().catch(() => ({}))) as {
-      error?: string;
-      messages?: Record<string, unknown>[];
-    };
-    if (!res.ok) throw new Error(authFailureMessage(res.status, json.error ?? 'Failed to load messages'));
-
-    const raw: Message[] = (json.messages ?? [])
-      .reverse()
-      .map(normalizeDbMessage);
-
+  const decryptMessages = useCallback(async (id: string, raw: Message[]): Promise<Message[]> => {
     // Unreadable messages keep their ciphertext, so they decrypt in place once keys arrive.
     const v2Resolved = await Promise.all(raw.map(async (m) => {
       if (!m.content.startsWith('e2e2:')) return m;
@@ -310,6 +310,34 @@ export function useMessageLoading({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [e2eKeys, groupMasterKey, isGroupClique, getE2eeV2Session]);
 
+  const fetchMessages = useCallback(
+    async (id: string, cursor?: number, aroundMessageId?: string) =>
+      decryptMessages(id, await fetchRawMessages(id, cursor, aroundMessageId)),
+    [decryptMessages, fetchRawMessages],
+  );
+
+  // Opening a thread: request the first page as soon as the chat id is known, while the keys
+  // are still loading, instead of after them. The load below decrypts it once they're ready.
+  const firstPageRef = useRef<{ key: string; page: Promise<Message[]> } | null>(null);
+  const firstPage = useCallback(
+    (id: string, around: string | undefined) => {
+      const key = `${id}|${around ?? ''}`;
+      if (firstPageRef.current?.key !== key) {
+        // A page warmed from the inbox (hover/touch) stands in when it's fresh.
+        const warm = around ? null : takeWarmThreadFirstPage(id);
+        firstPageRef.current = { key, page: warm ?? fetchRawMessages(id, undefined, around) };
+      }
+      return firstPageRef.current.page;
+    },
+    [fetchRawMessages],
+  );
+  useEffect(() => {
+    if (!chatId) return;
+    firstPage(chatId, targetMessageId?.trim() || undefined).catch(() => {
+      /* surfaced by the load below */
+    });
+  }, [chatId, targetMessageId, firstPage]);
+
   useEffect(() => {
     if (!chatId) return;
 
@@ -325,7 +353,8 @@ export function useMessageLoading({
     const load = async () => {
       try {
         const around = targetMessageId?.trim() || undefined;
-        const msgs = await fetchMessages(chatId, undefined, around);
+        const raw = await firstPage(chatId, around);
+        const msgs = await decryptMessages(chatId, raw);
         setMessages(msgs);
         const ackIds = msgs
           .filter((m) => m.user_id !== currentUserId && (m.delivered_at == null || m.delivered_at === undefined))
@@ -335,6 +364,8 @@ export function useMessageLoading({
       } catch (err: any) {
         setError(err.message);
       } finally {
+        // Used once (or failed): a later reload (keys rotated, retry) fetches fresh.
+        firstPageRef.current = null;
         setLoading(false);
       }
     };
@@ -346,7 +377,8 @@ export function useMessageLoading({
     connection.userIds,
     currentUserId,
     e2eKeys,
-    fetchMessages,
+    decryptMessages,
+    firstPage,
     groupKeyError,
     groupMasterKey,
     isGroupClique,

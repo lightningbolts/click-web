@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { memo, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import {
   Archive,
   ArchiveRestore,
@@ -38,6 +38,7 @@ import type { ChatListConnection } from './types';
 import { MUTE_OPTIONS } from '@/lib/chat/conversationApi';
 import { inboxPreview, inboxTimestamp, sayHiRemaining } from '@/lib/chat/inboxFormatting';
 import { UNREADABLE_PREVIEW_LABEL } from '@/lib/chat/inboxPreviews';
+import { warmThreadFirstPage } from '@/lib/chat/threadPages';
 import { cn } from '@/lib/cn';
 
 export type InboxRowActions = {
@@ -90,6 +91,15 @@ export const InboxRow = memo(function InboxRow({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isGroup = conn.chatKind === 'group_clique';
+  // Start loading the thread's latest page on intent (50 ms hover, touch, focus), like pages.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warm = () => {
+    if (!state.selected) warmThreadFirstPage(conn.chatId);
+  };
+  const cancelHover = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+  };
   const unread = conn.chatUnreadCount ?? 0;
   const activityMs = conn.chatLastMessageAt ?? conn.chatUpdatedAt ?? null;
   const sayHiLeft = state.sayHiDeadline != null && !conn.chatLastMessageAt ? sayHiRemaining(state.sayHiDeadline, nowMs) : null;
@@ -116,6 +126,14 @@ export const InboxRow = memo(function InboxRow({
         data-connection-id={conn.id}
         data-testid={`conversation-row-${conn.id}`}
         aria-current={state.selected ? 'page' : undefined}
+        onPointerEnter={(e) => {
+          if (e.pointerType !== 'mouse') return;
+          cancelHover();
+          hoverTimer.current = setTimeout(warm, 50);
+        }}
+        onPointerLeave={cancelHover}
+        onPointerDown={warm}
+        onFocus={warm}
         className={cn(
           'group flex h-[72px] items-center gap-3 rounded-md px-3 max-md:pr-10 transition-colors duration-[var(--d-fast)]',
           state.selected ? 'bg-selection' : 'hover:bg-hover',
