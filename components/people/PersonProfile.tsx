@@ -80,7 +80,7 @@ function ActionTile({
 
 function ProfileSkeleton() {
   return (
-    <div aria-busy aria-label="Loading profile" className="container-narrow grid gap-8 py-6 md:py-8 lg:container-page lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-10">
+    <div aria-busy aria-label="Loading profile" className="container-page grid gap-8 py-6 max-lg:*:max-w-[640px] md:py-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-10">
       <div className="flex flex-col items-center gap-3 lg:items-start">
         <Skeleton rounded="full" className="size-24" shimmer />
         <Skeleton className="h-7 w-48" />
@@ -221,7 +221,7 @@ export function PersonProfile({ userId }: { userId: string }) {
 
   return (
     // One phone-width column (iOS proportions) until there's room for identity beside history.
-    <div className="container-narrow grid gap-8 py-6 md:py-8 lg:container-page lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-10">
+    <div className="container-page grid gap-8 py-6 max-lg:*:max-w-[640px] md:py-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-10">
       <aside className="lg:sticky lg:top-[calc(var(--topbar-height)+24px)] lg:self-start">
         <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
           <div className="relative">

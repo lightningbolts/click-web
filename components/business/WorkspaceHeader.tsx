@@ -112,7 +112,7 @@ export function WorkspaceHeader() {
   const status = placeStatusPill(place);
   const publicHref = place.slug && place.listed && place.verification_status === 'verified' ? `/p/${place.slug}` : null;
   return (
-    <header className="container-wide pt-6" data-testid="workspace-header">
+    <header className="container-page pt-6" data-testid="workspace-header">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <PlaceSwitcher />

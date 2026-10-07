@@ -23,7 +23,7 @@ export default async function BusinessPlacesPage() {
   if (places.length === 0) redirect('/business/get-started');
 
   return (
-    <div className="container-wide pb-16 pt-6 md:pt-10">
+    <div className="container-page pb-16 pt-6 md:pt-10">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="type-title-1 text-fg">Your Places</h1>

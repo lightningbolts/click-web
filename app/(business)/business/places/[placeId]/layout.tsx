@@ -19,7 +19,7 @@ export default async function PlaceWorkspaceLayout({ params, children }: { param
   return (
     <PlaceWorkspaceProvider value={{ place: toWorkspacePlace(ws.place), places: ws.places.map(toWorkspacePlace) }}>
       <WorkspaceHeader />
-      <div className="container-wide pb-16 pt-6 md:pt-8">{children}</div>
+      <div className="container-page pb-16 pt-6 md:pt-8">{children}</div>
     </PlaceWorkspaceProvider>
   );
 }

@@ -116,8 +116,9 @@ export function TopBar({ auth, onOpenMarketingMenu }: { auth: TopBarAuth; onOpen
       >
         <div
           className={cn(
-            'mx-auto flex h-full items-center gap-2 px-[var(--gutter)] md:gap-4',
-            fluid ? 'max-w-none md:px-6' : 'max-w-[1280px]',
+            'flex h-full items-center gap-2 md:gap-4',
+            // Same frame as every page (container-page), so the logo sits over page titles.
+            fluid ? 'px-[var(--gutter)] md:px-6' : 'container-page',
           )}
         >
           {/* Left: logo, or back + title on pushed mobile pages. */}

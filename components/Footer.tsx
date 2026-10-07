@@ -17,7 +17,7 @@ export default function Footer() {
       className="relative z-50 border-t border-hairline bg-surface py-12 text-fg"
       style={{ backgroundColor: "var(--color-surface)" }}
     >
-      <div className="container-wide">
+      <div className="container-page">
         <div className="mb-8 flex flex-col items-center justify-center gap-6">
           <div className="flex items-center gap-3 text-2xl font-bold md:text-3xl">
             <ClickLogo size={36} className="h-9 w-9 md:h-10 md:w-10" />

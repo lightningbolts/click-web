@@ -80,7 +80,7 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
   }
   if (variant === 'places') {
     return (
-      <div {...status} className="route-loading container-wide pb-16 pt-6 md:pt-10">
+      <div {...status} className="route-loading container-page pb-16 pt-6 md:pt-10">
         <Title subtitle />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (

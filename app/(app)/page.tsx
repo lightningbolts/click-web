@@ -46,7 +46,7 @@ async function SignedInHome() {
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? 'UTC';
   const firstName = name?.split(' ')[0] ?? '';
   return (
-    <div className="mx-auto w-full max-w-[1040px] px-[var(--gutter)] pb-16 pt-6 md:pt-10">
+    <div className="container-page pb-16 pt-6 md:pt-10">
       <div className="mb-8 lg:max-w-[680px]">
         <HomeGreeting firstName={firstName} serverHour={currentHourIn(timeZone)} />
       </div>

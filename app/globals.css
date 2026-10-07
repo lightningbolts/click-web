@@ -198,7 +198,6 @@ body:has([data-app-shell]) [data-site-chrome] {
   --container-narrow: 640px;
   --container-content: 760px;
   --container-page: 1080px;
-  --container-wide: 1280px;
 }
 
 /* ── Typography roles (spec §4.2) ─────────────────────────────────────────── */
@@ -309,20 +308,9 @@ body:has([data-app-shell]) [data-site-chrome] {
 
 /* ── Containers (spec §4.3) ───────────────────────────────────────────────── */
 
-@utility container-narrow {
-  width: 100%;
-  max-width: calc(640px + 2 * var(--gutter));
-  margin-inline: auto;
-  padding-inline: var(--gutter);
-}
-
-@utility container-content {
-  width: 100%;
-  max-width: calc(760px + 2 * var(--gutter));
-  margin-inline: auto;
-  padding-inline: var(--gutter);
-}
-
+/* Every page shares one frame with the top bar and footer (1080 px of content), so titles
+   always start under the logo. Single-column pages keep a readable measure by limiting their
+   content, not the frame: it stays aligned to the frame's left edge. */
 @utility container-page {
   width: 100%;
   max-width: calc(1080px + 2 * var(--gutter));
@@ -330,11 +318,24 @@ body:has([data-app-shell]) [data-site-chrome] {
   padding-inline: var(--gutter);
 }
 
-@utility container-wide {
+@utility container-content {
   width: 100%;
-  max-width: calc(1280px + 2 * var(--gutter));
+  max-width: calc(1080px + 2 * var(--gutter));
   margin-inline: auto;
   padding-inline: var(--gutter);
+  & > * {
+    max-width: 760px;
+  }
+}
+
+@utility container-narrow {
+  width: 100%;
+  max-width: calc(1080px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  & > * {
+    max-width: 640px;
+  }
 }
 
 /* ── Material (spec §4.5) ─────────────────────────────────────────────────── */
