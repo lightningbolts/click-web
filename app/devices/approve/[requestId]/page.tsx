@@ -6,6 +6,7 @@ import { CheckCircle2, ShieldQuestion, XCircle } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
 import { Spinner } from '@/components/ds/Spinner';
 import { cn } from '@/lib/cn';
+import { shareWebE2eeV2HistoryWithApprovedDevices } from '@/lib/chat/e2eeV2Client';
 
 /**
  * Landing page for the "new device signed in" magic-link email. Supabase appends the new session
@@ -88,7 +89,16 @@ export default function ApproveDevicePage() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? 'Could not save your decision.');
-      setView({ kind: 'done', request: body.request as HistoryRequest });
+      const decided = body.request as HistoryRequest;
+      if (decision === 'approve') {
+        // If this browser already holds historical epoch keys, finish the transfer now instead
+        // of waiting for a later app focus/poll. Approval remains successful if this browser has
+        // no old keys; another established device can still backfill them when it next opens.
+        await shareWebE2eeV2HistoryWithApprovedDevices({
+          getAuthHeaders: async () => ({ Authorization: `Bearer ${token}` }),
+        }).catch(() => 0);
+      }
+      setView({ kind: 'done', request: decided });
     } catch (err) {
       setView({ kind: 'error', message: err instanceof Error ? err.message : 'Something went wrong.' });
     }
@@ -141,7 +151,7 @@ export default function ApproveDevicePage() {
           : 'This request has expired';
     const detail =
       request.status === 'approved'
-        ? 'Your earlier messages appear on the new device as soon as Click is open on a device you already use.'
+        ? 'Approved. If this browser had your earlier chat keys, they were shared now. Otherwise, open Click on a device you used before to finish the transfer.'
         : request.status === 'denied'
           ? 'Your chat history stays on your existing devices. The new device will only see new messages.'
           : 'Sign in on the new device again to get a fresh email.';
