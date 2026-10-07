@@ -22,7 +22,10 @@ export function supabaseRenderUrl(src: string, width: number, quality = 75): str
   const params = new URLSearchParams(query);
   params.set('width', String(width));
   params.set('quality', String(quality));
-  params.set('resize', 'cover');
+  // `contain` scales to `width` keeping the aspect ratio. `cover` with only a width keeps the
+  // original height and crops the sides (a 1080×810 photo at width 96 came back 96×810), which
+  // made avatars and covers look extremely zoomed in. CSS `object-cover` does the cropping.
+  params.set('resize', 'contain');
   return `${base.slice(0, at)}${RENDER_SEGMENT}${path}?${params.toString()}`;
 }
 

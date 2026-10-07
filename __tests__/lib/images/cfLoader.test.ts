@@ -5,13 +5,13 @@ const OBJ = 'https://abc.supabase.co/storage/v1/object/public/avatars/u/1.jpg';
 describe('cfLoader', () => {
   it('rewrites Supabase public objects to the render endpoint', () => {
     expect(cfLoader({ src: OBJ, width: 128 })).toBe(
-      'https://abc.supabase.co/storage/v1/render/image/public/avatars/u/1.jpg?width=128&quality=75&resize=cover',
+      'https://abc.supabase.co/storage/v1/render/image/public/avatars/u/1.jpg?width=128&quality=75&resize=contain',
     );
   });
 
   it('keeps existing query params (cache busters)', () => {
     expect(supabaseRenderUrl(`${OBJ}?v=3`, 64, 60)).toBe(
-      'https://abc.supabase.co/storage/v1/render/image/public/avatars/u/1.jpg?v=3&width=64&quality=60&resize=cover',
+      'https://abc.supabase.co/storage/v1/render/image/public/avatars/u/1.jpg?v=3&width=64&quality=60&resize=contain',
     );
   });
 
