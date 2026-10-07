@@ -2,7 +2,7 @@ import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 
 /** Authenticated request for Home's inline actions; throws the server's message (or a generic one). */
 export async function homeRequest<T = Record<string, unknown>>(
-  method: 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<T> {

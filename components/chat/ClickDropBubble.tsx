@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Hourglass, Sparkles } from 'lucide-react';
 import { Spinner } from '@/components/ds/Spinner';
+import { DropDevelopImage } from '@/components/drops/DropDevelopImage';
 import type { DerivedKeys } from '@/lib/chat/crypto';
 import type { E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { mediaV2Fields } from '@/lib/chat/mediaV2Fields';
@@ -14,15 +15,15 @@ import { chatDropRevealAtMs, dropDevelopState } from '@/lib/drops/developState';
 import { postHomeAction } from '@/lib/home/postHomeAction';
 import { chatNotify } from './chatNotify';
 
-/** Block widths of the develop layers (iOS `ClickDropDevelopEffect`), coarsest first. */
-const BLOOM_BLOCKS = [12, 24, 48, 96] as const;
+/** Blocks across a pending drop's pixelated preview (iOS `ClickDropPixelation.blocksPerSide`). */
+const PREVIEW_BLOCKS = 12;
 
 type DevelopResponse = {
   drops: ({ id: string; status: 'developed'; developed_at: string; url: string | null } | { id: string; status: 'pending' | 'not_found' })[];
 };
 
 /** The image redrawn `blocks` wide and scaled back up with hard edges. */
-function PixelLayer({ src, blocks, className }: { src: string; blocks: number; className?: string }) {
+function PixelLayer({ src, blocks }: { src: string; blocks: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const img = new Image();
@@ -35,7 +36,7 @@ function PixelLayer({ src, blocks, className }: { src: string; blocks: number; c
     };
     img.src = src;
   }, [src, blocks]);
-  return <canvas ref={ref} aria-hidden className={`absolute inset-0 size-full [image-rendering:pixelated] ${className ?? ''}`} />;
+  return <canvas ref={ref} aria-hidden className="absolute inset-0 size-full object-cover [image-rendering:pixelated]" />;
 }
 
 function formatLeft(ms: number): string {
@@ -46,8 +47,8 @@ function formatLeft(ms: number): string {
 }
 
 /**
- * A Click Drop in the timeline (spec §7.2): pixelated until it develops, then a pixel-bloom
- * reveal. Gated originals arrive as a signed URL once developed and are decrypted here.
+ * A Click Drop in the timeline (spec §7.2): pixelated until it develops, then the iOS pixel-bloom
+ * develop (`DropDevelopImage`). Gated originals arrive as a signed URL once developed and are decrypted here.
  */
 export function ClickDropBubble({
   message,
@@ -131,26 +132,9 @@ export function ClickDropBubble({
   return (
     <div className="relative h-[min(320px,60vw)] w-[240px] max-w-full overflow-hidden rounded-lg bg-fill-subtle">
       {previewLoading && !previewSrc ? <div className="absolute inset-0 animate-pulse bg-fill-subtle" aria-busy aria-label="Decrypting Click Drop" /> : null}
-      {previewSrc ? <PixelLayer src={previewSrc} blocks={BLOOM_BLOCKS[0]} /> : null}
+      {previewSrc ? <PixelLayer src={previewSrc} blocks={PREVIEW_BLOCKS} /> : null}
 
-      {revealed && fullSrc ? (
-        animate ? (
-          <>
-            {BLOOM_BLOCKS.slice(1).map((blocks, i) => (
-              <div key={blocks} className="drop-bloom-layer absolute inset-0" style={{ animationDelay: `${i * 140}ms` }}>
-                <PixelLayer src={fullSrc} blocks={blocks} />
-              </div>
-            ))}
-            <div className="drop-bloom-layer absolute inset-0" style={{ animationDelay: `${3 * 140}ms` }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- decrypted object URL */}
-              <img src={fullSrc} alt="Click Drop photo" className="size-full object-cover" />
-            </div>
-          </>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- decrypted object URL
-          <img src={fullSrc} alt="Click Drop photo" className="absolute inset-0 size-full object-cover" />
-        )
-      ) : null}
+      {revealed && fullSrc ? <DropDevelopImage src={fullSrc} alt="Click Drop photo" plays={animate} /> : null}
 
       {!revealed ? (
         <div className="absolute inset-0 flex items-center justify-center">

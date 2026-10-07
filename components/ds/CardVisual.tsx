@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState, type CSSProperties, type ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   generateCardVisual,
@@ -37,7 +36,7 @@ export function CardVisual({
   visual,
   ratio,
   radius = "lg",
-  glyph: Glyph,
+  glyph,
   photoUrl,
   sizes = "(max-width: 768px) 100vw, 560px",
   priority,
@@ -50,7 +49,8 @@ export function CardVisual({
   /** Omit to size with className (e.g. `size-24`). */
   ratio?: CardVisualRatio;
   radius?: keyof typeof RADIUS;
-  glyph?: LucideIcon;
+  /** Centered icon element (e.g. `<Building2 />`), sized here; an element, not a component, so Server Components can pass it. */
+  glyph?: ReactNode;
   photoUrl?: string | null;
   sizes?: string;
   priority?: boolean;
@@ -82,12 +82,12 @@ export function CardVisual({
           className="object-cover"
           onError={() => setFailed(url)}
         />
-      ) : Glyph ? (
+      ) : glyph ? (
         <span
-          className="absolute inset-0 flex items-center justify-center text-white/85"
+          className="absolute inset-0 flex items-center justify-center text-white/85 [&>svg]:size-[38%] [&>svg]:max-h-16 [&>svg]:max-w-16 [&>svg]:stroke-[1.75]"
           aria-hidden
         >
-          <Glyph className="size-[38%] max-h-16 max-w-16" strokeWidth={1.75} />
+          {glyph}
         </span>
       ) : null}
       {children ? (

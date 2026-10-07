@@ -2,6 +2,7 @@ import { ENVELOPE_PREFIX, E2EE_V2_ATTACHMENT_PREFIX } from '@/lib/chat/attachmen
 import type { Message, MessageMediaMetadata, MessageType } from '@/lib/chat/types';
 import { isKlipyMediaUrl } from '@/lib/chat/gif';
 import { isEncryptedWireContent } from '@/lib/chat/crypto';
+import { dropReplyFromMetadata } from '@/lib/drops/dropReply';
 
 /** Public URL for image/audio from `metadata.media_url` (camelCase fallback for older rows). */
 export function mediaUrlFromMetadata(metadata: MessageMediaMetadata | undefined | null): string | null {
@@ -107,6 +108,8 @@ export function previewLabelForMessage(
   if (cap.startsWith(ENVELOPE_PREFIX) || cap.startsWith(E2EE_V2_ATTACHMENT_PREFIX)) return '📎 Attachment';
   // GIF messages carry only the KLIPY URL as their body.
   if (isKlipyMediaUrl(cap)) return 'GIF';
+  const dropReply = dropReplyFromMetadata(message.metadata);
+  if (dropReply && !encrypted) return dropReply.reaction ? `Reacted ${cap} to a drop` : `Replied to a drop: ${cap}`;
   if (encrypted) return 'Encrypted message';
   return message.content;
 }

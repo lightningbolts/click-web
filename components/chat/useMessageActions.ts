@@ -11,12 +11,9 @@ import type { Message } from '@/lib/chat/types';
 import { chatNotify } from './chatNotify';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
-import {
-  encryptContent,
-  encryptGroupMessageContent,
-  type DerivedKeys,
-} from '@/lib/chat/crypto';
-import { encryptWebE2eeV2Message, invalidateWebE2eeV2Session, type E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import type { DerivedKeys } from '@/lib/chat/crypto';
+import type { E2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { encryptChatText, postChatText } from '@/lib/chat/chatTextSend';
 import { replySnippetForSend } from '@/lib/chat/reply';
 import { CLIENT_OPTIMISTIC_MESSAGE_ID_PREFIX } from '@/lib/chat/clientOptimistic';
 import { gifMessageMetadata, isKlipyMediaUrl } from '@/lib/chat/gif';
@@ -92,20 +89,17 @@ export function useMessageActions({
     async (content: string, extraMetadata: Record<string, unknown> | null, sentAt: number, staleOk = false) => {
       if (!chatId) throw new Error('Chat is not ready');
       const v2Session = await getE2eeV2Session(true, true, staleOk);
-      const encryptedV2 = v2Session ? await encryptWebE2eeV2Message(v2Session, chatId, content) : null;
-      const wireContent = encryptedV2
-        ? encryptedV2.wireContent
-        : isGroupClique && groupMasterKey
-          ? await encryptGroupMessageContent(content, groupMasterKey)
-          : e2eKeys
-            ? await encryptContent(content, e2eKeys)
-            : content;
+      const { wireContent, v2Metadata } = await encryptChatText(chatId, content, {
+        v2Session,
+        groupMasterKey: isGroupClique ? groupMasterKey : null,
+        e2eKeys,
+      });
       const replyMetadata =
         replyingTo && replyingTo.message_type !== 'call_log' ? await appendReplyToMetadata({}) : undefined;
       const metadata = {
         ...(extraMetadata ?? {}),
         ...(replyMetadata ?? {}),
-        ...(encryptedV2?.metadata ?? {}),
+        ...(v2Metadata ?? {}),
       };
       return {
         chatId,
@@ -164,22 +158,7 @@ export function useMessageActions({
 
     try {
       const headers = await getAuthHeaders();
-      const post = async (staleOk: boolean) =>
-        fetch('/api/chat/messages', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(await buildTextPost(content, extraMetadata, sentAt, staleOk)),
-        });
-      // Send with the keys at hand (no re-check round trips first); the server validates the
-      // epoch, so if they went stale, re-read them and send once more.
-      let res = await post(true);
-      if (!res.ok && (res.status === 400 || res.status === 409)) {
-        const { code } = (await res.json().catch(() => ({}))) as { code?: unknown };
-        if (code === 'E2EE_V2_INVALID' || code === 'E2EE_V2_REQUIRED') {
-          invalidateWebE2eeV2Session(chatId);
-          res = await post(false);
-        }
-      }
+      const res = await postChatText(chatId, headers, (staleOk) => buildTextPost(content, extraMetadata, sentAt, staleOk));
       if (!res.ok) throw new Error('Send failed');
       const payload = (await res.json().catch(() => ({}))) as { id?: unknown; message?: { id?: unknown } };
       const serverId =
@@ -323,16 +302,12 @@ export function useMessageActions({
         : {};
     const previousClientMessageId =
       typeof previousMeta.client_message_id === 'string' ? previousMeta.client_message_id : undefined;
-    const encryptedV2 = v2Session
-      ? await encryptWebE2eeV2Message(v2Session, previous.chat_id, newContent, previousClientMessageId)
-      : null;
-    const wireContent = encryptedV2
-      ? encryptedV2.wireContent
-      : isGroupClique && groupMasterKey
-        ? await encryptGroupMessageContent(newContent, groupMasterKey)
-        : e2eKeys
-          ? await encryptContent(newContent, e2eKeys)
-          : newContent;
+    const { wireContent, v2Metadata } = await encryptChatText(
+      previous.chat_id,
+      newContent,
+      { v2Session, groupMasterKey: isGroupClique ? groupMasterKey : null, e2eKeys },
+      previousClientMessageId,
+    );
     const headers = await getAuthHeaders();
     const res = await fetch('/api/chat/messages', {
       method: 'PATCH',
@@ -340,7 +315,7 @@ export function useMessageActions({
       body: JSON.stringify({
         messageId: editingId,
         content: wireContent,
-        ...(encryptedV2 ? { metadata: { ...previousMeta, ...encryptedV2.metadata } } : {}),
+        ...(v2Metadata ? { metadata: { ...previousMeta, ...v2Metadata } } : {}),
       }),
     });
 
