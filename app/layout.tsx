@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Manrope } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { SiteChrome } from "@/components/app-shell/SiteChrome";
@@ -17,13 +17,17 @@ import { brandShareImage } from "@/lib/brand/shareImage";
 /**
  * Manrope is the display face only (titles, 700–800). Body text uses the system
  * stack (spec §4.2, D2), so this is the only font request on any page.
+ * Self-hosted (Fontsource, OFL) so builds never fetch Google Fonts: in Workers
+ * Builds, next/font/google failed with "queries have exactly one entry".
  */
-const manrope = Manrope({
-  subsets: ["latin"],
+const manrope = localFont({
+  src: [
+    { path: "./fonts/manrope-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/manrope-latin-800-normal.woff2", weight: "800", style: "normal" },
+  ],
   display: "swap",
-  weight: ["700", "800"],
   preload: true,
-  adjustFontFallback: true,
+  adjustFontFallback: "Arial",
   variable: "--font-manrope",
 });
 
