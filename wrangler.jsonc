@@ -32,7 +32,8 @@
   // Non-secret public site URL. Supabase / LiveKit / Stripe stay in the
   // Workers dashboard so `deploy -- --keep-vars` does not wipe them.
   "vars": {
-    "NEXT_PUBLIC_BASE_URL": "https://joinclick.co"
+    "NEXT_PUBLIC_BASE_URL": "https://joinclick.co",
+    "PLACES_PUBLIC_PAGES_ENABLED": "true"
   },
   // Cloudflare Images: resizes an event's picture for its Apple Wallet pass (free tier: 5,000
   // unique transformations a month). Without it, passes wear the event's generated colors.
