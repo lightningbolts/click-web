@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Users } from 'lucide-react';
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -10,26 +11,18 @@ import { SectionHeader } from '@/components/ds/SectionHeader';
 import { Sheet } from '@/components/ds/Sheet';
 import EventRsvpDirectory from '@/components/events/EventRsvpDirectory';
 import { useAuth } from '@/lib/AuthContext';
-import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { eventRsvpKey } from '@/lib/events/eventRsvpKey';
-import { fetchEventRsvpPayload } from '@/lib/events/eventRsvpClient';
+import { fetchEventRsvpPayload, fetchMutualAttendees, mutualAttendeesKey } from '@/lib/events/eventRsvpClient';
 import { personHref } from '@/lib/shell/appNav';
 
 const MAX_FACES = 12;
 
-export const mutualAttendeesKey = (beaconId: string) => `/api/beacons/${beaconId}/mutual-attendees`;
-
-async function fetchMutual(url: string): Promise<{ count: number; attendees: Array<{ user_id: string }> }> {
-  const res = await fetch(url, { headers: await getFreshAuthHeaders() });
-  if (!res.ok) throw new Error('Failed to load mutual attendees');
-  return res.json();
-}
 
 /** Signed-in meta row (spec §7.6.2): "{N} going · {M} of your Clicks". */
 export function EventGoingMetaRow({ beaconId, count, ended }: { beaconId: string; count: number; ended: boolean }) {
   const { user } = useAuth();
   const { data: rsvp } = useSWR(user ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload, { revalidateOnFocus: false });
-  const { data: mutual } = useSWR(user ? mutualAttendeesKey(beaconId) : null, fetchMutual, { revalidateOnFocus: false });
+  const { data: mutual } = useSWR(user ? mutualAttendeesKey(beaconId) : null, fetchMutualAttendees, { revalidateOnFocus: false });
   if (!user) return null;
   const going = rsvp?.rsvp_count ?? count;
   const clicks = mutual?.count ?? 0;
@@ -67,10 +60,10 @@ export function EventPeopleSection({ beaconId, ended }: { beaconId: string; ende
       <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-3">
         {people.slice(0, MAX_FACES).map((p) => (
           <li key={p.user_id}>
-            <a href={personHref(p.user_id)} className="flex flex-col items-center gap-1 rounded-md p-1 hover:bg-hover" title={p.name}>
+            <Link href={personHref(p.user_id)} className="flex flex-col items-center gap-1 rounded-md p-1 hover:bg-hover" title={p.name}>
               <Avatar seed={p.user_id} name={p.name} src={p.avatar_url} size={40} />
               <span className="type-badge w-full truncate text-center font-normal text-fg-secondary">{p.name.split(' ')[0]}</span>
-            </a>
+            </Link>
           </li>
         ))}
       </ul>
