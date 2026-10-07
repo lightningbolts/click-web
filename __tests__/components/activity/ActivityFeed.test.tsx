@@ -2,12 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { mutate } from 'swr';
 import { ActivityFeed } from '@/components/activity/ActivityFeed';
 import type { ActivityPage } from '@/components/activity/activityData';
+import type { ActivityRowItem } from '@/components/activity/ActivityRow';
 
 jest.mock('@/lib/auth/freshAuthHeaders', () => ({ getFreshAuthHeaders: async () => ({}) }));
 
 const NOW = Date.parse('2026-10-08T18:00:00Z');
-const row = (id: string, title: string, iso: string) => ({ id, type: 'reaction', title, body: '', data: {}, created_at: iso, actor: null });
-const page = (items: ReturnType<typeof row>[]): ActivityPage => ({
+const row = (id: string, title: string, iso: string): ActivityRowItem => ({ id, type: 'reaction', title, body: '', data: {}, created_at: iso, actor: null });
+const page = (items: ActivityRowItem[]): ActivityPage => ({
   items,
   seen_at: '2026-10-08T17:30:00Z',
   next_before: null,

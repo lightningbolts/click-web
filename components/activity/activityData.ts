@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR, { mutate, preload } from 'swr';
+import useSWR, { mutate } from 'swr';
 import { authedJson } from '@/lib/api/authedJson';
 import { SHELL_KEY } from '@/lib/shell/useShellBootstrap';
 import type { ActivityRowItem } from './ActivityRow';
@@ -29,9 +29,19 @@ export function useLatestActivity(rendered?: ActivityPage) {
   });
 }
 
-/** Starts reading the latest page before the popover opens (hover, focus). */
+let reading: Promise<unknown> | null = null;
+
+/**
+ * Starts reading the latest page before the popover opens (hover, focus), into the cache the
+ * popover shows at once. Only when nothing is cached yet: a cached page is kept current by
+ * `LiveActivity`, and the popover revalidates it on open either way.
+ */
 export function preloadActivity(): void {
-  void preload(ACTIVITY_KEY, fetchActivityPage).catch(() => undefined);
+  reading ??= mutate<ActivityPage>(ACTIVITY_KEY, (cached) => cached ?? fetchActivityPage(ACTIVITY_KEY), { revalidate: false })
+    .catch(() => undefined)
+    .finally(() => {
+      reading = null;
+    });
 }
 
 /** Refetches what shows activity: the latest page (where it's on screen) and the bell's dot. */
