@@ -762,13 +762,20 @@ a {
   }
 }
 
-/* Overlays enter with a 0.98→1 scale + fade on the expo curve (spec §5.4). */
+/*
+ * Overlays enter with a 0.98→1 scale + fade on the expo curve (spec §5.4) and leave the same
+ * way, quicker, instead of vanishing (Radix keeps them mounted until the exit animation ends).
+ * Popovers, menus and tooltips grow from and shrink back into what opened them.
+ */
 @keyframes ds-overlay-in {
   from {
     opacity: 0;
   }
+}
+
+@keyframes ds-overlay-out {
   to {
-    opacity: 1;
+    opacity: 0;
   }
 }
 
@@ -777,20 +784,26 @@ a {
     opacity: 0;
     transform: scale(0.98);
   }
+}
+
+@keyframes ds-dialog-out {
   to {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 0;
+    transform: scale(0.98);
   }
 }
 
 @keyframes ds-popover-in {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: scale(0.96);
   }
+}
+
+@keyframes ds-popover-out {
   to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    opacity: 0;
+    transform: scale(0.96);
   }
 }
 
@@ -798,8 +811,11 @@ a {
   from {
     transform: translateX(100%);
   }
+}
+
+@keyframes ds-sheet-right-out {
   to {
-    transform: translateX(0);
+    transform: translateX(100%);
   }
 }
 
@@ -807,8 +823,11 @@ a {
   from {
     transform: translateY(100%);
   }
+}
+
+@keyframes ds-sheet-up-out {
   to {
-    transform: translateY(0);
+    transform: translateY(100%);
   }
 }
 
@@ -818,6 +837,13 @@ a {
 
 .ds-anim-dialog[data-state="open"] {
   animation: ds-dialog-in var(--d-slow) var(--ease-out-expo);
+}
+
+.ds-anim-popover {
+  transform-origin: var(
+    --radix-popover-content-transform-origin,
+    var(--radix-dropdown-menu-content-transform-origin, var(--radix-tooltip-content-transform-origin, top))
+  );
 }
 
 .ds-anim-popover[data-state="open"],
@@ -834,12 +860,40 @@ a {
   animation: ds-sheet-up-in var(--d-slow) var(--ease-out-expo);
 }
 
+.ds-anim-overlay[data-state="closed"] {
+  animation: ds-overlay-out var(--d-base) var(--ease) forwards;
+}
+
+.ds-anim-dialog[data-state="closed"] {
+  animation: ds-dialog-out var(--d-fast) var(--ease) forwards;
+}
+
+.ds-anim-popover[data-state="closed"] {
+  animation: ds-popover-out var(--d-fast) var(--ease) forwards;
+}
+
+.ds-anim-sheet-right[data-state="closed"] {
+  animation: ds-sheet-right-out var(--d-base) var(--ease) forwards;
+}
+
+.ds-anim-sheet-up[data-state="closed"] {
+  animation: ds-sheet-up-out var(--d-base) var(--ease) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ds-anim-dialog[data-state="open"],
   .ds-anim-popover[data-state="open"],
   .ds-anim-sheet-right[data-state="open"],
   .ds-anim-sheet-up[data-state="open"] {
     animation: ds-overlay-in 120ms linear;
+  }
+
+  .ds-anim-overlay[data-state="closed"],
+  .ds-anim-dialog[data-state="closed"],
+  .ds-anim-popover[data-state="closed"],
+  .ds-anim-sheet-right[data-state="closed"],
+  .ds-anim-sheet-up[data-state="closed"] {
+    animation: ds-overlay-out 120ms linear forwards;
   }
 }
 

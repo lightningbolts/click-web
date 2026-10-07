@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Avatar } from "@/components/ds/Avatar";
 import { cardClassName } from "@/components/ds/Card";
 import { PersonRow } from "@/components/ds/PersonRow";
@@ -38,9 +39,9 @@ export function EventHostCard({
       ) : null}
       <p className="type-meta flex flex-wrap gap-x-4 gap-y-1 px-1 text-fg-tertiary">
         {canContact && href ? (
-          <a href={href} className="hover:text-fg-secondary hover:underline">
+          <Link href={href} className="hover:text-fg-secondary hover:underline">
             Contact the host
-          </a>
+          </Link>
         ) : null}
         <a href={reportHref} className="hover:text-fg-secondary hover:underline">
           Report event
@@ -72,9 +73,9 @@ export default function EventHostRow({
     </>
   );
   return href ? (
-    <a href={href} className="inline-flex items-center gap-2 hover:underline">
+    <Link href={href} className="inline-flex items-center gap-2 hover:underline">
       {inner}
-    </a>
+    </Link>
   ) : (
     <div className="inline-flex items-center gap-2">{inner}</div>
   );

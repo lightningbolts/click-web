@@ -1,4 +1,6 @@
 import { getFreshAuthHeaders } from "@/lib/auth/freshAuthHeaders";
+import { eventRsvpKey } from "@/lib/events/eventRsvpKey";
+import { warmFetch, withWarmFetch } from "@/lib/swr/warmFetch";
 
 export type EventRsvpAttendee = {
   user_id: string;
@@ -13,11 +15,36 @@ export type EventRsvpPayload = {
   rsvp_count?: number;
 };
 
-export async function fetchEventRsvpPayload(url: string): Promise<EventRsvpPayload> {
+async function readEventRsvpPayload(url: string): Promise<EventRsvpPayload> {
   const headers = await getFreshAuthHeaders();
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error("Failed to load RSVP");
   return res.json() as Promise<EventRsvpPayload>;
+}
+
+/** The viewer's RSVP and the guests (`eventRsvpKey`), answered by a read warmed on intent. */
+export const fetchEventRsvpPayload = withWarmFetch(readEventRsvpPayload);
+
+export const mutualAttendeesKey = (beaconId: string) => `/api/beacons/${beaconId}/mutual-attendees`;
+
+export type MutualAttendees = { count: number; attendees: Array<{ user_id: string }> };
+
+async function readMutualAttendees(url: string): Promise<MutualAttendees> {
+  const res = await fetch(url, { headers: await getFreshAuthHeaders() });
+  if (!res.ok) throw new Error("Failed to load mutual attendees");
+  return res.json() as Promise<MutualAttendees>;
+}
+
+/** Which of your Clicks are going (`mutualAttendeesKey`), answered by a read warmed on intent. */
+export const fetchMutualAttendees = withWarmFetch(readMutualAttendees);
+
+/**
+ * Starts the event page's signed-in reads (who's going, your RSVP, your Clicks there) before it
+ * opens, so its people section and going line are there with the page instead of popping in.
+ */
+export function warmEventViewer(beaconId: string): void {
+  warmFetch(eventRsvpKey(beaconId), readEventRsvpPayload);
+  warmFetch(mutualAttendeesKey(beaconId), readMutualAttendees);
 }
 
 export function applyRsvpOptimistic(

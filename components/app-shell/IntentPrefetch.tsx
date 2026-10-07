@@ -3,6 +3,9 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PrefetchKind } from 'next/dist/client/components/router-reducer/router-reducer-types';
+import { useAuth } from '@/lib/AuthContext';
+import { warmEventViewer } from '@/lib/events/eventRsvpClient';
+import { warmPersonProfile } from '@/lib/people/profileClient';
 
 /** Long enough to skip links the pointer only crosses, short enough to win most of the hover. */
 const HOVER_DELAY_MS = 50;
@@ -31,6 +34,19 @@ export function prefetchTarget(anchor: HTMLAnchorElement, here: { href: string; 
 }
 
 /**
+ * Starts what a page reads in the browser once it opens, which a route prefetch can't carry:
+ * an event's guests and your Clicks there, a person's profile. Signed in only (they're private).
+ * Each read expires after a few seconds, so an old hover never stands in for a fresh read.
+ */
+export function warmPageData(path: string): void {
+  const pathname = path.split(/[?#]/)[0];
+  const event = /^\/e\/([0-9a-f-]{36})$/i.exec(pathname);
+  if (event) return warmEventViewer(event[1]);
+  const person = /^\/people\/([^/]+)$/.exec(pathname);
+  if (person) warmPersonProfile(decodeURIComponent(person[1]));
+}
+
+/**
  * Full-prefetches a page the moment someone shows intent to open it: 50 ms of hover, a touch
  * starting, or keyboard focus. Next's default viewport prefetch stops at a dynamic route's
  * `loading.tsx`; this fetches the page itself, so most clicks land on a finished page instead
@@ -38,6 +54,7 @@ export function prefetchTarget(anchor: HTMLAnchorElement, here: { href: string; 
  */
 export function IntentPrefetch() {
   const router = useRouter();
+  const signedIn = Boolean(useAuth().user);
 
   useEffect(() => {
     const sent = new Map<string, number>();
@@ -47,6 +64,8 @@ export function IntentPrefetch() {
     const prefetch = (anchor: HTMLAnchorElement) => {
       const target = prefetchTarget(anchor, window.location);
       if (!target) return;
+      // Before the route's repeat window: these reads expire sooner than a prefetched page.
+      if (signedIn) warmPageData(target);
       const now = Date.now();
       if (now - (sent.get(target) ?? 0) < REPEAT_MS) return;
       sent.set(target, now);
@@ -87,7 +106,7 @@ export function IntentPrefetch() {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('focusin', onFocusIn);
     };
-  }, [router]);
+  }, [router, signedIn]);
 
   return null;
 }

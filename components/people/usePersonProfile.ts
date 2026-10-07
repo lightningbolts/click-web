@@ -2,34 +2,20 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { authFailureMessage, getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { parseConnectionEncounters } from '@/lib/dashboard/connectionEncounters';
 import { isPriorSource } from '@/lib/insights/analytics';
 import { computeFriendshipStats } from '@/lib/people/friendship';
+import { fetchProfile, profileJson, profilePath } from '@/lib/people/profileClient';
 import { coerceSharedConnection, displayName } from '@/lib/userProfile/profileDisplay';
 import type { UserProfilePayload } from '@/lib/userProfile/profileModalTypes';
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(path, { headers: await getFreshAuthHeaders() });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const message = typeof json?.error === 'string' && json.error.trim() ? json.error : 'Couldn’t load this profile.';
-    const err = new Error(authFailureMessage(res.status, message)) as Error & { status?: number };
-    err.status = res.status;
-    throw err;
-  }
-  return json as T;
-}
-
-export function profilePath(userId: string) {
-  return `/api/users/${encodeURIComponent(userId)}/profile`;
-}
+export { profilePath };
 
 /** Profile, relationship and Together stats for `/people/[userId]` (spec §7.3). */
 export function usePersonProfile(userId: string, currentUserId: string | null) {
   const path = profilePath(userId);
-  const profile = useSWR<UserProfilePayload>(path, getJson, { revalidateOnFocus: false, dedupingInterval: 60_000 });
-  const core = useSWR<{ core: string[] }>('/api/connections/core', getJson, { revalidateOnFocus: false });
+  const profile = useSWR<UserProfilePayload>(path, fetchProfile, { revalidateOnFocus: false, dedupingInterval: 60_000 });
+  const core = useSWR<{ core: string[] }>('/api/connections/core', profileJson, { revalidateOnFocus: false });
   const [nowMs] = useState(() => Date.now());
 
   const data = profile.data?.user?.id === userId ? profile.data : undefined;

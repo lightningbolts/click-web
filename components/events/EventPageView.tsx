@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense, type CSSProperties } from "react";
 import { ArrowUpRight, MapPin } from "lucide-react";
 import { CardVisual } from "@/components/ds/CardVisual";
@@ -121,25 +122,25 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
   };
 
   const placeCard = event.place ? (
-    <a href={`/p/${event.place.slug}`} className={cardClassName({ compact: true, interactive: true, className: "flex items-center gap-3" })}>
+    <Link href={`/p/${event.place.slug}`} className={cardClassName({ compact: true, interactive: true, className: "flex items-center gap-3" })}>
       <CardVisual seed={event.place.id} className="size-10 shrink-0" radius="sm" />
       <span className="min-w-0">
         <span className="type-meta block font-semibold text-fg-secondary">Hosted at</span>
         <span className="type-body-strong block truncate text-fg">{event.place.name}</span>
         <span className="type-meta block capitalize text-fg-tertiary">{event.place.category.replace(/_/g, " ")}</span>
       </span>
-    </a>
+    </Link>
   ) : null;
   const categories = event.categories.length ? (
     <ul className="flex flex-wrap gap-1.5" aria-label="Categories">
       {event.categories.map((c) => (
         <li key={c}>
-          <a
+          <Link
             href={`/events?q=${encodeURIComponent(c)}`}
             className="type-meta inline-flex h-[30px] items-center rounded-pill bg-fill-subtle px-3 font-semibold text-fg-secondary hover:bg-hover"
           >
             {c}
-          </a>
+          </Link>
         </li>
       ))}
     </ul>

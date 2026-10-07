@@ -16,6 +16,12 @@ if (typeof window.PointerEvent === 'undefined') {
   window.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent;
 }
 jest.mock('next/navigation', () => ({ useRouter: () => ({ prefetch }) }));
+let signedInUser: { id: string } | null = null;
+jest.mock('@/lib/AuthContext', () => ({ useAuth: () => ({ user: signedInUser }) }));
+const warmEventViewer = jest.fn();
+jest.mock('@/lib/events/eventRsvpClient', () => ({ warmEventViewer: (id: string) => warmEventViewer(id) }));
+const warmPersonProfile = jest.fn();
+jest.mock('@/lib/people/profileClient', () => ({ warmPersonProfile: (id: string) => warmPersonProfile(id) }));
 
 const here = { href: 'https://joinclick.co/events', origin: 'https://joinclick.co', pathname: '/events', search: '' };
 
@@ -92,5 +98,33 @@ describe('IntentPrefetch', () => {
     fireEvent.pointerDown(link, { pointerType: 'touch' });
     fireEvent.pointerDown(link, { pointerType: 'touch' });
     expect(prefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("also starts an event's and a person's signed-in reads, but not when signed out", () => {
+    const EVENT = '11111111-1111-4111-8111-111111111111';
+    const view = render(
+      <>
+        <IntentPrefetch />
+        <a href={`/e/${EVENT}`}>Board Meeting</a>
+        <a href="/people/u%201">Maya</a>
+      </>,
+    );
+    fireEvent.pointerDown(view.getByText('Board Meeting'), { pointerType: 'touch' });
+    expect(warmEventViewer).not.toHaveBeenCalled();
+    view.unmount();
+
+    signedInUser = { id: 'me' };
+    const again = render(
+      <>
+        <IntentPrefetch />
+        <a href={`/e/${EVENT}`}>Board Meeting</a>
+        <a href="/people/u%201">Maya</a>
+      </>,
+    );
+    fireEvent.pointerDown(again.getByText('Board Meeting'), { pointerType: 'touch' });
+    fireEvent.focusIn(again.getByText('Maya'));
+    expect(warmEventViewer).toHaveBeenCalledWith(EVENT);
+    expect(warmPersonProfile).toHaveBeenCalledWith('u 1');
+    signedInUser = null;
   });
 });
