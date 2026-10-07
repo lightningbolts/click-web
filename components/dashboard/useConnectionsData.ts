@@ -25,6 +25,7 @@ import type { DisplayNamesBatchResponse } from '@/types/database-connections';
 import { normalizeConnectionStatus } from '@/lib/dashboard/connectionStatus';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
 import { readSessionCache } from '@/lib/dashboard/sessionCache';
+import { INBOX_PRELOAD_MAX_AGE_MS, type InboxPreload } from '@/lib/clicks/inboxPreload';
 
 /**
  * Loading and live-patching of the dashboard's connection records: the
@@ -44,6 +45,7 @@ export function useConnectionsData({
   setConnectionsInitialLoadComplete,
   updateArchivedIds,
   setVibePromptConnection,
+  preload,
 }: {
   user: any;
   getAuthHeaders: () => Promise<HeadersInit>;
@@ -55,11 +57,14 @@ export function useConnectionsData({
   setConnectionsInitialLoadComplete: Dispatch<SetStateAction<boolean>>;
   updateArchivedIds: (updater: (prev: Set<string>) => Set<string>) => void;
   setVibePromptConnection: Dispatch<SetStateAction<ConnectionRecord | null>>;
+  /** Server-started first load (`clicks/layout.tsx`); used once, when it's fresh. */
+  preload?: Promise<InboxPreload | null>;
 }) {
   const seenConnectionIdsRef = useRef<Set<string> | null>(null);
   const connectionsLoadUserIdRef = useRef<string | null>(null);
   const mapRowToRecordRef = useRef<((conn: Record<string, unknown>) => ConnectionRecord) | null>(null);
   const realtimePatchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preloadRef = useRef(preload);
 
   const loadConnections = useCallback(async () => {
     const markInitialLoadComplete = () => {
@@ -83,25 +88,39 @@ export function useConnectionsData({
     };
 
     try {
-      const headers = await getAuthHeaders();
-      const bundleRes = await fetch('/api/connections?bundle=dashboard', {
-        headers,
-        cache: 'no-store',
-      });
+      // The first load can come from the server (streamed with the page); later loads fetch.
+      const pending = preloadRef.current;
+      preloadRef.current = undefined;
+      const preloaded = pending ? await pending.catch(() => null) : null;
+      const fresh =
+        preloaded && preloaded.userId === user.id && Date.now() - preloaded.loadedAt < INBOX_PRELOAD_MAX_AGE_MS
+          ? preloaded
+          : null;
 
-      if (!bundleRes.ok) {
-        const errPayload = (await bundleRes.json().catch(() => ({}))) as { error?: string };
-        console.error('Error fetching connections:', errPayload.error || bundleRes.statusText);
-        setEmptyConnections();
-        return;
-      }
-
-      const bundlePayload = (await bundleRes.json()) as {
+      const headers = fresh ? {} : await getAuthHeaders();
+      let bundlePayload: {
         active?: Record<string, unknown>[];
         archived?: Record<string, unknown>[];
         map?: Record<string, unknown>[];
         core?: string[];
       };
+      if (fresh) {
+        bundlePayload = fresh.bundle;
+      } else {
+        const bundleRes = await fetch('/api/connections?bundle=dashboard', {
+          headers,
+          cache: 'no-store',
+        });
+
+        if (!bundleRes.ok) {
+          const errPayload = (await bundleRes.json().catch(() => ({}))) as { error?: string };
+          console.error('Error fetching connections:', errPayload.error || bundleRes.statusText);
+          setEmptyConnections();
+          return;
+        }
+
+        bundlePayload = await bundleRes.json();
+      }
 
       const activeRows = bundlePayload.active ?? [];
       const archivedRows = bundlePayload.archived ?? [];
@@ -152,6 +171,11 @@ export function useConnectionsData({
       let userNameMap: Record<string, string> = {};
       let userImageMap: Record<string, string | null> = {};
       const loadNames = async () => {
+        if (fresh) {
+          userNameMap = fresh.names;
+          userImageMap = fresh.images;
+          return;
+        }
         if (otherUserIds.length > 0) {
           try {
             const nameRes = await fetch('/api/users/display-names', {
@@ -222,6 +246,17 @@ export function useConnectionsData({
       let selfIntentRows: AvailabilityIntentRow[] = [];
       const peerIntentByUserId = new Map<string, AvailabilityIntentRow[]>();
       const loadIntents = async () => {
+        if (fresh) {
+          selfIntentRows = normalizeAvailabilityIntentRows(fresh.selfIntents);
+          const acc = new Map<string, unknown[]>();
+          for (const row of fresh.peerIntents) {
+            const uid = row.user_id;
+            if (typeof uid !== 'string' || !uid.trim()) continue;
+            acc.set(uid, [...(acc.get(uid) ?? []), row]);
+          }
+          for (const [uid, rows] of acc) peerIntentByUserId.set(uid, normalizeAvailabilityIntentRows(rows));
+          return;
+        }
         if (supabase) {
           try {
             const [{ data: mine }, peers] = await Promise.all([

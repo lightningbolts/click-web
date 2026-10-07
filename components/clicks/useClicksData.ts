@@ -1,5 +1,6 @@
 'use client';
 
+import type { InboxPreload } from '@/lib/clicks/inboxPreload';
 import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { useSessionCachedState } from '@/lib/dashboard/sessionCache';
@@ -24,11 +25,14 @@ export function useClicksData({
   user,
   selectedId,
   onThreadClosed,
+  preload,
 }: {
   user: { id: string } & Record<string, unknown>;
   selectedId: string | null;
   /** The open thread's connection was removed or blocked. */
   onThreadClosed: () => void;
+  /** Server-started first load, see `useConnectionsData`. */
+  preload?: Promise<InboxPreload | null>;
 }) {
   const userId = user.id;
   const [connectionRecords, setConnectionRecords] = useSessionCachedState<ConnectionRecord[]>(userId, 'connections', []);
@@ -102,6 +106,7 @@ export function useClicksData({
     setConnectionsInitialLoadComplete: setLoaded,
     updateArchivedIds,
     setVibePromptConnection,
+    preload,
   });
 
   const search = useChatSearch({

@@ -28,6 +28,7 @@ import { HubsList } from './HubsList';
 import { HubThread } from './HubThread';
 import { MembersDialog, RenameGroupDialog, ReportDialog } from './ClickDialogs';
 import { useClicksData } from './useClicksData';
+import type { InboxPreload } from '@/lib/clicks/inboxPreload';
 
 const CreateVerifiedClickDialog = dynamic(() => import('@/components/chat/CreateVerifiedClickDialog'), { ssr: false });
 const PostConnectionVibePrompt = dynamic(() => import('@/components/dashboard/PostConnectionVibePrompt'), { ssr: false });
@@ -42,18 +43,20 @@ const unreadOf = (rows: ChatListConnection[]) => rows.reduce((n, c) => n + (c.ch
  * ≥1024: inbox 360 + thread (+ details inside the thread). 768–1023: inbox 320 + thread.
  * <768: the inbox, or a full-screen thread (the shell hides its bars on thread routes).
  */
-export function ClicksWorkspace() {
+export function ClicksWorkspace({ preload }: { preload?: Promise<InboxPreload | null> }) {
   const { user, onlineUserIds } = useAuth();
   if (!user) return null;
-  return <Workspace user={user} onlineUserIds={onlineUserIds} />;
+  return <Workspace user={user} onlineUserIds={onlineUserIds} preload={preload} />;
 }
 
 function Workspace({
   user,
   onlineUserIds,
+  preload,
 }: {
   user: NonNullable<ReturnType<typeof useAuth>['user']>;
   onlineUserIds: ReadonlySet<string>;
+  preload?: Promise<InboxPreload | null>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -77,6 +80,7 @@ function Workspace({
     user: user as unknown as { id: string } & Record<string, unknown>,
     selectedId: thread && thread.kind !== 'h' ? thread.id : null,
     onThreadClosed: closeThread,
+    preload,
   });
   const { lifecycle, cliques, search, coreConnectionIds, blockedUserIds } = data;
   const { muteFor, setMuted } = useChatMutes();

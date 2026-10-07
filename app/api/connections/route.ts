@@ -37,6 +37,7 @@ import {
   type MemoryCapsulePayload,
 } from '@/lib/server/connections/encounterEnrichment';
 import { finiteBatteryPct } from '@/lib/server/proximity/matching';
+import { loadDashboardBundle } from '@/lib/server/connections/dashboardBundle';
 import { runAfterResponse } from '@/lib/server/afterResponse';
 import { encounterObservationColumns, parseEncounterObservation } from '@/lib/server/encounterObservation';
 import {
@@ -78,6 +79,7 @@ export async function GET(request: NextRequest) {
     const insights = isInsightsScope(searchParams);
     const singleConnectionId = searchParams.get('connectionId')?.trim();
     const scope = searchParams.get(STATUS_SCOPE_PARAM)?.toLowerCase();
+    const dashboardBundle = searchParams.get(BUNDLE_PARAM)?.toLowerCase() === 'dashboard';
 
     // Sweeping only affects active/archive membership. Skip the RPC for read shapes whose
     // response is independent of the archive junction: insights history, a direct row refresh,
@@ -85,7 +87,9 @@ export async function GET(request: NextRequest) {
     const needsLifecycleSweep =
       !insights &&
       !singleConnectionId &&
-      scope !== 'map';
+      scope !== 'map' &&
+      // `loadDashboardBundle` sweeps itself.
+      !dashboardBundle;
 
     if (needsLifecycleSweep) {
       const sweep = await sweepStaleConnectionsForUser(supabase, user.id);
@@ -141,48 +145,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Dashboard bundle: one sweep + one junction fetch + parallel selects (replaces 3 HTTP calls).
-    if (searchParams.get(BUNDLE_PARAM)?.toLowerCase() === 'dashboard') {
-      const [archivedForUser, hiddenForUser, coreForUser] = await Promise.all([
-        fetchJunctionConnectionIds(supabase, 'connection_archives', user.id),
-        fetchJunctionConnectionIds(supabase, 'connection_hidden', user.id),
-        fetchJunctionConnectionIds(supabase, 'connection_core', user.id),
-      ]);
-
-      const excludedIds = dedupeIds([...archivedForUser, ...hiddenForUser]);
-      const hiddenSet = new Set(hiddenForUser);
-      const includeArchivedIds = archivedForUser.filter((id) => !hiddenSet.has(id));
-
-      const [activeResult, archivedResult, mapResult] = await Promise.all([
-        executeActiveConnectionsQuery(supabase, user.id, excludedIds),
-        executeArchivedConnectionsQuery(supabase, user.id, includeArchivedIds),
-        executeMapConnectionsQuery(supabase, user.id, hiddenForUser),
-      ]);
-
-      if (activeResult.error) {
-        console.error('Error fetching connections (bundle active):', activeResult.error);
-        return NextResponse.json({ error: activeResult.error.message }, { status: 400 });
-      }
-      if (archivedResult.error) {
-        console.error('Error fetching connections (bundle archived):', archivedResult.error);
-        return NextResponse.json({ error: archivedResult.error.message }, { status: 400 });
-      }
-      if (mapResult.error) {
-        console.error('Error fetching connections (bundle map):', mapResult.error);
-        return NextResponse.json({ error: mapResult.error.message }, { status: 400 });
-      }
-
-      const [active, archived, map] = await Promise.all([
-        redactEventFieldsForViewer(user.id, (activeResult.data ?? []) as Record<string, unknown>[]),
-        redactEventFieldsForViewer(user.id, (archivedResult.data ?? []) as Record<string, unknown>[]),
-        redactEventFieldsForViewer(user.id, (mapResult.data ?? []) as Record<string, unknown>[]),
-      ]);
-
-      return NextResponse.json({
-        active,
-        archived,
-        map,
-        core: coreForUser,
-      });
+    if (dashboardBundle) {
+      const result = await loadDashboardBundle(supabase, user.id);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.bundle);
     }
 
     const [archivedForUser, hiddenForUser] = await Promise.all([
