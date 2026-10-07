@@ -190,7 +190,6 @@ export default function ChatView({
   const snapScrollToLatestOnOpenRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputTextRef = useRef('');
-  const programmaticListScrollRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof getSupabaseClient> extends null ? never : any>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -264,8 +263,6 @@ export default function ChatView({
     setHighlightedMessageId,
     scrollContainerRef,
     messagesEndRef,
-    inputRef,
-    programmaticListScrollRef,
     snapScrollToLatestOnOpenRef,
     searchFocusConsumedRef,
     readReceiptsEnabled: active,
@@ -726,6 +723,11 @@ export default function ChatView({
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
+            // Dragging the thread on a touch screen puts the keyboard away; scrolling with a
+            // wheel, or the thread following a send, keeps the composer focused.
+            onTouchMove={() => {
+              if (document.activeElement === inputRef.current) inputRef.current?.blur();
+            }}
             className="chat-thread-scroll relative h-full"
           >
             <div className={cn('mx-auto flex min-h-full max-w-[720px] flex-col px-3 pb-3 md:px-6', banner ? 'pt-20' : 'pt-4')}>

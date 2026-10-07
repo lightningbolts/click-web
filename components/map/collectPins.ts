@@ -112,6 +112,7 @@ export function collectPins(map: Pick<maplibregl.Map, 'querySourceFeatures' | 'g
               title: String(f.properties?.title ?? ''),
               tint: String(f.properties?.tint ?? 'var(--action)'),
               icon: String(f.properties?.icon_char ?? '•'),
+              imageUrl: beaconHeroImageUrl(beacon.metadata),
             },
       );
     }
