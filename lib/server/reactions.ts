@@ -5,8 +5,7 @@ import { loadVisibleBeacon } from '@/lib/map/beaconVisibility';
 import { resolveSharedDrops } from '@/lib/server/sharedDrops';
 import { loadReactionsBatch, type ReactionKind, type ReactionsPayload } from '@/lib/server/reactionLists';
 
-/** The quick palette clients show first; any single emoji is accepted (`isReactionEmoji`). */
-export const REACTION_EMOJI = ['❤️', '🔥', '😂', '😍', '👏', '😮'] as const;
+export { REACTION_EMOJI } from '@/lib/drops/reactionPalette';
 
 const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' });
 

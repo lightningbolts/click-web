@@ -28,9 +28,20 @@ function PixelLayer({ image, blocks }: { image: HTMLImageElement; blocks: number
  * A developed Click Drop photo, filling its (relative) parent. With `plays` (developed on this
  * screen just now) it resolves out of its pixels like iOS: finer layers bloom out from the center,
  * the photo last, once it has fully decoded. Otherwise, or with Reduce Motion, it fades in as it
- * loads. Callers keep their pixelated preview underneath until the photo covers it.
+ * loads. Callers keep their pixelated preview underneath until the photo covers it. `onShown` runs
+ * once the photo is on screen (or failed to load), so a story can start its clock.
  */
-export function DropDevelopImage({ src, alt, plays }: { src: string; alt: string; plays: boolean }) {
+export function DropDevelopImage({
+  src,
+  alt,
+  plays,
+  onShown,
+}: {
+  src: string;
+  alt: string;
+  plays: boolean;
+  onShown?: () => void;
+}) {
   const bloom = plays && !prefersReducedMotion();
   const [decoded, setDecoded] = useState<{ src: string; image: HTMLImageElement | null } | null>(null);
 
@@ -54,13 +65,27 @@ export function DropDevelopImage({ src, alt, plays }: { src: string; alt: string
   }, [bloom, src]);
 
   const layers = bloom && decoded?.src === src ? decoded.image : null;
+
+  useEffect(() => {
+    if (layers) onShown?.();
+  }, [layers, onShown]);
+
   // Still decoding: the caller's preview holds until the bloom can run start to finish.
   if (bloom && decoded?.src !== src) return null;
 
   if (!layers) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- decrypted object URLs and signed originals
-      <img src={src} alt={alt} onLoad={revealImage} className="img-reveal absolute inset-0 size-full object-cover" />
+      <img
+        src={src}
+        alt={alt}
+        onLoad={(event) => {
+          revealImage(event);
+          onShown?.();
+        }}
+        onError={onShown}
+        className="img-reveal absolute inset-0 size-full object-cover"
+      />
     );
   }
 

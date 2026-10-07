@@ -710,6 +710,27 @@ a {
   opacity: 1;
 }
 
+/* A reaction pops as it's picked (iOS `ReactionTray`). */
+@keyframes reaction-pop {
+  40% {
+    transform: scale(1.35);
+  }
+}
+.reaction-pop {
+  animation: reaction-pop 360ms var(--ease-out-expo);
+}
+
+/* A control that appears (a reply's send button) scales in rather than popping. */
+@keyframes ds-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.ds-scale-in {
+  animation: ds-scale-in var(--d-fast) var(--ease-out-expo);
+}
+
 /* Streamed content settles in over its skeleton instead of cutting in. Backwards fill only, so
    nothing lingers on the element (no stacking context) once it has arrived. */
 .content-enter {
@@ -721,6 +742,12 @@ a {
     transition: none;
   }
   .content-enter {
+    animation: none;
+  }
+  .reaction-pop {
+    animation-duration: 1ms;
+  }
+  .ds-scale-in {
     animation: none;
   }
 }

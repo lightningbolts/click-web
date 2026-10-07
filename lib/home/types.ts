@@ -1,4 +1,5 @@
 import type { HomeNudge } from '@/lib/dashboard/homeFeed';
+import type { SharedAudience } from '@/lib/drops/sharedAudience';
 import type { ActivityRecap } from '@/lib/me/activityRecap';
 import type { AvailabilityIntentRow } from '@/lib/userProfile/availability';
 
@@ -25,16 +26,31 @@ export type HomeOpportunity =
   | ({ kind: 'sayHi' } & HomeSayHi)
   | { kind: 'nudge'; nudge: HomeNudge; person: HomePerson | null };
 
+/** `GET /api/reactions/shared_drop/{id}`, and inline on drops this viewer has developed. */
+export type DropReactions = {
+  mine: string | null;
+  /** The poster sees everyone; others see their connections. Newest first. */
+  reactions: Array<{ user_id: string; name: string; avatar_url: string | null; emoji: string }>;
+  is_owner: boolean;
+};
+
 export type HomeDrop = {
   id: string;
   user: { id: string; name: string; avatar_url: string | null };
   is_mine: boolean;
+  /** Only on your own drops. */
+  audience?: SharedAudience;
   connection_id: string | null;
   created_at: string;
   reveal_at: string;
   developed_at: string | null;
+  /** The photo's size, when known (its shape before it loads). */
+  width: number | null;
+  height: number | null;
   preview_url: string | null;
   original_url: string | null;
+  /** Inline once this viewer has developed it. */
+  reactions: DropReactions | null;
   caption: string | null;
 };
 

@@ -29,6 +29,8 @@ import AttachmentBubble from './AttachmentBubble';
 import BeaconChatCard from './BeaconChatCard';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
 import { ClickDropBubble } from './ClickDropBubble';
+import { DropReplyHeader } from '@/components/drops/DropReplyHeader';
+import { dropReplyFromMetadata } from '@/lib/drops/dropReply';
 import { MessageActionBar } from './MessageActionBar';
 import { MessageMeta, callLogLabel, formatMessageTime, isSafeMediaUrl } from './messageMeta';
 import { PlanCard } from './PlanCard';
@@ -209,6 +211,7 @@ export default function MessageBubble({
       : null;
   const ciphertext = isEncryptedWireContent(caption);
   const isText = !plan && !gif && !isImage && !isAudio && !isBeacon && !attachment;
+  const dropReply = message.message_type === 'text' ? dropReplyFromMetadata(meta) : null;
 
   // RSVPs on a plan are counted on its card, not repeated as reaction chips.
   const reactions = Object.entries(message.reactions ?? {})
@@ -374,12 +377,21 @@ export default function MessageBubble({
       </>
     );
   } else {
-    body = (
+    const bubble = (
       <div className={cn('relative max-w-full rounded-bubble px-3 py-2 type-body break-words whitespace-pre-wrap pointer-coarse:text-[16px]', bubbleTone, tail)}>
         {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble onClick={jumpToReply} /> : null}
         {ciphertext ? <EncryptedText mine={isMine} lockedText={lockedText} /> : <LinkifiedText text={content} variant={variant} />}
         <InlineMeta message={message} mine={isMine} pinned={pinned} />
       </div>
+    );
+    // A shared drop's reply or reaction: the drop over the text; a reaction is just its emoji on the photo.
+    body = dropReply ? (
+      <>
+        <DropReplyHeader reply={dropReply} mine={isMine} emoji={dropReply.reaction && !ciphertext ? caption : null} />
+        {dropReply.reaction ? metaBelow : bubble}
+      </>
+    ) : (
+      bubble
     );
   }
 
