@@ -917,8 +917,15 @@ a {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.map-pin:hover,
-.map-pin[data-selected] {
+.map-pin-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: scale var(--d-fast) var(--ease);
+}
+.map-pin:hover > .map-pin-body,
+.map-pin[data-selected] > .map-pin-body {
   scale: 1.15;
 }
 .map-pin:focus-visible {
@@ -965,7 +972,7 @@ a {
   height: 100%;
   object-fit: cover;
 }
-.map-pin-cluster {
+.map-pin-cluster > .map-pin-body {
   min-width: 36px;
   height: 32px;
   padding: 0 10px;
@@ -1032,13 +1039,10 @@ a {
   z-index: 2;
 }
 
-/* A pin is also its marker. MapLibre's sheet loads later, so these win on specificity, not order:
-   absolute like every marker, and `scale` (not `transform`, which MapLibre sets inline) eases. */
+/* A pin is also its marker: absolute like every marker. MapLibre's sheet loads later, so this
+   wins on specificity, not order. */
 .maplibregl-marker.map-pin {
   position: absolute;
-  transition:
-    opacity 0.2s,
-    scale var(--d-fast) var(--ease);
 }
 /* Your network is the base layer: events, places and every other pin sit on top of it. The pin
    under the pointer or selected rises above both. */

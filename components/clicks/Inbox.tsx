@@ -43,7 +43,7 @@ const EMPTY: Record<Exclude<ClicksFilter, 'hubs'>, { icon: typeof Users; title: 
   },
 };
 
-/** Rows at `InboxRow`'s exact size, shown until the first load says whether the list is empty. */
+/** Rows at `InboxRow`'s exact size, shown until the first load is complete. */
 function InboxSkeleton() {
   return (
     <ul aria-busy aria-label="Loading conversations" className="route-loading">
@@ -89,7 +89,7 @@ export function Inbox({
   filter: ClicksFilter;
   onFilterChange: (filter: ClicksFilter) => void;
   rows: ChatListConnection[];
-  /** The rows' first load finished: until then an empty list is unknown, not empty. */
+  /** The first load is complete (rows and previews): until then rows are placeholders. */
   loaded: boolean;
   unreadByFilter: Partial<Record<ClicksFilter, number>>;
   core: ChatListConnection[];
@@ -191,7 +191,7 @@ export function Inbox({
       </div>
 
       <div className="chat-thread-scroll min-h-0 flex-1 pb-4">
-        {filter === 'active' && !query && core.length > 0 ? (
+        {filter === 'active' && !query && loaded && core.length > 0 ? (
           <section aria-label="Core" className="pb-2">
             <ul className="flex gap-3 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none]">
               {core.map((c) => (
@@ -252,10 +252,10 @@ export function Inbox({
               </section>
             ) : null}
 
-            {visible.length === 0 ? (
-              !loaded ? (
-                <InboxSkeleton />
-              ) : query ? (
+            {!loaded ? (
+              <InboxSkeleton />
+            ) : visible.length === 0 ? (
+              query ? (
                 <p className="type-body px-6 py-10 text-center text-fg-secondary">No one matches that search.</p>
               ) : (
                 <EmptyState

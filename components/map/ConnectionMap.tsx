@@ -5,6 +5,7 @@ import * as maplibregl from '@/lib/maps/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Layers, LocateFixed, MapPin, Minus, Plus } from 'lucide-react';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { useSessionCachedState } from '@/lib/dashboard/sessionCache';
 import { getSupabaseClient } from '@/lib/supabase';
 import {
   DEFAULT_MAP_LAYER_TOGGLES,
@@ -37,6 +38,8 @@ import { collectPins, hideGlPins, selectionKey, type PinSources } from './collec
 import { MapMarkerLayer, pinLabel, type PinModel } from './mapMarkers';
 
 interface ConnectionMapProps {
+  /** Keys the cached pins, so a revisit (or reload) paints the last ones while they refresh. */
+  userId: string | undefined;
   connections: ConnectionRecord[];
   onConnectionClick?: (connection: ConnectionRecord) => void;
   /** Open a person's profile from a selected pin. */
@@ -82,6 +85,7 @@ function dedupeById(beacons: MapBeaconRecord[]): MapBeaconRecord[] {
  * **Data contract:** pass rows from `GET /api/connections?statusScope=map` or the `map` array from `?bundle=dashboard`.
  */
 export default function ConnectionMap({
+  userId,
   connections,
   onConnectionClick,
   onOpenProfile,
@@ -103,11 +107,11 @@ export default function ConnectionMap({
     ...DEFAULT_MAP_LAYER_TOGGLES,
   }));
   const [layersOpen, setLayersOpen] = useState(false);
-  const [beacons, setBeacons] = useState<MapBeaconRecord[]>([]);
-  const [places, setPlaces] = useState<PlaceSummary[]>([]);
-  /** The first beacon / Places answer arrived (or failed), so an empty list means empty. */
-  const [beaconsSettled, setBeaconsSettled] = useState(false);
-  const [placesSettled, setPlacesSettled] = useState(false);
+  const [beacons, setBeacons] = useSessionCachedState<MapBeaconRecord[]>(userId, 'mapBeacons', []);
+  const [places, setPlaces] = useSessionCachedState<PlaceSummary[]>(userId, 'mapPlaces', []);
+  /** A beacon / Places answer arrived (or failed) at least once, so an empty list means empty. */
+  const [beaconsSettled, setBeaconsSettled] = useSessionCachedState(userId, 'mapBeaconsLoaded', false);
+  const [placesSettled, setPlacesSettled] = useSessionCachedState(userId, 'mapPlacesLoaded', false);
   const [selection, setSelection] = useState<MapSelection | null>(null);
   /** Hover label is positioned imperatively: a mousemove must not re-render the map component. */
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -254,7 +258,7 @@ export default function ConnectionMap({
     return () => {
       cancelled = true;
     };
-  }, [wantsBeaconFetch, active, viewportReady, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
+  }, [wantsBeaconFetch, active, viewportReady, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch, setBeacons, setBeaconsSettled]);
 
   // Click Places near the view (feature-flagged: a 403/404 simply means no Places layer).
   useEffect(() => {
@@ -285,7 +289,7 @@ export default function ConnectionMap({
     return () => {
       cancelled = true;
     };
-  }, [layers.places, active, viewportReady, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch]);
+  }, [layers.places, active, viewportReady, beaconQueryLng, beaconQueryLat, beaconQueryRadiusM, beaconAuthEpoch, setPlaces, setPlacesSettled]);
 
   /**
    * DOM pins (spec §7.5) over MapLibre's clustering: rebuilt when tiles or the view settle, never
