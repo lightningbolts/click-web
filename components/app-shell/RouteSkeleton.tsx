@@ -35,7 +35,7 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
 
   if (variant === 'me') {
     return (
-      <div {...status} className="container-page pb-16 pt-6 md:pt-10">
+      <div {...status} className="route-loading container-page pb-16 pt-6 md:pt-10">
         <div className="grid gap-10 md:grid-cols-[360px_minmax(0,1fr)]">
           <div>
             <Skeleton rounded="full" className="size-24" shimmer />
@@ -56,7 +56,7 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
   }
   if (variant === 'settings') {
     return (
-      <div {...status}>
+      <div {...status} className="route-loading">
         <Skeleton rounded="sm" className="h-7 w-40" />
         <Skeleton rounded="sm" className="mb-6 mt-1.5 h-5 w-72 max-w-full" />
         <Rows count={4} avatar={false} />
@@ -65,7 +65,7 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
   }
   if (variant === 'workspace') {
     return (
-      <div {...status} className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div {...status} className="route-loading grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-10">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
@@ -80,7 +80,7 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
   }
   if (variant === 'places') {
     return (
-      <div {...status} className="container-wide pb-16 pt-6 md:pt-10">
+      <div {...status} className="route-loading container-wide pb-16 pt-6 md:pt-10">
         <Title subtitle />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
@@ -91,7 +91,7 @@ export function RouteSkeleton({ variant, label }: { variant: 'list' | 'me' | 'se
     );
   }
   return (
-    <div {...status} className="container-content pb-16 pt-6 md:pt-10">
+    <div {...status} className="route-loading container-content pb-16 pt-6 md:pt-10">
       <Title />
       <Rows count={6} />
     </div>

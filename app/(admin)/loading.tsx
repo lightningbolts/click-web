@@ -2,7 +2,7 @@
 export default function AdminLoading() {
   return (
     <div
-      className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-10"
+      className="route-loading mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-4 py-6 sm:px-6 lg:px-10"
       role="status"
       aria-label="Loading admin dashboard"
     >

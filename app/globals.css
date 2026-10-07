@@ -629,6 +629,18 @@ a {
   animation: ds-appear 1ms linear var(--loader-delay, 200ms) both;
 }
 
+/* Route and module skeletons stay invisible for the first 150 ms, then fade in. A page that
+   arrives quickly (prefetched, cached, fast server) goes straight from the old page to the new
+   one instead of flashing a skeleton in between; a slow one still shows it. */
+.route-loading {
+  animation: ds-appear var(--d-base) var(--ease) 150ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-loading {
+    animation-duration: 1ms;
+  }
+}
+
 .ds-loader > * {
   animation: ds-loader-pulse 850ms ease-in-out infinite alternate;
 }

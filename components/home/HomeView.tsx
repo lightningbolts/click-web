@@ -79,7 +79,7 @@ export function HomeView({ data }: { data: HomeData }) {
 
 export function HomeSkeleton() {
   return (
-    <div className={GRID} aria-busy aria-label="Loading Home">
+    <div className={`route-loading ${GRID}`} aria-busy aria-label="Loading Home">
       <div className="flex flex-col gap-10">
         <Skeleton rounded="lg" className="aspect-[16/9] w-full md:aspect-[16/5]" />
         <div className="flex flex-col gap-3">

@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ds/Skeleton";
 export default function EventDetailLoading() {
   return (
     <div
-      className="container-page grid gap-6 pb-24 pt-6 min-[900px]:grid-cols-[340px_minmax(0,1fr)] min-[900px]:gap-10 min-[900px]:pt-8"
+      className="route-loading container-page grid gap-6 pb-24 pt-6 min-[900px]:grid-cols-[340px_minmax(0,1fr)] min-[900px]:gap-10 min-[900px]:pt-8"
       role="status"
       aria-label="Loading event"
       data-testid="event-route-loading"
