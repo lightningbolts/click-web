@@ -14,6 +14,7 @@ import { StatusPill } from "@/components/ds/StatusPill";
 import { TextLink } from "@/components/ds/TextLink";
 import { Timeline, TimelineDay } from "@/components/ds/Timeline";
 import { EventLocationSection } from "@/components/events/EventLocationSection";
+import { MapsMenu } from "@/components/events/MapsMenu";
 import { ManagePlaceButton } from "@/components/places/ManagePlaceButton";
 import PlaceNowCard from "@/components/places/PlaceNowCard";
 import { brandShareImage } from "@/lib/brand/shareImage";
@@ -129,9 +130,15 @@ export default async function PlacePage({
           <Button href={openInClick} variant="primary">
             Open in Click
           </Button>
-          <Button href={place.directions.apple_maps_url} variant="secondary" icon={Navigation} target="_blank" rel="noopener noreferrer">
-            Directions
-          </Button>
+          <MapsMenu
+            destination={{ lat: place.latitude, lng: place.longitude, name: place.name, address }}
+            directions
+            trigger={
+              <Button variant="secondary" icon={Navigation}>
+                Directions
+              </Button>
+            }
+          />
           <Suspense fallback={null}>
             <ManagePlaceButton placeId={place.id} />
           </Suspense>
@@ -156,7 +163,8 @@ export default async function PlacePage({
                           title={e.title}
                           timeLabel={day.key === "tba" || !e.starts_at ? "Time to be announced" : time.format(Date.parse(e.starts_at))}
                           live={e.is_live}
-                          host={{ seed: place.id, name: place.name }}
+                          host={{ seed: place.id, name: place.name, src: place.photo_url }}
+                          photoUrl={e.image_url}
                         />
                       </li>
                     ))}
@@ -200,10 +208,10 @@ export default async function PlacePage({
 
         <EventLocationSection
           beaconId={place.id}
-          label={address || place.name}
+          label={place.name}
+          address={address}
           lat={place.latitude}
           lng={place.longitude}
-          mapsUrl={place.directions.google_maps_url}
         />
 
         <p className="type-meta text-fg-tertiary">

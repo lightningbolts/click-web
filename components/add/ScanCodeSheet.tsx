@@ -1,22 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { InlineNotice } from '@/components/ds/InlineNotice';
 import { Sheet } from '@/components/ds/Sheet';
+import { useQrScanner } from '@/lib/ui/useQrScanner';
 
-type Detector = { detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]> };
-type DetectorCtor = new (opts: { formats: string[] }) => Detector;
-
-function detectorCtor(): DetectorCtor | null {
-  if (typeof window === 'undefined') return null;
-  return (window as Window & { BarcodeDetector?: DetectorCtor }).BarcodeDetector ?? null;
-}
-
-/** Scanning ships only where the browser can decode QR codes itself (Safari can't). */
-export function canScanCodes(): boolean {
-  return detectorCtor() !== null;
-}
+export { canScanCodes } from '@/lib/ui/useQrScanner';
 
 /** A Click link on this site, as an in-app path; anything else is ignored. */
 export function clickPathFromScan(raw: string, origin: string): string | null {
@@ -32,67 +22,28 @@ export function clickPathFromScan(raw: string, origin: string): string | null {
 
 export function ScanCodeSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    const Ctor = detectorCtor();
-    if (!Ctor) return;
-    let stream: MediaStream | null = null;
-    let raf = 0;
-    let stopped = false;
-    const detector = new Ctor({ formats: ['qr_code'] });
-
-    const tick = async () => {
-      const video = videoRef.current;
-      if (stopped || !video) return;
-      if (video.readyState >= 2) {
-        try {
-          const codes = await detector.detect(video);
-          for (const c of codes) {
-            const path = clickPathFromScan(c.rawValue, window.location.origin);
-            if (path) {
-              stopped = true;
-              onOpenChange(false);
-              router.push(path);
-              return;
-            }
-          }
-          if (codes.length) setError('That isn’t a Click code.');
-        } catch {
-          /* a frame that couldn't be read */
-        }
-      }
-      raf = window.requestAnimationFrame(() => void tick());
-    };
-
-    void (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        if (stopped) return;
-        const video = videoRef.current;
-        if (!video) return;
-        video.srcObject = stream;
-        await video.play();
-        void tick();
-      } catch {
-        setError('Click needs camera access to scan. Allow it in your browser settings.');
-      }
-    })();
-
-    return () => {
-      stopped = true;
-      window.cancelAnimationFrame(raf);
-      stream?.getTracks().forEach((t) => t.stop());
-    };
-  }, [open, onOpenChange, router]);
+  const [notClick, setNotClick] = useState(false);
+  const { videoRef, status } = useQrScanner(open, (raw) => {
+    const path = clickPathFromScan(raw, window.location.origin);
+    if (!path) {
+      setNotClick(true);
+      return;
+    }
+    onOpenChange(false);
+    router.push(path);
+  });
+  const error =
+    status === 'denied'
+      ? 'Click needs camera access to scan. Allow it in your browser settings.'
+      : notClick
+        ? 'That isn’t a Click code.'
+        : '';
 
   return (
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError('');
+        if (!next) setNotClick(false);
         onOpenChange(next);
       }}
       title="Scan a code"

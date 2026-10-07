@@ -4,6 +4,7 @@ import { cache } from "react";
 import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 import { loadViewerEventRsvp, type ViewerEventRsvpSnapshot } from "@/lib/events/viewerEventGoing";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { activeCheckIn } from "@/lib/server/eventPass";
 import { getServerUser } from "@/lib/server/getServerUser";
 
 export type EventViewer = {
@@ -11,6 +12,8 @@ export type EventViewer = {
   rsvp: ViewerEventRsvpSnapshot;
   /** Creator, or a manager of the hosting Place: sees the host bar. */
   canManage: boolean;
+  /** Checked in at the door (a host scanned their Click Pass, or on-site check-in). */
+  checkedIn: boolean;
 };
 
 /**
@@ -20,13 +23,13 @@ export type EventViewer = {
 export const loadEventViewer = cache(
   async (beaconId: string, creatorId: string | null, venueId: string | null): Promise<EventViewer> => {
     const user = await getServerUser();
-    if (!user) return { userId: null, rsvp: { kind: "guest" }, canManage: false };
-    const [rsvp, canManage] = await Promise.all([
+    if (!user) return { userId: null, rsvp: { kind: "guest" }, canManage: false, checkedIn: false };
+    const admin = createAdminSupabaseClient();
+    const [rsvp, canManage, checkedInAt] = await Promise.all([
       loadViewerEventRsvp(beaconId, user.id),
-      userMayManageBeacon(createAdminSupabaseClient(), user.id, { creator_id: creatorId ?? "", venue_id: venueId }).catch(
-        () => user.id === creatorId,
-      ),
+      userMayManageBeacon(admin, user.id, { creator_id: creatorId ?? "", venue_id: venueId }).catch(() => user.id === creatorId),
+      activeCheckIn(admin, beaconId, user.id).catch(() => null),
     ]);
-    return { userId: user.id, rsvp, canManage };
+    return { userId: user.id, rsvp, canManage, checkedIn: checkedInAt != null };
   },
 );

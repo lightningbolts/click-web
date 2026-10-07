@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { icsFile } from "@/lib/events/calendarLinks";
-import { EVENT_BEACON_UUID_RE, eventDescriptionPlainText, eventDisplayTitle } from "@/lib/events/eventMetadata";
-import { eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
+import { calendarEventFor, icsFile } from "@/lib/events/calendarLinks";
+import { EVENT_BEACON_UUID_RE, eventDisplayTitle } from "@/lib/events/eventMetadata";
 import { loadPublicEvent } from "@/lib/server/events/loadPublicEvent";
 
 export const dynamic = "force-dynamic";
@@ -12,18 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bea
   if (!EVENT_BEACON_UUID_RE.test(beaconId)) return new NextResponse("Not found", { status: 404 });
   const event = await loadPublicEvent(beaconId).catch(() => null);
   if (!event) return new NextResponse("Not found", { status: 404 });
-  const body = icsFile(
-    {
-      id: beaconId,
-      title: eventDisplayTitle(event.title, event.location_name, event.description),
-      startAt: event.event_start_at,
-      endAt: event.event_end_at,
-      location: event.location_name,
-      description: eventDescriptionPlainText(event.description),
-      url: eventShareUrl(beaconId, publicOrigin()),
-    },
-    Date.now(),
-  );
+  const body = icsFile(calendarEventFor(event, eventDisplayTitle(event.title, event.location_name, event.description)), Date.now());
   if (!body) return new NextResponse("This event has no date yet", { status: 404 });
   return new NextResponse(body, {
     headers: {
