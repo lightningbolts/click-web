@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense, type CSSProperties } from "react";
-import { ArrowUpRight, MapPin } from "lucide-react";
+import { ArrowUpRight, MapPin, ScanLine } from "lucide-react";
 import { CardVisual } from "@/components/ds/CardVisual";
 import { cardClassName } from "@/components/ds/Card";
 import { DateTile } from "@/components/ds/DateTile";
@@ -18,20 +18,22 @@ import { EventLocationSection } from "@/components/events/EventLocationSection";
 import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import { EventGoingMetaRow, EventPeopleSection } from "@/components/events/EventPeopleSection";
 import { EventRsvpCard } from "@/components/events/EventRsvpCard";
-import { EventShareButton } from "@/components/events/EventShareButton";
+import { EventShareMenu } from "@/components/events/EventShareButton";
+import { MapsMenu } from "@/components/events/MapsMenu";
 import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
 import { APP_CONFIG } from "@/lib/config";
-import type { CalendarEvent } from "@/lib/events/calendarLinks";
+import { calendarEventFor } from "@/lib/events/calendarLinks";
 import {
-  eventDescriptionPlainText,
   eventDisplayTitle,
   eventIsPast,
   eventSubtitle,
   withoutLeadingTitle,
   eventWhereLabel,
 } from "@/lib/events/eventMetadata";
-import { eventDeepLink, eventManagePath, eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
+import { eventDeepLink, eventManagePath, eventScanPath, eventShareUrl, publicOrigin } from "@/lib/events/eventUrls";
 import { eventWhenLines } from "@/lib/events/eventWhen";
+import { flyerEvent } from "@/lib/events/flyerEvent";
+import { eventMapsDestination } from "@/lib/events/mapsLinks";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
 import { dayKey } from "@/lib/home/selectOpportunity";
 import { loadEventViewer } from "@/lib/server/events/eventViewer";
@@ -40,8 +42,12 @@ import { generateCardVisual } from "@/lib/ui/generateCardVisual";
 
 const THREE_HOURS = 3 * 3_600_000;
 
-/** Host bar (spec §7.6.2): only hosts and Place managers, streamed after the cached body. */
-async function HostBar({ event, title, shareUrl }: { event: PublicEventPayload; title: string; shareUrl: string }) {
+
+/**
+ * Host bar (spec §7.6.2): only hosts and Place managers, streamed after the cached body. Until the
+ * event ends it opens the door scanner for Click Passes (spec 06 §7).
+ */
+async function HostBar({ event, ended }: { event: PublicEventPayload; ended: boolean }) {
   const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
   if (!viewer.canManage) return null;
   return (
@@ -50,7 +56,11 @@ async function HostBar({ event, title, shareUrl }: { event: PublicEventPayload; 
       className="mb-5"
       action={
         <span className="flex gap-2">
-          <EventShareButton url={shareUrl} title={title} />
+          {ended ? null : (
+            <Button href={eventScanPath(event.beacon_id)} variant="secondary" size="sm" icon={ScanLine} aria-label="Scan Click Passes">
+              <span className="sr-only min-[400px]:not-sr-only">Scan passes</span>
+            </Button>
+          )}
           <Button href={eventManagePath(event.beacon_id)} variant="primary" size="sm">
             Manage
           </Button>
@@ -65,7 +75,7 @@ async function HostBar({ event, title, shareUrl }: { event: PublicEventPayload; 
 async function RsvpIsland(props: Omit<React.ComponentProps<typeof EventRsvpCard>, "initialViewer"> & { event: PublicEventPayload }) {
   const { event, ...card } = props;
   const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
-  return <EventRsvpCard {...card} initialViewer={viewer.rsvp} />;
+  return <EventRsvpCard {...card} initialViewer={viewer.rsvp} checkedIn={viewer.checkedIn} />;
 }
 
 async function ChatIsland({ event, ended }: { event: PublicEventPayload; ended: boolean }) {
@@ -101,36 +111,13 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
   const live =
     Number.isFinite(start) && start <= nowMs && (Number.isFinite(endMs) && endMs > start ? endMs : start + THREE_HOURS) > nowMs;
   const today = !live && Number.isFinite(start) && start > nowMs && dayKey(start, timeZone) === dayKey(nowMs, timeZone);
-  const hasPin = event.latitude != null && event.longitude != null;
-  const mapsUrl = hasPin
-    ? `https://maps.google.com/?q=${event.latitude},${event.longitude}`
-    : where
-      ? `https://maps.google.com/?q=${encodeURIComponent(where)}`
-      : null;
+  const destination = eventMapsDestination(event);
   const shareUrl = eventShareUrl(beaconId, publicOrigin());
   const reportHref = `mailto:mepsht@uw.edu?subject=${encodeURIComponent(`Report event ${beaconId}`)}&body=${encodeURIComponent(`Event ID: ${beaconId}\nURL: ${shareUrl}\n\nDescribe the issue:\n`)}`;
   const seed = event.visual_seed || beaconId;
   const tint = generateCardVisual(seed).gradient[0];
-  const calendar: CalendarEvent = {
-    id: beaconId,
-    title,
-    startAt: event.event_start_at,
-    endAt: event.event_end_at,
-    location: where,
-    description: eventDescriptionPlainText(event.description),
-    url: shareUrl,
-  };
-
-  const placeCard = event.place ? (
-    <Link href={`/p/${event.place.slug}`} className={cardClassName({ compact: true, interactive: true, className: "flex items-center gap-3" })}>
-      <CardVisual seed={event.place.id} className="size-10 shrink-0" radius="sm" />
-      <span className="min-w-0">
-        <span className="type-meta block font-semibold text-fg-secondary">Hosted at</span>
-        <span className="type-body-strong block truncate text-fg">{event.place.name}</span>
-        <span className="type-meta block capitalize text-fg-tertiary">{event.place.category.replace(/_/g, " ")}</span>
-      </span>
-    </Link>
-  ) : null;
+  const calendar = calendarEventFor(event, title);
+  const flyer = flyerEvent(event, title, shareUrl, event.timezone ?? timeZone);
   const categories = event.categories.length ? (
     <ul className="flex flex-wrap gap-1.5" aria-label="Categories">
       {event.categories.map((c) => (
@@ -160,15 +147,20 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
             className="aspect-video w-full min-[900px]:aspect-square"
           />
           <div className="hidden space-y-4 min-[900px]:block">
-            <EventHostCard creatorId={event.creator_id} name={event.host_name} avatarUrl={event.host_avatar_url} reportHref={reportHref} />
-            {placeCard}
+            <EventHostCard
+              creatorId={event.creator_id}
+              name={event.host_name}
+              avatarUrl={event.host_avatar_url}
+              place={event.place}
+              reportHref={reportHref}
+            />
             {categories}
           </div>
         </aside>
 
         <article className="min-w-0">
           <Suspense fallback={null}>
-            <HostBar event={event} title={title} shareUrl={shareUrl} />
+            <HostBar event={event} ended={ended} />
           </Suspense>
 
           {live || today || event.listing.event_visibility !== "public" ? (
@@ -179,9 +171,12 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
               {event.listing.event_visibility === "invite_only" ? <StatusPill variant="neutral">Invite only</StatusPill> : null}
             </div>
           ) : null}
-          <h1 className="type-title-2 text-fg [text-wrap:balance] min-[900px]:text-[36px] min-[900px]:leading-[42px]">{title}</h1>
+          <div className="flex items-start gap-3">
+            <h1 className="type-title-2 min-w-0 flex-1 text-fg [text-wrap:balance] min-[900px]:text-[36px] min-[900px]:leading-[42px]">{title}</h1>
+            <EventShareMenu event={flyer} />
+          </div>
           <div className="mt-3 min-[900px]:hidden">
-            <EventHostRow creatorId={event.creator_id} name={event.host_name} avatarUrl={event.host_avatar_url} />
+            <EventHostRow creatorId={event.creator_id} name={event.host_name} avatarUrl={event.host_avatar_url} place={event.place} />
           </div>
 
           <div className="mt-6 space-y-4">
@@ -209,8 +204,8 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
                 icon={MapPin}
                 title={where}
                 trailing={
-                  mapsUrl ? (
-                    <IconButton icon={ArrowUpRight} size="sm" href={mapsUrl} target="_blank" rel="noopener noreferrer" aria-label="Open in Maps" />
+                  destination ? (
+                    <MapsMenu destination={destination} trigger={<IconButton icon={ArrowUpRight} size="sm" aria-label="Open in Maps" />} />
                   ) : null
                 }
               />
@@ -248,7 +243,14 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
             ) : null}
 
             {where ? (
-              <EventLocationSection beaconId={beaconId} label={where} lat={event.latitude} lng={event.longitude} mapsUrl={mapsUrl} />
+              <EventLocationSection
+                beaconId={beaconId}
+                label={where}
+                address={event.address}
+                lat={event.latitude}
+                lng={event.longitude}
+                weather={ended ? null : { forecastAt: Number.isFinite(start) && start > nowMs ? event.event_start_at : null, timeZone }}
+              />
             ) : null}
 
             <EventPeopleSection beaconId={beaconId} ended={ended} />
@@ -268,7 +270,6 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
             </Suspense>
 
             <div className="space-y-4 min-[900px]:hidden">
-              {placeCard}
               {categories}
               <EventHostCard creatorId={event.creator_id} name={null} avatarUrl={null} reportHref={reportHref} />
             </div>

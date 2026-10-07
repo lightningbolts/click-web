@@ -18,7 +18,7 @@ describe("manage tabs (spec §7.6.4)", () => {
 
   it("orders next steps by urgency and switches after the event", () => {
     const upcoming = manageNextSteps({ beaconId: "b1", counts, ended: false, hasCover: false, summaryPublished: false });
-    expect(upcoming.map((s) => s.title)).toEqual(["Review 3 requests", "Add a cover photo", "Seed the room", "Edit details"]);
+    expect(upcoming.map((s) => s.title)).toEqual(["Review 3 requests", "Scan Click Passes", "Add a cover photo", "Seed the room", "Edit details"]);
     const past = manageNextSteps({ beaconId: "b1", counts: { ...counts, requests: 0, waitlist: 0 }, ended: true, hasCover: true, summaryPublished: true });
     expect(past.map((s) => s.href)).toEqual(["/e/b1/manage/insights"]);
   });

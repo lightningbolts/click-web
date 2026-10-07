@@ -1,3 +1,7 @@
+import { eventDescriptionPlainText, eventWhereLabel } from '@/lib/events/eventMetadata';
+import type { PublicEventPayload } from '@/lib/events/publicEvent';
+import { eventShareUrl, publicOrigin } from '@/lib/events/eventUrls';
+
 /** "Add to calendar" targets for an event (spec §7.6.2): Google, Outlook and an .ics file. */
 export type CalendarEvent = {
   id: string;
@@ -8,6 +12,22 @@ export type CalendarEvent = {
   description: string | null;
   url: string;
 };
+
+/** One event's calendar entry, from its public payload and display title. */
+export function calendarEventFor(event: PublicEventPayload, title: string): CalendarEvent {
+  const where = eventWhereLabel(event.location_name);
+  const address = event.address?.trim() || null;
+  return {
+    id: event.beacon_id,
+    title,
+    startAt: event.event_start_at,
+    endAt: event.event_end_at,
+    // "Cafe Allegro, 4214 University Way NE": the name, then the street address that routes.
+    location: [where, address && address !== where ? address : null].filter(Boolean).join(', ') || null,
+    description: eventDescriptionPlainText(event.description),
+    url: eventShareUrl(event.beacon_id, publicOrigin()),
+  };
+}
 
 const TWO_HOURS = 2 * 3_600_000;
 

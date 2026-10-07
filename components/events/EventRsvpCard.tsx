@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ds/Skeleton";
 import { toast } from "@/components/ds/Toast";
 import { CalendarMenuItems, EventCalendarMenu } from "@/components/events/EventCalendarMenu";
+import { EventPassLink } from "@/components/events/EventPassLink";
 import { shareEventLink } from "@/components/events/EventShareButton";
 import GuestRsvpForm from "@/components/events/GuestRsvpForm";
 import { useAuth } from "@/lib/AuthContext";
@@ -74,6 +75,7 @@ export function EventRsvpCard({
   people,
   calendar,
   shareUrl,
+  checkedIn = false,
 }: {
   beaconId: string;
   title: string;
@@ -86,6 +88,8 @@ export function EventRsvpCard({
   people: Person[];
   calendar: CalendarEvent;
   shareUrl: string;
+  /** Checked in at the door, as the server saw it. */
+  checkedIn?: boolean;
 }) {
   const { user, loading: authLoading } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -304,6 +308,7 @@ export function EventRsvpCard({
         <p className="type-meta mb-4 text-fg-secondary">Save a spot. No Click account needed.</p>
       ) : null}
       <div className="flex flex-col">{action}</div>
+      {state === "going" ? <EventPassLink beaconId={beaconId} checkedIn={checkedIn} /> : null}
       {liveCount > 0 ? (
         <div className="type-meta tabular mt-4 flex items-center gap-2 text-fg-secondary">
           {livePeople.length ? (

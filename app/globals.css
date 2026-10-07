@@ -390,14 +390,18 @@ body {
   line-height: 22px;
 }
 
-h1,
-h2,
-h3 {
-  text-wrap: balance;
-}
+/* Base layer, so utilities win: the `text-wrap` shorthand resets `text-wrap-mode`, which would
+   otherwise undo `truncate` on any heading or paragraph. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
 
-p {
-  text-wrap: pretty;
+  p {
+    text-wrap: pretty;
+  }
 }
 
 ::selection {

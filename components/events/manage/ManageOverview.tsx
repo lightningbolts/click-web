@@ -1,10 +1,12 @@
-import { BarChart3, FileText, ImagePlus, PencilLine, Upload, UserCheck } from "lucide-react";
+import { BarChart3, FileText, ImagePlus, PencilLine, ScanLine, Upload, UserCheck } from "lucide-react";
 import { ListGroup, ListRow } from "@/components/ds/ListGroup";
 import { StatTile } from "@/components/ds/StatTile";
 import { ManageShareCard } from "@/components/events/manage/ManageShareCard";
 import type { EventAccess } from "@/lib/events/beaconManageAuth";
 import type { ManageCounts } from "@/lib/events/eventManageData";
-import { eventManagePath, eventShareUrl } from "@/lib/events/eventUrls";
+import { eventDisplayTitle } from "@/lib/events/eventMetadata";
+import { eventManagePath, eventScanPath, eventShareUrl } from "@/lib/events/eventUrls";
+import { flyerEvent } from "@/lib/events/flyerEvent";
 import { formatEventWhen } from "@/lib/events/formatEventWhen";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
 
@@ -35,6 +37,7 @@ export function manageNextSteps(args: {
     }
     steps.push({ href: `${base}/insights`, icon: BarChart3, title: "See how it went", subtitle: "Check-ins and connections made." });
   } else {
+    steps.push({ href: eventScanPath(args.beaconId), icon: ScanLine, title: "Scan Click Passes", subtitle: "Check guests in at the door." });
     if (!args.hasCover) {
       steps.push({ href: `${base}/edit`, icon: ImagePlus, title: "Add a cover photo", subtitle: "Events with a photo get more RSVPs." });
     }
@@ -63,6 +66,8 @@ export function ManageOverview({
       ? manageNextSteps({ beaconId: event.beacon_id, counts, ended, hasCover: Boolean(event.image_url), summaryPublished })
       : [];
   const capacity = event.listing.event_capacity;
+  const url = eventShareUrl(event.beacon_id);
+  const title = eventDisplayTitle(event.title, event.location_name, event.description);
 
   return (
     <div className="flex flex-col gap-8" data-testid="manage-overview">
@@ -83,7 +88,11 @@ export function ManageOverview({
       </section>
 
       <div className="grid gap-8 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <ManageShareCard url={eventShareUrl(event.beacon_id)} fileName={`click-event-${event.beacon_id.slice(0, 8)}`} />
+        <ManageShareCard
+          url={url}
+          fileName={`click-event-${event.beacon_id.slice(0, 8)}`}
+          flyer={access === "manage" && !ended ? flyerEvent(event, title, url, event.timezone ?? "UTC") : null}
+        />
         {steps.length > 0 ? (
           <ListGroup header="Next steps">
             {steps.map((s) => (

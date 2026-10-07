@@ -1,4 +1,5 @@
-import { googleCalendarUrl, icsFile, outlookCalendarUrl, type CalendarEvent } from '@/lib/events/calendarLinks';
+import { calendarEventFor, googleCalendarUrl, icsFile, outlookCalendarUrl, type CalendarEvent } from '@/lib/events/calendarLinks';
+import { publicEventFixture } from '../../helpers/publicEventFixture';
 
 const ev: CalendarEvent = {
   id: '11111111-2222-3333-4444-555555555555',
@@ -50,5 +51,13 @@ describe('calendar links', () => {
 
   it('escapes newlines in descriptions', () => {
     expect(icsFile(ev, 0)).toContain('DESCRIPTION:Bring a friend.\\nNo cover.\\n\\nhttps://click.example/e/1111');
+  });
+});
+
+describe('calendarEventFor', () => {
+  it('locates by name, then the street address that routes', () => {
+    expect(calendarEventFor(publicEventFixture(), 'Jazz').location).toBe('Cafe Allegro, 4214 University Way NE');
+    expect(calendarEventFor(publicEventFixture({ address: 'Cafe Allegro' }), 'Jazz').location).toBe('Cafe Allegro');
+    expect(calendarEventFor(publicEventFixture({ location_name: null, address: null }), 'Jazz').location).toBeNull();
   });
 });

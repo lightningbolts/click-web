@@ -37,7 +37,7 @@ export function hidesTabBar(pathname: string): boolean {
   return (
     isThreadPath(pathname) ||
     pathname === '/events/new' ||
-    /^\/e\/[^/]+\/(edit|manage|recap)/.test(pathname)
+    /^\/e\/[^/]+\/(edit|manage|recap|scan)/.test(pathname)
   );
 }
 
