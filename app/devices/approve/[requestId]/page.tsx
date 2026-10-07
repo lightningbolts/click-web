@@ -96,6 +96,7 @@ export default function ApproveDevicePage() {
         // no old keys; another established device can still backfill them when it next opens.
         await shareWebE2eeV2HistoryWithApprovedDevices({
           getAuthHeaders: async () => ({ Authorization: `Bearer ${token}` }),
+          registerDeviceIfNeeded: false,
         }).catch(() => 0);
       }
       setView({ kind: 'done', request: decided });
