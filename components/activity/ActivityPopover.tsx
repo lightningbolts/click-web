@@ -1,9 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import useSWR from 'swr';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
 import { IconButton } from '@/components/ds/IconButton';
@@ -12,17 +10,13 @@ import { RetryRow } from '@/components/ds/RetryRow';
 import { Skeleton } from '@/components/ds/Skeleton';
 import { useMediaQuery } from '@/components/ds/useMediaQuery';
 import { requestConnectionId } from '@/lib/activity/activityView';
-import { authedJson } from '@/lib/api/authedJson';
-import { markSeen, type ActivityPage } from './ActivityFeed';
+import { markSeen, preloadActivity, useLatestActivity } from './activityData';
 import { ActivityRow } from './ActivityRow';
 
 const SHOWN = 8;
 
 function PopoverBody({ onNavigate }: { onNavigate: () => void }) {
-  const router = useRouter();
-  const { data, error, isLoading, mutate } = useSWR('/api/activity', (url: string) => authedJson<ActivityPage>(url), {
-    revalidateOnFocus: false,
-  });
+  const { data, error, isLoading, mutate } = useLatestActivity();
   // eslint-disable-next-line react-hooks/purity -- relative ages only
   const nowMs = Date.now();
   const items = (data?.items ?? []).slice(0, SHOWN);
@@ -38,11 +32,7 @@ function PopoverBody({ onNavigate }: { onNavigate: () => void }) {
           <Button
             variant="plain"
             size="sm"
-            onClick={async () => {
-              await markSeen(data!.items);
-              await mutate();
-              router.refresh();
-            }}
+            onClick={() => void markSeen(data!.items)}
           >
             Mark all read
           </Button>
@@ -90,7 +80,7 @@ function PopoverBody({ onNavigate }: { onNavigate: () => void }) {
 
 /**
  * The top-bar bell (spec §6.1 / §7.9): a popover with the latest 8 on desktop, the Activity page
- * on phones. The dot shows unseen activity from the session bootstrap.
+ * on phones. The dot shows unseen activity from the session bootstrap, kept live by `LiveActivity`.
  */
 export function ActivityBell({ hasNew }: { hasNew: boolean }) {
   const desktop = useMediaQuery('(min-width: 768px)');
@@ -100,7 +90,8 @@ export function ActivityBell({ hasNew }: { hasNew: boolean }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <IconButton icon={Bell} aria-label={label} dot={hasNew} />
+        {/* Read ahead on hover or focus, so the popover opens with its rows already there. */}
+        <IconButton icon={Bell} aria-label={label} dot={hasNew} onPointerEnter={preloadActivity} onFocus={preloadActivity} />
       </PopoverTrigger>
       <PopoverContent className="p-0" data-testid="activity-popover">
         <PopoverBody onNavigate={() => setOpen(false)} />

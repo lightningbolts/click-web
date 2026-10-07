@@ -11,6 +11,7 @@ import { useShellBootstrap } from '@/lib/shell/useShellBootstrap';
 import { useProductChrome } from '@/lib/shell/ProductChromeContext';
 import { buttonClassName } from '@/components/ds/Button';
 import { GlobalShortcuts } from './GlobalShortcuts';
+import { LiveActivity } from './LiveActivity';
 import { MobileTabBar } from './MobileTabBar';
 import { TopBar, type TopBarAuth } from './TopBar';
 import { WaitlistButton } from './WaitlistButton';
@@ -53,6 +54,7 @@ export function SiteChrome() {
         <>
           <MobileTabBar bootstrap={state.bootstrap} />
           <GlobalShortcuts />
+          <LiveActivity viewerId={state.bootstrap.viewer.id} />
         </>
       ) : null}
       {state.state === 'signed-out' ? (

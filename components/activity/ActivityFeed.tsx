@@ -1,54 +1,51 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
 import { EmptyState } from '@/components/ds/EmptyState';
-import { groupActivity, requestConnectionId } from '@/lib/activity/activityView';
-import { authedJson } from '@/lib/api/authedJson';
+import { groupActivity, mergeActivity, requestConnectionId } from '@/lib/activity/activityView';
+import { fetchActivityPage, markSeen, useLatestActivity, type ActivityPage } from './activityData';
 import { ActivityRow, type ActivityRowItem } from './ActivityRow';
-
-export type ActivityPage = {
-  items: ActivityRowItem[];
-  seen_at: string | null;
-  next_before: string | null;
-  pending_requests: string[];
-};
-
-/** Tells the server the newest item was seen; clears the bell dot (fire and forget). */
-export function markSeen(items: { created_at: string }[]): Promise<unknown> {
-  const newest = items[0]?.created_at;
-  return newest ? authedJson('/api/activity/seen', { method: 'POST', body: { seen_at: newest } }).catch(() => undefined) : Promise.resolve();
-}
 
 /**
  * The Activity page list (spec §7.9): New / Today / Yesterday / This week / Earlier under sticky
- * headers, server-rendered first page, "Show more" for older ones. Opening it marks items seen.
+ * headers, server-rendered first page, "Show more" for older ones. Live: items arriving while
+ * it's open join the top (and are marked seen, so the bell stays clear).
  */
-export function ActivityFeed({ initial, nowMs, timeZone }: { initial: ActivityPage; nowMs: number; timeZone: string }) {
-  const router = useRouter();
-  const [items, setItems] = useState(initial.items);
-  const [pending, setPending] = useState(() => new Set(initial.pending_requests));
+export function ActivityFeed({ initial, nowMs: renderedNowMs, timeZone }: { initial: ActivityPage; nowMs: number; timeZone: string }) {
+  const { data: latest = initial } = useLatestActivity(initial);
+  const [older, setOlder] = useState<{ items: ActivityRowItem[]; pending: string[] }>({ items: [], pending: [] });
   const [next, setNext] = useState(initial.next_before);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   // "New" stays as it was when the page opened, even after it's marked seen.
   const [seenAt] = useState(initial.seen_at);
+  const [nowMs, setNowMs] = useState(renderedNowMs);
 
+  // The live page can be fresher than the rendered one (or the reverse, from a popover read
+  // earlier): merge, so nothing is dropped and "Show more" carries on from the oldest loaded.
+  const items = useMemo(() => mergeActivity(latest.items, initial.items, older.items), [latest.items, initial.items, older.items]);
+  const pending = useMemo(
+    () => new Set([...latest.pending_requests, ...older.pending]),
+    [latest.pending_requests, older.pending],
+  );
+
+  const newest = items[0]?.created_at;
   useEffect(() => {
-    void markSeen(initial.items).then(() => router.refresh());
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per open
-  }, []);
+    if (!newest) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- relative ages for rows that just arrived
+    setNowMs(Math.max(renderedNowMs, Date.now()));
+    void markSeen([{ created_at: newest }]);
+  }, [newest, renderedNowMs]);
 
   const more = async () => {
     if (!next) return;
     setLoading(true);
     setFailed(false);
     try {
-      const page = await authedJson<ActivityPage>(`/api/activity?before=${encodeURIComponent(next)}`);
-      setItems((cur) => [...cur, ...page.items]);
-      setPending((cur) => new Set([...cur, ...page.pending_requests]));
+      const page = await fetchActivityPage(`/api/activity?before=${encodeURIComponent(next)}`);
+      setOlder((cur) => ({ items: [...cur.items, ...page.items], pending: [...cur.pending, ...page.pending_requests] }));
       setNext(page.next_before);
     } catch {
       setFailed(true);

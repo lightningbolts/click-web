@@ -1,4 +1,4 @@
-import { activityKind, groupActivity, requestConnectionId } from '@/lib/activity/activityView';
+import { activityKind, groupActivity, mergeActivity, requestConnectionId } from '@/lib/activity/activityView';
 import { groupByMonth } from '@/lib/me/monthGroups';
 
 const NOW = Date.parse('2026-10-08T18:00:00Z'); // Thursday, 11 AM in Los Angeles
@@ -46,6 +46,19 @@ describe('activityView (spec §7.9)', () => {
     expect(groupByMonth(rows, (r) => r.ms, 'UTC').map((g) => [g.title, g.items.length])).toEqual([
       ['October 2026', 2],
       ['August 2026', 1],
+    ]);
+  });
+
+  it('merges pages into one newest-first list, keeping the latest copy of a re-recorded item', () => {
+    const row = (id: string, iso: string, title = id) => ({ id, created_at: iso, title });
+    const live = [row('b', '2026-10-08T17:59:00Z', 'Maya and 1 other'), row('c', '2026-10-08T17:00:00Z')];
+    const rendered = [row('a', '2026-10-08T17:30:00Z'), row('b', '2026-10-08T16:00:00Z', 'Maya'), row('c', '2026-10-08T17:00:00Z')];
+    const older = [row('d', '2026-10-01T10:00:00Z')];
+    expect(mergeActivity(live, rendered, older).map((i) => [i.id, i.title])).toEqual([
+      ['b', 'Maya and 1 other'],
+      ['a', 'a'],
+      ['c', 'c'],
+      ['d', 'd'],
     ]);
   });
 });
