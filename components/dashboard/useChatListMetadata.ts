@@ -56,6 +56,9 @@ export function useChatListMetadata({
   const [chatMetadataByConnectionId, setChatMetadataByConnectionId] = useSessionCachedState<
     Record<string, ChatListMetadata>
   >(viewerId, 'chatMetadata', {});
+  /** A first pass finished (either way), so rows can show with their previews in final order. */
+  const [directPreviewsLoaded, setDirectPreviewsLoaded] = useSessionCachedState(viewerId, 'directPreviewsLoaded', false);
+  const [groupPreviewsLoaded, setGroupPreviewsLoaded] = useSessionCachedState(viewerId, 'groupPreviewsLoaded', false);
   const connectionMapRef = useRef<Map<string, ConnectionRecord>>(new Map());
   /** Bumped per refresh so a slower earlier pass never overwrites a newer one. */
   const directGenerationRef = useRef(0);
@@ -125,10 +128,13 @@ export function useChatListMetadata({
       });
     } catch (error) {
       console.error('Inbox preview refresh error:', error);
+    } finally {
+      if (generation === directGenerationRef.current) setDirectPreviewsLoaded(true);
     }
-  }, [directConnectionIds, previewForDirectRow, setChatMetadataByConnectionId, viewerId]);
+  }, [directConnectionIds, previewForDirectRow, setChatMetadataByConnectionId, setDirectPreviewsLoaded, viewerId]);
 
-  // Direct chats: prime the chat→connection map, then refresh now, every 30s, and on focus.
+  // Direct chats: refresh now (alongside priming the chat→connection map, which only realtime and
+  // search read), every 30s, and on focus.
   useEffect(() => {
     if (!viewerId || connectionRecords.length === 0) {
       chatConnectionMapRef.current = new Map();
@@ -138,6 +144,7 @@ export function useChatListMetadata({
     if (!supabase) return;
     let cancelled = false;
 
+    void refreshDirectPreviews();
     void (async () => {
       const { data, error } = await supabase
         .from('chats')
@@ -150,7 +157,6 @@ export function useChatListMetadata({
           (data ?? []).map((chat: { id: string; connection_id: string }) => [String(chat.id), String(chat.connection_id)]),
         );
       }
-      if (!cancelled) await refreshDirectPreviews();
     })();
 
     const intervalId = setInterval(() => void refreshDirectPreviews(), POLL_MS);
@@ -278,13 +284,15 @@ export function useChatListMetadata({
         });
       } catch (error) {
         console.error('Unexpected group chat metadata load error:', error);
+      } finally {
+        if (!cancelled) setGroupPreviewsLoaded(true);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [groupCliqueRecords, groupRefreshNonce, setChatMetadataByConnectionId, viewerId]);
+  }, [groupCliqueRecords, groupRefreshNonce, setChatMetadataByConnectionId, setGroupPreviewsLoaded, viewerId]);
 
-  return { chatMetadataByConnectionId, refreshDirectPreviews };
+  return { chatMetadataByConnectionId, refreshDirectPreviews, directPreviewsLoaded, groupPreviewsLoaded };
 }

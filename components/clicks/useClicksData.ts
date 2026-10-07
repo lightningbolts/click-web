@@ -1,7 +1,7 @@
 'use client';
 
 import type { InboxPreload } from '@/lib/clicks/inboxPreload';
-import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { useSessionCachedState } from '@/lib/dashboard/sessionCache';
 import { isActiveChatListStatus } from '@/lib/dashboard/connectionStatus';
@@ -14,6 +14,8 @@ import { useChatSearch } from '@/components/dashboard/useChatSearch';
 import { useConnectionLifecycle } from '@/components/dashboard/useConnectionLifecycle';
 
 const sortKey = (c: ChatListConnection) => c.chatLastMessageAt ?? c.chatUpdatedAt ?? c.dateMet.getTime();
+/** Longest the inbox holds rows back for their previews (a slow key fetch shouldn't hide the list). */
+const PREVIEW_WAIT_MS = 2500;
 
 /**
  * Everything the Clicks inbox and threads read: connections, verified groups, previews and
@@ -87,7 +89,7 @@ export function useClicksData({
     [onThreadClosed],
   );
 
-  const { chatMetadataByConnectionId, refreshDirectPreviews } = useChatListMetadata({
+  const { chatMetadataByConnectionId, refreshDirectPreviews, directPreviewsLoaded, groupPreviewsLoaded } = useChatListMetadata({
     user,
     connectionRecords,
     selectedConnection,
@@ -158,6 +160,20 @@ export function useClicksData({
     [chatMetadataByConnectionId, connectionRecords, groupCliqueRecords],
   );
 
+  // The inbox appears once, complete and in final order: rows, groups and previews together
+  // (previews set the order), instead of rows that fill in and then reshuffle.
+  const listsLoaded = loaded && cliques.groupsLoaded;
+  const previewsLoaded =
+    (directPreviewsLoaded || !connectionRecords.some((c) => isActiveChatListStatus(c.status) || c.status === 'archived')) &&
+    (groupPreviewsLoaded || groupCliqueRecords.length === 0);
+  const [previewWaitOver, setPreviewWaitOver] = useState(false);
+  useEffect(() => {
+    if (!listsLoaded || previewsLoaded) return;
+    const id = setTimeout(() => setPreviewWaitOver(true), PREVIEW_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [listsLoaded, previewsLoaded]);
+  const ready = listsLoaded && (previewsLoaded || previewWaitOver);
+
   const isArchived = useCallback(
     (c: ConnectionRecord) => c.status === 'archived' || archivedConnectionIds.has(c.id),
     [archivedConnectionIds],
@@ -179,6 +195,7 @@ export function useClicksData({
 
   return {
     loaded,
+    ready,
     connectionRecords,
     groupCliqueRecords,
     chatCandidates,
