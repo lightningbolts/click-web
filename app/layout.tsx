@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { SiteChrome } from "@/components/app-shell/SiteChrome";
+import { IntentPrefetch } from "@/components/app-shell/IntentPrefetch";
 import { ShellProvider } from "@/components/app-shell/ShellContext";
 import Footer from "@/components/Footer";
 import { AppToaster } from "@/components/ds/Toast";
@@ -88,6 +89,7 @@ export default function RootLayout({
                   <main className="flex flex-1 flex-col">{children}</main>
                   <Footer />
                   <AppToaster />
+                  <IntentPrefetch />
                 </ShellProvider>
               </TooltipProvider>
             </ProductChromeProvider>
