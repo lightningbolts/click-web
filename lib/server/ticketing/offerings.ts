@@ -131,7 +131,8 @@ export async function loadTierCounts(admin: SupabaseClient, beaconId: string): P
   return counts;
 }
 
-async function loadEventSales(admin: SupabaseClient, beaconId: string): Promise<EventSalesRow | null> {
+/** The event's sales columns, or null when it isn't an event. */
+export async function loadEventSales(admin: SupabaseClient, beaconId: string): Promise<EventSalesRow | null> {
   const { data, error } = await admin
     .from('map_beacons')
     .select(EVENT_SALES_COLUMNS)

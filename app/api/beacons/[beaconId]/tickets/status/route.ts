@@ -2,16 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireEventManager } from '@/lib/events/requireEventManager';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
 import { loadOrganizerAccount } from '@/lib/server/ticketing/connect';
+import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
 import { parseBody } from '@/lib/api/parseBody';
+import { apiError } from '@/lib/api/errors';
 import { ticketingStatusBodySchema } from '@/lib/api/schemas/ticketing';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Organizer sales-lifecycle transitions. Only the backend may move a paid
- * event into a sellable state: sales_open requires at least one active tier
- * and a payout-ready connected account owned by this organizer.
+ * Organizer sales-lifecycle transitions. Opening sales needs an active tier, and a payout-ready
+ * account owned by this organizer only when a tier costs money; `disabled` turns the event back
+ * into an RSVP event, allowed only before any ticket exists.
  */
 export async function POST(
   request: NextRequest,
@@ -29,46 +31,60 @@ export async function POST(
   const body = parsed.data;
   const admin = manager.admin;
 
-  const patch: Record<string, unknown> = {
-    ticketing_status: body.ticketing_status,
-  };
-  if (body.ticket_sales_start_at !== undefined) {
-    patch.ticket_sales_start_at = body.ticket_sales_start_at;
+  const { data: event, error: eventError } = await admin
+    .from('map_beacons')
+    .select('event_cancelled_at')
+    .eq('id', beaconId)
+    .maybeSingle();
+  if (eventError || !event) return apiError('Event not found', 404);
+  if ((event as { event_cancelled_at: string | null }).event_cancelled_at) {
+    return apiError('This event was cancelled', 409, 'event_cancelled');
   }
-  if (body.ticket_sales_end_at !== undefined) {
-    patch.ticket_sales_end_at = body.ticket_sales_end_at;
+
+  const patch: Record<string, unknown> = { ticketing_status: body.ticketing_status };
+  if (body.ticket_sales_start_at !== undefined) patch.ticket_sales_start_at = body.ticket_sales_start_at;
+  if (body.ticket_sales_end_at !== undefined) patch.ticket_sales_end_at = body.ticket_sales_end_at;
+
+  if (body.ticketing_status === 'disabled') {
+    const { count, error } = await admin
+      .from('tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('beacon_id', beaconId);
+    if (error) return apiError('Failed to update ticketing status', 500);
+    if (count) {
+      return apiError("Tickets have been issued, so ticketing can't be turned off", 409, 'tickets_issued');
+    }
+    patch.admission_type = 'rsvp';
   }
 
   if (body.ticketing_status === 'sales_open') {
-    const account = await loadOrganizerAccount(admin, manager.userId);
-    if (!account || account.onboarding_state !== 'ready' || !account.transfers_enabled) {
-      return NextResponse.json(
-        { error: 'Organizer payout account is not ready', code: 'organizer_not_ready' },
-        { status: 409 },
-      );
-    }
-
-    const { count, error: tierError } = await admin
+    const { data: tiers, error: tierError } = await admin
       .from('ticket_tiers')
-      .select('id', { count: 'exact', head: true })
+      .select('unit_amount')
       .eq('beacon_id', beaconId)
-      .eq('is_active', true);
-    if (tierError || !count) {
-      return NextResponse.json(
-        { error: 'A paid event needs at least one active ticket tier', code: 'no_active_tiers' },
-        { status: 409 },
-      );
+      .eq('is_active', true)
+      .is('archived_at', null);
+    if (tierError) return apiError('Failed to update ticketing status', 500);
+    if (!tiers?.length) {
+      return apiError('Add a ticket before opening sales', 409, 'no_active_tiers');
     }
 
-    patch.admission_type = 'paid';
-    patch.organizer_payment_account_id = account.id;
+    if ((tiers as { unit_amount: number }[]).some((tier) => tier.unit_amount > 0)) {
+      const account = await loadOrganizerAccount(admin, manager.userId);
+      if (!account || account.onboarding_state !== 'ready' || !account.transfers_enabled) {
+        return apiError('Set up payouts to sell paid tickets', 409, 'organizer_not_ready');
+      }
+      patch.organizer_payment_account_id = account.id;
+    }
+    patch.admission_type = 'ticketed';
   }
 
   const { error } = await admin.from('map_beacons').update(patch).eq('id', beaconId);
   if (error) {
     console.error('ticketing_status update failed:', error.message);
-    return NextResponse.json({ error: 'Failed to update ticketing status' }, { status: 500 });
+    return apiError('Failed to update ticketing status', 500);
   }
 
+  revalidatePublicEvents(beaconId);
   return NextResponse.json({ ticketing_status: body.ticketing_status });
 }
