@@ -73,7 +73,7 @@ export function DeviceApprovals() {
 
   // A recovery key never survives an account change or an app-shell unmount.
   useEffect(() => {
-    return () => resetBrowserHistoryRecovery();
+    return () => { if (HISTORY_RECOVERY_ENABLED) resetBrowserHistoryRecovery(); };
   }, [userId]);
 
   useEffect(() => {
