@@ -87,7 +87,7 @@ async function seal(key: Uint8Array, plaintext: Uint8Array, userId: string, kind
   if (plaintext.length > MAX_PAYLOAD_BYTES) throw new Error('Recovery payload too large');
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: aad(userId, kind), tagLength: 128 },
+    { name: 'AES-GCM', iv: new Uint8Array(iv), additionalData: new Uint8Array(aad(userId, kind)), tagLength: 128 },
     await aesKey(key), new Uint8Array(plaintext),
   );
   return { version: 1, iv: toB64(iv), ciphertext: toB64(new Uint8Array(ciphertext)) };
@@ -99,7 +99,7 @@ async function open(key: Uint8Array, payload: EncryptedRecoveryPayload, userId: 
   const ciphertext = fromB64(payload.ciphertext);
   if (ciphertext.length > MAX_PAYLOAD_BYTES) throw new Error('Recovery payload too large');
   const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv, additionalData: aad(userId, kind), tagLength: 128 },
+    { name: 'AES-GCM', iv: new Uint8Array(iv), additionalData: new Uint8Array(aad(userId, kind)), tagLength: 128 },
     await aesKey(key), ciphertext,
   );
   return new Uint8Array(plain);
