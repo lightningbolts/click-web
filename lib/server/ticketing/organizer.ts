@@ -75,7 +75,8 @@ type AttendeeRow = {
   display_name: string | null;
   avatar_url: string | null;
   tier_name: string;
-  paid: boolean;
+  unit_amount: number;
+  currency: string;
   status: TicketStatus;
   checked_in_at: string | null;
   ticket_number: string;
@@ -146,7 +147,9 @@ export async function searchAttendees(
       status: row.status,
       checked_in_at: row.checked_in_at,
       ticket_number: row.ticket_number,
-      refundable: access === 'manage' && row.paid && (row.status === 'valid' || row.status === 'checked_in'),
+      amount: row.unit_amount,
+      currency: row.currency,
+      refundable: access === 'manage' && row.unit_amount > 0 && (row.status === 'valid' || row.status === 'checked_in'),
     })),
     next_cursor: hasMore ? encodeCursor(page[page.length - 1]!) : null,
   };

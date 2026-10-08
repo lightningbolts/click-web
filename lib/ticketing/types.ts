@@ -105,6 +105,9 @@ export type TicketAttendee = {
   status: TicketStatus;
   checked_in_at: string | null;
   ticket_number: string;
+  /** What this ticket cost, in minor units (its price when bought). */
+  amount: number;
+  currency: string;
   /** Paid tickets that still admit, and only for people who manage the event. */
   refundable: boolean;
 };

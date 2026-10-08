@@ -217,3 +217,15 @@ describe('paid tickets while sales are open', () => {
     expect(db.rows('map_beacons')[0]).toMatchObject({ organizer_payment_account_id: 'acct-1' });
   });
 });
+
+describe('a cancelled event', () => {
+  it('refuses ticket edits and removals', async () => {
+    world({ cancelled: true });
+    const patch = await PATCH(json('PATCH', `${base}/${TIER}`, { name: 'Late' }), tierParams());
+    expect(patch.status).toBe(409);
+    expect((await patch.json()).code).toBe('event_cancelled');
+    const del = await DELETE(json('DELETE', `${base}/${TIER}`), tierParams());
+    expect(del.status).toBe(409);
+    expect(db.rows('ticket_tiers')).toHaveLength(1);
+  });
+});

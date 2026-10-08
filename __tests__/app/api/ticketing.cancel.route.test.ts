@@ -53,7 +53,7 @@ const order = (id: string, order_state: string, over: Record<string, unknown> = 
   ...over,
 });
 
-function world(opts: { orders?: Record<string, unknown>[]; cancelledAt?: string | null; refundIds?: string[] } = {}) {
+function world(opts: { orders?: Record<string, unknown>[]; cancelledAt?: string | null; refundIds?: string[]; cancelFails?: boolean } = {}) {
   db = new FakeDb({
     tables: {
       map_beacons: [
@@ -70,7 +70,10 @@ function world(opts: { orders?: Record<string, unknown>[]; cancelledAt?: string 
       ticket_orders: opts.orders ?? [order('o1', 'paid'), order('o2', 'paid'), order('o3', 'checkout_created')],
     },
     rpc: {
-      ticketing_cancel_event: () => ({ ok: true, refund_order_ids: opts.refundIds ?? ['o1', 'o2'] }),
+      ticketing_cancel_event: () => {
+        if (opts.cancelFails) throw new Error('connection reset');
+        return { ok: true, refund_order_ids: opts.refundIds ?? ['o1', 'o2'] };
+      },
       ticketing_expire_stale: () => 0,
     },
   });
@@ -103,6 +106,12 @@ describe('POST /api/beacons/:id/cancel', () => {
     expect(mockRefund).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'o1' }), HOST, null, 'event_cancelled');
     // A buyer still on Stripe's page can't pay for a ticket that no longer exists.
     expect(mockExpireSession).toHaveBeenCalledWith('cs_o3');
+    expect(mockRevalidate).toHaveBeenCalledWith(EVENT, null);
+  });
+
+  it('refreshes the event page even when the cancel fails partway', async () => {
+    world({ cancelFails: true });
+    expect((await post()).status).toBe(500);
     expect(mockRevalidate).toHaveBeenCalledWith(EVENT, null);
   });
 
@@ -166,6 +175,23 @@ describe('ticketing cron', () => {
     expect(await res.json()).toMatchObject({ ok: true, expired: 0, refunds_retried: 2 });
     expect(refundedOrders()).toEqual(['o1', 'o2']);
     expect(mockRefund).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'o1' }), HOST, null, 'event_cancelled');
+  });
+
+  it('takes the longest-waiting orders first and sends refused ones to the back of the queue', async () => {
+    world({
+      cancelledAt: new Date(Date.now() - 86_400_000).toISOString(),
+      orders: [
+        order('o1', 'paid', { updated_at: '2026-10-05T00:00:00.000Z' }),
+        order('o2', 'paid', { updated_at: '2026-10-01T00:00:00.000Z', stripe_payment_intent_id: null }),
+      ],
+    });
+    mockRefund.mockImplementation(async (_admin: unknown, o: { id: string }) =>
+      o.id === 'o2' ? { ok: false, code: 'order_missing_payment_intent', status: 409 } : { ok: true, refundId: 'r', stripeRefundId: 're', amount: 1500 },
+    );
+    await cron(new NextRequest('https://click.example/api/cron/ticketing-expiry'));
+    expect(refundedOrders()).toEqual(['o2', 'o1']);
+    const o2 = db.rows('ticket_orders').find((o) => o.id === 'o2')!;
+    expect(Date.parse(o2.updated_at as string)).toBeGreaterThan(Date.parse('2026-10-05T00:00:00.000Z'));
   });
 
   it('leaves live events alone', async () => {

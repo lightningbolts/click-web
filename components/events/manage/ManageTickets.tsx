@@ -88,11 +88,6 @@ export function ManageTickets({
     }
   };
 
-  const priceOf = (tierName: string) => {
-    const tier = summary.tiers.find((t) => t.name === tierName);
-    return tier && tier.unit_amount > 0 ? { cents: tier.unit_amount, currency: summary.currency } : null;
-  };
-
   const cancel = async () => {
     const ok = await confirm({
       title: "Cancel this event?",
@@ -163,7 +158,7 @@ export function ManageTickets({
           {error && !attendees.length ? (
             <InlineNotice variant="warning">We couldn’t load attendees. Try again in a moment.</InlineNotice>
           ) : attendees.length ? (
-            <TicketAttendeeList beaconId={beaconId} attendees={attendees} readOnly={readOnly} priceOf={priceOf} timeZone={timeZone} />
+            <TicketAttendeeList beaconId={beaconId} attendees={attendees} readOnly={readOnly} timeZone={timeZone} />
           ) : isLoading ? null : (
             <EmptyState
               icon={Search}

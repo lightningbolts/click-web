@@ -41,14 +41,11 @@ export function TicketAttendeeList({
   beaconId,
   attendees,
   readOnly,
-  priceOf,
   timeZone,
 }: {
   beaconId: string;
   attendees: TicketAttendee[];
   readOnly: boolean;
-  /** Face value of a ticket type by name, for the refund confirmation. */
-  priceOf: (tierName: string) => { cents: number; currency: string } | null;
   timeZone: string;
 }) {
   const [changed, setChanged] = useState<Record<string, Partial<TicketAttendee>>>({});
@@ -75,9 +72,8 @@ export function TicketAttendeeList({
   };
 
   const refund = async (a: TicketAttendee) => {
-    const price = priceOf(a.tier_name);
     const ok = await confirm({
-      title: price ? `Refund ${formatMoney(price.cents, price.currency)} to ${a.name}?` : `Refund ${a.name}’s ticket?`,
+      title: a.amount > 0 ? `Refund ${formatMoney(a.amount, a.currency)} to ${a.name}?` : `Refund ${a.name}’s ticket?`,
       message: "Their ticket stops working right away.",
       confirmLabel: "Refund",
       destructive: true,

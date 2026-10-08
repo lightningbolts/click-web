@@ -24,11 +24,12 @@ export async function POST(
   if (!manager.ok) return manager.response;
 
   try {
-    const tally = await cancelTicketedEvent(manager.admin, beaconId, manager.userId);
-    revalidatePublicEvents(beaconId, manager.beacon.venue_id ?? null);
-    return NextResponse.json(tally);
+    return NextResponse.json(await cancelTicketedEvent(manager.admin, beaconId, manager.userId));
   } catch (e) {
     console.error('Event cancel failed:', e);
     return apiError('Failed to cancel event', 500);
+  } finally {
+    // The cancel may have committed before a later step failed: never leave "Get tickets" up.
+    revalidatePublicEvents(beaconId, manager.beacon.venue_id ?? null);
   }
 }

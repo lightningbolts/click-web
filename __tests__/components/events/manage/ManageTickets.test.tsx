@@ -47,6 +47,8 @@ const person = (over: Partial<TicketAttendee> = {}): TicketAttendee => ({
   status: "valid",
   checked_in_at: null,
   ticket_number: "CLK-7Q2M-0001",
+  amount: 1500,
+  currency: "usd",
   refundable: true,
   ...over,
 });
@@ -133,6 +135,13 @@ describe("ManageTickets", () => {
     expect(mockToast.success).toHaveBeenCalledWith("Refund started");
     // Opening a dialog from a menu must not leave the page unclickable afterwards.
     await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
+  });
+
+  it("prices the refund by what this ticket cost, even when two ticket types share a name", async () => {
+    renderTab({ initialAttendees: { attendees: [person({ amount: 2000 })], next_cursor: null } });
+    await openRowMenu();
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Refund ticket" }));
+    expect(within(await screen.findByRole("dialog")).getByText("Refund $20.00 to Alex Chen?")).toBeInTheDocument();
   });
 
   it("cancels the event and refunds every order", async () => {

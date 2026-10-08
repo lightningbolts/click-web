@@ -57,7 +57,8 @@ const attendee = (n: number, over: Record<string, unknown> = {}) => ({
   display_name: null,
   avatar_url: null,
   tier_name: 'GA',
-  paid: true,
+  unit_amount: 1500,
+  currency: 'usd',
   status: 'valid',
   checked_in_at: null,
   ticket_number: `CLK-${n}`,
@@ -138,7 +139,7 @@ describe('organizer ticketing routes', () => {
   it('lists attendees with names and marks paid live tickets refundable for managers', async () => {
     attendeeRows = [
       attendee(1),
-      attendee(2, { paid: false }),
+      attendee(2, { unit_amount: 0 }),
       attendee(3, { status: 'refunded' }),
       attendee(4, { first_name: null, last_name: null, display_name: 'ada.l', status: 'checked_in' }),
       attendee(5, { first_name: null, last_name: null }),
@@ -161,6 +162,8 @@ describe('organizer ticketing routes', () => {
       status: 'valid',
       checked_in_at: null,
       ticket_number: 'CLK-1',
+      amount: 1500,
+      currency: 'usd',
       refundable: true,
     });
     expect(next_cursor).toBeNull();

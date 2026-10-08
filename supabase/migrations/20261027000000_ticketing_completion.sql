@@ -649,6 +649,8 @@ $$;
 -- name (substring, case-insensitive, wildcards literal) or a ticket number exactly.
 -- ---------------------------------------------------------------------------
 
+DROP FUNCTION IF EXISTS public.ticketing_search_attendees (UUID, TEXT, TIMESTAMPTZ, UUID, INTEGER);
+
 CREATE OR REPLACE FUNCTION public.ticketing_search_attendees (
     p_beacon UUID,
     p_query TEXT,
@@ -665,7 +667,8 @@ RETURNS TABLE (
     display_name TEXT,
     avatar_url TEXT,
     tier_name TEXT,
-    paid BOOLEAN,
+    unit_amount INTEGER,
+    currency TEXT,
     status TEXT,
     checked_in_at TIMESTAMPTZ,
     ticket_number TEXT,
@@ -682,9 +685,12 @@ AS $$
             '%' || replace(replace(replace(btrim(coalesce(p_query, '')), '\', '\\'), '%', '\%'), '_', '\_') || '%' AS pattern
     )
     SELECT t.id, t.order_id, t.owner_user_id, u.first_name, u.last_name, u.name, u.image,
-           tt.name, tt.unit_amount > 0, t.status, t.checked_in_at, t.ticket_number, t.issued_at
+           tt.name, coalesce(oi.unit_amount, tt.unit_amount), tt.currency,
+           t.status, t.checked_in_at, t.ticket_number, t.issued_at
     FROM public.tickets t
     JOIN public.ticket_tiers tt ON tt.id = t.ticket_tier_id
+    -- What this ticket actually cost (the price when it was bought), for the refund prompt.
+    LEFT JOIN public.ticket_order_items oi ON oi.order_id = t.order_id AND oi.ticket_tier_id = t.ticket_tier_id
     LEFT JOIN public.users u ON u.id = t.owner_user_id
     CROSS JOIN q
     WHERE t.beacon_id = p_beacon

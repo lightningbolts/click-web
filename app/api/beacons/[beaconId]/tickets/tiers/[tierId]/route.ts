@@ -47,8 +47,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!parsed.ok) return parsed.response;
 
   if (!(await loadOwnTier(manager.admin, beaconId, tierId))) return apiError('Ticket not found', 404);
+  const event = await loadEventSales(manager.admin, beaconId);
+  if (event?.event_cancelled_at) return apiError('This event was cancelled', 409, 'event_cancelled');
   if ((parsed.data.unit_amount ?? 0) > 0) {
-    const event = await loadEventSales(manager.admin, beaconId);
     if (event?.ticketing_status === 'sales_open' && !(await attachPayoutAccount(manager.admin, beaconId, manager.beacon.creator_id))) {
       return apiError('Set up payouts to sell paid tickets', 409, 'organizer_not_ready');
     }
@@ -84,6 +85,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const admin = manager.admin;
 
   if (!(await loadOwnTier(admin, beaconId, tierId))) return apiError('Ticket not found', 404);
+  if ((await loadEventSales(admin, beaconId))?.event_cancelled_at) {
+    return apiError('This event was cancelled', 409, 'event_cancelled');
+  }
 
   const { count, error: countError } = await admin
     .from('ticket_order_items')

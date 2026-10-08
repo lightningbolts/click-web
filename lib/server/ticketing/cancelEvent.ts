@@ -28,8 +28,10 @@ async function refundOrders(admin: SupabaseClient, orderIds: readonly string[], 
   for (const id of ids) {
     const order = byId.get(id);
     if (!order) continue;
+    let started = false;
     try {
       const result = await requestTicketRefund(admin, order, requestedBy(order), null, REFUND_REASON);
+      started = result.ok;
       if (result.ok) tally.refunds_started += 1;
       else if (!ALREADY_REFUNDED.has(result.code)) {
         console.error(`cancel refund refused (order=${id}): ${result.code}`);
@@ -39,8 +41,16 @@ async function refundOrders(admin: SupabaseClient, orderIds: readonly string[], 
       console.error(`cancel refund failed (order=${id}):`, e);
       tally.refunds_failed += 1;
     }
+    // The retry pass takes the longest-waiting orders first; one that got nowhere goes to the
+    // back, so a permanently refused order can't hold up the rest.
+    if (!started) await touchOrder(admin, id);
   }
   return tally;
+}
+
+async function touchOrder(admin: SupabaseClient, orderId: string): Promise<void> {
+  const { error } = await admin.from('ticket_orders').update({ updated_at: new Date().toISOString() }).eq('id', orderId);
+  if (error) console.error(`order touch failed (order=${orderId}): ${error.message}`);
 }
 
 /**
@@ -96,6 +106,7 @@ export async function retryCancelledEventRefunds(admin: SupabaseClient, nowMs = 
     .in('beacon_id', [...creators.keys()])
     .in('order_state', ['paid', 'partially_refunded'])
     .gt('total_amount', 0)
+    .order('updated_at', { ascending: true })
     .limit(REFUNDS_PER_RUN);
   if (ordersError) throw new Error(`refund retry load failed: ${ordersError.message}`);
 
