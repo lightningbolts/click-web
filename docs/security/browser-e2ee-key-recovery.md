@@ -1,6 +1,6 @@
 # Browser history recovery without server-readable keys
 
-Status: design-only; **not implemented**. This proposal is intentionally separate from ticketing and existing device-approval fixes.
+Status: implemented behind `NEXT_PUBLIC_E2EE_RECOVERY_ENABLED=true`; **not yet enabled or production-validated**. This work is separate from ticketing and native device-approval changes. The existing device approval remains as the recovery fallback.
 
 ## Product contract
 
@@ -23,7 +23,7 @@ BK must be recoverable via a **user-controlled cryptographic capability**. An ex
 
 Use a versioned encrypted BK envelope per enrolled recovery credential. Explicitly specify enrollment, key rotation, lost credential/recovery, revocation, multi-passkey portability, platform compatibility, account deletion and safe backup replacement. Support authenticated metadata checks, request size bounds, rate limiting, fail-closed responses and tests with corrupted ciphertext. Use established browser crypto (WebCrypto) and reviewed WebAuthn libraries; never invent a custom cipher.
 
-## Proposed phased implementation
+## Architecture and phased implementation
 
 1. Introduce **opt-in backup enrollment** on an already trusted device. Verify supported WebAuthn PRF behavior end-to-end before enabling a credential; otherwise leave the existing approved-device history transfer unchanged.
 2. Add authenticated, row-level isolated backup ciphertext storage and versioned envelopes via new Supabase migration and API endpoints. Do not grant service roles plaintext keys; the service only stores ciphertext.
@@ -44,4 +44,34 @@ Use a versioned encrypted BK envelope per enrolled recovery credential. Explicit
 
 ## Review gate
 
-This document is an implementation contract, **not a feature release**. Do not merge a change that removes the existing device approval before end-to-end recovery has been implemented and verified.
+The web enrollment, encrypted vault, credential wrapping, epoch export, passkey recovery, cache integration and browser UI are implemented behind a disabled-by-default rollout flag. Do not enable the flag until the tests below pass. This PR does **not** remove the existing device-approval fallback.
+
+
+## Code and deployment
+
+- `supabase/migrations/20261008194700_chat_key_recovery_vault.sql`: account-scoped ciphertext vault, per-passkey envelopes and atomic initial enrollment. Apply this migration **before** turning on the rollout flag.
+- `app/api/chat/key-recovery/{vault,credentials,enroll,export}`: authenticated, feature-gated ciphertext APIs. There is no plaintext recovery-key API.
+- `lib/chat/keyRecoveryCrypto.ts`: browser WebCrypto AES-256-GCM envelopes and HKDF wrapping.
+- `lib/chat/browserHistoryRecovery.ts`: WebAuthn PRF enrollment, client-side historical envelope export/decryption, restore and backup refresh.
+- `lib/chat/recoveredHistoryKeys.ts` and `lib/chat/e2eeV2Client.ts`: volatile, account-scoped restored epoch-key integration for chat and hub reads.
+- `components/settings/DevicesSettings.tsx` and `components/chat/useE2eeNotice.ts`: opt-in setup, restore and approval fallback.
+
+## Actual user path
+
+On the first trusted browser, approve its access to earlier E2EE v2 keys using the existing phone flow, allow backfill to finish, and open Settings > Devices > Set up passkey recovery. The browser exports and decrypts only envelopes this device already owns, creates a passkey, derives a wrapping key using WebAuthn PRF, and atomically persists ciphertext plus a credential-wrapped backup key.
+
+On a subsequent browser, sign in normally. In a chat containing locked history, choose Recover with passkey. A supported authenticator provides the PRF output after the OS's user verification prompt; the browser recovers the key locally and retries decrypting the chat. The server never sees the recovery key. If restoration fails or some epochs are missing, normal approval remains possible.
+
+This is **not** silent recovery from OAuth/email alone, and the original browser must have the relevant keys before they can be backed up. Older non-v2 messages and epochs never transferred to that browser are not covered by the new manifest. Native iOS does not directly enroll or refresh this web passkey vault.
+
+## Required end-to-end verification
+
+1. From an established Safari/Chrome profile, approve history on an existing iPhone and wait for old E2EE v2 chat and hub messages to decrypt; then enroll a PRF-capable recovery passkey.
+2. Sign into a clean independent browser profile on the same account. Confirm historical v2 messages decrypt after one passkey user-verification interaction and no phone approval push was generated.
+3. Test a different device using a synced passkey. Confirm that Safari and Chrome actually expose the same PRF output for the account's credential. If not supported, Click must fall back to native approval.
+4. Verify wrong credential, canceled biometrics, unsupported PRF, corrupted ciphertext, and stale/revoked credentials do not reveal keys; the old approval path must remain usable.
+5. Verify wrong-account bearer tokens cannot retrieve or write another account's vault or encrypted envelopes.
+6. Exercise chat and hub epoch rotation, multiple enrolled credentials, concurrent refreshes, and user sign-out/account switching.
+7. Validate first deployment with the flag off, apply migration, and only enable the flag after independent security review and observed success.
+
+Security limitations requiring explicit review: current implementation has no independent client-side anti-rollback witness against a server replaying an older valid encrypted manifest; legacy/non-v2 history may require separate recovery designs; passkey interoperability and OS UX cannot be proven by Jest alone. Do not describe this as universal, zero-interaction recovery across all browsers.
