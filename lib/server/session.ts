@@ -1,4 +1,5 @@
 import 'server-only';
+import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
 
 import { cache } from 'react';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
@@ -109,5 +110,6 @@ export const loadSessionBootstrap = cache(async (): Promise<SessionBootstrap | n
     unreadTotal,
     hasActivity,
     managesPlaces,
+    ticketing: ticketingEnabled(),
   };
 });

@@ -4,4 +4,6 @@ export type SessionBootstrap = {
   unreadTotal: number;
   hasActivity: boolean;
   managesPlaces: boolean;
+  /** Ticketing is switched on (`TICKETING_ENABLED`): show the ticket wallet entry points. */
+  ticketing: boolean;
 };

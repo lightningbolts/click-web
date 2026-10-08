@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronRight, Ticket } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -12,6 +13,7 @@ import { eventDisplayTitle } from '@/lib/events/eventMetadata';
 import { formatEventWhen } from '@/lib/home/format';
 import type { MineEvent } from '@/lib/server/events/mineEvents';
 import { eventHref } from '@/lib/shell/appNav';
+import { fetchMyTickets } from '@/lib/ticketing/ticketingClient';
 
 /** Same key and response shape as every other `/api/beacons/mine` reader, so they share SWR's cache. */
 export const MINE_EVENTS_KEY = '/api/beacons/mine';
@@ -47,8 +49,21 @@ function upcoming(e: Pick<MineEvent, 'event_start_at' | 'event_end_at'>, nowMs: 
  * saved, shown only when there are any (or when `?view=saved` asks for Saved). Loads in the
  * browser so the public list stays shared-cacheable.
  */
-export function YourEventsStrip({ timeZone, initialFilter }: { timeZone: string; initialFilter?: Filter | null }) {
+export function YourEventsStrip({
+  timeZone,
+  initialFilter,
+  ticketing = false,
+}: {
+  timeZone: string;
+  initialFilter?: Filter | null;
+  /** Ticketing is on: link to the ticket wallet when you hold an upcoming ticket. */
+  ticketing?: boolean;
+}) {
   const { user } = useAuth();
+  // Same key as the ticket wallet's Upcoming list, so the two share SWR's cache.
+  const { data: ticketGroups } = useSWR(user && ticketing ? ['my-tickets', 'upcoming'] : null, () => fetchMyTickets('upcoming'), {
+    revalidateOnFocus: false,
+  });
   const { data, isLoading } = useSWR(user ? MINE_EVENTS_KEY : null, fetchMine, { revalidateOnFocus: false });
   const { data: savedData } = useSWR(user ? BOOKMARKS_KEY : null, fetchSaved, { revalidateOnFocus: false });
   const [nowMs] = useState(() => Date.now());
@@ -77,7 +92,23 @@ export function YourEventsStrip({ timeZone, initialFilter }: { timeZone: string;
   const saved = (savedData?.bookmarks ?? [])
     .filter((b) => b.created_at && upcoming(b, nowMs))
     .map((b) => ({ id: b.beacon_id, title: eventDisplayTitle(b.title), startAt: b.event_start_at, imageUrl: null }));
-  if (soon.length === 0 && saved.length === 0 && filter !== 'saved') return null;
+  const ticketCount = (ticketGroups ?? []).reduce((sum, g) => sum + g.tickets.length, 0);
+  const ticketsLink = ticketCount ? (
+    <Link
+      href="/tickets"
+      className="type-body-strong flex items-center gap-3 rounded-lg bg-surface p-3 text-fg transition-colors duration-[var(--d-fast)] hover:bg-hover dark:shadow-[inset_0_0_0_1px_var(--hairline)]"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-selection text-accent">
+        <Ticket size={18} strokeWidth={2} aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1 truncate">Your tickets</span>
+      <span className="type-meta tabular text-fg-secondary">{ticketCount}</span>
+      <ChevronRight size={16} strokeWidth={2} aria-hidden className="shrink-0 text-fg-tertiary" />
+    </Link>
+  ) : null;
+  if (soon.length === 0 && saved.length === 0 && filter !== 'saved') {
+    return ticketsLink ? <div className="mb-10">{ticketsLink}</div> : null;
+  }
   const active: Filter = filter ?? (hosting.length ? 'hosting' : going.length ? 'going' : 'saved');
   const shown = active === 'hosting' ? hosting : active === 'going' ? going : saved;
   const EMPTY: Record<Filter, string> = {
@@ -121,6 +152,7 @@ export function YourEventsStrip({ timeZone, initialFilter }: { timeZone: string;
           ))}
         </ul>
       )}
+      {ticketsLink ? <div className="mt-3">{ticketsLink}</div> : null}
     </section>
   );
 }

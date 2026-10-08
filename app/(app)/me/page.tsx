@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { Bell, Building2, KeyRound, Laptop, QrCode, ShieldCheck, Sparkles, Star, Store, Trash2, UserX } from 'lucide-react';
+import { Bell, Building2, KeyRound, Laptop, QrCode, ShieldCheck, Sparkles, Star, Store, Ticket, Trash2, UserX } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
 import { ListGroup, ListRow } from '@/components/ds/ListGroup';
 import { StatusPill } from '@/components/ds/StatusPill';
@@ -11,6 +11,7 @@ import { SignOutRow } from '@/components/me/SignOutRow';
 import { AppearanceControl } from '@/components/settings/AppearanceSettings';
 import { PERSONALITY_REQUIRED_TAG_COUNT } from '@/lib/personality/taxonomy';
 import { loadMe } from '@/lib/server/me/loadMe';
+import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
 import { settingsHref } from '@/lib/settings/sections';
 
 export const metadata: Metadata = { title: 'Me · Click' };
@@ -57,6 +58,12 @@ export default async function MePage() {
 
         <div className="flex flex-col gap-8">
           <MeSocial intents={me.intents} placesEnabled={me.placesEnabled} untilLabel={untilLabel} />
+
+          {ticketingEnabled() ? (
+            <ListGroup>
+              <ListRow icon={Ticket} title="Tickets" href="/tickets" chevron />
+            </ListGroup>
+          ) : null}
 
           <ListGroup header="Preferences">
             <ListRow icon={Bell} title="Notifications" href={settingsHref('notifications')} chevron />
