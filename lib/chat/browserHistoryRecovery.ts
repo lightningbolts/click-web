@@ -60,7 +60,7 @@ async function credentialPRF(credentialIds: string[], userId: string): Promise<{
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: challenge(),
     userVerification: 'required',
-    allowCredentials: credentialIds.map((id) => ({ type: 'public-key' as const, id: fromB64url(id) })),
+    allowCredentials: credentialIds.map((id) => ({ type: 'public-key' as const, id: new Uint8Array(fromB64url(id)) })),
     extensions: { prf: { eval: { first: await prfInput(userId) } } },
   };
   const credential = await navigator.credentials.get({ publicKey }) as PublicKeyCredential | null;
