@@ -50,6 +50,11 @@ async function prfInput(userId: string): Promise<Uint8Array<ArrayBuffer>> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('click/history-prf/v1/' + userId));
   return new Uint8Array(digest);
 }
+function recoveryRpId(): string {
+  const host = window.location.hostname.toLowerCase();
+  // All Click-owned subdomains share the same synced passkey; preview origins remain isolated.
+  return host === 'joinclick.co' || host.endsWith('.joinclick.co') ? 'joinclick.co' : host;
+}
 function requirePasskeys(): void {
   if (typeof window === 'undefined' || !window.isSecureContext || !('PublicKeyCredential' in window)) {
     throw new Error('Passkey recovery requires a compatible secure browser');
@@ -59,6 +64,7 @@ async function credentialPRF(credentialIds: string[], userId: string): Promise<{
   requirePasskeys();
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: challenge(),
+    rpId: recoveryRpId(),
     userVerification: 'required',
     allowCredentials: credentialIds.map((id) => ({ type: 'public-key' as const, id: new Uint8Array(fromB64url(id)) })),
     extensions: { prf: { eval: { first: await prfInput(userId) } } },
@@ -76,12 +82,13 @@ async function credentialPRF(credentialIds: string[], userId: string): Promise<{
   }
   return { credentialId: b64url(new Uint8Array(credential.rawId)), output: new Uint8Array(first) };
 }
-async function createCredential(userId: string): Promise<string> {
+async function createCredential(userId: string, excluded: string[] = []): Promise<string> {
   requirePasskeys();
   const userHandle = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(userId)));
   const publicKey: PublicKeyCredentialCreationOptions = {
     challenge: challenge(),
-    rp: { name: 'Click' },
+    rp: { id: recoveryRpId(), name: 'Click' },
+    excludeCredentials: excluded.map((id) => ({ type: 'public-key' as const, id: new Uint8Array(fromB64url(id)) })),
     user: { id: userHandle, name: 'Click history recovery', displayName: 'Click' },
     pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
     timeout: 120_000,
@@ -182,7 +189,8 @@ export async function addBrowserHistoryRecoveryPasskey(userId: string, getAuthHe
   if (!activeBackup || activeBackup.userId !== userId) {
     throw new Error('Unlock your existing recovery passkey before adding another');
   }
-  const credentialId = await createCredential(userId);
+  const enrolled = await existingCredentials(getAuthHeaders);
+  const credentialId = await createCredential(userId, enrolled.map((item) => item.credentialId));
   const prf = await credentialPRF([credentialId], userId);
   const key = await deriveWrappingKey(prf.output);
   const encryptedBackupKey = await wrapBackupKey(key, activeBackup.key, userId);
