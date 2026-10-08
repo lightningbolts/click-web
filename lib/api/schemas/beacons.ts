@@ -190,6 +190,8 @@ export const beaconReportBodySchema = z.object({
 });
 
 /** Host scan of a Click Pass: the QR's text as read (full URL or bare token). */
-export const passScanBodySchema = z.object({
-  credential: z.string().trim().min(1).max(512),
-});
+/** A scanned Click Pass or ticket QR (URL or bare token), or a ticket picked from the attendee list. */
+export const passScanBodySchema = z.union([
+  z.object({ credential: z.string().trim().min(1).max(512) }),
+  z.object({ ticket_id: z.string().uuid() }),
+]);
