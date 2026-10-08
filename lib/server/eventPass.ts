@@ -3,7 +3,7 @@ import 'server-only';
 import { createHmac } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
-import { eventPassCode, eventPassUrl, mintEventPassToken } from '@/lib/events/eventPass';
+import { eventPassCode, eventPassUrl, mintEventPassToken, mintTicketToken } from '@/lib/events/eventPass';
 import { displayNameFromUser, type UserProfileRow } from '@/lib/events/attendeeDirectory';
 import { eventDisplayTitle, parseIsoMs } from '@/lib/events/eventMetadata';
 import type { PublicEventPayload } from '@/lib/events/publicEvent';
@@ -34,6 +34,12 @@ export type IssuedPass = { token: string; url: string; code: string };
 
 export function issueEventPass(key: Buffer, beaconId: string, userId: string): IssuedPass {
   const token = mintEventPassToken(key, beaconId, userId);
+  return { token, url: eventPassUrl(publicBaseUrl(), beaconId, token), code: eventPassCode(token) };
+}
+
+/** A ticket's QR: the event URL carrying its stable v2 token. */
+export function issueTicketCredential(key: Buffer, beaconId: string, ticketId: string): IssuedPass {
+  const token = mintTicketToken(key, beaconId, ticketId);
   return { token, url: eventPassUrl(publicBaseUrl(), beaconId, token), code: eventPassCode(token) };
 }
 

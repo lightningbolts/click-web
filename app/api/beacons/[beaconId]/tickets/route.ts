@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
-import { mintTicketCredential, ticketQrUrl } from '@/lib/server/ticketing/credentials';
-import { getAppBaseUrl } from '@/lib/server/stripe';
+import { eventPassKey, issueTicketCredential } from '@/lib/server/eventPass';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,8 +27,8 @@ function tierName(t: TicketRow): string | null {
 
 /**
  * The signed-in user's tickets for an event. With ?include_credential=1 each
- * live ticket's QR credential is ROTATED (new opaque token minted, only its
- * hash stored) and returned once; the database never holds a usable token.
+ * live ticket carries its QR credential, derived from the ticket id, so every
+ * device shows the same code.
  */
 export async function GET(
   request: NextRequest,
@@ -61,20 +60,13 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to load tickets' }, { status: 500 });
   }
 
-  const base = getAppBaseUrl();
+  const key = includeCredential ? eventPassKey() : null;
   const tickets = [];
   for (const row of (data as TicketRow[]) ?? []) {
-    let credentialUrl: string | null = null;
-    if (includeCredential && row.status === 'valid') {
-      const minted = mintTicketCredential();
-      const { error: rotateError } = await admin
-        .from('tickets')
-        .update({ qr_token_hash: minted.tokenHash })
-        .eq('id', row.id)
-        .eq('owner_user_id', user.id)
-        .eq('status', 'valid');
-      if (!rotateError) credentialUrl = ticketQrUrl(base, minted.token);
-    }
+    const credentialUrl =
+      key && (row.status === 'valid' || row.status === 'checked_in')
+        ? issueTicketCredential(key, beaconId, row.id).url
+        : null;
     tickets.push({
       id: row.id,
       status: row.status,
