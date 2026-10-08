@@ -86,13 +86,17 @@ export async function fetchOrder(orderId: string): Promise<OrderProjection> {
   return (await request<{ order: OrderProjection }>('GET', `/api/orders/${orderId}`)).order;
 }
 
-export type OrderOutcome = 'confirmed' | 'pending' | 'canceled' | 'failed' | 'expired';
+export type OrderOutcome = 'confirmed' | 'pending' | 'canceled' | 'failed' | 'expired' | 'refunded';
 
 /** What the buyer sees after checkout. Webhooks, not the return redirect, decide this. */
 export function orderOutcome(order: OrderProjection): OrderOutcome {
   switch (order.order_state) {
     case 'paid':
+    case 'partially_refunded':
+    case 'disputed':
       return order.fulfillment_state === 'fulfilled' ? 'confirmed' : 'pending';
+    case 'refunded':
+      return 'refunded';
     case 'canceled':
       return 'canceled';
     case 'payment_failed':

@@ -36,6 +36,9 @@ describe('orderOutcome', () => {
     [order('canceled'), 'canceled'],
     [order('payment_failed'), 'failed'],
     [order('expired'), 'expired'],
+    [order('refunded', 'voided'), 'refunded'],
+    [order('partially_refunded', 'fulfilled'), 'confirmed'],
+    [order('disputed', 'fulfilled'), 'confirmed'],
   ])('%o → %s', (projection, outcome) => {
     expect(orderOutcome(projection)).toBe(outcome);
   });
