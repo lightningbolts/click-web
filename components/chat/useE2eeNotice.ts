@@ -261,6 +261,8 @@ export function useE2eeNotice({
         onClick: () => {
           void restoreBrowserHistory(userId, getAuthHeaders).then((count) => {
             toast.success('Unlocked ' + count + ' encrypted conversation epochs.');
+            // If some epochs are still unavailable, the normal approval fallback must reappear.
+            setRecoveryFailed(true);
             window.dispatchEvent(new Event('click-history-restored'));
           }).catch((error: unknown) => {
             setRecoveryFailed(true);
