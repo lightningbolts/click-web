@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 
 const encrypted = z.object({
@@ -17,8 +18,9 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
-  const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success || parsed.data.encryptedBackupKey.ciphertext.length > 256) {
+  const parsed = await parseBody(req, schema);
+  if (!parsed.ok) return parsed.response;
+  if (parsed.data.encryptedBackupKey.ciphertext.length > 256) {
     return NextResponse.json({ error: 'Invalid encrypted recovery enrollment' }, { status: 400 });
   }
   const { data, error } = await createChatGatekeeperAdmin().rpc('enroll_chat_key_recovery', {
