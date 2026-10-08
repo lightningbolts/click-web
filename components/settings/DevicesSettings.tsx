@@ -15,6 +15,11 @@ import { newSignInSubject } from '@/lib/chat/deviceLabel';
 import { loadOrCreateWebE2eeV2Identity, shareWebE2eeV2HistoryWithApprovedDevices } from '@/lib/chat/e2eeV2Client';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { useAuth } from '@/lib/AuthContext';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
+import {
+  enrollBrowserHistoryRecovery, restoreBrowserHistory, refreshBrowserHistoryBackup,
+  addBrowserHistoryRecoveryPasskey, hasUnlockedHistoryRecovery,
+} from '@/lib/chat/browserHistoryRecovery';
 import { formatRelativeShort } from '@/lib/home/format';
 
 type Device = { device_id: string; label: string | null; created_at: string; last_seen_at: string | null };
@@ -35,6 +40,8 @@ export function orderDevices(devices: Device[], thisDevice: string | null): Devi
 export function DevicesSettings() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [busy, setBusy] = useState<string | null>(null);
+  const [recoveryEnrolled, setRecoveryEnrolled] = useState<boolean | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const userId = useAuth().user?.id ?? null;
   // eslint-disable-next-line react-hooks/purity -- relative labels only
@@ -66,6 +73,49 @@ export function DevicesSettings() {
       cancelled = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!userId) { setRecoveryEnrolled(null); return; }
+    let cancelled = false;
+    void authedJson<{ vault: { version: number } | null }>('/api/chat/key-recovery/vault')
+      .then(({ vault }) => { if (!cancelled) setRecoveryEnrolled(Boolean(vault)); })
+      .catch(() => { if (!cancelled) setRecoveryEnrolled(null); });
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const recover = async () => {
+    if (!userId || recoveryEnrolled === null) return;
+    setRecoveryBusy(true);
+    try {
+      if (recoveryEnrolled) {
+        const count = await restoreBrowserHistory(userId, getFreshAuthHeaders);
+        toast.success('Unlocked encrypted history for ' + count + ' conversation epochs.');
+        void refreshBrowserHistoryBackup(userId, getFreshAuthHeaders).catch(() => {});
+      } else {
+        const count = await enrollBrowserHistoryRecovery(userId, getFreshAuthHeaders);
+        setRecoveryEnrolled(true);
+        toast.success('Passkey recovery enabled for ' + count + ' encrypted conversation epochs.');
+      }
+      window.dispatchEvent(new Event('click-history-restored'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not access encrypted history recovery.');
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const addRecoveryCredential = async () => {
+    if (!userId || !hasUnlockedHistoryRecovery(userId)) return;
+    setRecoveryBusy(true);
+    try {
+      await addBrowserHistoryRecoveryPasskey(userId, getFreshAuthHeaders);
+      toast.success('Another passkey can now restore your encrypted history.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not add recovery passkey.');
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
 
   const retry = async () => {
     setState({ kind: 'loading' });
@@ -128,6 +178,29 @@ export function DevicesSettings() {
 
   return (
     <div className="flex flex-col gap-8">
+      {HISTORY_RECOVERY_ENABLED ? <section aria-labelledby="encrypted-history-recovery" className="rounded-lg bg-surface p-4">
+        <h2 id="encrypted-history-recovery" className="type-body font-semibold text-fg">Encrypted history recovery</h2>
+        <p className="type-meta mt-1 text-fg-secondary">
+          {recoveryEnrolled
+            ? 'Unlock older messages in another browser using your recovery passkey. Click cannot decrypt your backup.'
+            : 'Set up a synced passkey to restore the encrypted message history already available on this browser.'}
+          {' '}A new browser may ask for Face ID, Touch ID or your device PIN.
+        </p>
+        <div className="mt-3">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="primary" disabled={recoveryEnrolled === null || recoveryBusy}
+              loading={recoveryBusy} onClick={() => void recover()}>
+              {recoveryEnrolled ? 'Restore history with passkey' : 'Set up passkey recovery'}
+            </Button>
+            {recoveryEnrolled && userId && hasUnlockedHistoryRecovery(userId) ? (
+              <Button size="sm" variant="secondary" disabled={recoveryBusy}
+                onClick={() => void addRecoveryCredential()}>
+                Add another passkey
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </section> : null}
       {state.incoming.length > 0 ? (
         <section aria-labelledby="devices-pending">
           <h2 id="devices-pending" className="type-meta mb-2 px-4 font-semibold text-fg-secondary">

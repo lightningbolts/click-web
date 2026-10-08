@@ -14,6 +14,7 @@ import {
   type DeviceIdentity,
 } from '@/lib/chat/e2eeV2';
 import { thisBrowserDeviceLabel } from '@/lib/chat/deviceLabel';
+import { recoveredHistoryFor } from '@/lib/chat/recoveredHistoryKeys';
 
 type DeviceRow = {
   id: string;
@@ -68,6 +69,16 @@ const sessionResolvedAt = new Map<string, number>();
 const SEND_SESSION_REUSE_MS = 60_000;
 /** Devices registered from this page; registration is idempotent, so once per page is enough. */
 const registeredDeviceIds = new Set<string>();
+
+/** Sign-out boundary: no decrypted session can outlive the account it was resolved for. */
+export function clearWebE2eeV2SessionCaches(): void {
+  for (const session of sessionCache.values()) {
+    for (const key of session.epochKeys.values()) key.fill(0);
+  }
+  sessionCache.clear();
+  sessionResolvedAt.clear();
+  registeredDeviceIds.clear();
+}
 
 function browserIndexedDb(): IDBFactory {
   if (typeof indexedDB === 'undefined') throw new E2eeV2UnavailableError('IndexedDB is required for E2EE v2');
@@ -301,6 +312,8 @@ async function unwrapSession(
   identity: DeviceIdentity & { deviceId: string },
   deviceRowId: string,
   state: EpochState,
+  scope: E2eeV2Scope = 'chat',
+  accountId: string | null = null,
 ): Promise<E2eeV2Session> {
   const currentEpoch = state.current_epoch;
   if (!currentEpoch) throw new E2eeV2UnavailableError('E2EE v2 epoch is not initialized');
@@ -317,7 +330,19 @@ async function unwrapSession(
       });
       keys.set(row.epoch, key);
     } catch {
-      if (row.epoch === currentEpoch) throw new E2eeV2UnavailableError('Unable to unlock the current E2EE v2 epoch');
+      // A matching authenticated passkey recovery may supply this epoch instead.
+      if (row.epoch === currentEpoch &&
+          !(accountId && recoveredHistoryFor(scope, state.chat_id, accountId)?.has(currentEpoch))) {
+        throw new E2eeV2UnavailableError('Unable to unlock the current E2EE v2 epoch');
+      }
+    }
+  }
+  // A passkey-unlocked backup is held only in memory and bound to the signed-in account.
+  // Never replace keys delivered by the existing per-device X25519 envelopes.
+  const recovered = accountId ? recoveredHistoryFor(scope, state.chat_id, accountId) : null;
+  if (recovered) {
+    for (const [epoch, key] of recovered) {
+      if (!keys.has(epoch)) keys.set(epoch, key);
     }
   }
   if (!keys.has(currentEpoch)) throw new E2eeV2UnavailableError('This device is not approved for the current E2EE v2 epoch');
@@ -384,6 +409,23 @@ export function invalidateWebE2eeV2Session(chatId: string, scope: E2eeV2Scope = 
   const key = sessionKey({ chatId, scope });
   sessionCache.delete(key);
   sessionResolvedAt.delete(key);
+}
+
+/** Read the account ID from already-authenticated request headers for local cache isolation.
+ * The API still validates the JWT; decoding here never authorizes server access.
+ */
+function authenticatedAccountId(headers: HeadersInit): string | null {
+  try {
+    const authorization = new Headers(headers).get('Authorization') ?? '';
+    if (!authorization.startsWith('Bearer ')) return null;
+    const token = authorization.slice(7);
+    const base64 = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
+    if (!base64) return null;
+    const decoded = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))) as { sub?: unknown };
+    return typeof decoded.sub === 'string' ? decoded.sub : null;
+  } catch {
+    return null;
+  }
 }
 
 function sessionKey(options: Pick<ResolveSessionOptions, 'chatId' | 'scope'>): string {
@@ -454,7 +496,7 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
       state = await getEpochState(id, identity.deviceId, headers, scope);
     }
   }
-  const session = await unwrapSession(identity, own.id, state);
+  const session = await unwrapSession(identity, own.id, state, scope, authenticatedAccountId(headers));
   sessionCache.set(sessionKey(options), session);
   sessionResolvedAt.set(sessionKey(options), Date.now());
   return session;
@@ -542,7 +584,7 @@ export async function resolveWebHubE2eeV2Session(options: {
     envelopes: state.envelopes
       .filter((row) => row.hub_id === options.hubId && row.recipient_device_id === own.id)
       .map((row) => ({ ...row, chat_id: row.hub_id })),
-  });
+  }, 'hub', authenticatedAccountId(headers));
 }
 
 /**

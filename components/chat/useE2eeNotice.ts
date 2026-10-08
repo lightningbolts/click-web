@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { InlineNoticeVariant } from '@/components/ds/InlineNotice';
 import { toast } from '@/components/ds/Toast';
+import { useAuth } from '@/lib/AuthContext';
+import { restoreBrowserHistory } from '@/lib/chat/browserHistoryRecovery';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import type { DerivedKeys } from '@/lib/chat/crypto';
 import { isBrowserDeviceLabel, isMobileAppDeviceLabel } from '@/lib/chat/deviceLabel';
 import {
@@ -99,6 +102,21 @@ export function useE2eeNotice({
   hasLockedMessages: boolean;
   onKeysChanged: () => void;
 }): { notice: E2eeNotice | null; lockedText: string | null } {
+  const userId = useAuth().user?.id ?? null;
+  const [hasRecovery, setHasRecovery] = useState(false);
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
+  useEffect(() => {
+    setRecoveryFailed(false);
+    if (!HISTORY_RECOVERY_ENABLED || !userId || !chatId || !hasLockedMessages) { setHasRecovery(false); return; }
+    let cancelled = false;
+    void (async () => {
+      const response = await fetch('/api/chat/key-recovery/vault', { headers: await getAuthHeaders() });
+      const data = response.ok ? await response.json() as { vault?: unknown } : {};
+      if (!cancelled) setHasRecovery(Boolean(data.vault));
+    })().catch(() => { if (!cancelled) setHasRecovery(false); });
+    return () => { cancelled = true; };
+  }, [userId, chatId, hasLockedMessages, getAuthHeaders]);
+
   const keysReady = isGroupClique ? Boolean(groupMasterKey) : Boolean(e2eKeys);
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -138,6 +156,14 @@ export function useE2eeNotice({
     if (!chatId || !keysReady) return;
     void check(chatId, false);
   }, [chatId, keysReady, check]);
+
+  // A passkey restored epoch keys in Settings; re-resolve this open chat immediately.
+  useEffect(() => {
+    if (!chatId) return;
+    const onRestore = () => { void check(chatId, true); };
+    window.addEventListener('click-history-restored', onRestore);
+    return () => window.removeEventListener('click-history-restored', onRestore);
+  }, [chatId, check]);
 
   // Messages that turned out unreadable after the first check: learn why (once).
   const state = device && device.chatId === chatId ? device.state : null;
@@ -230,8 +256,27 @@ export function useE2eeNotice({
     }
   };
   const hidden = view.action === 'dismiss' && dismissedChats.has(chatId);
+  const recoverAction: E2eeNotice['action'] = hasRecovery && !recoveryFailed && hasLockedMessages && userId
+    ? {
+        label: 'Recover with passkey',
+        onClick: () => {
+          void restoreBrowserHistory(userId, getAuthHeaders).then((count) => {
+            toast.success('Unlocked ' + count + ' encrypted conversation epochs.');
+            // If some epochs are still unavailable, the normal approval fallback must reappear.
+            setRecoveryFailed(true);
+            window.dispatchEvent(new Event('click-history-restored'));
+          }).catch((error: unknown) => {
+            setRecoveryFailed(true);
+            toast.error(error instanceof Error ? error.message : 'Could not unlock history with this passkey.');
+          });
+        },
+      }
+    : null;
   return {
-    notice: hidden ? null : { key: view.key, variant: view.variant, text: view.text, action: actionFor(view.action) },
+    notice: hidden && !recoverAction ? null : {
+      key: view.key, variant: view.variant, text: view.text,
+      action: recoverAction ?? actionFor(view.action),
+    },
     lockedText: view.lockedText,
   };
 }
