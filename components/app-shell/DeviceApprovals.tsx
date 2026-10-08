@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ds/Dialog';
 import { toast } from '@/components/ds/Toast';
 import { useAuth } from '@/lib/AuthContext';
 import { refreshBrowserHistoryBackup, resetBrowserHistoryRecovery } from '@/lib/chat/browserHistoryRecovery';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { authedJson } from '@/lib/api/authedJson';
 import { decideDeviceRequest } from '@/lib/chat/decideDeviceRequest';
@@ -59,7 +60,7 @@ export function DeviceApprovals() {
       lastSync.current = Date.now();
       // Sharing registers this browser first; the request list needs it registered.
       await share(id);
-      void refreshBrowserHistoryBackup(id, getFreshAuthHeaders).catch(() => {});
+      if (HISTORY_RECOVERY_ENABLED) void refreshBrowserHistoryBackup(id, getFreshAuthHeaders).catch(() => {});
       const { deviceId } = await loadOrCreateWebE2eeV2Identity();
       const { incoming } = await authedJson<{ incoming: Incoming[] }>(
         `/api/chat/devices/history-requests?device_id=${encodeURIComponent(deviceId)}`,
