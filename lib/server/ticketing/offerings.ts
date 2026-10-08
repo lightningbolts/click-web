@@ -1,7 +1,5 @@
-import 'server-only';
-
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ticketingEnabled } from '@/lib/server/ticketing/flags';
+import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
 import type {
   EventTicketing,
   ManagedTier,

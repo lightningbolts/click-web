@@ -28,6 +28,7 @@ export function publicEventFixture(overrides: Partial<PublicEventPayload> = {}):
     place: null,
     categories: [],
     venue_id: null,
+    ticketing: null,
     ...overrides,
   };
 }
