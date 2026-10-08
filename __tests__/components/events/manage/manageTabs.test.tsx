@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { guestRows, ManageGuests } from "@/components/events/manage/ManageGuests";
 import { manageTabs } from "@/components/events/manage/ManageHeader";
-import { manageNextSteps } from "@/components/events/manage/ManageOverview";
+import { ManageOverview, manageNextSteps } from "@/components/events/manage/ManageOverview";
+import { publicEventFixture } from "@/__tests__/helpers/publicEventFixture";
 import { recapStage } from "@/components/events/manage/ManageRecap";
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ refresh: jest.fn() }), usePathname: () => "/" }));
@@ -14,6 +15,23 @@ describe("manage tabs (spec §7.6.4)", () => {
   it("hides Edit from read-only viewers", () => {
     expect(manageTabs("b1", "manage").map((t) => t.label)).toEqual(["Overview", "Guests", "Edit", "Insights", "Recap & summary"]);
     expect(manageTabs("b1", "view").map((t) => t.href)).not.toContain("/e/b1/manage/edit");
+  });
+
+  it("adds Tickets only for ticketed events", () => {
+    expect(manageTabs("b1", "manage", true).map((t) => t.label)).toEqual(["Overview", "Guests", "Tickets", "Edit", "Insights", "Recap & summary"]);
+    expect(manageTabs("b1", "view", false).map((t) => t.label)).not.toContain("Tickets");
+  });
+
+  it("sums up ticket sales on the overview of a ticketed event", () => {
+    const sales = { sold: 87, capacity: 120, checked_in: 42, gross_cents: 130500, refunded_cents: 0, net_cents: 0, refundable_orders: 0, currency: "usd", tiers: [] };
+    const event = publicEventFixture({ beacon_id: "b1" });
+    const { rerender } = render(<ManageOverview event={event} counts={counts} access="manage" ended={false} summaryPublished={false} sales={sales} />);
+    const card = screen.getByRole("region", { name: "Tickets" });
+    expect(card).toHaveTextContent("87 / 120");
+    expect(card).toHaveTextContent("$1,305");
+    expect(screen.getByRole("link", { name: "See all" })).toHaveAttribute("href", "/e/b1/manage/tickets");
+    rerender(<ManageOverview event={event} counts={counts} access="manage" ended={false} summaryPublished={false} />);
+    expect(screen.queryByRole("region", { name: "Tickets" })).not.toBeInTheDocument();
   });
 
   it("orders next steps by urgency and switches after the event", () => {

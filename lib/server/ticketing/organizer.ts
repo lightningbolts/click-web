@@ -34,12 +34,14 @@ export async function loadSalesSummary(admin: SupabaseClient, beaconId: string):
   let gross = 0;
   let refunded = 0;
   let feeKept = 0;
+  let refundableOrders = 0;
   for (const order of orders) {
     const orderRefunded = (order.ticket_refunds ?? [])
       .filter((refund) => refund.status === 'succeeded')
       .reduce((sum, refund) => sum + refund.amount, 0);
     gross += order.total_amount;
     refunded += orderRefunded;
+    if (order.total_amount > orderRefunded) refundableOrders += 1;
     if (order.total_amount > 0) {
       feeKept += Math.round(order.platform_fee_amount * (1 - orderRefunded / order.total_amount));
     }
@@ -52,6 +54,7 @@ export async function loadSalesSummary(admin: SupabaseClient, beaconId: string):
     gross_cents: gross,
     refunded_cents: refunded,
     net_cents: gross - refunded - feeKept,
+    refundable_orders: refundableOrders,
     currency: orders[0]?.currency ?? tiers[0]?.currency ?? 'usd',
     tiers: tiers.map((tier) => ({
       id: tier.id,

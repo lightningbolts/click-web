@@ -190,6 +190,14 @@ export function cancelEvent(beaconId: string): Promise<{ refunds_started: number
   return request('POST', `/api/beacons/${beaconId}/cancel`);
 }
 
+/** The door scanner's verdict for one ticket ("checked_in", "already_checked_in", "refunded", …). */
+export type TicketScan = { result: string; checked_in_at: string | null };
+
+/** Admit a ticket by hand from the attendee list (same path as scanning its QR). */
+export function checkInTicket(beaconId: string, ticketId: string): Promise<TicketScan> {
+  return request('POST', `/api/beacons/${beaconId}/pass/scan`, { ticket_id: ticketId });
+}
+
 export type PayoutStatus = { onboarding_state: string; can_sell: boolean };
 
 export function fetchPayoutStatus(): Promise<PayoutStatus> {

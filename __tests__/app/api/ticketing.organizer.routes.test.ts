@@ -117,6 +117,8 @@ describe('organizer ticketing routes', () => {
       gross_cents: 5500,
       refunded_cents: 1500,
       net_cents: 5500 - 1500 - 75 - 125,
+      // o1 (half refunded) and o2 still have money to give back; o3 was free.
+      refundable_orders: 2,
       currency: 'usd',
       tiers: [
         { id: GA, name: 'GA', sold: 1, capacity: 100, unit_amount: 1500 },

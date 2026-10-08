@@ -1,4 +1,4 @@
-import { formatFromPrice, formatMoney } from '@/lib/ticketing/money';
+import { formatAmount, formatFromPrice, formatMoney } from '@/lib/ticketing/money';
 
 describe('formatMoney', () => {
   it('shows free, whole and fractional amounts', () => {
@@ -14,5 +14,13 @@ describe('formatFromPrice', () => {
     expect(formatFromPrice(1200, 'usd')).toBe('$12');
     expect(formatFromPrice(1250, 'usd')).toBe('$12.50');
     expect(formatFromPrice(0, 'usd')).toBe('Free');
+  });
+});
+
+describe('formatAmount', () => {
+  it('totals in whole dollars when it can, and never says Free', () => {
+    expect(formatAmount(130500, 'usd')).toBe('$1,305');
+    expect(formatAmount(1250, 'usd')).toBe('$12.50');
+    expect(formatAmount(0, 'usd')).toBe('$0');
   });
 });

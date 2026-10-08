@@ -5,6 +5,7 @@ jest.mock('@/lib/auth/freshAuthHeaders', () => ({ getFreshAuthHeaders: async () 
 
 import {
   TicketingError,
+  checkInTicket,
   orderOutcome,
   startCheckout,
   ticketingErrorMessage,
@@ -67,6 +68,17 @@ describe('startCheckout', () => {
     global.fetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     const error = await startCheckout(EVENT, []).catch((e: unknown) => e);
     expect(error).toMatchObject({ status: 0, code: 'network' });
+  });
+});
+
+describe('checkInTicket', () => {
+  it('admits one ticket by id through the door scanner', async () => {
+    const fetchMock = respond(200, { result: 'checked_in', checked_in_at: '2026-10-10T03:04:00Z', attendee: null });
+    global.fetch = fetchMock;
+    await expect(checkInTicket(EVENT, 't1')).resolves.toMatchObject({ result: 'checked_in', checked_in_at: '2026-10-10T03:04:00Z' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`/api/beacons/${EVENT}/pass/scan`);
+    expect(JSON.parse(init.body)).toEqual({ ticket_id: 't1' });
   });
 });
 

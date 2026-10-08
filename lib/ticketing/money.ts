@@ -20,3 +20,8 @@ export function formatFromPrice(cents: number, currency: string): string {
   if (cents === 0) return 'Free';
   return formatter(currency, cents % 100 === 0).format(cents / 100);
 }
+
+/** Totals for dashboards: "$1,305", "$12.50", "$0" (an amount, so zero is not "Free"). */
+export function formatAmount(cents: number, currency: string): string {
+  return formatter(currency, cents % 100 === 0).format(cents / 100);
+}

@@ -7,6 +7,7 @@ import EventForm from "@/components/events/EventForm";
 import { ManageGuests } from "@/components/events/manage/ManageGuests";
 import { ManageInsights } from "@/components/events/manage/ManageInsights";
 import { ManageOverview } from "@/components/events/manage/ManageOverview";
+import { ManageTickets } from "@/components/events/manage/ManageTickets";
 import { ManageRecap, recapStage } from "@/components/events/manage/ManageRecap";
 import { loadEventEditDraft } from "@/lib/events/eventEditDraft";
 import { loadGuestRsvps, loadManageAttendees, loadManageCounts, loadRsvpRequests } from "@/lib/events/eventManageData";
@@ -18,15 +19,17 @@ import { loadDropEvent, eventDropsConfigFrom } from "@/lib/server/eventDrops";
 import { loadEventManageContext } from "@/lib/server/events/loadEventManage";
 import { resolveFeature } from "@/lib/server/featureFlags";
 import { ticketingEnabled } from "@/lib/server/ticketing/enabled";
+import { loadSalesSummary, searchAttendees } from "@/lib/server/ticketing/organizer";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
 
 export const dynamic = "force-dynamic";
 
-const TABS = ["guests", "edit", "insights", "recap"] as const;
+const TABS = ["guests", "tickets", "edit", "insights", "recap"] as const;
 type Tab = "overview" | (typeof TABS)[number];
 const TAB_TITLE: Record<Tab, string> = {
   overview: "Manage",
   guests: "Guests",
+  tickets: "Tickets",
   edit: "Edit",
   insights: "Insights",
   recap: "Recap & summary",
@@ -63,8 +66,31 @@ export default async function EventManageTabPage({ params }: { params: Params })
 
   switch (tab) {
     case "overview": {
-      const counts = await loadManageCounts(admin, beaconId);
-      return <ManageOverview event={event} counts={counts} access={access} ended={ended} summaryPublished={ctx.summary.published} />;
+      const [counts, sales] = await Promise.all([
+        loadManageCounts(admin, beaconId),
+        event.ticketing ? loadSalesSummary(admin, beaconId) : Promise.resolve(null),
+      ]);
+      return (
+        <ManageOverview event={event} counts={counts} access={access} ended={ended} summaryPublished={ctx.summary.published} sales={sales} />
+      );
+    }
+    case "tickets": {
+      // event.ticketing is null for RSVP events and whenever the rollout flag is off.
+      if (!event.ticketing) notFound();
+      const [summary, initialAttendees] = await Promise.all([
+        loadSalesSummary(admin, beaconId),
+        searchAttendees(admin, beaconId, "", null, access),
+      ]);
+      return (
+        <ManageTickets
+          beaconId={beaconId}
+          access={access}
+          summary={summary}
+          initialAttendees={initialAttendees}
+          cancelled={event.ticketing.cancelled}
+          timeZone={event.timezone ?? "UTC"}
+        />
+      );
     }
     case "guests": {
       const [requests, attendees, guests, guestList] = await Promise.all([

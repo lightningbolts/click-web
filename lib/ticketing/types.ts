@@ -89,6 +89,8 @@ export type TicketSalesSummary = {
   refunded_cents: number;
   /** What the organizer receives: gross less refunds and the part of Click's fee it keeps. */
   net_cents: number;
+  /** Paid orders with money left to refund: what cancelling the event would refund. */
+  refundable_orders: number;
   currency: string;
   tiers: { id: string; name: string; sold: number; capacity: number; unit_amount: number }[];
 };
