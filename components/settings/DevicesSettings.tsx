@@ -17,6 +17,7 @@ import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { useAuth } from '@/lib/AuthContext';
 import {
   enrollBrowserHistoryRecovery, restoreBrowserHistory, refreshBrowserHistoryBackup,
+  addBrowserHistoryRecoveryPasskey, hasUnlockedHistoryRecovery,
 } from '@/lib/chat/browserHistoryRecovery';
 import { formatRelativeShort } from '@/lib/home/format';
 
@@ -102,6 +103,19 @@ export function DevicesSettings() {
     }
   };
 
+  const addRecoveryCredential = async () => {
+    if (!userId || !hasUnlockedHistoryRecovery(userId)) return;
+    setRecoveryBusy(true);
+    try {
+      await addBrowserHistoryRecoveryPasskey(userId, getFreshAuthHeaders);
+      toast.success('Another passkey can now restore your encrypted history.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not add recovery passkey.');
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
   const retry = async () => {
     setState({ kind: 'loading' });
     setState(await load());
@@ -172,10 +186,18 @@ export function DevicesSettings() {
           {' '}A new browser may ask for Face ID, Touch ID or your device PIN.
         </p>
         <div className="mt-3">
-          <Button size="sm" variant="primary" disabled={recoveryEnrolled === null || recoveryBusy}
-            loading={recoveryBusy} onClick={() => void recover()}>
-            {recoveryEnrolled ? 'Restore history with passkey' : 'Set up passkey recovery'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="primary" disabled={recoveryEnrolled === null || recoveryBusy}
+              loading={recoveryBusy} onClick={() => void recover()}>
+              {recoveryEnrolled ? 'Restore history with passkey' : 'Set up passkey recovery'}
+            </Button>
+            {recoveryEnrolled && userId && hasUnlockedHistoryRecovery(userId) ? (
+              <Button size="sm" variant="secondary" disabled={recoveryBusy}
+                onClick={() => void addRecoveryCredential()}>
+                Add another passkey
+              </Button>
+            ) : null}
+          </div>
         </div>
       </section>
       {state.incoming.length > 0 ? (
