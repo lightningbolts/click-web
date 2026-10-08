@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import { z } from 'zod';
 import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
@@ -16,6 +17,7 @@ const schema = z.object({
 
 // Passkey PRF is evaluated only on the client. Enrollment is atomic on the database.
 export async function POST(req: NextRequest) {
+  if (!HISTORY_RECOVERY_ENABLED) return NextResponse.json({ error: 'Recovery not enabled' }, { status: 404 });
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
   const parsed = await parseBody(req, schema);
