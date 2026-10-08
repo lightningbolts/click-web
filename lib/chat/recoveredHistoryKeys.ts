@@ -8,11 +8,15 @@ function fromB64(value: string): Uint8Array {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 }
 export function clearRecoveredHistory(): void {
+  for (const epochs of restored.values()) {
+    for (const key of epochs.values()) key.fill(0);
+  }
   restored.clear();
   activeAccount = null;
 }
 export function installRecoveredHistory(manifest: HistoryKeyManifest): void {
-  clearRecoveredHistory();
+  // A same-account refresh must not zero keys still held by live chat sessions.
+  if (activeAccount !== manifest.userId) clearRecoveredHistory();
   activeAccount = manifest.userId;
   for (const key of manifest.keys) {
     const bytes = fromB64(key.key);
