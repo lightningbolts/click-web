@@ -2,8 +2,10 @@ import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import type {
   ManagedTier,
   MyTicketsGroup,
+  OrderSummary,
   OwnedTicket,
   TicketAttendee,
+  TicketEventRef,
   TicketOffering,
   TicketSalesSummary,
   TicketingStatus,
@@ -110,6 +112,13 @@ export function orderOutcome(order: OrderProjection): OrderOutcome {
 
 export async function fetchEventTickets(beaconId: string): Promise<OwnedTicket[]> {
   return (await request<{ tickets: OwnedTicket[] }>('GET', `/api/beacons/${beaconId}/tickets`)).tickets;
+}
+
+export type TicketDetail = { ticket: OwnedTicket; event: TicketEventRef; order: OrderSummary };
+
+/** `GET /api/tickets/:id`: one of your tickets with its event and receipt. */
+export async function fetchTicketDetail(ticketId: string): Promise<TicketDetail> {
+  return request<TicketDetail>('GET', `/api/tickets/${ticketId}`);
 }
 
 export async function fetchMyTickets(scope: 'upcoming' | 'past'): Promise<MyTicketsGroup[]> {

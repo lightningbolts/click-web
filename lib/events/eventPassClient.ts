@@ -1,4 +1,6 @@
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
+import { fetchEventTickets } from '@/lib/ticketing/ticketingClient';
+import type { OwnedTicket } from '@/lib/ticketing/types';
 
 /** `GET /api/beacons/{id}/pass` (spec 06 §1). */
 export type ClickPass = {
@@ -10,9 +12,14 @@ export type ClickPass = {
 
 /**
  * What the pass screen shows: the pass, "RSVP first" (403 `not_going`), or "not available right
- * now" (503 `pass_unavailable`: the server can't sign passes; the RSVP still counts).
+ * now" (503 `pass_unavailable`: the server can't sign passes; the RSVP still counts). On a
+ * ticketed event it shows your tickets instead, and `not_going` means you hold none.
  */
-export type ClickPassState = { kind: 'ready'; pass: ClickPass } | { kind: 'not_going' } | { kind: 'unavailable' };
+export type ClickPassState =
+  | { kind: 'ready'; pass: ClickPass }
+  | { kind: 'tickets'; tickets: OwnedTicket[] }
+  | { kind: 'not_going' }
+  | { kind: 'unavailable' };
 
 export function clickPassUrl(beaconId: string): string {
   return `/api/beacons/${beaconId}/pass`;
@@ -25,6 +32,12 @@ export async function fetchClickPass(url: string): Promise<ClickPassState> {
   if (res.status === 503) return { kind: 'unavailable' };
   if (!res.ok) throw new Error(`pass ${res.status}`);
   return { kind: 'ready', pass: (await res.json()) as ClickPass };
+}
+
+/** Your tickets for a ticketed event. Throws on network and server errors, like `fetchClickPass`. */
+export async function fetchTicketPass(beaconId: string): Promise<ClickPassState> {
+  const tickets = await fetchEventTickets(beaconId);
+  return tickets.length ? { kind: 'tickets', tickets } : { kind: 'not_going' };
 }
 
 /** The event is on, or starts within the hour: the host may scan at any moment. */
