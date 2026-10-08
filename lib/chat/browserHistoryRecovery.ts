@@ -180,6 +180,7 @@ export async function restoreBrowserHistory(userId: string, getAuthHeaders: Auth
 export async function refreshBrowserHistoryBackup(userId: string, getAuthHeaders: AuthHeaders): Promise<number> {
   if (!activeBackup || activeBackup.userId !== userId || Date.now() - lastBackup < REFRESH_INTERVAL_MS) return 0;
   lastBackup = Date.now();
+  let succeeded = false;
   const key = activeBackup.key;
   try {
     const newlyAvailable = await exportedHistory(userId, getAuthHeaders);
@@ -189,7 +190,7 @@ export async function refreshBrowserHistoryBackup(userId: string, getAuthHeaders
       const existing = await decryptHistoryManifest(key, vault.encryptedManifest, userId);
       const merged = new Map(existing.keys.map((record) => [keyId(record), record]));
       for (const record of newlyAvailable.keys) merged.set(keyId(record), record);
-      if (merged.size === existing.keys.length) return 0;
+      if (merged.size === existing.keys.length) { succeeded = true; return 0; }
       const manifest: HistoryKeyManifest = { version: 1, userId, keys: [...merged.values()] };
       const encryptedManifest = await encryptHistoryManifest(key, manifest);
       try {
@@ -197,6 +198,7 @@ export async function refreshBrowserHistoryBackup(userId: string, getAuthHeaders
           method: 'PUT', body: JSON.stringify({ expectedVersion: vault.version, encryptedManifest }),
         });
         installRecoveredHistory(manifest);
+        succeeded = true;
         return merged.size - existing.keys.length;
       } catch (error) {
         if (!(error instanceof Error) || !/Version conflict/.test(error.message) || attempt === 1) throw error;
@@ -204,7 +206,7 @@ export async function refreshBrowserHistoryBackup(userId: string, getAuthHeaders
     }
   } finally {
     // Failure is retryable; do not throttle an unsuccessful backup.
-    lastBackup = 0;
+    if (!succeeded) lastBackup = 0;
   }
   return 0;
 }
