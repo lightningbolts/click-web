@@ -100,7 +100,7 @@ async function open(key: Uint8Array, payload: EncryptedRecoveryPayload, userId: 
   if (ciphertext.length > MAX_PAYLOAD_BYTES) throw new Error('Recovery payload too large');
   const plain = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: new Uint8Array(iv), additionalData: new Uint8Array(aad(userId, kind)), tagLength: 128 },
-    await aesKey(key), ciphertext,
+    await aesKey(key), new Uint8Array(ciphertext),
   );
   return new Uint8Array(plain);
 }
