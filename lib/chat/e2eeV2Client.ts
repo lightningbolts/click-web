@@ -153,14 +153,14 @@ async function identityWithDeviceId(identity: DeviceIdentity): Promise<DeviceIde
 /**
  * This browser's one device identity. Concurrent callers share one load: on a first visit the
  * page's chat, approval and sharing code all ask at once, and each minting its own identity made
- * the server see several new devices (a push, an approval prompt and an email for each).
+ * the server see several new devices (a push, an approval prompt and an email for each). Once the
+ * load settles, IndexedDB stays the source of truth, so later callers read it again.
  */
 let identityLoad: Promise<DeviceIdentity & { deviceId: string }> | null = null;
 
 export function loadOrCreateWebE2eeV2Identity(): Promise<DeviceIdentity & { deviceId: string }> {
-  identityLoad ??= loadOrCreateIdentity().catch((error: unknown) => {
-    identityLoad = null; // e.g. storage was briefly unavailable: the next caller tries again
-    throw error;
+  identityLoad ??= loadOrCreateIdentity().finally(() => {
+    identityLoad = null;
   });
   return identityLoad;
 }
