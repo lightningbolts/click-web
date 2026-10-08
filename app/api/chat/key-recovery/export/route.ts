@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 
 // Return ciphertext envelopes only; the browser unwraps with its non-extractable X25519 key.
@@ -7,6 +8,7 @@ const PAGE = 100;
 const DEVICE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export async function GET(req: NextRequest) {
+  if (!HISTORY_RECOVERY_ENABLED) return NextResponse.json({ error: 'Recovery not enabled' }, { status: 404 });
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
   const deviceId = req.nextUrl.searchParams.get('device_id') ?? '';
