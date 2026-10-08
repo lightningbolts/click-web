@@ -125,6 +125,8 @@ export function walletPassJson(args: {
   holder: { userId: string; name: string };
   /** The card's color under its background picture (`passArt`). */
   backgroundColor: string;
+  /** A ticket's pass: one per ticket, named by its type. `pass` is then the ticket's credential. */
+  ticket?: { id: string; tierName: string };
 }): Record<string, unknown> {
   const { event, pass } = args;
   const title = eventDisplayTitle(event.title, event.location_name);
@@ -144,6 +146,7 @@ export function walletPassJson(args: {
     );
   }
   const auxiliary: Array<Record<string, unknown>> = [{ key: 'guest', label: 'GUEST', value: args.holder.name }];
+  if (args.ticket) auxiliary.push({ key: 'ticket', label: 'TICKET', value: args.ticket.tierName });
   if (event.location_name) auxiliary.push({ key: 'place', label: 'WHERE', value: event.location_name });
 
   const back: Array<Record<string, unknown>> = [
@@ -160,7 +163,7 @@ export function walletPassJson(args: {
     formatVersion: 1,
     passTypeIdentifier: args.config.passTypeIdentifier,
     teamIdentifier: args.config.teamIdentifier,
-    serialNumber: `${event.beacon_id}:${args.holder.userId}`,
+    serialNumber: args.ticket?.id ?? `${event.beacon_id}:${args.holder.userId}`,
     organizationName: 'Click',
     description: `Click Pass · ${title}`,
     logoText: 'Click',
