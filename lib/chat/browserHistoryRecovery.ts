@@ -55,16 +55,16 @@ function requirePasskeys(): void {
     throw new Error('Passkey recovery requires a compatible secure browser');
   }
 }
-async function credentialPRF(credentialId: string, userId: string): Promise<Uint8Array> {
+async function credentialPRF(credentialIds: string[], userId: string): Promise<{ credentialId: string; output: Uint8Array }> {
   requirePasskeys();
   const publicKey: PublicKeyCredentialRequestOptions = {
     challenge: challenge(),
     userVerification: 'required',
-    allowCredentials: [{ type: 'public-key', id: fromB64url(credentialId) }],
+    allowCredentials: credentialIds.map((id) => ({ type: 'public-key' as const, id: fromB64url(id) })),
     extensions: { prf: { eval: { first: await prfInput(userId) } } },
   };
   const credential = await navigator.credentials.get({ publicKey }) as PublicKeyCredential | null;
-  if (!credential || b64url(new Uint8Array(credential.rawId)) !== credentialId) {
+  if (!credential || !credentialIds.includes(b64url(new Uint8Array(credential.rawId)))) {
     throw new Error('Recovery passkey not available');
   }
   const extension = credential.getClientExtensionResults() as AuthenticationExtensionsClientOutputs & {
@@ -74,7 +74,7 @@ async function credentialPRF(credentialId: string, userId: string): Promise<Uint
   if (!first || first.byteLength !== 32) {
     throw new Error('This passkey does not support encrypted-history recovery');
   }
-  return new Uint8Array(first);
+  return { credentialId: b64url(new Uint8Array(credential.rawId)), output: new Uint8Array(first) };
 }
 async function createCredential(userId: string): Promise<string> {
   requirePasskeys();
@@ -145,8 +145,8 @@ export async function enrollBrowserHistoryRecovery(userId: string, getAuthHeader
     throw new Error('Approve this browser to read your historical messages before setting up recovery');
   }
   const credentialId = await createCredential(userId);
-  const prf = await credentialPRF(credentialId, userId);
-  const wrappingKey = await deriveWrappingKey(prf);
+  const prf = await credentialPRF([credentialId], userId);
+  const wrappingKey = await deriveWrappingKey(prf.output);
   const backupKey = generateBackupKey();
   const [encryptedManifest, encryptedBackupKey] = await Promise.all([
     encryptHistoryManifest(backupKey, manifest),
@@ -165,15 +165,33 @@ export async function enrollBrowserHistoryRecovery(userId: string, getAuthHeader
 export async function restoreBrowserHistory(userId: string, getAuthHeaders: AuthHeaders): Promise<number> {
   const [vault, credentials] = await Promise.all([currentVault(getAuthHeaders), existingCredentials(getAuthHeaders)]);
   if (!vault || credentials.length === 0) throw new Error('Encrypted history recovery is not set up');
-  const selected = credentials[0];
-  const prf = await credentialPRF(selected.credentialId, userId);
-  const wrappingKey = await deriveWrappingKey(prf);
+  const prf = await credentialPRF(credentials.map((credential) => credential.credentialId), userId);
+  const selected = credentials.find((credential) => credential.credentialId === prf.credentialId);
+  if (!selected) throw new Error('Unrecognized recovery passkey');
+  const wrappingKey = await deriveWrappingKey(prf.output);
   const backupKey = await unwrapBackupKey(wrappingKey, selected.encryptedBackupKey, userId);
   const manifest = await decryptHistoryManifest(backupKey, vault.encryptedManifest, userId);
   activeBackup = { userId, key: backupKey };
   installRecoveredHistory(manifest);
   lastBackup = 0;
   return manifest.keys.length;
+}
+
+/** Register a second recovery credential using the already-unlocked backup key. */
+export async function addBrowserHistoryRecoveryPasskey(userId: string, getAuthHeaders: AuthHeaders): Promise<void> {
+  if (!activeBackup || activeBackup.userId !== userId) {
+    throw new Error('Unlock your existing recovery passkey before adding another');
+  }
+  const credentialId = await createCredential(userId);
+  const prf = await credentialPRF([credentialId], userId);
+  const key = await deriveWrappingKey(prf.output);
+  const encryptedBackupKey = await wrapBackupKey(key, activeBackup.key, userId);
+  await json(getAuthHeaders, '/api/chat/key-recovery/credentials', {
+    method: 'POST', body: JSON.stringify({ credentialId, encryptedBackupKey }),
+  });
+}
+export function hasUnlockedHistoryRecovery(userId: string): boolean {
+  return activeBackup?.userId === userId;
 }
 
 /** Refresh held keys without another passkey prompt while the recovery key is already in memory. */
