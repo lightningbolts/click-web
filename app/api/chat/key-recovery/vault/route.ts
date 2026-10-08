@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import { z } from 'zod';
 import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
@@ -15,6 +16,7 @@ const putSchema = z.object({
 
 // No secret key ever crosses these endpoints. Compare-and-swap prevents lost updates.
 export async function GET(req: NextRequest) {
+  if (!HISTORY_RECOVERY_ENABLED) return NextResponse.json({ error: 'Recovery not enabled' }, { status: 404 });
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
   const { data, error } = await createChatGatekeeperAdmin()
@@ -26,6 +28,7 @@ export async function GET(req: NextRequest) {
     { headers: { 'Cache-Control': 'no-store' } });
 }
 export async function PUT(req: NextRequest) {
+  if (!HISTORY_RECOVERY_ENABLED) return NextResponse.json({ error: 'Recovery not enabled' }, { status: 404 });
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
   const parsed = await parseBody(req, putSchema);
