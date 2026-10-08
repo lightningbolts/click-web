@@ -1,4 +1,4 @@
-import { clampSelection, ctaLabel, selectionTotal } from '@/lib/ticketing/selection';
+import { clampSelection, ctaLabel, pickQuantity, selectionTotal } from '@/lib/ticketing/selection';
 import type { TicketOffering } from '@/lib/ticketing/types';
 
 const offering = (id: string, over: Partial<TicketOffering> = {}): TicketOffering => ({
@@ -23,6 +23,23 @@ describe('clampSelection', () => {
 
   it('drops zero and negative quantities', () => {
     expect(clampSelection({ ga: 0, vip: -1 }, [offering('ga'), offering('vip')])).toEqual({});
+  });
+});
+
+describe('pickQuantity', () => {
+  const list = [offering('ga', { unit_amount: 1500 }), offering('vip', { unit_amount: 4500 }), offering('free', { unit_amount: 0 })];
+
+  it('adds to tickets of the same kind', () => {
+    expect(pickQuantity({ ga: 1 }, list, 'vip', 2)).toEqual({ ga: 1, vip: 2 });
+  });
+
+  it('never mixes free and paid tickets in one order', () => {
+    expect(pickQuantity({ ga: 1, vip: 2 }, list, 'free', 1)).toEqual({ free: 1 });
+    expect(pickQuantity({ free: 2 }, list, 'ga', 1)).toEqual({ ga: 1 });
+  });
+
+  it('lowering a line keeps the rest', () => {
+    expect(pickQuantity({ ga: 2, vip: 1 }, list, 'ga', 0)).toEqual({ ga: 0, vip: 1 });
   });
 });
 

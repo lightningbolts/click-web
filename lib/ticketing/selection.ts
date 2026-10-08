@@ -23,6 +23,22 @@ export function clampSelection(selection: Selection, offerings: readonly TicketO
   return clamped;
 }
 
+/**
+ * Sets one tier's quantity. Free and paid tickets are separate orders (the server refuses a mix),
+ * so picking one kind clears lines of the other.
+ */
+export function pickQuantity(
+  selection: Selection,
+  offerings: readonly TicketOffering[],
+  tierId: string,
+  quantity: number,
+): Selection {
+  const free = new Set(offerings.filter((o) => o.unit_amount === 0).map((o) => o.id));
+  const kind = free.has(tierId);
+  const kept = quantity > 0 ? Object.fromEntries(Object.entries(selection).filter(([id]) => free.has(id) === kind)) : selection;
+  return { ...kept, [tierId]: quantity };
+}
+
 /** The order summary, in the organizer's tier order. */
 export function selectionTotal(selection: Selection, offerings: readonly TicketOffering[]): SelectionTotal {
   const lines = offerings

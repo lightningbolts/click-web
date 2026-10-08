@@ -93,6 +93,16 @@ describe("TicketPurchaseCard", () => {
     expect(more).toBeDisabled();
   });
 
+  it("keeps free and paid tickets in separate orders", async () => {
+    mockFetchOfferings.mockResolvedValue([offering("ga", { name: "General", unit_amount: 1500 }), offering("crew", { name: "Volunteer", unit_amount: 0 })]);
+    renderCard();
+    await userEvent.click(await screen.findByRole("button", { name: "More General" }));
+    expect(cta()).toHaveTextContent("Checkout · $15.00");
+    await userEvent.click(screen.getByRole("button", { name: "More Volunteer" }));
+    expect(cta()).toHaveTextContent("Claim free ticket");
+    expect(screen.getByText("Free and paid tickets are separate orders.")).toBeInTheDocument();
+  });
+
   it("claims free tickets and opens them", async () => {
     mockFetchOfferings.mockResolvedValue([offering("free", { unit_amount: 0 })]);
     mockStartCheckout.mockResolvedValue({ order_id: "o", status: "fulfilled" });

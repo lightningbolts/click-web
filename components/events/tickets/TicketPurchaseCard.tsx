@@ -14,7 +14,7 @@ import { eventPassPath, eventSharePath } from "@/lib/events/eventUrls";
 import { assignLocation } from "@/lib/navigation/assignLocation";
 import { loginHref } from "@/lib/shell/appNav";
 import { formatMoney } from "@/lib/ticketing/money";
-import { clampSelection, ctaLabel, selectionTotal, type Selection } from "@/lib/ticketing/selection";
+import { clampSelection, ctaLabel, pickQuantity, selectionTotal, type Selection } from "@/lib/ticketing/selection";
 import {
   TicketingError,
   fetchOfferings,
@@ -130,10 +130,12 @@ export function TicketPurchaseCard({
   const summary = selectionTotal(selection, list);
   const currency = list[0]?.currency ?? ticketing.currency;
   const onSale = list.some((o) => o.availability === "on_sale" && o.max_quantity > 0);
+  // Free and paid tickets check out separately; say so wherever both are offered.
+  const mixed = list.some((o) => o.unit_amount === 0) && list.some((o) => o.unit_amount > 0);
 
   const setQuantity = (tierId: string, quantity: number) => {
     setError(null);
-    setPicked({ ...selection, [tierId]: quantity });
+    setPicked(pickQuantity(selection, list, tierId, quantity));
   };
 
   const submit = async () => {
@@ -210,6 +212,7 @@ export function TicketPurchaseCard({
                   {stepper(offering)}
                 </li>
               ))}
+              {mixed ? <li className="type-meta pb-1 text-fg-tertiary">Free and paid tickets are separate orders.</li> : null}
             </ul>
           ) : (
             <p className="type-meta text-fg-secondary">The host hasn’t put tickets on sale yet.</p>
