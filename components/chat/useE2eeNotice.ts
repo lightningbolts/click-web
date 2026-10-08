@@ -30,7 +30,7 @@ type DeviceState =
 /** Keys normally derive in well under a second; only say so when it takes longer. */
 const SLOW_KEYS_MS = 1500;
 /** While waiting on another device, re-check this often (visible tab only). */
-const WAITING_POLL_MS = 15_000;
+const WAITING_POLL_MS = 3_000;
 /** Chats whose final "can't be read here" notice was dismissed this page session. */
 const dismissedChats = new Set<string>();
 
