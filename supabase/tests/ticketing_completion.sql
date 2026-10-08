@@ -81,6 +81,8 @@ SELECT is(
 
 -- Attendee search ------------------------------------------------------------
 
+-- Production has these columns; a clean migration chain doesn't (rolled back with the test).
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS first_name TEXT, ADD COLUMN IF NOT EXISTS last_name TEXT;
 INSERT INTO public.users (id, first_name, last_name) VALUES
     ('00000000-0000-4000-8000-0000000a0002', 'Ada', 'Lovelace_x')
 ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name;

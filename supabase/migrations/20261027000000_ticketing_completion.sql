@@ -691,7 +691,13 @@ AS $$
     JOIN public.ticket_tiers tt ON tt.id = t.ticket_tier_id
     -- What this ticket actually cost (the price when it was bought), for the refund prompt.
     LEFT JOIN public.ticket_order_items oi ON oi.order_id = t.order_id AND oi.ticket_tier_id = t.ticket_tier_id
-    LEFT JOIN public.users u ON u.id = t.owner_user_id
+    -- first_name/last_name are read through jsonb: production has them, a clean migration chain doesn't.
+    LEFT JOIN LATERAL (
+        SELECT to_jsonb(usr) ->> 'first_name' AS first_name, to_jsonb(usr) ->> 'last_name' AS last_name,
+               usr.name, usr.image
+        FROM public.users usr
+        WHERE usr.id = t.owner_user_id
+    ) u ON true
     CROSS JOIN q
     WHERE t.beacon_id = p_beacon
       AND (p_after_issued_at IS NULL OR (t.issued_at, t.id) > (p_after_issued_at, p_after_id))
