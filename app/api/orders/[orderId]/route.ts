@@ -34,7 +34,7 @@ export async function GET(
   const admin = createAdminSupabaseClient();
   const { data, error } = await admin
     .from('ticket_orders')
-    .select('id, beacon_id, buyer_user_id, currency, subtotal_amount, platform_fee_amount, total_amount, order_state, fulfillment_state, checkout_expires_at, paid_at, created_at')
+    .select('id, beacon_id, buyer_user_id, currency, subtotal_amount, total_amount, order_state, fulfillment_state, checkout_expires_at, paid_at, created_at')
     .eq('id', orderId)
     .maybeSingle();
   if (error) {
@@ -46,6 +46,15 @@ export async function GET(
     return NextResponse.json({ error: 'Order not found' }, { status: 404 });
   }
 
+  const { count, error: countError } = await admin
+    .from('tickets')
+    .select('id', { count: 'exact', head: true })
+    .eq('order_id', orderId);
+  if (countError) {
+    return NextResponse.json({ error: 'Failed to load order' }, { status: 500 });
+  }
+
+  // Buyers never see Click's fee: the organizer absorbs it.
   const { buyer_user_id: _omit, ...projection } = order as Record<string, unknown>;
-  return NextResponse.json({ order: projection });
+  return NextResponse.json({ order: { ...projection, platform_fee_amount: 0, ticket_count: count ?? 0 } });
 }
