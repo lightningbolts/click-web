@@ -1,7 +1,7 @@
 'use client';
 
 import { unwrapEpochKey } from '@/lib/chat/e2eeV2';
-import { loadOrCreateWebE2eeV2Identity } from '@/lib/chat/e2eeV2Client';
+import { clearWebE2eeV2SessionCaches, loadOrCreateWebE2eeV2Identity } from '@/lib/chat/e2eeV2Client';
 import { clearRecoveredHistory, installRecoveredHistory } from '@/lib/chat/recoveredHistoryKeys';
 import {
   decryptHistoryManifest, deriveWrappingKey, encryptHistoryManifest, generateBackupKey,
@@ -233,4 +233,5 @@ export function resetBrowserHistoryRecovery(): void {
   activeBackup = null;
   lastBackup = 0;
   clearRecoveredHistory();
+  clearWebE2eeV2SessionCaches();
 }
