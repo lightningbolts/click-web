@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ds/Button";
 import { Skeleton } from "@/components/ds/Skeleton";
@@ -9,6 +9,7 @@ import { TitleInput } from "@/components/ds/TextField";
 import { toast } from "@/components/ds/Toast";
 import EventLocationPicker from "@/components/events/EventLocationPicker";
 import EventMarkdownEditor from "@/components/events/EventMarkdownEditor";
+import { TicketingSection } from "@/components/events/tickets/TicketingSection";
 import {
   CoverColumn,
   FieldError,
@@ -32,9 +33,12 @@ import {
 import { resolvedTimeZone } from "@/lib/events/eventScheduleUi";
 import { DEFAULT_EVENT_LISTING_OPTIONS, EVENT_COVER_THEME_IDS, coverVisualSeed } from "@/lib/events/eventOptions";
 import type { EventRecurrenceFrequency } from "@/lib/events/eventRecurrence";
-import { eventSharePath } from "@/lib/events/eventUrls";
+import { eventManagePath, eventSharePath } from "@/lib/events/eventUrls";
 import { instantFromWallClock, wallClockInZone, type WallClock } from "@/lib/events/zonedTime";
 import { placeApi, type ManagerPlace } from "@/lib/places/managerClient";
+import { createTier, fetchPayoutStatus, setTicketingStatus } from "@/lib/ticketing/ticketingClient";
+import { validateTierDraft, type TierDraft } from "@/lib/ticketing/tierForm";
+import type { TicketingStatus } from "@/lib/ticketing/types";
 import { BEACON_IMAGE_ENDPOINT, COVER_IMAGE_MIME_TYPES } from "@/lib/uploads/constants";
 import { useImageUpload } from "@/lib/uploads/useImageUpload";
 
@@ -51,6 +55,33 @@ function defaultWindow(nowMs: number, timeZone: string): { start: WallClock; end
 const fetchMyPlaces = (url: string) => placeApi<{ places: ManagerPlace[] }>(url);
 
 /**
+ * After a new event exists: create its drafted ticket types in order, then open sales, or leave
+ * them in draft when paid tickets wait on payouts (spec §5.1). Any failure → "failed"; the
+ * event is kept and the host finishes on the manage page.
+ */
+async function createDraftedTickets(
+  beaconId: string,
+  drafts: TierDraft[],
+  timeZone: string,
+  canSell: boolean,
+): Promise<"opened" | "draft" | "failed"> {
+  try {
+    let paid = false;
+    for (const [index, draft] of drafts.entries()) {
+      const { body } = validateTierDraft(draft, { sold: 0, timeZone, wasPaid: null });
+      if (!body) return "failed";
+      paid ||= body.unit_amount > 0;
+      await createTier(beaconId, { ...body, sort_order: index });
+    }
+    const open = !paid || canSell;
+    await setTicketingStatus(beaconId, open ? "sales_open" : "draft");
+    return open ? "opened" : "draft";
+  } catch {
+    return "failed";
+  }
+}
+
+/**
  * Create / edit an event (spec §7.6.3). Times are wall clocks in an explicit zone, so a host
  * in London can set "7 PM in New York". Errors show per field on blur, and a failed submit
  * scrolls to and focuses the first one.
@@ -63,6 +94,8 @@ type EventFormProps = {
   nowMs: number;
   /** `?host=place:{id}`; honored only when the viewer can write to that Place. */
   initialHostPlaceId?: string | null;
+  /** Ticketing is switched on; `status` is the saved event's sales state (null: RSVPs). */
+  ticketing?: { status: TicketingStatus | null; cancelled?: boolean } | null;
 };
 
 const noSubscribe = () => () => {};
@@ -81,6 +114,7 @@ function EventFormInner({
   defaultTimeZone,
   nowMs,
   initialHostPlaceId = null,
+  ticketing = null,
 }: EventFormProps & { defaultTimeZone: string }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -101,6 +135,11 @@ function EventFormInner({
   const [themeId, setThemeId] = useState<string>(initial ? initial.coverThemeId : EVENT_COVER_THEME_IDS[0]);
   const [repeat, setRepeat] = useState<EventRecurrenceFrequency | null>(null);
   const [repeatCount, setRepeatCount] = useState("4");
+  const [tierDrafts, setTierDrafts] = useState<TierDraft[]>([]);
+  const onTierDrafts = useCallback((drafts: TierDraft[]) => setTierDrafts(drafts), []);
+  const { data: payouts } = useSWR(ticketing ? "/api/payments/connect/status" : null, fetchPayoutStatus, {
+    revalidateOnFocus: true,
+  });
   const [options, setOptions] = useState<EventOptionsValue>(() => ({
     visibility: initial?.visibility ?? DEFAULT_EVENT_LISTING_OPTIONS.event_visibility,
     approvalRequired: initial?.approvalRequired ?? false,
@@ -238,6 +277,18 @@ function EventFormInner({
         setServerError(json.error || (isEdit ? "Couldn’t save your changes. Try again." : "Couldn’t create the event. Try again."));
         return;
       }
+      if (!isEdit && tierDrafts.length) {
+        const outcome = await createDraftedTickets(id, tierDrafts, timeZone, payouts?.can_sell === true);
+        navigating = true;
+        if (outcome === "failed") {
+          toast.error("Event created, but its tickets didn’t save. Finish them here.");
+          router.push(`${eventManagePath(id)}/tickets`);
+          return;
+        }
+        toast.success(outcome === "draft" ? "Event created. Set up payouts to open ticket sales." : "Event created");
+        router.push(eventSharePath(id));
+        return;
+      }
       toast.success(
         isEdit ? "Changes saved" : json.series_count && json.series_count > 1 ? `${json.series_count} events created` : "Event created",
       );
@@ -357,6 +408,23 @@ function EventFormInner({
           onBlurField={blur}
           hostedByPlace={Boolean(venueId)}
         />
+
+        {ticketing ? (
+          <TicketingSection
+            beaconId={beaconId}
+            timeZone={timeZone}
+            hasPaidAccount={payouts ? payouts.can_sell : null}
+            initialStatus={ticketing.status}
+            disabledReason={
+              ticketing.cancelled
+                ? "This event was cancelled."
+                : !isEdit && repeat
+                  ? "Repeating events can’t sell tickets yet."
+                  : null
+            }
+            onDraftsChange={isEdit ? undefined : onTierDrafts}
+          />
+        ) : null}
 
         <div
           className="material-glass sticky bottom-0 z-10 -mx-[var(--gutter)] px-[var(--gutter)] pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[inset_0_1px_0_var(--hairline)] min-[900px]:static min-[900px]:mx-0 min-[900px]:bg-transparent min-[900px]:p-0 min-[900px]:shadow-none min-[900px]:backdrop-filter-none"

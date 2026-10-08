@@ -17,6 +17,7 @@ import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { loadDropEvent, eventDropsConfigFrom } from "@/lib/server/eventDrops";
 import { loadEventManageContext } from "@/lib/server/events/loadEventManage";
 import { resolveFeature } from "@/lib/server/featureFlags";
+import { ticketingEnabled } from "@/lib/server/ticketing/enabled";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +104,14 @@ export default async function EventManageTabPage({ params }: { params: Params })
           initial={draft}
           defaultTimeZone={validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value)}
           nowMs={nowMs}
+          ticketing={
+            ticketingEnabled()
+              ? {
+                  status: event.ticketing?.status ?? null,
+                  cancelled: event.ticketing?.cancelled ?? false,
+                }
+              : null
+          }
         />
       );
     }

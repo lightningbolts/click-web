@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SWRConfig } from "swr";
 import EventForm from "@/components/events/EventForm";
@@ -16,6 +16,9 @@ jest.mock("@/lib/auth/freshAuthHeaders", () => ({
   fetchWithFreshAuth: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
   authFailureMessage: (_status: number, fallback: string) => fallback,
 }));
+
+// jsdom has no matchMedia; the ticket Sheet asks whether it's on a phone.
+jest.mock("@/components/ds/useMediaQuery", () => ({ useMediaQuery: () => true }));
 
 const toastSuccess = jest.fn();
 jest.mock("@/components/ds/Toast", () => ({ toast: { success: (m: string) => toastSuccess(m), error: jest.fn() } }));
@@ -273,5 +276,88 @@ describe("EventForm", () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, new File([new Uint8Array(1200)], "cover.jpg", { type: "image/jpeg" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Storage upload failed");
+  });
+});
+
+describe("EventForm tickets", () => {
+  const toastError = jest.requireMock("@/components/ds/Toast").toast.error as jest.Mock;
+
+  function routes(over: Record<string, () => Promise<unknown>> = {}) {
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const key = `${init?.method ?? "GET"} ${url}`;
+      if (over[key]) return over[key]();
+      if (url === "/api/places/mine") return json(200, { places: [] });
+      if (url === "/api/payments/connect/status") return json(200, { onboarding_state: "ready", can_sell: true });
+      if (url.endsWith("/tickets/tiers")) return json(201, { tier_id: "t1" });
+      if (url.endsWith("/tickets/status")) return json(200, { ticketing_status: "sales_open" });
+      return json(200, { beacon: { id: "new-id" } });
+    });
+  }
+
+  async function fillAndAddTier(user: ReturnType<typeof userEvent.setup>, price: string) {
+    await user.type(screen.getByPlaceholderText("Event name"), "Rooftop jam");
+    await user.type(screen.getByLabelText("Location"), "Pier 17");
+    await user.click(screen.getByRole("button", { name: "Pin" }));
+    await user.click(screen.getByRole("switch", { name: "Sell or hand out tickets" }));
+    await user.click(screen.getByRole("button", { name: "Add ticket type" }));
+    const sheet = await screen.findByRole("dialog");
+    await user.type(within(sheet).getByLabelText("Name"), "General");
+    if (price) await user.type(within(sheet).getByLabelText("Price"), price);
+    await user.type(within(sheet).getByLabelText("Capacity"), "50");
+    await user.click(within(sheet).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  }
+
+  const calls = (suffix: string) =>
+    mockFetch.mock.calls.filter(([url, init]) => String(url).endsWith(suffix) && init?.method === "POST").map(([, init]) => JSON.parse(String(init.body)));
+
+  beforeEach(() => toastError.mockReset());
+
+  it("is hidden while ticketing is off", () => {
+    setup();
+    expect(screen.queryByRole("switch", { name: "Sell or hand out tickets" })).not.toBeInTheDocument();
+  });
+
+  it("creates the drafted ticket types after the event, then opens sales", async () => {
+    routes();
+    const user = userEvent.setup();
+    setup({ ticketing: { status: null } });
+    await fillAndAddTier(user, "");
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/e/new-id"));
+    expect(calls("/api/beacons/new-id/tickets/tiers")).toEqual([expect.objectContaining({ name: "General", unit_amount: 0, capacity: 50, sort_order: 0 })]);
+    expect(calls("/api/beacons/new-id/tickets/status")).toEqual([{ ticketing_status: "sales_open" }]);
+    expect(toastSuccess).toHaveBeenCalledWith("Event created");
+  });
+
+  it("keeps paid sales in draft until payouts are set up", async () => {
+    routes({ "GET /api/payments/connect/status": () => json(200, { onboarding_state: "not_started", can_sell: false }) });
+    const user = userEvent.setup();
+    setup({ ticketing: { status: null } });
+    await fillAndAddTier(user, "15");
+    expect(screen.getByText("Set up payouts to sell paid tickets")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/e/new-id"));
+    expect(calls("/tickets/status")).toEqual([{ ticketing_status: "draft" }]);
+    expect(toastSuccess).toHaveBeenCalledWith("Event created. Set up payouts to open ticket sales.");
+  });
+
+  it("finishes ticket setup on the manage page when a ticket type fails", async () => {
+    routes({ "POST /api/beacons/new-id/tickets/tiers": () => json(400, { error: "Bad tier" }) });
+    const user = userEvent.setup();
+    setup({ ticketing: { status: null } });
+    await fillAndAddTier(user, "");
+    await user.click(screen.getByRole("button", { name: "Create event" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/e/new-id/manage/tickets"));
+    expect(toastError).toHaveBeenCalledWith("Event created, but its tickets didn’t save. Finish them here.");
+    expect(calls("/tickets/status")).toEqual([]);
+  });
+
+  it("can't sell tickets for a repeating event", async () => {
+    routes();
+    setup({ ticketing: { status: null } });
+    fireEvent.change(screen.getByLabelText("Repeats"), { target: { value: "weekly" } });
+    expect(screen.getByRole("switch", { name: "Sell or hand out tickets" })).toBeDisabled();
+    expect(screen.getByText("Repeating events can’t sell tickets yet.")).toBeInTheDocument();
   });
 });

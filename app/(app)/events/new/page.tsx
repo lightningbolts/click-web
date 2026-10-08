@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import EventForm from "@/components/events/EventForm";
 import { getServerUser } from "@/lib/server/getServerUser";
+import { ticketingEnabled } from "@/lib/server/ticketing/enabled";
 import { loginHref } from "@/lib/shell/appNav";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
 
@@ -33,6 +34,7 @@ export default async function NewEventPage({
         defaultTimeZone={validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value)}
         nowMs={nowMs}
         initialHostPlaceId={host}
+        ticketing={ticketingEnabled() ? { status: null } : null}
       />
     </div>
   );

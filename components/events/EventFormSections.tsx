@@ -30,7 +30,8 @@ import { cn } from "@/lib/cn";
 
 export type VenueScale = "intimate" | "neighborhood" | "venue" | "campus";
 
-const compactField = cn(fieldClassName, "h-9 w-auto px-2.5 tabular");
+/** Small inline field for list rows (date, time, select). */
+export const compactField = cn(fieldClassName, "h-9 w-auto px-2.5 tabular");
 
 export const errorId = (field: EventFormField) => `${field}-error`;
 
