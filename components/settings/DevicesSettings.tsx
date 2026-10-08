@@ -15,6 +15,7 @@ import { newSignInSubject } from '@/lib/chat/deviceLabel';
 import { loadOrCreateWebE2eeV2Identity, shareWebE2eeV2HistoryWithApprovedDevices } from '@/lib/chat/e2eeV2Client';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { useAuth } from '@/lib/AuthContext';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import {
   enrollBrowserHistoryRecovery, restoreBrowserHistory, refreshBrowserHistoryBackup,
   addBrowserHistoryRecoveryPasskey, hasUnlockedHistoryRecovery,
@@ -177,7 +178,7 @@ export function DevicesSettings() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section aria-labelledby="encrypted-history-recovery" className="rounded-lg bg-surface p-4">
+      {HISTORY_RECOVERY_ENABLED ? <section aria-labelledby="encrypted-history-recovery" className="rounded-lg bg-surface p-4">
         <h2 id="encrypted-history-recovery" className="type-body font-semibold text-fg">Encrypted history recovery</h2>
         <p className="type-meta mt-1 text-fg-secondary">
           {recoveryEnrolled
@@ -199,7 +200,7 @@ export function DevicesSettings() {
             ) : null}
           </div>
         </div>
-      </section>
+      </section> : null}
       {state.incoming.length > 0 ? (
         <section aria-labelledby="devices-pending">
           <h2 id="devices-pending" className="type-meta mb-2 px-4 font-semibold text-fg-secondary">
