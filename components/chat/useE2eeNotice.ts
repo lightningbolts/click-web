@@ -5,6 +5,7 @@ import type { InlineNoticeVariant } from '@/components/ds/InlineNotice';
 import { toast } from '@/components/ds/Toast';
 import { useAuth } from '@/lib/AuthContext';
 import { restoreBrowserHistory } from '@/lib/chat/browserHistoryRecovery';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import type { DerivedKeys } from '@/lib/chat/crypto';
 import { isBrowserDeviceLabel, isMobileAppDeviceLabel } from '@/lib/chat/deviceLabel';
 import {
@@ -106,7 +107,7 @@ export function useE2eeNotice({
   const [recoveryFailed, setRecoveryFailed] = useState(false);
   useEffect(() => {
     setRecoveryFailed(false);
-    if (!userId || !chatId || !hasLockedMessages) { setHasRecovery(false); return; }
+    if (!HISTORY_RECOVERY_ENABLED || !userId || !chatId || !hasLockedMessages) { setHasRecovery(false); return; }
     let cancelled = false;
     void (async () => {
       const response = await fetch('/api/chat/key-recovery/vault', { headers: await getAuthHeaders() });
