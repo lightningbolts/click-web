@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 
 const envelope = z.object({
@@ -30,8 +31,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
-  const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid recovery credential' }, { status: 400 });
+  const parsed = await parseBody(req, schema);
+  if (!parsed.ok) return parsed.response;
   const { error } = await createChatGatekeeperAdmin().from('chat_key_recovery_credentials')
     .insert({
       user_id: auth.user.id,
