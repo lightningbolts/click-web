@@ -70,6 +70,16 @@ const SEND_SESSION_REUSE_MS = 60_000;
 /** Devices registered from this page; registration is idempotent, so once per page is enough. */
 const registeredDeviceIds = new Set<string>();
 
+/** Sign-out boundary: no decrypted session can outlive the account it was resolved for. */
+export function clearWebE2eeV2SessionCaches(): void {
+  for (const session of sessionCache.values()) {
+    for (const key of session.epochKeys.values()) key.fill(0);
+  }
+  sessionCache.clear();
+  sessionResolvedAt.clear();
+  registeredDeviceIds.clear();
+}
+
 function browserIndexedDb(): IDBFactory {
   if (typeof indexedDB === 'undefined') throw new E2eeV2UnavailableError('IndexedDB is required for E2EE v2');
   return indexedDB;
