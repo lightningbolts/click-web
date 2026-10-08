@@ -643,6 +643,69 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Attendee search for the organizer list. Holder names live in public.users,
+-- which tickets can't embed (owner_user_id references auth.users), so the join
+-- happens here. Keyset paging on (issued_at, id); a query matches the holder's
+-- name (substring, case-insensitive, wildcards literal) or a ticket number exactly.
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.ticketing_search_attendees (
+    p_beacon UUID,
+    p_query TEXT,
+    p_after_issued_at TIMESTAMPTZ,
+    p_after_id UUID,
+    p_limit INTEGER
+)
+RETURNS TABLE (
+    ticket_id UUID,
+    order_id UUID,
+    user_id UUID,
+    first_name TEXT,
+    last_name TEXT,
+    display_name TEXT,
+    avatar_url TEXT,
+    tier_name TEXT,
+    paid BOOLEAN,
+    status TEXT,
+    checked_in_at TIMESTAMPTZ,
+    ticket_number TEXT,
+    issued_at TIMESTAMPTZ
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+    WITH q AS (
+        SELECT
+            btrim(coalesce(p_query, '')) AS raw,
+            '%' || replace(replace(replace(btrim(coalesce(p_query, '')), '\', '\\'), '%', '\%'), '_', '\_') || '%' AS pattern
+    )
+    SELECT t.id, t.order_id, t.owner_user_id, u.first_name, u.last_name, u.name, u.image,
+           tt.name, tt.unit_amount > 0, t.status, t.checked_in_at, t.ticket_number, t.issued_at
+    FROM public.tickets t
+    JOIN public.ticket_tiers tt ON tt.id = t.ticket_tier_id
+    LEFT JOIN public.users u ON u.id = t.owner_user_id
+    CROSS JOIN q
+    WHERE t.beacon_id = p_beacon
+      AND (p_after_issued_at IS NULL OR (t.issued_at, t.id) > (p_after_issued_at, p_after_id))
+      AND (
+          q.raw = ''
+          OR upper(t.ticket_number) = upper(q.raw)
+          OR concat_ws(' ', u.first_name, u.last_name) ILIKE q.pattern
+          OR u.name ILIKE q.pattern
+      )
+    ORDER BY t.issued_at, t.id
+    LIMIT greatest(1, least(coalesce(p_limit, 50), 200));
+$$;
+
+COMMENT ON FUNCTION public.ticketing_search_attendees IS
+    'Organizer attendee list: tickets for an event with holder names, filtered by name or ticket number, keyset-paged.';
+
+REVOKE ALL ON FUNCTION public.ticketing_search_attendees (UUID, TEXT, TIMESTAMPTZ, UUID, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ticketing_search_attendees (UUID, TEXT, TIMESTAMPTZ, UUID, INTEGER) TO service_role;
+
+-- ---------------------------------------------------------------------------
 -- 12. Per-tier counts for availability and the organizer dashboard.
 -- ---------------------------------------------------------------------------
 

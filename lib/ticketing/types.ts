@@ -80,3 +80,29 @@ export type OrderSummary = {
   paid_at: string | null;
   refunded_amount: number;
 };
+
+export type TicketSalesSummary = {
+  sold: number;
+  capacity: number;
+  checked_in: number;
+  gross_cents: number;
+  refunded_cents: number;
+  /** What the organizer receives: gross less refunds and the part of Click's fee it keeps. */
+  net_cents: number;
+  currency: string;
+  tiers: { id: string; name: string; sold: number; capacity: number; unit_amount: number }[];
+};
+
+export type TicketAttendee = {
+  ticket_id: string;
+  order_id: string;
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+  tier_name: string;
+  status: TicketStatus;
+  checked_in_at: string | null;
+  ticket_number: string;
+  /** Paid tickets that still admit, and only for people who manage the event. */
+  refundable: boolean;
+};

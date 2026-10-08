@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions, pg_temp;
-SELECT plan(34);
+SELECT plan(39);
 
 -- Fixtures: a host, two buyers, one ticketed event with a free tier (capacity 2), a paid tier,
 -- and an archived free tier.
@@ -77,6 +77,47 @@ SELECT is(
        AND id IN ('00000000-0000-4000-8000-0000000d0001', '00000000-0000-4000-8000-0000000d0002')),
     2,
     'claimed tickets are valid and keep the supplied ids'
+);
+
+-- Attendee search ------------------------------------------------------------
+
+INSERT INTO public.users (id, first_name, last_name) VALUES
+    ('00000000-0000-4000-8000-0000000a0002', 'Ada', 'Lovelace_x')
+ON CONFLICT (id) DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name;
+
+SELECT is(
+    (SELECT count(*)::int FROM public.ticketing_search_attendees(
+        '00000000-0000-4000-8000-0000000b0001', 'ada love', NULL, NULL, 50)),
+    2,
+    'attendees are found by full name, case-insensitively'
+);
+SELECT is(
+    (SELECT array_agg(ticket_id ORDER BY issued_at, ticket_id)::text FROM public.ticketing_search_attendees(
+        '00000000-0000-4000-8000-0000000b0001', ' clk-free1-aaaaa ', NULL, NULL, 50)),
+    '{00000000-0000-4000-8000-0000000d0001}',
+    'a ticket number matches exactly, ignoring case and spaces'
+);
+SELECT is(
+    (SELECT count(*)::int FROM public.ticketing_search_attendees(
+        '00000000-0000-4000-8000-0000000b0001', '%', NULL, NULL, 50)),
+    0,
+    'LIKE wildcards in the query are literal'
+);
+SELECT is(
+    (SELECT count(*)::int FROM public.ticketing_search_attendees(
+        '00000000-0000-4000-8000-0000000b0001', 'e_x', NULL, NULL, 50)),
+    2,
+    'an underscore matches only itself'
+);
+SELECT is(
+    (WITH first_page AS (
+        SELECT * FROM public.ticketing_search_attendees('00000000-0000-4000-8000-0000000b0001', '', NULL, NULL, 1)
+     )
+     SELECT count(*)::int FROM first_page f,
+         public.ticketing_search_attendees('00000000-0000-4000-8000-0000000b0001', '', f.issued_at, f.ticket_id, 50) n
+     WHERE n.ticket_id = f.ticket_id),
+    0,
+    'the next page starts after the cursor row'
 );
 SELECT is(
     (SELECT order_state || '/' || fulfillment_state || '/' || total_amount || '/' || (organizer_payment_account_id IS NULL)::text
