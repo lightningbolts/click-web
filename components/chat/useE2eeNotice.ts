@@ -139,6 +139,14 @@ export function useE2eeNotice({
     void check(chatId, false);
   }, [chatId, keysReady, check]);
 
+  // A passkey restored epoch keys in Settings; re-resolve this open chat immediately.
+  useEffect(() => {
+    if (!chatId) return;
+    const onRestore = () => { void check(chatId, true); };
+    window.addEventListener('click-history-restored', onRestore);
+    return () => window.removeEventListener('click-history-restored', onRestore);
+  }, [chatId, check]);
+
   // Messages that turned out unreadable after the first check: learn why (once).
   const state = device && device.chatId === chatId ? device.state : null;
   const needsApproval = Boolean(chatId && hasLockedMessages && state?.kind === 'checked' && state.canRead && !state.approval);
