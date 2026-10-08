@@ -2,7 +2,7 @@
 
 import { ScanLine, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ds/Button";
 import { useConfirm } from "@/components/ds/ConfirmDialog";
@@ -16,6 +16,7 @@ import { TicketAttendeeList } from "@/components/events/manage/TicketAttendeeLis
 import type { EventAccess } from "@/lib/events/beaconManageAuth";
 import { eventScanPath } from "@/lib/events/eventUrls";
 import { formatAmount, formatMoney } from "@/lib/ticketing/money";
+import { useDebounced } from "@/lib/ui/useDebounced";
 import {
   TicketingError,
   attendeesUrl,
@@ -27,16 +28,7 @@ import type { TicketAttendee, TicketSalesSummary } from "@/lib/ticketing/types";
 
 type Page = { attendees: TicketAttendee[]; next_cursor: string | null };
 
-const SEARCH_DELAY_MS = 250;
-
-function useDebounced<T>(value: T, ms: number): T {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setSettled(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return settled;
-}
+export const SEARCH_DELAY_MS = 250;
 
 function cancelMessage(orders: number): string {
   if (orders === 0) return "Everyone’s tickets stop working right away.";

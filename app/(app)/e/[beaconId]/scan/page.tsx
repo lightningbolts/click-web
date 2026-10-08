@@ -35,6 +35,7 @@ export default async function EventScanPage({ params }: { params: Promise<{ beac
       title={eventDisplayTitle(event.title, event.location_name, event.description)}
       closeHref={eventSharePath(beaconId)}
       timeZone={validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? event.timezone ?? "UTC"}
+      ticketed={event.ticketing != null}
     />
   );
 }

@@ -191,7 +191,13 @@ export function cancelEvent(beaconId: string): Promise<{ refunds_started: number
 }
 
 /** The door scanner's verdict for one ticket ("checked_in", "already_checked_in", "refunded", …). */
-export type TicketScan = { result: string; checked_in_at: string | null };
+export type TicketScan = {
+  result: string;
+  attendee: { user_id: string; name: string; avatar_url: string | null } | null;
+  tier_name?: string | null;
+  checked_in_at: string | null;
+  check_in_count?: number;
+};
 
 /** Admit a ticket by hand from the attendee list (same path as scanning its QR). */
 export function checkInTicket(beaconId: string, ticketId: string): Promise<TicketScan> {
