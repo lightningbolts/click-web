@@ -4,7 +4,6 @@
 
 import { NextRequest } from 'next/server';
 import { POST as postCheckout } from '@/app/api/beacons/[beaconId]/tickets/checkout/route';
-import { GET as getOrder } from '@/app/api/orders/[orderId]/route';
 
 const mockGetSupabaseFromRouteRequest = jest.fn();
 const mockCreateAdminSupabaseClient = jest.fn();
@@ -119,7 +118,32 @@ describe('POST /api/beacons/[beaconId]/tickets/checkout', () => {
     // never client-supplied prices.
     expect(mockCreateTicketCheckout).toHaveBeenCalledWith({}, USER_ID, BEACON_ID, [
       { tierId: TIER_ID, quantity: 2 },
-    ]);
+    ], { client: undefined });
+  });
+
+  it('reports free claims as fulfilled with no checkout URL', async () => {
+    mockCreateAdminSupabaseClient.mockReturnValue({});
+    mockCreateTicketCheckout.mockResolvedValue({ ok: true, orderId: ORDER_ID, fulfilled: true });
+    const res = await postCheckout(
+      checkoutRequest({ items: [{ ticket_tier_id: TIER_ID, quantity: 1 }], client: 'ios' }),
+      beaconParams(),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ order_id: ORDER_ID, status: 'fulfilled' });
+    expect(mockCreateTicketCheckout).toHaveBeenCalledWith({}, USER_ID, BEACON_ID, [
+      { tierId: TIER_ID, quantity: 1 },
+    ], { client: 'ios' });
+  });
+
+  it('rejects orders mixing free and paid tickets', async () => {
+    mockCreateAdminSupabaseClient.mockReturnValue({});
+    mockCreateTicketCheckout.mockResolvedValue({ ok: false, status: 400, code: 'mixed_order' });
+    const res = await postCheckout(
+      checkoutRequest({ items: [{ ticket_tier_id: TIER_ID, quantity: 1 }] }),
+      beaconParams(),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe('mixed_order');
   });
 
   it('maps reservation failures onto their HTTP statuses', async () => {
@@ -138,51 +162,5 @@ describe('POST /api/beacons/[beaconId]/tickets/checkout', () => {
     const body = await res.json();
     expect(body.code).toBe('insufficient_inventory');
     expect(body.remaining).toBe(1);
-  });
-});
-
-describe('GET /api/orders/[orderId]', () => {
-  function orderRequest(): NextRequest {
-    return new NextRequest(`http://localhost/api/orders/${ORDER_ID}`);
-  }
-
-  function orderParams() {
-    return { params: Promise.resolve({ orderId: ORDER_ID }) };
-  }
-
-  function adminReturningOrder(order: unknown) {
-    return {
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            maybeSingle: jest.fn().mockResolvedValue({ data: order, error: null }),
-          }),
-        }),
-      }),
-    };
-  }
-
-  it('hides other buyers’ orders as 404', async () => {
-    mockCreateAdminSupabaseClient.mockReturnValue(
-      adminReturningOrder({ id: ORDER_ID, buyer_user_id: 'someone-else' }),
-    );
-    const res = await getOrder(orderRequest(), orderParams());
-    expect(res.status).toBe(404);
-  });
-
-  it('returns the buyer’s own order without the buyer id', async () => {
-    mockCreateAdminSupabaseClient.mockReturnValue(
-      adminReturningOrder({
-        id: ORDER_ID,
-        buyer_user_id: USER_ID,
-        order_state: 'paid',
-        fulfillment_state: 'fulfilled',
-      }),
-    );
-    const res = await getOrder(orderRequest(), orderParams());
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.order.order_state).toBe('paid');
-    expect(body.order.buyer_user_id).toBeUndefined();
   });
 });

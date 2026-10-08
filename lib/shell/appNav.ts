@@ -26,6 +26,7 @@ export function activeAppSection(pathname: string): AppNavId | 'add' | 'me' | nu
   if (pathname.startsWith('/business') || pathname.startsWith('/insights')) return 'business';
   if (pathname.startsWith('/add')) return 'add';
   if (pathname.startsWith('/me') || pathname.startsWith('/settings') || pathname.startsWith('/activity')) return 'me';
+  if (/^\/tickets(?:[/?]|$)/.test(pathname)) return 'me';
   return null;
 }
 

@@ -5,6 +5,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fulfillFromCheckoutSession, loadOrder } from '@/lib/server/ticketing/fulfillment';
 import { snapshotFromStripeAccount } from '@/lib/server/ticketing/connect';
 import { accountRowPatch } from '@/lib/server/ticketing/accountState';
+import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
+import { getStripe } from '@/lib/server/stripe';
 
 /**
  * Ticketing slice of the Stripe webhook. Deliberately constrained event set;
@@ -49,7 +51,16 @@ export async function handleTicketingEvent(
     case 'checkout.session.async_payment_succeeded': {
       const session = event.data.object as Stripe.Checkout.Session;
       const result = await fulfillFromCheckoutSession(admin, session);
-      if (!result.ok && result.code !== 'not_paid_yet') {
+      if (result.ok) {
+        // Sold counts and "Sold out" on the public event page.
+        revalidatePublicEvents(session.metadata?.click_event_id);
+        return;
+      }
+      if (result.code === 'order_not_payable') {
+        if (await refundUnfulfillablePayment(session)) await markGivenBack(admin, session);
+        return;
+      }
+      if (result.code !== 'not_paid_yet') {
         // Reconciliation mismatches are operator-visible, not retried forever.
         console.error(
           `Ticketing fulfillment rejected (order=${session.metadata?.click_order_id}, session=${session.id}): ${result.code}`,
@@ -67,6 +78,8 @@ export async function handleTicketingEvent(
         p_target_state: 'expired',
       });
       if (error) throw new Error(`ticketing_cancel_order failed: ${error.message}`);
+      // Its held tickets are free again.
+      revalidatePublicEvents(session.metadata?.click_event_id);
       return;
     }
 
@@ -84,7 +97,8 @@ export async function handleTicketingEvent(
 
     case 'refund.updated': {
       const refund = event.data.object as Stripe.Refund;
-      await applyRefundObject(admin, refund);
+      // Refunded tickets stop counting as sold (this also covers the cancel retry pass).
+      revalidatePublicEvents(await applyRefundObject(admin, refund));
       return;
     }
 
@@ -123,13 +137,48 @@ export async function handleTicketingEvent(
   }
 }
 
-async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): Promise<void> {
-  const orderId = refund.metadata?.click_order_id;
+/**
+ * Money arrived for an order that can no longer be fulfilled (the event was cancelled while the
+ * buyer was on Stripe's page). Give it straight back; the key makes webhook redelivery safe.
+ */
+async function refundUnfulfillablePayment(session: Stripe.Checkout.Session): Promise<boolean> {
+  const paymentIntent =
+    typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+  if (session.payment_status !== 'paid' || !paymentIntent) return false;
+  const orderId = session.metadata?.click_order_id ?? session.client_reference_id ?? '';
+  await getStripe().refunds.create(
+    {
+      payment_intent: paymentIntent,
+      reverse_transfer: true,
+      refund_application_fee: true,
+      metadata: { click_unfulfillable_order: orderId },
+    },
+    { idempotencyKey: `unfulfillable-payment:${session.id}` },
+  );
+  console.warn(`Refunded payment for unfulfillable order ${orderId} (session ${session.id}).`);
+  return true;
+}
+
+/** The buyer was charged and given the money back: say "refunded", not "no charge was made". */
+async function markGivenBack(admin: SupabaseClient, session: Stripe.Checkout.Session): Promise<void> {
+  const orderId = session.metadata?.click_order_id ?? session.client_reference_id;
   if (!orderId) return;
+  const { error } = await admin
+    .from('ticket_orders')
+    .update({ order_state: 'refunded', updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+    .in('order_state', ['canceled', 'expired', 'payment_failed']);
+  if (error) throw new Error(`refunded order update failed: ${error.message}`);
+}
+
+/** Records a refund's progress; returns the order's event, if the order is ours. */
+async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): Promise<string | null> {
+  const orderId = refund.metadata?.click_order_id;
+  if (!orderId) return null;
   const order = await loadOrder(admin, orderId);
   if (!order) {
     console.error(`refund ${refund.id} references unknown order ${orderId}`);
-    return;
+    return null;
   }
   const status =
     refund.status === 'succeeded'
@@ -155,4 +204,5 @@ async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): 
   if (!result.ok) {
     console.error(`refund ${refund.id} not applied to order ${orderId}: ${result.code}`);
   }
+  return order.beacon_id;
 }

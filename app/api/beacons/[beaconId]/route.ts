@@ -9,6 +9,12 @@ import { revalidatePublicEvents } from "@/lib/server/events/revalidatePublicEven
 import { getSupabaseFromRouteRequest } from "@/lib/server/supabaseRouteAuth";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { withPlaceRefs } from "@/lib/server/places/placeRefs";
+import {
+  countMyLiveTickets,
+  EVENT_SALES_COLUMNS,
+  loadEventTicketing,
+  type EventSalesRow,
+} from "@/lib/server/ticketing/offerings";
 import { parseMapBeacon, type MapBeaconType } from "@/lib/map/mapBeacons";
 import { rowFromInsertWithLocation } from "@/lib/map/mapBeaconApiShared";
 import { applyVenueScaleToMetadata } from "@/lib/server/eventEngagement";
@@ -134,7 +140,9 @@ export async function GET(
     const admin = createAdminSupabaseClient();
     const { data, error } = await admin
       .from("map_beacons")
-      .select("id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location")
+      .select(
+        `id, creator_id, venue_id, hub_id, beacon_type, show_creator_name, metadata, created_at, expires_at, location, ${EVENT_SALES_COLUMNS}`,
+      )
       .eq("id", beaconId)
       .maybeSingle();
 
@@ -158,13 +166,28 @@ export async function GET(
     if (beacon == null) {
       return NextResponse.json({ error: "Malformed beacon" }, { status: 500 });
     }
-    const [withPlace] = await withPlaceRefs(admin, [beacon]);
+    const [[withPlace], ticketing] = await Promise.all([
+      withPlaceRefs(admin, [beacon]),
+      row.beacon_type === "event" ? viewerTicketing(admin, beaconId, user.id, row as EventSalesRow) : null,
+    ]);
 
-    return NextResponse.json({ beacon: withPlace, expired });
+    return NextResponse.json({ beacon: { ...withPlace, ticketing }, expired });
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
+}
+
+/** The event's ticket summary plus how many live tickets the caller holds (iOS shows both). */
+async function viewerTicketing(
+  admin: ReturnType<typeof createAdminSupabaseClient>,
+  beaconId: string,
+  userId: string,
+  event: EventSalesRow,
+) {
+  const summary = await loadEventTicketing(admin, beaconId, Date.now(), event);
+  if (!summary) return null;
+  return { ...summary, my_ticket_count: await countMyLiveTickets(admin, beaconId, userId) };
 }
 
 /**
@@ -393,6 +416,22 @@ export async function DELETE(
     if (errorResponse != null) return errorResponse;
     if (row == null) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Orders are financial records; an event that sold tickets is cancelled, never deleted.
+    const { count: orderCount, error: orderError } = await admin
+      .from("ticket_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("beacon_id", beaconId);
+    if (orderError) {
+      console.error("DELETE /api/beacons/[beaconId] order check:", orderError.message);
+      return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+    if (orderCount) {
+      return NextResponse.json(
+        { error: "This event has ticket orders. Cancel it instead.", code: "has_ticket_orders" },
+        { status: 409 },
+      );
     }
 
     const { error: deleteError } = await supabase

@@ -3,14 +3,21 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStripe, getAppBaseUrl } from '@/lib/server/stripe';
 import { CURRENT_FEE_POLICY, priceOrder } from '@/lib/server/ticketing/feePolicy';
+import { mintsForItems } from '@/lib/server/ticketing/fulfillment';
+import { eventPassKey } from '@/lib/server/eventPass';
+import { eventTicketsReturnPath } from '@/lib/events/eventUrls';
+import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
 
 const CHECKOUT_SESSION_MINUTES = 30; // Stripe minimum lifetime
 const HOLD_MINUTES = 32; // small reconciliation window past session expiry
 
 export type CheckoutItemInput = { tierId: string; quantity: number };
 
+export type CheckoutClient = 'web' | 'ios';
+
 export type CheckoutResult =
   | { ok: true; orderId: string; checkoutUrl: string }
+  | { ok: true; orderId: string; fulfilled: true }
   | { ok: false; status: number; code: string; extra?: Record<string, unknown> };
 
 type TierRow = {
@@ -25,6 +32,7 @@ const RESERVE_FAILURE_STATUS: Record<string, number> = {
   invalid_items: 400,
   event_not_found: 404,
   tier_not_found: 404,
+  event_cancelled: 409,
   sales_not_open: 409,
   sales_not_started: 409,
   sales_ended: 409,
@@ -35,13 +43,56 @@ const RESERVE_FAILURE_STATUS: Record<string, number> = {
   over_order_limit: 409,
   over_user_limit: 409,
   insufficient_inventory: 409,
+  not_free: 409,
+  invalid_tickets: 500,
   pricing_mismatch: 500,
 };
 
+function reserveFailure(raw: { code?: string; remaining?: number }): CheckoutResult {
+  const code = raw.code ?? 'reservation_failed';
+  return {
+    ok: false,
+    status: RESERVE_FAILURE_STATUS[code] ?? 409,
+    code,
+    extra: raw.remaining !== undefined ? { remaining: raw.remaining } : undefined,
+  };
+}
+
 /**
- * Reserve inventory in Postgres first, then create the Stripe Checkout
- * Session. The client submitted only tier ids + quantities; every financial
- * value is loaded and computed here. If Stripe session creation fails the
+ * Free tickets are issued in one transaction with no payment step. Tickets are
+ * minted here (ids + credential hashes) so the database never sees a raw token.
+ */
+async function claimFreeTickets(
+  admin: SupabaseClient,
+  buyerUserId: string,
+  beaconId: string,
+  items: readonly CheckoutItemInput[],
+): Promise<CheckoutResult> {
+  const key = eventPassKey();
+  if (!key) throw new Error('ticket_key_unavailable');
+  const { data, error } = await admin.rpc('ticketing_claim_free', {
+    p_buyer: buyerUserId,
+    p_beacon: beaconId,
+    p_items: items.map((i) => ({ tier_id: i.tierId, quantity: i.quantity, expected_unit_amount: 0 })),
+    p_tickets: mintsForItems(
+      items.map((i) => ({ ticket_tier_id: i.tierId, quantity: i.quantity })),
+      beaconId,
+      key,
+    ),
+  });
+  if (error) throw new Error(`ticketing_claim_free failed: ${error.message}`);
+  const claim = data as { ok: boolean; code?: string; order_id?: string; remaining?: number };
+  if (!claim.ok || !claim.order_id) return reserveFailure(claim);
+
+  revalidatePublicEvents(beaconId);
+  return { ok: true, orderId: claim.order_id, fulfilled: true };
+}
+
+/**
+ * Free orders are claimed instantly. Paid orders reserve inventory in Postgres
+ * first, then create the Stripe Checkout Session. The client submitted only
+ * tier ids + quantities; every financial value — including whether the order
+ * is free — is loaded and computed here. If Stripe session creation fails the
  * reservation is released; the Stripe call itself is idempotent on the order
  * id so a lost HTTP response can be retried without a second checkout.
  */
@@ -50,6 +101,7 @@ export async function createTicketCheckout(
   buyerUserId: string,
   beaconId: string,
   items: readonly CheckoutItemInput[],
+  options: { client?: CheckoutClient } = {},
 ): Promise<CheckoutResult> {
   const tierIds = items.map((i) => i.tierId);
   const { data: tierRows, error: tierError } = await admin
@@ -65,6 +117,10 @@ export async function createTicketCheckout(
       return { ok: false, status: 404, code: 'tier_not_found' };
     }
   }
+
+  const freeLines = items.filter((i) => tiers.get(i.tierId)!.unit_amount === 0).length;
+  if (freeLines === items.length) return claimFreeTickets(admin, buyerUserId, beaconId, items);
+  if (freeLines > 0) return { ok: false, status: 400, code: 'mixed_order' };
 
   const currency = (tiers.get(items[0]!.tierId)!.currency || 'usd').toLowerCase();
   const pricing = priceOrder(
@@ -93,15 +149,7 @@ export async function createTicketCheckout(
   if (reserveError) throw new Error(`ticketing_reserve_order failed: ${reserveError.message}`);
 
   const reserve = reserveRaw as { ok: boolean; code?: string; order_id?: string; remaining?: number };
-  if (!reserve.ok || !reserve.order_id) {
-    const code = reserve.code ?? 'reservation_failed';
-    return {
-      ok: false,
-      status: RESERVE_FAILURE_STATUS[code] ?? 409,
-      code,
-      extra: reserve.remaining !== undefined ? { remaining: reserve.remaining } : undefined,
-    };
-  }
+  if (!reserve.ok || !reserve.order_id) return reserveFailure(reserve);
   const orderId = reserve.order_id;
 
   const organizer = await loadOrganizerStripeAccountForBeacon(admin, beaconId);
@@ -114,7 +162,11 @@ export async function createTicketCheckout(
       {
         mode: 'payment',
         client_reference_id: orderId,
-        metadata: { click_order_id: orderId, click_event_id: beaconId },
+        metadata: {
+          click_order_id: orderId,
+          click_event_id: beaconId,
+          ...(options.client ? { click_client: options.client } : {}),
+        },
         line_items: items.map((i) => ({
           quantity: i.quantity,
           price_data: {
@@ -129,8 +181,8 @@ export async function createTicketCheckout(
           application_fee_amount: pricing.platformFeeCents,
           metadata: { click_order_id: orderId },
         },
-        success_url: `${base}/events/${beaconId}/tickets/return?order=${orderId}`,
-        cancel_url: `${base}/events/${beaconId}/tickets/return?order=${orderId}&canceled=1`,
+        success_url: `${base}${eventTicketsReturnPath(beaconId, orderId)}`,
+        cancel_url: `${base}${eventTicketsReturnPath(beaconId, orderId, true)}`,
       },
       { idempotencyKey: `checkout-order:${orderId}` },
     );
@@ -176,4 +228,40 @@ async function loadOrganizerStripeAccountForBeacon(
   const stripeAccountId = joined?.stripe_account_id;
   if (!stripeAccountId) throw new Error('beacon has no organizer Stripe account');
   return { stripeAccountId };
+}
+
+export type ReleaseResult = { ok: true; beaconId: string } | { ok: false; status: 404 | 409; code: string };
+
+/**
+ * The buyer left Stripe Checkout: expire the session, then free its held tickets at once rather
+ * than after the 30-minute expiry. A session that can no longer expire was paid (or is being
+ * paid), so its hold stays for the webhook to fulfill.
+ */
+export async function releaseCheckout(admin: SupabaseClient, orderId: string, buyerId: string): Promise<ReleaseResult> {
+  const { data, error } = await admin
+    .from('ticket_orders')
+    .select('beacon_id, buyer_user_id, order_state, stripe_checkout_session_id')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (error) throw new Error(`order load failed: ${error.message}`);
+  const order = data as { beacon_id: string; buyer_user_id: string; order_state: string; stripe_checkout_session_id: string | null } | null;
+  if (!order || order.buyer_user_id !== buyerId) return { ok: false, status: 404, code: 'order_not_found' };
+  if (order.order_state !== 'reserved' && order.order_state !== 'checkout_created') {
+    return { ok: false, status: 409, code: 'order_not_cancelable' };
+  }
+
+  if (order.stripe_checkout_session_id) {
+    try {
+      await getStripe().checkout.sessions.expire(order.stripe_checkout_session_id);
+    } catch {
+      return { ok: false, status: 409, code: 'order_not_cancelable' };
+    }
+  }
+  const { data: cancelled, error: cancelError } = await admin.rpc('ticketing_cancel_order', {
+    p_order: orderId,
+    p_target_state: 'canceled',
+  });
+  if (cancelError) throw new Error(`ticketing_cancel_order failed: ${cancelError.message}`);
+  if (!(cancelled as { ok: boolean }).ok) return { ok: false, status: 409, code: 'order_not_cancelable' };
+  return { ok: true, beaconId: order.beacon_id };
 }

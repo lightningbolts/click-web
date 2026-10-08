@@ -10,8 +10,9 @@ import { eventPassPath } from "@/lib/events/eventUrls";
 import { eventWhenLines } from "@/lib/events/eventWhen";
 import { eventMapsDestination } from "@/lib/events/mapsLinks";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { activeCheckIn, eventPassKey, isGoing, issueEventPass, loadPassHolder, walletConfig } from "@/lib/server/eventPass";
+import { activeCheckIn, eventPassKey, hasRsvpPass, issueEventPass, loadPassHolder, walletConfig } from "@/lib/server/eventPass";
 import { loadPublicEvent } from "@/lib/server/events/loadPublicEvent";
+import { listOwnedTickets } from "@/lib/server/ticketing/ownedTickets";
 import { getServerUser } from "@/lib/server/getServerUser";
 import { loginHref } from "@/lib/shell/appNav";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
@@ -26,11 +27,18 @@ const OPEN_ENDED_MS = 6 * 3_600_000;
  * The attendee's Click Pass (spec 06 §1). Issued with the page (the same HMAC the API signs),
  * so the QR is there on first paint; the client takes over to watch for the host's scan.
  */
-export default async function EventPassPage({ params }: { params: Promise<{ beaconId: string }> }) {
-  const { beaconId } = await params;
+export default async function EventPassPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ beaconId: string }>;
+  searchParams: Promise<{ ticket?: string | string[] }>;
+}) {
+  const [{ beaconId }, query] = await Promise.all([params, searchParams]);
   if (!EVENT_BEACON_UUID_RE.test(beaconId)) notFound();
+  const ticketId = typeof query.ticket === "string" && EVENT_BEACON_UUID_RE.test(query.ticket) ? query.ticket : null;
   const user = await getServerUser();
-  if (!user) redirect(loginHref(eventPassPath(beaconId)));
+  if (!user) redirect(loginHref(`${eventPassPath(beaconId)}${ticketId ? `?ticket=${ticketId}` : ""}`));
 
   const [event, jar] = await Promise.all([loadPublicEvent(beaconId).catch(() => null), cookies()]);
   if (!event) notFound();
@@ -40,8 +48,14 @@ export default async function EventPassPage({ params }: { params: Promise<{ beac
   const hostId = event.creator_id && event.creator_id !== user.id ? event.creator_id : null;
   const [initial, holder, connectionId] = await Promise.all([
     (async (): Promise<ClickPassState | null> => {
+      // A ticket replaces the RSVP on ticketed events (spec §5.4); an RSVP from before tickets
+      // went on sale keeps its pass.
+      if (event.ticketing) {
+        const tickets = await listOwnedTickets(admin, user.id, { beaconId });
+        if (tickets.length) return { kind: "tickets", tickets };
+      }
       if (!key) return { kind: "unavailable" };
-      if (!(await isGoing(admin, beaconId, user.id))) return { kind: "not_going" };
+      if (!(await hasRsvpPass(admin, beaconId, user.id))) return { kind: "not_going" };
       const pass = issueEventPass(key, beaconId, user.id);
       return {
         kind: "ready",
@@ -91,6 +105,10 @@ export default async function EventPassPage({ params }: { params: Promise<{ beac
             place: event.place ? { name: event.place.name, slug: event.place.slug } : null,
             host: connectionId && firstName ? { firstName, connectionId } : null,
           }}
+          ticketed={event.ticketing != null}
+          cancelled={event.ticketing?.cancelled ?? false}
+          initialTicketId={ticketId}
+          walletAvailable={walletConfig() != null}
         />
       </div>
     </div>

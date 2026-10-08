@@ -19,6 +19,7 @@ import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import { EventGoingMetaRow, EventPeopleSection } from "@/components/events/EventPeopleSection";
 import { EventRsvpCard } from "@/components/events/EventRsvpCard";
 import { EventShareMenu } from "@/components/events/EventShareButton";
+import { TicketPurchaseCard } from "@/components/events/tickets/TicketPurchaseCard";
 import { MapsMenu } from "@/components/events/MapsMenu";
 import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
 import { APP_CONFIG } from "@/lib/config";
@@ -37,6 +38,9 @@ import { eventMapsDestination } from "@/lib/events/mapsLinks";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
 import { dayKey } from "@/lib/home/selectOpportunity";
 import { loadEventViewer } from "@/lib/server/events/eventViewer";
+import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { countMyLiveTickets } from "@/lib/server/ticketing/offerings";
+import type { EventTicketing } from "@/lib/ticketing/types";
 import { generateCardVisual } from "@/lib/ui/generateCardVisual";
 
 
@@ -76,6 +80,17 @@ async function RsvpIsland(props: Omit<React.ComponentProps<typeof EventRsvpCard>
   const { event, ...card } = props;
   const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
   return <EventRsvpCard {...card} initialViewer={viewer.rsvp} checkedIn={viewer.checkedIn} />;
+}
+
+/** Ticketed events (spec §5.2): the purchase card, with the viewer's live ticket count. */
+async function TicketIsland({ event, ticketing }: { event: PublicEventPayload; ticketing: EventTicketing }) {
+  const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
+  const myTicketCount = viewer.userId
+    ? await countMyLiveTickets(createAdminSupabaseClient(), event.beacon_id, viewer.userId).catch(() => 0)
+    : 0;
+  return (
+    <TicketPurchaseCard beaconId={event.beacon_id} ticketing={ticketing} myTicketCount={myTicketCount} signedIn={viewer.userId != null} />
+  );
 }
 
 async function ChatIsland({ event, ended }: { event: PublicEventPayload; ended: boolean }) {
@@ -171,6 +186,11 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
               {event.listing.event_visibility === "invite_only" ? <StatusPill variant="neutral">Invite only</StatusPill> : null}
             </div>
           ) : null}
+          {event.ticketing?.cancelled ? (
+            <InlineNotice variant="destructive" className="mb-4">
+              This event was cancelled. Paid tickets are refunded automatically.
+            </InlineNotice>
+          ) : null}
           <div className="flex items-start gap-3">
             <h1 className="type-title-2 min-w-0 flex-1 text-fg [text-wrap:balance] min-[900px]:text-[36px] min-[900px]:leading-[42px]">{title}</h1>
             <EventShareMenu event={flyer} />
@@ -215,6 +235,9 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
 
           <div className="mt-6">
             <Suspense fallback={<RsvpSkeleton />}>
+              {event.ticketing ? (
+                <TicketIsland event={event} ticketing={event.ticketing} />
+              ) : (
               <RsvpIsland
                 event={event}
                 beaconId={beaconId}
@@ -227,6 +250,7 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
                 calendar={calendar}
                 shareUrl={shareUrl}
               />
+              )}
             </Suspense>
           </div>
 

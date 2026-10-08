@@ -19,6 +19,8 @@ export type EventRowProps = {
   live?: boolean;
   host?: { seed: string; name: string; src?: string | null } | null;
   location?: string | null;
+  /** One more meta line under the location, e.g. "2 tickets · General". */
+  detail?: ReactNode;
   pills?: readonly EventRowPill[];
   going?: {
     people: readonly {
@@ -48,6 +50,7 @@ export function EventRow({
   live,
   host,
   location,
+  detail,
   pills,
   going,
   photoUrl,
@@ -93,6 +96,7 @@ export function EventRow({
             <span className="truncate">{location}</span>
           </div>
         ) : null}
+        {detail ? <p className="type-meta tabular mt-1 truncate text-fg-secondary">{detail}</p> : null}
         {pills?.length || (going && going.count > 0) ? (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {pills?.map((p) => (

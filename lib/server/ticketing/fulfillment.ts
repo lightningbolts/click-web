@@ -3,7 +3,8 @@ import 'server-only';
 import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStripe } from '@/lib/server/stripe';
-import { mintTicketCredential, mintTicketNumber } from '@/lib/server/ticketing/credentials';
+import { mintTicketRow } from '@/lib/server/ticketing/credentials';
+import { eventPassKey } from '@/lib/server/eventPass';
 
 export type OrderRow = {
   id: string;
@@ -48,7 +49,9 @@ export async function fulfillFromCheckoutSession(
 
   const order = await loadOrder(admin, orderId);
   if (!order) return { ok: false, code: 'order_not_found' };
-  if (order.order_state === 'paid' && order.fulfillment_state === 'fulfilled') {
+  // Fulfilled once is fulfilled for good: a later refund or dispute moves the order on, and a
+  // redelivered webhook must not read that as "unpayable" and refund the rest.
+  if (order.fulfillment_state === 'fulfilled') {
     return { ok: true, code: 'idempotent' };
   }
   if (
@@ -90,7 +93,10 @@ export async function fulfillFromCheckoutSession(
       ? intent.latest_charge
       : intent.latest_charge?.id ?? null;
 
-  const tickets = await buildTicketMints(admin, order.id);
+  const key = eventPassKey();
+  // Throwing makes the webhook answer 5xx so Stripe retries once the key is configured.
+  if (!key) throw new Error('ticket_key_unavailable');
+  const tickets = await buildTicketMints(admin, order.id, order.beacon_id, key);
 
   const { data, error } = await admin.rpc('ticketing_fulfill_order', {
     p_order: order.id,
@@ -123,30 +129,40 @@ export function verifyIntentAgainstOrder(
   return null;
 }
 
-type MintPayload = {
+export type MintPayload = {
+  id: string;
   tier_id: string;
   ordinal: number;
   ticket_number: string;
   token_hash: string;
 };
 
-async function buildTicketMints(admin: SupabaseClient, orderId: string): Promise<MintPayload[]> {
+/** One mint per ticket in the order, numbered 1…n in item order. */
+export async function buildTicketMints(
+  admin: SupabaseClient,
+  orderId: string,
+  beaconId: string,
+  key: Buffer,
+): Promise<MintPayload[]> {
   const { data, error } = await admin
     .from('ticket_order_items')
     .select('ticket_tier_id, quantity')
-    .eq('order_id', orderId);
+    .eq('order_id', orderId)
+    .order('id', { ascending: true });
   if (error) throw new Error(`ticket_order_items load failed: ${error.message}`);
+  return mintsForItems((data as { ticket_tier_id: string; quantity: number }[]) ?? [], beaconId, key);
+}
 
+export function mintsForItems(
+  items: { ticket_tier_id: string; quantity: number }[],
+  beaconId: string,
+  key: Buffer,
+): MintPayload[] {
   const mints: MintPayload[] = [];
   let ordinal = 1;
-  for (const item of (data as { ticket_tier_id: string; quantity: number }[]) ?? []) {
+  for (const item of items) {
     for (let i = 0; i < item.quantity; i++) {
-      mints.push({
-        tier_id: item.ticket_tier_id,
-        ordinal: ordinal++,
-        ticket_number: mintTicketNumber(),
-        token_hash: mintTicketCredential().tokenHash,
-      });
+      mints.push({ ...mintTicketRow(key, beaconId), tier_id: item.ticket_tier_id, ordinal: ordinal++ });
     }
   }
   return mints;

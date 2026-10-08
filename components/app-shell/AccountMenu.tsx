@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { HelpCircle, LogOut, Monitor, Moon, Settings, Store, Sun, User } from 'lucide-react';
+import { HelpCircle, LogOut, Monitor, Moon, Settings, Store, Sun, Ticket, User } from 'lucide-react';
 import { Avatar } from '@/components/ds/Avatar';
 import {
   Menu,
@@ -56,6 +56,11 @@ export function AccountMenu({ bootstrap }: { bootstrap: SessionBootstrap }) {
         <MenuItem icon={User} onSelect={() => router.push('/me')}>
           Profile
         </MenuItem>
+        {bootstrap.ticketing ? (
+          <MenuItem icon={Ticket} onSelect={() => router.push('/tickets')}>
+            Tickets
+          </MenuItem>
+        ) : null}
         <MenuItem icon={Settings} onSelect={() => router.push('/settings')}>
           Settings
         </MenuItem>

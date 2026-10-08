@@ -12,7 +12,8 @@ export const dynamic = 'force-dynamic';
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
 /**
- * Start a ticket purchase: reserve inventory transactionally in Postgres,
+ * Start a ticket purchase. Free orders are issued immediately (`status: 'fulfilled'`).
+ * Paid orders reserve inventory transactionally in Postgres,
  * then create a Stripe-hosted Checkout Session (destination charge to the
  * organizer's connected account with Click's application fee). The client
  * submits only tier ids and quantities — never prices, fees, or accounts —
@@ -55,6 +56,7 @@ export async function POST(
       user.id,
       beaconId,
       parsed.data.items.map((i) => ({ tierId: i.ticket_tier_id, quantity: i.quantity })),
+      { client: parsed.data.client },
     );
     if (!result.ok) {
       return NextResponse.json(
@@ -62,6 +64,7 @@ export async function POST(
         { status: result.status },
       );
     }
+    if ('fulfilled' in result) return NextResponse.json({ order_id: result.orderId, status: 'fulfilled' });
     return NextResponse.json({ order_id: result.orderId, checkout_url: result.checkoutUrl });
   } catch (e) {
     console.error('Ticket checkout failed:', e);

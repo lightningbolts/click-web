@@ -1,28 +1,13 @@
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
+import { mintTicketToken } from '@/lib/events/eventPass';
 
 /**
  * Ticket admission credentials.
  *
- * The QR payload is an opaque token with 256 bits of entropy; only its
- * SHA-256 hex hash is stored (`tickets.qr_token_hash`), so a leaked database
- * cannot be turned into printable admission credentials. The plaintext token
- * is returned only to the authenticated ticket owner, by rotating the
- * credential (mint new token, overwrite the stored hash) on request.
+ * A ticket's QR is a version-2 Click Pass token (`lib/events/eventPass.ts`) derived from its id,
+ * so it is stable across devices and never rotates. Only the token's SHA-256 hex hash is stored
+ * (`tickets.qr_token_hash`); the scan looks the ticket up by that hash.
  */
-
-const TOKEN_BYTES = 32;
-
-export type MintedCredential = {
-  /** Opaque base64url token embedded in the QR payload. */
-  token: string;
-  /** Hex SHA-256 of the token; the only value persisted. */
-  tokenHash: string;
-};
-
-export function mintTicketCredential(): MintedCredential {
-  const token = randomBytes(TOKEN_BYTES).toString('base64url');
-  return { token, tokenHash: hashTicketToken(token) };
-}
 
 export function hashTicketToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
@@ -41,7 +26,14 @@ export function mintTicketNumber(): string {
   return out;
 }
 
-/** HTTPS QR payload; a non-Click scanner lands on a controlled fallback page. */
-export function ticketQrUrl(baseUrl: string, token: string): string {
-  return `${baseUrl.replace(/\/$/, '')}/t/${token}`;
+export type MintedTicketRow = { id: string; ticket_number: string; token_hash: string };
+
+/** A new ticket's id, number and credential hash, ready for `tickets` insert via the RPCs. */
+export function mintTicketRow(key: Buffer, beaconId: string): MintedTicketRow {
+  const id = randomUUID();
+  return {
+    id,
+    ticket_number: mintTicketNumber(),
+    token_hash: hashTicketToken(mintTicketToken(key, beaconId, id)),
+  };
 }

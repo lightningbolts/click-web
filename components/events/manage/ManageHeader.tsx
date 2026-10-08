@@ -9,11 +9,12 @@ import { eventDisplayTitle } from "@/lib/events/eventMetadata";
 import { eventManagePath, eventSharePath, eventShareUrl } from "@/lib/events/eventUrls";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
 
-export function manageTabs(beaconId: string, access: EventAccess) {
+export function manageTabs(beaconId: string, access: EventAccess, ticketed = false) {
   const base = eventManagePath(beaconId);
   return [
     { href: base, label: "Overview" },
     { href: `${base}/guests`, label: "Guests" },
+    ...(ticketed ? [{ href: `${base}/tickets`, label: "Tickets" }] : []),
     ...(access === "manage" ? [{ href: `${base}/edit`, label: "Edit" }] : []),
     { href: `${base}/insights`, label: "Insights" },
     { href: `${base}/recap`, label: "Recap & summary" },
@@ -72,7 +73,7 @@ export function ManageHeader({
           <EventShareButton url={eventShareUrl(event.beacon_id)} title={title} variant="primary" />
         </div>
       </div>
-      <LinkTabs label="Manage event" tabs={manageTabs(event.beacon_id, access)} className="mt-4" />
+      <LinkTabs label="Manage event" tabs={manageTabs(event.beacon_id, access, event.ticketing != null)} className="mt-4" />
     </header>
   );
 }

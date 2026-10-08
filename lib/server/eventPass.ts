@@ -3,7 +3,7 @@ import 'server-only';
 import { createHmac } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { runtimeEnv } from '@/lib/server/runtimeEnv';
-import { eventPassCode, eventPassUrl, mintEventPassToken } from '@/lib/events/eventPass';
+import { eventPassCode, eventPassUrl, mintEventPassToken, mintTicketToken } from '@/lib/events/eventPass';
 import { displayNameFromUser, type UserProfileRow } from '@/lib/events/attendeeDirectory';
 import { eventDisplayTitle, parseIsoMs } from '@/lib/events/eventMetadata';
 import type { PublicEventPayload } from '@/lib/events/publicEvent';
@@ -37,16 +37,26 @@ export function issueEventPass(key: Buffer, beaconId: string, userId: string): I
   return { token, url: eventPassUrl(publicBaseUrl(), beaconId, token), code: eventPassCode(token) };
 }
 
+/** A ticket's QR: the event URL carrying its stable v2 token. */
+export function issueTicketCredential(key: Buffer, beaconId: string, ticketId: string): IssuedPass {
+  const token = mintTicketToken(key, beaconId, ticketId);
+  return { token, url: eventPassUrl(publicBaseUrl(), beaconId, token), code: eventPassCode(token) };
+}
+
 /** A pass belongs to people going (an approved RSVP); requests and waitlists have none yet. */
-export async function isGoing(admin: SupabaseClient, beaconId: string, userId: string): Promise<boolean> {
+/**
+ * Going, and not by buying a ticket: a ticket is its own pass, so a buyer never also gets an
+ * RSVP pass (one ticket would then admit two people).
+ */
+export async function hasRsvpPass(admin: SupabaseClient, beaconId: string, userId: string): Promise<boolean> {
   const { data, error } = await admin
     .from('beacon_attendees')
-    .select('user_id')
+    .select('source')
     .eq('beacon_id', beaconId)
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw new Error(`event pass rsvp: ${error.message}`);
-  return data != null;
+  return data != null && (data as { source: string | null }).source !== 'ticket';
 }
 
 export async function loadPassHolder(
@@ -119,6 +129,8 @@ export function walletPassJson(args: {
   holder: { userId: string; name: string };
   /** The card's color under its background picture (`passArt`). */
   backgroundColor: string;
+  /** A ticket's pass: one per ticket, named by its type. `pass` is then the ticket's credential. */
+  ticket?: { id: string; tierName: string };
 }): Record<string, unknown> {
   const { event, pass } = args;
   const title = eventDisplayTitle(event.title, event.location_name);
@@ -138,6 +150,7 @@ export function walletPassJson(args: {
     );
   }
   const auxiliary: Array<Record<string, unknown>> = [{ key: 'guest', label: 'GUEST', value: args.holder.name }];
+  if (args.ticket) auxiliary.push({ key: 'ticket', label: 'TICKET', value: args.ticket.tierName });
   if (event.location_name) auxiliary.push({ key: 'place', label: 'WHERE', value: event.location_name });
 
   const back: Array<Record<string, unknown>> = [
@@ -154,7 +167,7 @@ export function walletPassJson(args: {
     formatVersion: 1,
     passTypeIdentifier: args.config.passTypeIdentifier,
     teamIdentifier: args.config.teamIdentifier,
-    serialNumber: `${event.beacon_id}:${args.holder.userId}`,
+    serialNumber: args.ticket?.id ?? `${event.beacon_id}:${args.holder.userId}`,
     organizationName: 'Click',
     description: `Click Pass · ${title}`,
     logoText: 'Click',

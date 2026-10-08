@@ -24,6 +24,8 @@ import {
   parseEventListingOptions,
   type EventListingOptions,
 } from "@/lib/events/eventOptions";
+import { EVENT_SALES_COLUMNS, loadEventTicketing, type EventSalesRow } from "@/lib/server/ticketing/offerings";
+import type { EventTicketing } from "@/lib/ticketing/types";
 
 export type EventAttendeePreview = {
   user_id: string;
@@ -61,6 +63,8 @@ export type PublicEventPayload = {
   categories: string[];
   /** The hosting Place even when it is not listed (for manage rights, never rendered). */
   venue_id: string | null;
+  /** Ticket sales summary for ticketed events; null for RSVP events or while ticketing is off. */
+  ticketing: EventTicketing | null;
 };
 
 export type PublicEventListItem = {
@@ -242,7 +246,7 @@ export async function loadPublicEventPayload(
   const { data, error } = await admin
     .from("map_beacons")
     .select(
-      "id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at, starts_at, ends_at, event_timezone, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id, venue_id",
+      `id, beacon_type, metadata, location, show_creator_name, creator_id, expires_at, visibility_audience, created_at, starts_at, ends_at, event_timezone, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id, venue_id, ${EVENT_SALES_COLUMNS}`,
     )
     .eq("id", beaconId)
     .maybeSingle();
@@ -282,7 +286,10 @@ export async function loadPublicEventPayload(
     (typeof data.event_timezone === "string" && data.event_timezone.trim()) ||
     eventTimezoneFromMetadata(meta);
   const venueId = typeof data.venue_id === "string" ? data.venue_id : null;
-  const place = venueId ? (await loadPlaceRefs(admin, [venueId])).get(venueId) ?? null : null;
+  const [place, ticketing] = await Promise.all([
+    venueId ? loadPlaceRefs(admin, [venueId]).then((refs) => refs.get(venueId) ?? null) : null,
+    loadEventTicketing(admin, beaconId, Date.now(), data as unknown as EventSalesRow),
+  ]);
 
   return {
     beacon_id: typeof data.id === "string" ? data.id : beaconId,
@@ -310,6 +317,7 @@ export async function loadPublicEventPayload(
     venue_id: venueId,
     listing,
     place,
+    ticketing,
   };
 }
 

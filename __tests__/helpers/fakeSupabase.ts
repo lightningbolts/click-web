@@ -37,14 +37,37 @@ function cmp(a: unknown, b: unknown): number {
   return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
 }
 
+/** Top-level select items; commas inside an embed's parentheses don't split. */
+function selectItems(columns: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of columns) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      items.push(current);
+      current = '';
+    } else current += ch;
+  }
+  items.push(current);
+  return items.map((item) => item.trim()).filter(Boolean);
+}
+
+/**
+ * Projects plain columns. Embeds (`alias:table!fk ( cols )`) aren't joined; a fixture row that
+ * already carries the embedded value under the table name passes it through as-is.
+ */
 function project(row: Row, columns: string | undefined): Row {
   if (!columns || columns.trim() === '*') return { ...row };
   const out: Row = {};
-  for (const raw of columns.split(',')) {
-    const col = raw.trim();
-    if (!col || col.includes('(')) continue;
-    const [name, alias] = col.split(':').reverse();
-    out[alias ?? name] = row[name];
+  for (const item of selectItems(columns)) {
+    const embed = item.indexOf('(');
+    const head = (embed === -1 ? item : item.slice(0, embed)).trim();
+    const [name, alias] = head.split(':').reverse();
+    const source = name.split('!')[0].trim();
+    if (embed !== -1 && !(source in row)) continue;
+    out[(alias ?? source).trim()] = row[source];
   }
   return out;
 }

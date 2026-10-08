@@ -3,7 +3,6 @@
 import {
   CalendarDays,
   CalendarPlus,
-  CircleCheck,
   MapPin,
   MessagesSquare,
   Navigation,
@@ -11,22 +10,30 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import { useSyncExternalStore, type ComponentProps } from 'react';
+import { useState, useSyncExternalStore, type ComponentProps } from 'react';
 import useSWR from 'swr';
 import { Avatar } from '@/components/ds/Avatar';
 import { Button } from '@/components/ds/Button';
 import { CardVisual } from '@/components/ds/CardVisual';
 import { EmptyState } from '@/components/ds/EmptyState';
 import { InlineNotice } from '@/components/ds/InlineNotice';
-import { Skeleton } from '@/components/ds/Skeleton';
 import { useMediaQuery } from '@/components/ds/useMediaQuery';
 import EventBackLink from '@/components/events/EventBackLink';
 import { EventCalendarMenu } from '@/components/events/EventCalendarMenu';
 import { HostContactMenu, type HostContact } from '@/components/events/HostContactMenu';
 import { MapsMenu } from '@/components/events/MapsMenu';
+import { PassQrPlate } from '@/components/events/PassQrPlate';
+import { OrderDetails } from '@/components/events/tickets/OrderDetails';
+import { TicketPager, ticketStatusLine } from '@/components/events/tickets/TicketPager';
 import type { CalendarEvent } from '@/lib/events/calendarLinks';
-import { clickPassUrl, fetchClickPass, isAppleSafari, isAtTheDoor, type ClickPass, type ClickPassState } from '@/lib/events/eventPassClient';
+import {
+  clickPassUrl,
+  fetchClickPass,
+  fetchTicketPass,
+  isAppleSafari,
+  isAtTheDoor,
+  type ClickPassState,
+} from '@/lib/events/eventPassClient';
 import { eventSharePath } from '@/lib/events/eventUrls';
 import type { MapsDestination } from '@/lib/events/mapsLinks';
 import { cn } from '@/lib/cn';
@@ -41,6 +48,13 @@ export type PassTicket = {
 };
 
 const noop = () => () => {};
+
+/** A code on screen that the host hasn't scanned yet: keep the screen awake and watch for the scan. */
+function awaitingScan(state: ClickPassState | undefined, cancelled: boolean): boolean {
+  if (state?.kind === 'ready') return !state.pass.checked_in_at;
+  if (state?.kind === 'tickets') return !cancelled && state.tickets.some((t) => t.status === 'valid');
+  return false;
+}
 
 /** An equal-width labelled action under the ticket (iOS `EventActionTile`). */
 function ActionTile({ icon: Icon, label, className, ...rest }: ComponentProps<'button'> & { icon: LucideIcon; label: string }) {
@@ -70,33 +84,6 @@ function Perforation() {
   );
 }
 
-function QrPlate({ pass, holderName }: { pass: ClickPass | null; holderName: string }) {
-  const checkedIn = Boolean(pass?.checked_in_at);
-  return (
-    <div className="relative aspect-square w-full max-w-[260px] rounded-[20px] bg-white p-4 dark:shadow-[inset_0_0_0_1px_var(--hairline)]">
-      {pass ? (
-        <QRCodeSVG
-          value={pass.credential_url}
-          size={228}
-          level="M"
-          bgColor="#ffffff"
-          fgColor="#000000"
-          className={cn('size-full transition-opacity duration-[var(--d-slow)]', checkedIn && 'opacity-35')}
-          role="img"
-          aria-label={`Click Pass QR code for ${holderName}, ${pass.code}`}
-        />
-      ) : (
-        <Skeleton className="size-full" rounded="md" shimmer />
-      )}
-      {checkedIn ? (
-        <span className="ds-scale-in absolute inset-0 flex items-center justify-center">
-          <CircleCheck size={72} strokeWidth={2} aria-hidden className="fill-online text-white drop-shadow" />
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 /**
  * Your Click Pass (spec 06 §1, iOS `ClickPassView`): a ticket with the QR your host scans at the
  * door, your name and face (what the host matches), and what you need on the way: Wallet,
@@ -115,6 +102,10 @@ export function ClickPassView({
   calendar,
   destination,
   contact,
+  ticketed = false,
+  cancelled = false,
+  initialTicketId = null,
+  walletAvailable = false,
 }: {
   beaconId: string;
   /** The pass as the server issued it with the page; null when that failed (the client retries). */
@@ -130,19 +121,33 @@ export function ClickPassView({
   calendar: CalendarEvent;
   destination: MapsDestination | null;
   contact: HostContact;
+  /** A ticketed event: show the viewer's tickets instead of the RSVP pass (spec §5.4). */
+  ticketed?: boolean;
+  cancelled?: boolean;
+  /** `?ticket=`: the ticket to open on. */
+  initialTicketId?: string | null;
+  /** The server can sign Wallet passes (tickets carry no flag of their own). */
+  walletAvailable?: boolean;
 }) {
-  const { data, error, isLoading, mutate } = useSWR(clickPassUrl(beaconId), fetchClickPass, {
-    fallbackData: initial ?? undefined,
-    revalidateOnMount: !initial,
-    // Watch for the host's scan only while it can happen and the tab is visible (SWR pauses hidden tabs).
-    refreshInterval: (latest) =>
-      latest?.kind === 'ready' && !latest.pass.checked_in_at && isAtTheDoor(startMs, endMs, Date.now()) ? 4_000 : 0,
-    errorRetryCount: 2,
-  });
+  const { data, error, isLoading, mutate } = useSWR(
+    ticketed ? ['ticket-pass', beaconId] : clickPassUrl(beaconId),
+    () => (ticketed ? fetchTicketPass(beaconId) : fetchClickPass(clickPassUrl(beaconId))),
+    {
+      fallbackData: initial ?? undefined,
+      revalidateOnMount: !initial,
+      // Watch for the host's scan only while it can happen and the tab is visible (SWR pauses hidden tabs).
+      refreshInterval: (latest) => (awaitingScan(latest, cancelled) && isAtTheDoor(startMs, endMs, Date.now()) ? 4_000 : 0),
+      errorRetryCount: 2,
+    },
+  );
   const pass = data?.kind === 'ready' ? data.pass : null;
+  const tickets = data?.kind === 'tickets' ? data.tickets : null;
+  const [picked, setPicked] = useState(() => Math.max(0, (initial?.kind === 'tickets' ? initial.tickets : []).findIndex((t) => t.id === initialTicketId)));
+  const index = tickets ? Math.min(picked, tickets.length - 1) : 0;
+  const current = tickets?.[index] ?? null;
   const apple = useSyncExternalStore(noop, () => isAppleSafari(navigator.userAgent), () => false);
   const touch = useMediaQuery('(pointer: coarse)', false);
-  useWakeLock(pass != null && !pass.checked_in_at);
+  useWakeLock(awaitingScan(data, cancelled));
 
   const back = <EventBackLink href={eventSharePath(beaconId)} />;
 
@@ -152,11 +157,11 @@ export function ClickPassView({
         {back}
         <EmptyState
           icon={Ticket}
-          title="No pass yet"
-          body="RSVP to the event and your Click Pass appears here."
+          title={ticketed ? 'No tickets yet' : 'No pass yet'}
+          body={ticketed ? 'Get tickets on the event page and they appear here.' : 'RSVP to the event and your Click Pass appears here.'}
           action={
             <Button variant="primary" href={eventSharePath(beaconId)}>
-              View event
+              {ticketed ? 'Get tickets' : 'View event'}
             </Button>
           }
         />
@@ -182,12 +187,21 @@ export function ClickPassView({
   }
 
   const checkedInAt = pass?.checked_in_at ? Date.parse(pass.checked_in_at) : null;
-  const status =
-    checkedInAt != null
+  const status = current
+    ? ticketStatusLine(current, { cancelled, live, timeZone })
+    : checkedInAt != null
       ? `You’re in · checked in ${new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone }).format(checkedInAt)}`
       : live
         ? 'Going · show this at the door'
         : 'Going';
+  const inside = current ? current.status === 'checked_in' && !cancelled : checkedInAt != null;
+  const walletHref = current
+    ? walletAvailable && !cancelled && current.credential_url
+      ? `${clickPassUrl(beaconId)}/wallet?ticket=${current.id}`
+      : null
+    : pass?.wallet_available
+      ? `${clickPassUrl(beaconId)}/wallet`
+      : null;
 
   return (
     <>
@@ -215,7 +229,9 @@ export function ClickPassView({
         <Perforation />
 
         <div className="flex flex-col items-center gap-3.5 p-5">
-          {data?.kind === 'unavailable' ? (
+          {tickets ? (
+            <TicketPager tickets={tickets} index={index} onIndexChange={setPicked} cancelled={cancelled} holderName={holder.name} />
+          ) : data?.kind === 'unavailable' ? (
             <InlineNotice
               variant="neutral"
               className="w-full"
@@ -229,7 +245,11 @@ export function ClickPassView({
             </InlineNotice>
           ) : (
             <>
-              <QrPlate pass={pass} holderName={holder.name} />
+              <PassQrPlate
+                url={pass?.credential_url ?? null}
+                label={pass ? `Click Pass QR code for ${holder.name}, ${pass.code}` : ''}
+                dimmed={checkedInAt != null}
+              />
               <p className="h-7 select-all font-mono text-xl font-semibold tracking-[0.2em] text-fg">{pass?.code}</p>
             </>
           )}
@@ -237,7 +257,7 @@ export function ClickPassView({
             <Avatar seed={holder.userId} name={holder.name} src={holder.avatarUrl} size={40} />
             <div className="min-w-0">
               <p className="type-body-strong truncate text-fg">{holder.name}</p>
-              <p className={cn('type-meta', checkedInAt != null ? 'text-online-text' : 'text-fg-secondary')} aria-live="polite">
+              <p className={cn('type-meta', inside ? 'text-online-text' : 'text-fg-secondary')} aria-live="polite">
                 {status}
               </p>
             </div>
@@ -246,9 +266,9 @@ export function ClickPassView({
       </section>
 
       <div className="mt-5 space-y-2.5">
-        {pass?.wallet_available && apple ? (
+        {walletHref && apple ? (
           <a
-            href={`${clickPassUrl(beaconId)}/wallet`}
+            href={walletHref}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-pill bg-black font-semibold text-white transition-opacity hover:opacity-85 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]"
           >
             <Wallet size={18} strokeWidth={2} aria-hidden />
@@ -262,12 +282,15 @@ export function ClickPassView({
           ) : null}
           <HostContactMenu beaconId={beaconId} contact={contact} trigger={<ActionTile icon={MessagesSquare} label="Contact" />} />
         </div>
+        {current ? <OrderDetails ticketId={current.id} /> : null}
       </div>
 
-      <p className="type-meta mt-5 text-balance px-3 text-center text-fg-tertiary">
-        Your host scans this at the door. It’s yours alone: if it’s shared, the host sees your name and photo.
-        {touch ? ' Turn your brightness up so it scans first time.' : null}
-      </p>
+      {!current || (current.credential_url && !cancelled) ? (
+        <p className="type-meta mt-5 text-balance px-3 text-center text-fg-tertiary">
+          Your host scans this at the door. It’s yours alone: if it’s shared, the host sees your name and photo.
+          {touch ? ' Turn your brightness up so it scans first time.' : null}
+        </p>
+      ) : null}
     </>
   );
 }

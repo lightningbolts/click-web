@@ -1,4 +1,7 @@
-import { fetchClickPass, isAppleSafari, isAtTheDoor } from '@/lib/events/eventPassClient';
+import { fetchClickPass, fetchTicketPass, isAppleSafari, isAtTheDoor } from '@/lib/events/eventPassClient';
+
+const mockFetchEventTickets = jest.fn();
+jest.mock('@/lib/ticketing/ticketingClient', () => ({ fetchEventTickets: (...a: unknown[]) => mockFetchEventTickets(...a) }));
 
 jest.mock('@/lib/auth/freshAuthHeaders', () => ({ getFreshAuthHeaders: async () => ({}) }));
 
@@ -21,6 +24,23 @@ describe('Click Pass client', () => {
     await expect(fetchClickPass('/p')).resolves.toEqual({ kind: 'unavailable' });
     respond(500);
     await expect(fetchClickPass('/p')).rejects.toThrow('pass 500');
+  });
+
+  it('on a ticketed event, shows tickets, else the RSVP pass a guest already had', async () => {
+    const pass = { credential_url: 'u', code: 'K7P-4QX', checked_in_at: null, wallet_available: false };
+    const ticket = { id: 't1' };
+    mockFetchEventTickets.mockResolvedValueOnce([ticket]);
+    await expect(fetchTicketPass('b1')).resolves.toEqual({ kind: 'tickets', tickets: [ticket] });
+
+    mockFetchEventTickets.mockResolvedValueOnce([]);
+    const fetch = jest.fn(async () => ({ status: 200, ok: true, json: async () => pass }));
+    (global as { fetch?: unknown }).fetch = fetch;
+    await expect(fetchTicketPass('b1')).resolves.toEqual({ kind: 'ready', pass });
+    expect(fetch).toHaveBeenCalledWith('/api/beacons/b1/pass', expect.anything());
+
+    mockFetchEventTickets.mockResolvedValueOnce([]);
+    (global as { fetch?: unknown }).fetch = jest.fn(async () => ({ status: 403, ok: false, json: async () => ({}) }));
+    await expect(fetchTicketPass('b1')).resolves.toEqual({ kind: 'not_going' });
   });
 
   it('is at the door from an hour before the start until the end', () => {

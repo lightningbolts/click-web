@@ -1,4 +1,5 @@
 import { BarChart3, FileText, ImagePlus, PencilLine, ScanLine, Upload, UserCheck } from "lucide-react";
+import Link from "next/link";
 import { ListGroup, ListRow } from "@/components/ds/ListGroup";
 import { StatTile } from "@/components/ds/StatTile";
 import { ManageShareCard } from "@/components/events/manage/ManageShareCard";
@@ -9,6 +10,8 @@ import { eventManagePath, eventScanPath, eventShareUrl } from "@/lib/events/even
 import { flyerEvent } from "@/lib/events/flyerEvent";
 import { formatEventWhen } from "@/lib/events/formatEventWhen";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
+import { formatAmount } from "@/lib/ticketing/money";
+import type { TicketSalesSummary } from "@/lib/ticketing/types";
 
 type Step = { href: string; icon: typeof Upload; title: string; subtitle: string };
 
@@ -53,12 +56,15 @@ export function ManageOverview({
   access,
   ended,
   summaryPublished,
+  sales = null,
 }: {
   event: PublicEventPayload;
   counts: ManageCounts;
   access: EventAccess;
   ended: boolean;
   summaryPublished: boolean;
+  /** Ticketed events: sales at a glance, linking to the Tickets tab. */
+  sales?: TicketSalesSummary | null;
 }) {
   const when = formatEventWhen(event.event_start_at, event.event_end_at, event.timezone);
   const steps =
@@ -86,6 +92,24 @@ export function ManageOverview({
           <StatTile label="Checked in" value={counts.checkedIn} />
         </div>
       </section>
+
+      {sales ? (
+        <section aria-labelledby="overview-tickets-heading">
+          <div className="mb-2 flex items-baseline justify-between px-4">
+            <h3 id="overview-tickets-heading" className="type-meta font-semibold text-fg-secondary">
+              Tickets
+            </h3>
+            <Link href={`${eventManagePath(event.beacon_id)}/tickets`} className="type-meta font-semibold text-accent hover:underline">
+              See all
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <StatTile label="Sold" value={`${sales.sold} / ${sales.capacity}`} />
+            <StatTile label="Checked in" value={sales.checked_in} />
+            <StatTile label="Gross" value={formatAmount(sales.gross_cents, sales.currency)} />
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-8 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <ManageShareCard

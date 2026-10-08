@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
 import { loadOrder } from '@/lib/server/ticketing/fulfillment';
 import { requestTicketRefund } from '@/lib/server/ticketing/refunds';
+import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { refundBodySchema } from '@/lib/api/schemas/ticketing';
 
@@ -58,6 +59,8 @@ export async function POST(
         { status: result.status },
       );
     }
+    // The refunded tickets stop counting as sold.
+    revalidatePublicEvents(order.beacon_id);
     return NextResponse.json(
       { refund_id: result.refundId, amount: result.amount },
       { status: 201 },

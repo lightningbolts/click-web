@@ -3,8 +3,11 @@ import {
   eventPassCode,
   eventPassUrl,
   mintEventPassToken,
+  mintTicketToken,
   parsePassCredential,
+  passTokenVersion,
   verifyEventPassToken,
+  verifyTicketToken,
 } from '@/lib/events/eventPass';
 
 const key = Buffer.from('test-key');
@@ -45,5 +48,42 @@ describe('Click Pass credentials', () => {
   it('shows a short unambiguous code', () => {
     expect(eventPassCode(token)).toMatch(/^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$/);
     expect(eventPassCode(token)).toBe(eventPassCode(token));
+  });
+});
+
+describe('ticket credentials (v2)', () => {
+  const ticket = '7c1e2d3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f';
+  const token = mintTicketToken(key, beacon, ticket);
+
+  it('round-trips the ticket id for its event', () => {
+    expect(token.startsWith('2.')).toBe(true);
+    expect(verifyTicketToken(key, beacon, token)).toBe(ticket);
+    expect(mintTicketToken(key, beacon, ticket.toUpperCase())).toBe(token);
+  });
+
+  it('rejects another event, a flipped signature byte, a v1 token, and extra segments', () => {
+    expect(verifyTicketToken(key, '3f2c1a7e-9b8d-4c6e-a1f0-2d3e4f5a6b7d', token)).toBeNull();
+    const [v, t, s] = token.split('.');
+    const sig = Buffer.from(s!, 'base64url');
+    sig[0] = sig[0]! ^ 1;
+    expect(verifyTicketToken(key, beacon, [v, t, sig.toString('base64url')].join('.'))).toBeNull();
+    expect(verifyTicketToken(key, beacon, mintEventPassToken(key, beacon, user))).toBeNull();
+    expect(verifyTicketToken(key, beacon, `${token}.x`)).toBeNull();
+  });
+
+  it('is never accepted as an RSVP pass, and RSVP passes still verify', () => {
+    expect(verifyEventPassToken(key, beacon, token)).toBeNull();
+    expect(verifyEventPassToken(key, beacon, mintEventPassToken(key, beacon, user))).toBe(user);
+  });
+
+  it('reports the token version', () => {
+    expect(passTokenVersion('1.x.y')).toBe(1);
+    expect(passTokenVersion('2.x.y')).toBe(2);
+    expect(passTokenVersion('junk')).toBeNull();
+    expect(passTokenVersion('3.x.y')).toBeNull();
+  });
+
+  it('has a readable code like RSVP passes', () => {
+    expect(eventPassCode(token)).toMatch(/^[A-Z2-9]{3}-[A-Z2-9]{3}$/);
   });
 });

@@ -12,6 +12,7 @@ import { buildEventDirectory, directoryHref, parseDirectoryQuery, PUBLIC_EVENTS_
 import { loadPublicPastEvents, loadPublicUpcomingEvents, type PublicEventListItem } from "@/lib/events/publicEvent";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { getServerUser } from "@/lib/server/getServerUser";
+import { ticketingEnabled } from "@/lib/server/ticketing/enabled";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
 
 // Request-time only: listing uses the service-role client, which is optional
@@ -82,7 +83,7 @@ export default async function PublicEventsPage({
         <EventDirectoryControls query={query} />
       </div>
 
-      {user && query.tab === "upcoming" && !searching ? <YourEventsStrip timeZone={timeZone} initialFilter={params.view === "saved" ? "saved" : null} /> : null}
+      {user && query.tab === "upcoming" && !searching ? <YourEventsStrip timeZone={timeZone} initialFilter={params.view === "saved" ? "saved" : null} ticketing={ticketingEnabled()} /> : null}
 
       {dir.featured ? (
         <div className="mb-10">

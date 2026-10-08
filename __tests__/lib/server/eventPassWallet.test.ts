@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { issueEventPass, walletPassJson } from '@/lib/server/eventPass';
+import { issueEventPass, issueTicketCredential, walletPassJson } from '@/lib/server/eventPass';
 import type { PublicEventPayload } from '@/lib/events/publicEvent';
 
 const beacon = '3f2c1a7e-9b8d-4c6e-a1f0-2d3e4f5a6b7c';
@@ -41,5 +41,43 @@ describe('Wallet pass JSON', () => {
   it('carries the same QR credential as the app', () => {
     expect(json.barcodes).toEqual([expect.objectContaining({ format: 'PKBarcodeFormatQR', message: pass.url, altText: pass.code })]);
     expect(ticket.primaryFields?.[0]).toMatchObject({ key: 'event', value: 'Run Club' });
+  });
+});
+
+describe('Wallet pass JSON for a ticket', () => {
+  const ticketId = '44444444-4444-4444-8444-444444444444';
+  const config = { passTypeIdentifier: 'pass.co.joinclick.event', teamIdentifier: 'TEAM' };
+  const holder = { userId: user, name: 'Ada' };
+  const rsvp = walletPassJson({ config, event, pass: issueEventPass(Buffer.from('k'), beacon, user), holder, backgroundColor: 'rgb(0, 0, 0)' });
+  const credential = issueTicketCredential(Buffer.from('k'), beacon, ticketId);
+  const json = walletPassJson({
+    config,
+    event,
+    pass: credential,
+    holder,
+    backgroundColor: 'rgb(0, 0, 0)',
+    ticket: { id: ticketId, tierName: 'VIP' },
+  });
+  const fields = json.eventTicket as Record<string, Array<Record<string, unknown>>>;
+
+  it('is one Wallet pass per ticket, scanning as that ticket', () => {
+    expect(json.serialNumber).toBe(ticketId);
+    expect(json.barcodes).toEqual([expect.objectContaining({ message: credential.url, altText: credential.code })]);
+  });
+
+  it('names the ticket type beside the guest', () => {
+    expect(fields.auxiliaryFields).toEqual([
+      { key: 'guest', label: 'GUEST', value: 'Ada' },
+      { key: 'ticket', label: 'TICKET', value: 'VIP' },
+      { key: 'place', label: 'WHERE', value: 'Burke-Gilman Trail' },
+    ]);
+  });
+
+  it('leaves the RSVP pass unchanged', () => {
+    expect(rsvp.serialNumber).toBe(`${beacon}:${user}`);
+    expect((rsvp.eventTicket as Record<string, unknown[]>).auxiliaryFields).toEqual([
+      { key: 'guest', label: 'GUEST', value: 'Ada' },
+      { key: 'place', label: 'WHERE', value: 'Burke-Gilman Trail' },
+    ]);
   });
 });
