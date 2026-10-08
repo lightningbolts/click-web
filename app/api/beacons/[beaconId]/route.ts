@@ -418,6 +418,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // Orders are financial records; an event that sold tickets is cancelled, never deleted.
+    const { count: orderCount, error: orderError } = await admin
+      .from("ticket_orders")
+      .select("id", { count: "exact", head: true })
+      .eq("beacon_id", beaconId);
+    if (orderError) {
+      console.error("DELETE /api/beacons/[beaconId] order check:", orderError.message);
+      return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+    if (orderCount) {
+      return NextResponse.json(
+        { error: "This event has ticket orders. Cancel it instead.", code: "has_ticket_orders" },
+        { status: 409 },
+      );
+    }
+
     const { error: deleteError } = await supabase
       .from("map_beacons")
       .delete()

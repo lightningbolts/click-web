@@ -6,6 +6,7 @@ import { fulfillFromCheckoutSession, loadOrder } from '@/lib/server/ticketing/fu
 import { snapshotFromStripeAccount } from '@/lib/server/ticketing/connect';
 import { accountRowPatch } from '@/lib/server/ticketing/accountState';
 import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
+import { getStripe } from '@/lib/server/stripe';
 
 /**
  * Ticketing slice of the Stripe webhook. Deliberately constrained event set;
@@ -53,6 +54,10 @@ export async function handleTicketingEvent(
       if (result.ok) {
         // Sold counts and "Sold out" on the public event page.
         revalidatePublicEvents(session.metadata?.click_event_id);
+        return;
+      }
+      if (result.code === 'order_not_payable') {
+        await refundUnfulfillablePayment(session);
         return;
       }
       if (result.code !== 'not_paid_yet') {
@@ -127,6 +132,27 @@ export async function handleTicketingEvent(
     default:
       return;
   }
+}
+
+/**
+ * Money arrived for an order that can no longer be fulfilled (the event was cancelled while the
+ * buyer was on Stripe's page). Give it straight back; the key makes webhook redelivery safe.
+ */
+async function refundUnfulfillablePayment(session: Stripe.Checkout.Session): Promise<void> {
+  const paymentIntent =
+    typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+  if (session.payment_status !== 'paid' || !paymentIntent) return;
+  const orderId = session.metadata?.click_order_id ?? session.client_reference_id ?? '';
+  await getStripe().refunds.create(
+    {
+      payment_intent: paymentIntent,
+      reverse_transfer: true,
+      refund_application_fee: true,
+      metadata: { click_unfulfillable_order: orderId },
+    },
+    { idempotencyKey: `unfulfillable-payment:${session.id}` },
+  );
+  console.warn(`Refunded payment for unfulfillable order ${orderId} (session ${session.id}).`);
 }
 
 async function applyRefundObject(admin: SupabaseClient, refund: Stripe.Refund): Promise<void> {
