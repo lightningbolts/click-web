@@ -11,6 +11,7 @@ import { runAfterResponse } from '@/lib/server/afterResponse';
 import { requestHistoryApprovalForNewDevice } from '@/lib/server/deviceHistory';
 import { notifyDevicesOfNewSignIn } from '@/lib/server/deviceApproval';
 import { isBrowserDeviceLabel } from '@/lib/chat/deviceLabel';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 
 // Rollout-gated E2EE v2 device registry/discovery surface. Message writes and key transfer
 // remain out of this route until the v2 rollout gate is enabled.
@@ -218,7 +219,7 @@ export async function POST(request: NextRequest) {
     // Browsers without a usable passkey can still explicitly ask for the old approval flow.
     const registered = data as DeviceRow;
     let recoverableBrowser = false;
-    if (isBrowserDeviceLabel(deviceLabel)) {
+    if (HISTORY_RECOVERY_ENABLED && isBrowserDeviceLabel(deviceLabel)) {
       const { data: vault, error: vaultError } = await admin
         .from('chat_key_recovery_vaults').select('user_id')
         .eq('user_id', auth.user.id).maybeSingle();
