@@ -10,6 +10,7 @@ import {
 import { runAfterResponse } from '@/lib/server/afterResponse';
 import { requestHistoryApprovalForNewDevice } from '@/lib/server/deviceHistory';
 import { notifyDevicesOfNewSignIn } from '@/lib/server/deviceApproval';
+import { isBrowserDeviceLabel } from '@/lib/chat/deviceLabel';
 
 // Rollout-gated E2EE v2 device registry/discovery surface. Message writes and key transfer
 // remain out of this route until the v2 rollout gate is enabled.
@@ -212,14 +213,26 @@ export async function POST(request: NextRequest) {
       return errorResponse();
     }
 
-    // An additional device on this account: ask the account's devices to approve sharing history.
+    // With an enrolled zero-knowledge recovery credential, a browser can restore its
+    // historical keys locally. Don't wake every phone merely for a browser session.
+    // Browsers without a usable passkey can still explicitly ask for the old approval flow.
     const registered = data as DeviceRow;
-    runAfterResponse('chat/devices history approval', () =>
-      requestHistoryApprovalForNewDevice(
-        admin, auth.user, { id: registered.id, created_at: registered.created_at, device_label: deviceLabel },
-        (requestId, label) => notifyDevicesOfNewSignIn(auth.user.id, requestId, label),
-      ),
-    );
+    let recoverableBrowser = false;
+    if (isBrowserDeviceLabel(deviceLabel)) {
+      const { data: vault, error: vaultError } = await admin
+        .from('chat_key_recovery_vaults').select('user_id')
+        .eq('user_id', auth.user.id).maybeSingle();
+      // On an unavailable/missing migration, retain the existing approval behavior.
+      recoverableBrowser = !vaultError && Boolean(vault);
+    }
+    if (!recoverableBrowser) {
+      runAfterResponse('chat/devices history approval', () =>
+        requestHistoryApprovalForNewDevice(
+          admin, auth.user, { id: registered.id, created_at: registered.created_at, device_label: deviceLabel },
+          (requestId, label) => notifyDevicesOfNewSignIn(auth.user.id, requestId, label),
+        ),
+      );
+    }
 
     return NextResponse.json({ device: postProjection(data as DeviceRow) });
   } catch (error) {
