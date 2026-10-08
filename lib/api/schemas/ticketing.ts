@@ -10,6 +10,8 @@ export const checkoutBodySchema = z.object({
     )
     .min(1)
     .max(5),
+  /** Which app started checkout; recorded on the Stripe session for support. */
+  client: z.enum(['web', 'ios']).optional(),
 });
 
 const tierFields = {

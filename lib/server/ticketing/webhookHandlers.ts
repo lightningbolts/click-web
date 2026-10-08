@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fulfillFromCheckoutSession, loadOrder } from '@/lib/server/ticketing/fulfillment';
 import { snapshotFromStripeAccount } from '@/lib/server/ticketing/connect';
 import { accountRowPatch } from '@/lib/server/ticketing/accountState';
+import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
 
 /**
  * Ticketing slice of the Stripe webhook. Deliberately constrained event set;
@@ -49,7 +50,12 @@ export async function handleTicketingEvent(
     case 'checkout.session.async_payment_succeeded': {
       const session = event.data.object as Stripe.Checkout.Session;
       const result = await fulfillFromCheckoutSession(admin, session);
-      if (!result.ok && result.code !== 'not_paid_yet') {
+      if (result.ok) {
+        // Sold counts and "Sold out" on the public event page.
+        revalidatePublicEvents(session.metadata?.click_event_id);
+        return;
+      }
+      if (result.code !== 'not_paid_yet') {
         // Reconciliation mismatches are operator-visible, not retried forever.
         console.error(
           `Ticketing fulfillment rejected (order=${session.metadata?.click_order_id}, session=${session.id}): ${result.code}`,

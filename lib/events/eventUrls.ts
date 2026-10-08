@@ -31,6 +31,11 @@ export function eventScanPath(beaconId: string): string {
   return `/e/${beaconId}/scan`;
 }
 
+/** Where Stripe Checkout sends the buyer back to (success, or `canceled` when they backed out). */
+export function eventTicketsReturnPath(beaconId: string, orderId: string, canceled = false): string {
+  return `/e/${beaconId}/tickets/return?order=${orderId}${canceled ? "&canceled=1" : ""}`;
+}
+
 export function eventEditPath(beaconId: string): string {
   return `/e/${beaconId}/manage/edit`;
 }
