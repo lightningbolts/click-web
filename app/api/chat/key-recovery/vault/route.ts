@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
 
 const encrypted = z.object({
@@ -27,8 +28,8 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
-  const parsed = putSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: 'Invalid encrypted vault' }, { status: 400 });
+  const parsed = await parseBody(req, putSchema);
+  if (!parsed.ok) return parsed.response;
   const { expectedVersion, encryptedManifest } = parsed.data;
   const admin = createChatGatekeeperAdmin();
   if (expectedVersion === 0) {
