@@ -7,7 +7,7 @@ import { Button } from "@/components/ds/Button";
 import { EmptyState } from "@/components/ds/EmptyState";
 import { Spinner } from "@/components/ds/Spinner";
 import { eventPassPath, eventSharePath } from "@/lib/events/eventUrls";
-import { TicketingError, fetchOrder, orderOutcome, type OrderOutcome } from "@/lib/ticketing/ticketingClient";
+import { TicketingError, fetchOrder, releaseOrder, orderOutcome, type OrderOutcome } from "@/lib/ticketing/ticketingClient";
 
 /** Poll fast while the webhook usually lands, then ease off; give up quietly after a minute. */
 const FAST_MS = 1_000;
@@ -98,7 +98,10 @@ export function CheckoutReturn({ beaconId, orderId, canceledParam }: { beaconId:
       timer = setTimeout(() => void poll(), elapsed < FAST_FOR_MS ? FAST_MS : SLOW_MS);
     };
 
-    void poll();
+    // Free the held tickets before checking (a paid order refuses and stays), so "Try again"
+    // can buy them back at once.
+    if (canceledParam) void releaseOrder(orderId).catch(() => undefined).then(poll);
+    else void poll();
     return () => {
       stopped = true;
       clearTimeout(timer);
