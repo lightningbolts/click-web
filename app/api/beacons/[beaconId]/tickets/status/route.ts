@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireEventManager } from '@/lib/events/requireEventManager';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
-import { loadOrganizerAccount } from '@/lib/server/ticketing/connect';
+import { readyPayoutAccount } from '@/lib/server/ticketing/payouts';
 import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { apiError } from '@/lib/api/errors';
@@ -70,11 +70,9 @@ export async function POST(
     }
 
     if ((tiers as { unit_amount: number }[]).some((tier) => tier.unit_amount > 0)) {
-      const account = await loadOrganizerAccount(admin, manager.userId);
-      if (!account || account.onboarding_state !== 'ready' || !account.transfers_enabled) {
-        return apiError('Set up payouts to sell paid tickets', 409, 'organizer_not_ready');
-      }
-      patch.organizer_payment_account_id = account.id;
+      const accountId = await readyPayoutAccount(admin, manager.beacon.creator_id);
+      if (!accountId) return apiError('Set up payouts to sell paid tickets', 409, 'organizer_not_ready');
+      patch.organizer_payment_account_id = accountId;
     }
     patch.admission_type = 'ticketed';
   }

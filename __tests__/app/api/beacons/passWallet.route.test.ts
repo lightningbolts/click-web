@@ -30,7 +30,7 @@ jest.mock('@/lib/server/eventPass', () => {
     ...actual,
     walletConfig: () => ({ passTypeIdentifier: 'pass.co.joinclick.event', teamIdentifier: 'TEAM' }),
     eventPassKey: () => Buffer.from('k'),
-    isGoing: (...args: unknown[]) => mockIsGoing(...args),
+    hasRsvpPass: (...args: unknown[]) => mockIsGoing(...args),
     loadPassHolder: async (_admin: unknown, userId: string) => ({ userId, name: 'Ada', avatarUrl: null }),
     buildWalletPass: (...args: unknown[]) => mockBuild(...args),
   };

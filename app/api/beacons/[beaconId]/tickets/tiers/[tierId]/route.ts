@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireEventManager } from '@/lib/events/requireEventManager';
 import { EVENT_BEACON_UUID_RE } from '@/lib/events/eventMetadata';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
+import { attachPayoutAccount } from '@/lib/server/ticketing/payouts';
+import { loadEventSales } from '@/lib/server/ticketing/offerings';
 import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
 import { parseBody } from '@/lib/api/parseBody';
 import { apiError } from '@/lib/api/errors';
@@ -45,6 +47,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!parsed.ok) return parsed.response;
 
   if (!(await loadOwnTier(manager.admin, beaconId, tierId))) return apiError('Ticket not found', 404);
+  if ((parsed.data.unit_amount ?? 0) > 0) {
+    const event = await loadEventSales(manager.admin, beaconId);
+    if (event?.ticketing_status === 'sales_open' && !(await attachPayoutAccount(manager.admin, beaconId, manager.beacon.creator_id))) {
+      return apiError('Set up payouts to sell paid tickets', 409, 'organizer_not_ready');
+    }
+  }
 
   const { data, error } = await manager.admin.rpc('ticketing_update_tier', { p_tier: tierId, p_patch: parsed.data });
   if (error) {

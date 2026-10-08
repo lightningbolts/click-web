@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { loadEventBeaconOrResponse } from '@/lib/server/eventEngagement';
-import { activeCheckIn, eventPassKey, isGoing, issueEventPass, walletConfig } from '@/lib/server/eventPass';
+import { activeCheckIn, eventPassKey, hasRsvpPass, issueEventPass, walletConfig } from '@/lib/server/eventPass';
 import { apiError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const key = eventPassKey();
     if (!key) return apiError('Click Pass is not configured', 503, 'pass_unavailable');
-    if (!(await isGoing(admin, beaconId, user.id))) {
+    if (!(await hasRsvpPass(admin, beaconId, user.id))) {
       return apiError('RSVP to get a Click Pass', 403, 'not_going');
     }
 

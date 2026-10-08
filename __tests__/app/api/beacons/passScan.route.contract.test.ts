@@ -52,7 +52,7 @@ function failingCheckInRead(client: FakeDb['client']): FakeDb['client'] {
 
 type TicketScan = { result: string; status?: string };
 
-function world(opts: { going?: boolean; checkedIn?: boolean; failCheckInRead?: boolean; ticketScan?: TicketScan } = {}) {
+function world(opts: { going?: boolean; source?: string; cancelled?: boolean; checkedIn?: boolean; failCheckInRead?: boolean; ticketScan?: TicketScan } = {}) {
   const db = new FakeDb({
     rpc: {
       ticketing_check_in: () => ({
@@ -71,11 +71,11 @@ function world(opts: { going?: boolean; checkedIn?: boolean; failCheckInRead?: b
         { id: OTHER_TICKET_ID, beacon_id: OTHER_BEACON_ID, qr_token_hash: 'other-hash' },
       ],
       users: [{ id: GUEST_ID, first_name: 'Ada', last_name: 'Lovelace', name: null, image: 'https://img/ada.jpg' }],
-      beacon_attendees: opts.going === false ? [] : [{ beacon_id: BEACON_ID, user_id: GUEST_ID }],
+      beacon_attendees: opts.going === false ? [] : [{ beacon_id: BEACON_ID, user_id: GUEST_ID, source: opts.source ?? 'rsvp' }],
       event_check_ins: opts.checkedIn
         ? [{ beacon_id: BEACON_ID, user_id: GUEST_ID, checked_in_at: '2026-10-06T19:00:00.000Z', checked_out_at: null, check_in_count: 1 }]
         : [],
-      map_beacons: [{ id: BEACON_ID, metadata: {} }],
+      map_beacons: [{ id: BEACON_ID, metadata: {}, event_cancelled_at: opts.cancelled ? '2026-10-06T12:00:00.000Z' : null }],
       event_engagement_events: [],
     },
   });
@@ -130,6 +130,20 @@ describe('POST /api/beacons/[beaconId]/pass/scan', () => {
     world({ going: false });
     const body = await (await scan(passURL())).json();
     expect(body).toMatchObject({ result: 'not_going', attendee: { name: 'Ada Lovelace' } });
+  });
+
+  it('never admits a ticket buyer on their RSVP pass (the ticket is their pass)', async () => {
+    const db = world({ source: 'ticket' });
+    const body = await (await scan(passURL())).json();
+    expect(body).toMatchObject({ result: 'not_going', attendee: { name: 'Ada Lovelace' } });
+    expect(db.rows('event_check_ins')).toHaveLength(0);
+  });
+
+  it('turns an RSVP pass away once the event is cancelled', async () => {
+    const db = world({ cancelled: true });
+    const body = await (await scan(passURL())).json();
+    expect(body).toMatchObject({ result: 'event_cancelled' });
+    expect(db.rows('event_check_ins')).toHaveLength(0);
   });
 
   it('names a pass for another event, and rejects forgeries and noise', async () => {

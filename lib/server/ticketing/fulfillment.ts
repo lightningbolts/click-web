@@ -49,7 +49,9 @@ export async function fulfillFromCheckoutSession(
 
   const order = await loadOrder(admin, orderId);
   if (!order) return { ok: false, code: 'order_not_found' };
-  if (order.order_state === 'paid' && order.fulfillment_state === 'fulfilled') {
+  // Fulfilled once is fulfilled for good: a later refund or dispute moves the order on, and a
+  // redelivered webhook must not read that as "unpayable" and refund the rest.
+  if (order.fulfillment_state === 'fulfilled') {
     return { ok: true, code: 'idempotent' };
   }
   if (

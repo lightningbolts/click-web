@@ -3,6 +3,7 @@ import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { requireEventManager } from '@/lib/events/requireEventManager';
 import { EVENT_BEACON_UUID_RE } from '@/lib/events/eventMetadata';
+import { attachPayoutAccount } from '@/lib/server/ticketing/payouts';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
 import { loadEventSales, loadManagedTiers, loadOfferings } from '@/lib/server/ticketing/offerings';
 import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
@@ -63,6 +64,9 @@ export async function POST(
   const event = await loadEventSales(admin, beaconId);
   if (!event) return apiError('Event not found', 404);
   if (event.event_cancelled_at) return apiError('This event was cancelled', 409, 'event_cancelled');
+  if (body.unit_amount > 0 && event.ticketing_status === 'sales_open' && !(await attachPayoutAccount(admin, beaconId, manager.beacon.creator_id))) {
+    return apiError('Set up payouts to sell paid tickets', 409, 'organizer_not_ready');
+  }
 
   const { data, error } = await admin
     .from('ticket_tiers')

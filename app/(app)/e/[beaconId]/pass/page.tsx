@@ -10,7 +10,7 @@ import { eventPassPath } from "@/lib/events/eventUrls";
 import { eventWhenLines } from "@/lib/events/eventWhen";
 import { eventMapsDestination } from "@/lib/events/mapsLinks";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { activeCheckIn, eventPassKey, isGoing, issueEventPass, loadPassHolder, walletConfig } from "@/lib/server/eventPass";
+import { activeCheckIn, eventPassKey, hasRsvpPass, issueEventPass, loadPassHolder, walletConfig } from "@/lib/server/eventPass";
 import { loadPublicEvent } from "@/lib/server/events/loadPublicEvent";
 import { listOwnedTickets } from "@/lib/server/ticketing/ownedTickets";
 import { getServerUser } from "@/lib/server/getServerUser";
@@ -48,13 +48,14 @@ export default async function EventPassPage({
   const hostId = event.creator_id && event.creator_id !== user.id ? event.creator_id : null;
   const [initial, holder, connectionId] = await Promise.all([
     (async (): Promise<ClickPassState | null> => {
-      // A ticket replaces the RSVP on ticketed events (spec §5.4).
+      // A ticket replaces the RSVP on ticketed events (spec §5.4); an RSVP from before tickets
+      // went on sale keeps its pass.
       if (event.ticketing) {
         const tickets = await listOwnedTickets(admin, user.id, { beaconId });
-        return tickets.length ? { kind: "tickets", tickets } : { kind: "not_going" };
+        if (tickets.length) return { kind: "tickets", tickets };
       }
       if (!key) return { kind: "unavailable" };
-      if (!(await isGoing(admin, beaconId, user.id))) return { kind: "not_going" };
+      if (!(await hasRsvpPass(admin, beaconId, user.id))) return { kind: "not_going" };
       const pass = issueEventPass(key, beaconId, user.id);
       return {
         kind: "ready",

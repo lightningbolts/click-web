@@ -7,6 +7,7 @@ const mockRedirect = jest.fn((url: string) => {
   throw new Error(`redirect:${url}`);
 });
 const mockFetchOrder = jest.fn();
+const mockReleaseOrder = jest.fn(async (_orderId: string) => undefined);
 const mockUser: { current: { id: string } | null } = { current: null };
 
 jest.mock("next/navigation", () => ({
@@ -19,7 +20,11 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/lib/server/getServerUser", () => ({ getServerUser: async () => mockUser.current }));
 jest.mock("@/lib/ticketing/ticketingClient", () => {
   const actual = jest.requireActual("@/lib/ticketing/ticketingClient");
-  return { ...actual, fetchOrder: (...args: unknown[]) => mockFetchOrder(...args) };
+  return {
+    ...actual,
+    fetchOrder: (...args: unknown[]) => mockFetchOrder(...args),
+    releaseOrder: (orderId: string) => mockReleaseOrder(orderId),
+  };
 });
 
 const EVENT = "11111111-1111-4111-8111-111111111111";
@@ -79,6 +84,20 @@ describe("CheckoutReturn", () => {
     await flush(5_000);
     expect(mockFetchOrder).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("link", { name: "Back to event" })).toHaveAttribute("href", `/e/${EVENT}`);
+  });
+
+  it("frees the held tickets when the buyer leaves checkout, and only then", async () => {
+    mockFetchOrder.mockResolvedValue(order("canceled"));
+    render(<CheckoutReturn beaconId={EVENT} orderId={ORDER} canceledParam />);
+    await flush();
+    expect(mockReleaseOrder).toHaveBeenCalledWith(ORDER);
+    expect(mockReleaseOrder.mock.invocationCallOrder[0]).toBeLessThan(mockFetchOrder.mock.invocationCallOrder[0]!);
+
+    mockReleaseOrder.mockClear();
+    mockFetchOrder.mockResolvedValue(order("paid", "fulfilled"));
+    render(<CheckoutReturn beaconId={EVENT} orderId={ORDER} canceledParam={false} />);
+    await flush();
+    expect(mockReleaseOrder).not.toHaveBeenCalled();
   });
 
   it("still opens the tickets if a canceled return actually paid", async () => {

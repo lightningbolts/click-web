@@ -48,7 +48,7 @@ const tierRow = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function world(opts: { admission?: string; cancelled?: boolean; tiers?: Record<string, unknown>[]; orderItems?: boolean; updateTier?: unknown } = {}) {
+function world(opts: { admission?: string; cancelled?: boolean; tiers?: Record<string, unknown>[]; orderItems?: boolean; updateTier?: unknown; payouts?: boolean } = {}) {
   db = new FakeDb({
     tables: {
       map_beacons: [
@@ -65,13 +65,15 @@ function world(opts: { admission?: string; cancelled?: boolean; tiers?: Record<s
       ticket_tiers: opts.tiers ?? [tierRow()],
       ticket_order_items: opts.orderItems ? [{ id: 'oi1', order_id: 'o1', ticket_tier_id: TIER }] : [],
       tickets: [],
+      organizer_payment_accounts:
+        opts.payouts === false ? [] : [{ id: 'acct-1', owner_user_id: HOST, onboarding_state: 'ready', transfers_enabled: true }],
     },
     rpc: {
       ticketing_tier_counts: () => [{ tier_id: TIER, sold: 4, held: 1, checked_in: 2 }],
       ticketing_update_tier: () => opts.updateTier ?? { ok: true },
     },
   });
-  mockRequireEventManager.mockResolvedValue({ ok: true, admin: db.client, userId: HOST, beacon: { id: EVENT }, access: 'manage' });
+  mockRequireEventManager.mockResolvedValue({ ok: true, admin: db.client, userId: HOST, beacon: { id: EVENT, creator_id: HOST }, access: 'manage' });
 }
 
 const json = (method: string, url: string, body?: unknown) =>
@@ -186,5 +188,32 @@ describe('ticket tier routes', () => {
     expect(removed).toEqual({ deleted: 'removed' });
     expect(db.rows('ticket_tiers')).toHaveLength(0);
     expect(mockRevalidate).toHaveBeenCalledWith(EVENT);
+  });
+});
+
+describe('paid tickets while sales are open', () => {
+  const updateCalls = () => db.log.filter((entry) => entry.table === 'rpc:ticketing_update_tier');
+
+  it('refuses a paid ticket until payouts are set up; free ones still go on sale', async () => {
+    world({ payouts: false });
+    const res = await POST(json('POST', base, newTier), params);
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe('organizer_not_ready');
+    expect(db.rows('ticket_tiers')).toHaveLength(1);
+    expect((await POST(json('POST', base, { ...newTier, unit_amount: 0 }), params)).status).toBe(201);
+  });
+
+  it('refuses turning a ticket paid until payouts are set up', async () => {
+    world({ payouts: false, tiers: [tierRow({ unit_amount: 0 })] });
+    const res = await PATCH(json('PATCH', `${base}/${TIER}`, { unit_amount: 2000 }), tierParams());
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe('organizer_not_ready');
+    expect(updateCalls()).toHaveLength(0);
+  });
+
+  it("pays out to the event creator's account", async () => {
+    world();
+    expect((await POST(json('POST', base, newTier), params)).status).toBe(201);
+    expect(db.rows('map_beacons')[0]).toMatchObject({ organizer_payment_account_id: 'acct-1' });
   });
 });

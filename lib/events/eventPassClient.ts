@@ -34,10 +34,13 @@ export async function fetchClickPass(url: string): Promise<ClickPassState> {
   return { kind: 'ready', pass: (await res.json()) as ClickPass };
 }
 
-/** Your tickets for a ticketed event. Throws on network and server errors, like `fetchClickPass`. */
+/**
+ * Your tickets for a ticketed event; with none, the RSVP pass you had before tickets went on
+ * sale (it still admits you). Throws on network and server errors, like `fetchClickPass`.
+ */
 export async function fetchTicketPass(beaconId: string): Promise<ClickPassState> {
   const tickets = await fetchEventTickets(beaconId);
-  return tickets.length ? { kind: 'tickets', tickets } : { kind: 'not_going' };
+  return tickets.length ? { kind: 'tickets', tickets } : fetchClickPass(clickPassUrl(beaconId));
 }
 
 /** The event is on, or starts within the hour: the host may scan at any moment. */

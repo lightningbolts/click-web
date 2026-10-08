@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireEventManager } from '@/lib/events/requireEventManager';
 import { parsePassCredential, passTokenVersion, verifyEventPassToken, verifyTicketToken } from '@/lib/events/eventPass';
-import { eventPassKey, isGoing, loadPassHolder } from '@/lib/server/eventPass';
+import { eventPassKey, hasRsvpPass, loadPassHolder } from '@/lib/server/eventPass';
 import { recordDoorCheckIn } from '@/lib/server/events/doorCheckIn';
 import { hashTicketToken } from '@/lib/server/ticketing/credentials';
 import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
@@ -89,9 +89,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 async function admitPass(manager: Manager, beaconId: string, userId: string, reply: Reply): Promise<NextResponse> {
   const { admin } = manager;
-  const [holder, going, existing] = await Promise.all([
+  const [holder, going, beacon, existing] = await Promise.all([
     loadPassHolder(admin, userId),
-    isGoing(admin, beaconId, userId),
+    hasRsvpPass(admin, beaconId, userId),
+    admin.from('map_beacons').select('event_cancelled_at').eq('id', beaconId).maybeSingle(),
     admin
       .from('event_check_ins')
       .select('checked_in_at, checked_out_at, check_in_count')
@@ -101,7 +102,11 @@ async function admitPass(manager: Manager, beaconId: string, userId: string, rep
   ]);
   // A failed read must never look like "not checked in yet": that would wave a shared pass through.
   if (existing.error) throw new Error(`pass scan lookup: ${existing.error.message}`);
+  if (beacon.error) throw new Error(`pass scan event: ${beacon.error.message}`);
   const attendee = { user_id: holder.userId, name: holder.name, avatar_url: holder.avatarUrl };
+  if ((beacon.data as { event_cancelled_at: string | null } | null)?.event_cancelled_at) {
+    return reply('event_cancelled', { attendee });
+  }
   if (!going) return reply('not_going', { attendee });
 
   const row = existing.data as { checked_in_at: string; checked_out_at: string | null; check_in_count: number | null } | null;

@@ -44,15 +44,19 @@ export function issueTicketCredential(key: Buffer, beaconId: string, ticketId: s
 }
 
 /** A pass belongs to people going (an approved RSVP); requests and waitlists have none yet. */
-export async function isGoing(admin: SupabaseClient, beaconId: string, userId: string): Promise<boolean> {
+/**
+ * Going, and not by buying a ticket: a ticket is its own pass, so a buyer never also gets an
+ * RSVP pass (one ticket would then admit two people).
+ */
+export async function hasRsvpPass(admin: SupabaseClient, beaconId: string, userId: string): Promise<boolean> {
   const { data, error } = await admin
     .from('beacon_attendees')
-    .select('user_id')
+    .select('source')
     .eq('beacon_id', beaconId)
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw new Error(`event pass rsvp: ${error.message}`);
-  return data != null;
+  return data != null && (data as { source: string | null }).source !== 'ticket';
 }
 
 export async function loadPassHolder(

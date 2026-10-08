@@ -229,3 +229,39 @@ async function loadOrganizerStripeAccountForBeacon(
   if (!stripeAccountId) throw new Error('beacon has no organizer Stripe account');
   return { stripeAccountId };
 }
+
+export type ReleaseResult = { ok: true; beaconId: string } | { ok: false; status: 404 | 409; code: string };
+
+/**
+ * The buyer left Stripe Checkout: expire the session, then free its held tickets at once rather
+ * than after the 30-minute expiry. A session that can no longer expire was paid (or is being
+ * paid), so its hold stays for the webhook to fulfill.
+ */
+export async function releaseCheckout(admin: SupabaseClient, orderId: string, buyerId: string): Promise<ReleaseResult> {
+  const { data, error } = await admin
+    .from('ticket_orders')
+    .select('beacon_id, buyer_user_id, order_state, stripe_checkout_session_id')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (error) throw new Error(`order load failed: ${error.message}`);
+  const order = data as { beacon_id: string; buyer_user_id: string; order_state: string; stripe_checkout_session_id: string | null } | null;
+  if (!order || order.buyer_user_id !== buyerId) return { ok: false, status: 404, code: 'order_not_found' };
+  if (order.order_state !== 'reserved' && order.order_state !== 'checkout_created') {
+    return { ok: false, status: 409, code: 'order_not_cancelable' };
+  }
+
+  if (order.stripe_checkout_session_id) {
+    try {
+      await getStripe().checkout.sessions.expire(order.stripe_checkout_session_id);
+    } catch {
+      return { ok: false, status: 409, code: 'order_not_cancelable' };
+    }
+  }
+  const { data: cancelled, error: cancelError } = await admin.rpc('ticketing_cancel_order', {
+    p_order: orderId,
+    p_target_state: 'canceled',
+  });
+  if (cancelError) throw new Error(`ticketing_cancel_order failed: ${cancelError.message}`);
+  if (!(cancelled as { ok: boolean }).ok) return { ok: false, status: 409, code: 'order_not_cancelable' };
+  return { ok: true, beaconId: order.beacon_id };
+}

@@ -88,6 +88,11 @@ export async function fetchOrder(orderId: string): Promise<OrderProjection> {
   return (await request<{ order: OrderProjection }>('GET', `/api/orders/${orderId}`)).order;
 }
 
+/** The buyer left checkout: free its held tickets now. A paid order refuses (409) and stays. */
+export async function releaseOrder(orderId: string): Promise<void> {
+  await request<unknown>('DELETE', `/api/orders/${orderId}`);
+}
+
 export type OrderOutcome = 'confirmed' | 'pending' | 'canceled' | 'failed' | 'expired' | 'refunded';
 
 /** What the buyer sees after checkout. Webhooks, not the return redirect, decide this. */

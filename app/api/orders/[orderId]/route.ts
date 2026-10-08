@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
+import { releaseCheckout } from '@/lib/server/ticketing/checkout';
+import { revalidatePublicEvents } from '@/lib/server/events/revalidatePublicEvents';
+import { apiError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,4 +60,35 @@ export async function GET(
   // Buyers never see Click's fee: the organizer absorbs it.
   const { buyer_user_id: _omit, ...projection } = order as Record<string, unknown>;
   return NextResponse.json({ order: { ...projection, platform_fee_amount: 0, ticket_count: count ?? 0 } });
+}
+
+/**
+ * The buyer backed out of Stripe Checkout: release the order's held tickets now (they'd
+ * otherwise stay held, even from the buyer, until the session expires).
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> },
+) {
+  const gate = requireTicketingEnabled();
+  if (gate) return gate;
+
+  const { orderId } = await params;
+  if (!UUID_RE.test(orderId)) return apiError('Invalid order id', 400);
+
+  const { user, authError } = await getSupabaseFromRouteRequest(request);
+  if (authError || !user) return apiError('Unauthorized', 401);
+
+  try {
+    const released = await releaseCheckout(createAdminSupabaseClient(), orderId, user.id);
+    if (!released.ok) {
+      return apiError(released.status === 404 ? 'Order not found' : 'This order can no longer be cancelled', released.status, released.code);
+    }
+    // Freed tickets may turn "Sold out" back into "Get tickets".
+    revalidatePublicEvents(released.beaconId);
+    return NextResponse.json({ order_state: 'canceled' });
+  } catch (e) {
+    console.error('DELETE /api/orders/[orderId]:', e);
+    return apiError('Could not cancel the order', 500);
+  }
 }

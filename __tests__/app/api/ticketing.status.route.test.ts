@@ -43,7 +43,7 @@ function world(opts: { prices?: number[]; tickets?: number; cancelled?: boolean 
       tickets: Array.from({ length: opts.tickets ?? 0 }, (_, i) => ({ id: `k${i}`, beacon_id: EVENT })),
     },
   });
-  mockRequireEventManager.mockResolvedValue({ ok: true, admin: db.client, userId: HOST, beacon: { id: EVENT }, access: 'manage' });
+  mockRequireEventManager.mockResolvedValue({ ok: true, admin: db.client, userId: HOST, beacon: { id: EVENT, creator_id: HOST }, access: 'manage' });
 }
 
 const post = (ticketing_status: string) =>
@@ -86,6 +86,16 @@ describe('POST /api/beacons/:id/tickets/status', () => {
     mockLoadAccount.mockResolvedValue(READY);
     expect((await post('sales_open')).status).toBe(200);
     expect(event()).toMatchObject({ ticketing_status: 'sales_open', organizer_payment_account_id: 'acct-1' });
+  });
+
+  it("a co-host opening paid sales pays out to the creator, not to themselves", async () => {
+    world({ prices: [1500] });
+    mockRequireEventManager.mockResolvedValue({
+      ok: true, admin: db.client, userId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', beacon: { id: EVENT, creator_id: HOST }, access: 'manage',
+    });
+    mockLoadAccount.mockResolvedValue(READY);
+    expect((await post('sales_open')).status).toBe(200);
+    expect(mockLoadAccount).toHaveBeenCalledWith(expect.anything(), HOST);
   });
 
   it('needs at least one active tier to open', async () => {

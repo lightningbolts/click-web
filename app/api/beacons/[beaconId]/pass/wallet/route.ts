@@ -6,7 +6,7 @@ import { loadPublicEventPayload } from '@/lib/events/publicEvent';
 import {
   buildWalletPass,
   eventPassKey,
-  isGoing,
+  hasRsvpPass,
   issueEventPass,
   issueTicketCredential,
   loadPassHolder,
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const [event, going] = await Promise.all([
       loadPublicEventPayload(admin, beaconId),
-      isGoing(admin, beaconId, user.id),
+      hasRsvpPass(admin, beaconId, user.id),
     ]);
     if (!event) return apiError('Event not found', 404);
     if (!going) return apiError('RSVP to get a Click Pass', 403, 'not_going');
