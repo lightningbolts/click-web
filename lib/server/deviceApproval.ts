@@ -131,10 +131,16 @@ export async function notifyDevicesOfNewSignIn(userId: string, requestId: string
 
 type SendMagicLink = typeof sendApprovalMagicLink;
 
+/** At most one automatic approval email per account this often ("Email me a link" isn't capped). */
+export const EMAIL_FALLBACK_COOLDOWN_MS = 12 * 3_600_000;
+
 /**
  * The fallback: emails the approval link for requests no device has decided within
  * `EMAIL_FALLBACK_DELAY_MS` (accounts whose other devices are on builds without the prompt).
  * Each request is claimed (email_sent_at) before its email, so overlapping runs never send twice.
+ * One email per account per `EMAIL_FALLBACK_COOLDOWN_MS`, for its newest waiting device: a browser
+ * that keeps losing its storage (or several new devices at once) mustn't fill the inbox. The rest
+ * leave the sweep (email_deferred = false) but can still ask with "Email me a link".
  */
 export async function sendDeferredApprovalEmails(
   admin: SupabaseClient,
@@ -150,11 +156,39 @@ export async function sendDeferredApprovalEmails(
     .is('email_sent_at', null)
     .lte('created_at', new Date(nowMs - EMAIL_FALLBACK_DELAY_MS).toISOString())
     .gt('expires_at', nowIso)
+    .order('created_at', { ascending: false })
     .limit(50);
   if (error) throw new Error(`approval email sweep: ${error.message}`);
+  const due = (data ?? []) as Array<{ id: string; user_id: string }>;
+  if (due.length === 0) return 0;
+
+  const userIds = [...new Set(due.map((row) => row.user_id))];
+  const { data: recent, error: recentError } = await admin
+    .from('chat_device_history_requests')
+    .select('user_id')
+    .in('user_id', userIds)
+    .gt('email_sent_at', new Date(nowMs - EMAIL_FALLBACK_COOLDOWN_MS).toISOString());
+  if (recentError) throw new Error(`approval email cooldown: ${recentError.message}`);
+  const emailedRecently = new Set(((recent ?? []) as Array<{ user_id: string }>).map((row) => row.user_id));
+
   let sent = 0;
-  for (const row of (data ?? []) as Array<{ id: string; user_id: string }>) {
-    if (await emailApprovalLink(admin, row.id, row.user_id, nowIso, send)) sent += 1;
+  const skipped: string[] = [];
+  const tried = new Set<string>();
+  for (const row of due) {
+    // Newest first: the account's newest due request gets the email, unless one went out lately.
+    if (emailedRecently.has(row.user_id)) {
+      skipped.push(row.id);
+      continue;
+    }
+    if (tried.has(row.user_id)) continue; // its send failed this run: all of them retry next run
+    tried.add(row.user_id);
+    if (await emailApprovalLink(admin, row.id, row.user_id, nowIso, send)) {
+      sent += 1;
+      emailedRecently.add(row.user_id);
+    }
+  }
+  if (skipped.length > 0) {
+    await admin.from('chat_device_history_requests').update({ email_deferred: false }).in('id', skipped).is('email_sent_at', null);
   }
   return sent;
 }

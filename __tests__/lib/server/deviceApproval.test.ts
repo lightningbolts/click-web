@@ -100,4 +100,52 @@ describe('approval email fallback', () => {
     // "Email me a link" after the sweep sent it: nothing new.
     await expect(emailApprovalLink(client as never, 'due', 'me', new Date().toISOString(), send)).resolves.toBe(false);
   });
+
+  it('sends one email per account per cooldown, for its newest waiting device', async () => {
+    const db = new FakeDb({
+      tables: {
+        chat_device_history_requests: [
+          request('older', { created_at: minutesAgo(30) }),
+          request('newest', { created_at: minutesAgo(4) }),
+          request('middle', { created_at: minutesAgo(10) }),
+          request('theirs', { user_id: 'someone', created_at: minutesAgo(6) }),
+        ],
+      },
+    });
+    const client = { ...db.client, auth: { admin: { getUserById: async (id: string) => ({ data: { user: { email: `${id}@example.com` } } }) } } };
+    const send = jest.fn(async () => ({ error: null }));
+    await expect(sendDeferredApprovalEmails(client as never, Date.now(), send)).resolves.toBe(2);
+    expect(send).toHaveBeenCalledWith('me@example.com', expect.stringMatching(/\/newest$/));
+    expect(send).toHaveBeenCalledWith('someone@example.com', expect.stringMatching(/\/theirs$/));
+    // The others leave the sweep but keep "Email me a link"…
+    const byId = Object.fromEntries(db.rows('chat_device_history_requests').map((row) => [row.id, row]));
+    expect(byId.older.email_deferred).toBe(false);
+    expect(byId.middle.email_deferred).toBe(false);
+    await expect(emailApprovalLink(client as never, 'older', 'me', new Date().toISOString(), send)).resolves.toBe(true);
+
+    // …and a new device within the cooldown gets no automatic email.
+    db.rows('chat_device_history_requests').push(request('later', { created_at: minutesAgo(4) }));
+    send.mockClear();
+    await expect(sendDeferredApprovalEmails(client as never, Date.now(), send)).resolves.toBe(0);
+    expect(send).not.toHaveBeenCalled();
+    expect(db.rows('chat_device_history_requests').find((row) => row.id === 'later')).toMatchObject({ email_deferred: false });
+
+    // A device that signs in after the cooldown gets one again.
+    const later = Date.now() + 13 * 3_600_000;
+    db.rows('chat_device_history_requests').push(request('next-day', {
+      created_at: new Date(later - 5 * 60_000).toISOString(), expires_at: new Date(later + 3_600_000).toISOString(),
+    }));
+    await expect(sendDeferredApprovalEmails(client as never, later, send)).resolves.toBe(1);
+    expect(send).toHaveBeenCalledWith('me@example.com', expect.stringMatching(/\/next-day$/));
+  });
+
+  it('retries every waiting device of an account whose email failed', async () => {
+    const db = new FakeDb({
+      tables: { chat_device_history_requests: [request('a', { created_at: minutesAgo(4) }), request('b', { created_at: minutesAgo(9) })] },
+    });
+    const client = { ...db.client, auth: { admin: { getUserById: async () => ({ data: { user: { email: 'me@example.com' } } }) } } };
+    const send = jest.fn(async () => ({ error: { message: 'smtp down' } }));
+    await expect(sendDeferredApprovalEmails(client as never, Date.now(), send)).resolves.toBe(0);
+    expect(db.rows('chat_device_history_requests').every((row) => row.email_deferred === true && row.email_sent_at === null)).toBe(true);
+  });
 });

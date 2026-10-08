@@ -36,3 +36,10 @@ site_url = "http://127.0.0.1:3000"
 
 [storage]
 enabled = true
+
+# The "Magic link" email is sent for device approval, Place team invites and sign-in; the template
+# tells them apart by the link’s destination. Hosted projects: `scripts/apply-auth-email-templates.sh`,
+# not `supabase config push` (this file’s site_url is local).
+[auth.email.template.magic_link]
+subject = "{{ if eq (printf \"%.*s\" (len \"https://joinclick.co/devices/approve/\") .RedirectTo) \"https://joinclick.co/devices/approve/\" }}New sign-in to Click: review this device{{ else if eq (printf \"%.*s\" (len \"https://joinclick.co/business/invite/\") .RedirectTo) \"https://joinclick.co/business/invite/\" }}Your invitation to join a Place on Click{{ else }}Your Click sign-in link{{ end }}"
+content_path = "./supabase/templates/magic_link.html"
