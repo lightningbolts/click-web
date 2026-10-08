@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Dialog } from '@/components/ds/Dialog';
 import { toast } from '@/components/ds/Toast';
 import { useAuth } from '@/lib/AuthContext';
+import { refreshBrowserHistoryBackup, resetBrowserHistoryRecovery } from '@/lib/chat/browserHistoryRecovery';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { authedJson } from '@/lib/api/authedJson';
 import { decideDeviceRequest } from '@/lib/chat/decideDeviceRequest';
@@ -58,6 +59,7 @@ export function DeviceApprovals() {
       lastSync.current = Date.now();
       // Sharing registers this browser first; the request list needs it registered.
       await share(id);
+      void refreshBrowserHistoryBackup(id, getFreshAuthHeaders).catch(() => {});
       const { deviceId } = await loadOrCreateWebE2eeV2Identity();
       const { incoming } = await authedJson<{ incoming: Incoming[] }>(
         `/api/chat/devices/history-requests?device_id=${encodeURIComponent(deviceId)}`,
@@ -67,6 +69,11 @@ export function DeviceApprovals() {
     },
     [share],
   );
+
+  // A recovery key never survives an account change or an app-shell unmount.
+  useEffect(() => {
+    return () => resetBrowserHistoryRecovery();
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
