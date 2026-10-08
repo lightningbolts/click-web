@@ -107,13 +107,24 @@ async function readStoredIdentity(): Promise<StoredIdentity | null> {
   }
 }
 
-async function writeStoredIdentity(value: StoredIdentity): Promise<void> {
+/**
+ * Stores [value] unless an identity is already stored (another tab got there first), and returns
+ * the stored one. The read and the write share one readwrite transaction, which IndexedDB runs one
+ * at a time across tabs, so a browser never ends up with two identities.
+ */
+async function storeIdentityIfAbsent(value: StoredIdentity): Promise<StoredIdentity> {
   const db = await openIdentityDb();
   try {
-    await new Promise<void>((resolve, reject) => {
+    return await new Promise<StoredIdentity>((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
-      transaction.objectStore(STORE_NAME).put(value, IDENTITY_KEY);
-      transaction.oncomplete = () => resolve();
+      const store = transaction.objectStore(STORE_NAME);
+      let stored = value;
+      const existing = store.get(IDENTITY_KEY);
+      existing.onsuccess = () => {
+        if (existing.result) stored = existing.result as StoredIdentity;
+        else store.put(value, IDENTITY_KEY);
+      };
+      transaction.oncomplete = () => resolve(stored);
       transaction.onerror = () => reject(transaction.error ?? new Error('Unable to persist E2EE v2 key storage'));
       transaction.onabort = () => reject(transaction.error ?? new Error('Unable to persist E2EE v2 key storage'));
     });
@@ -139,26 +150,36 @@ async function identityWithDeviceId(identity: DeviceIdentity): Promise<DeviceIde
   return { ...identity, deviceId: await deviceIdForSpki(identity.publicKeySpkiBase64) };
 }
 
-export async function loadOrCreateWebE2eeV2Identity(): Promise<DeviceIdentity & { deviceId: string }> {
-  const stored = await readStoredIdentity();
-  if (stored) {
-    if (stored.privateKey.type !== 'private' || stored.privateKey.extractable || stored.publicKey.type !== 'public') {
-      throw new E2eeV2UnavailableError('Stored E2EE v2 identity is not non-extractable');
-    }
-    return identityWithDeviceId({
-      privateKey: stored.privateKey,
-      publicKey: stored.publicKey,
-      publicKeySpkiBase64: stored.publicKeySpkiBase64,
-      cryptoVersion: 2,
-    });
-  }
-  const identity = await generateDeviceIdentity();
-  await writeStoredIdentity({
-    privateKey: identity.privateKey,
-    publicKey: identity.publicKey,
-    publicKeySpkiBase64: identity.publicKeySpkiBase64,
+/**
+ * This browser's one device identity. Concurrent callers share one load: on a first visit the
+ * page's chat, approval and sharing code all ask at once, and each minting its own identity made
+ * the server see several new devices (a push, an approval prompt and an email for each).
+ */
+let identityLoad: Promise<DeviceIdentity & { deviceId: string }> | null = null;
+
+export function loadOrCreateWebE2eeV2Identity(): Promise<DeviceIdentity & { deviceId: string }> {
+  identityLoad ??= loadOrCreateIdentity().catch((error: unknown) => {
+    identityLoad = null; // e.g. storage was briefly unavailable: the next caller tries again
+    throw error;
   });
-  return identityWithDeviceId(identity);
+  return identityLoad;
+}
+
+async function loadOrCreateIdentity(): Promise<DeviceIdentity & { deviceId: string }> {
+  let stored = await readStoredIdentity();
+  if (!stored) {
+    const { privateKey, publicKey, publicKeySpkiBase64 } = await generateDeviceIdentity();
+    stored = await storeIdentityIfAbsent({ privateKey, publicKey, publicKeySpkiBase64 });
+  }
+  if (stored.privateKey.type !== 'private' || stored.privateKey.extractable || stored.publicKey.type !== 'public') {
+    throw new E2eeV2UnavailableError('Stored E2EE v2 identity is not non-extractable');
+  }
+  return identityWithDeviceId({
+    privateKey: stored.privateKey,
+    publicKey: stored.publicKey,
+    publicKeySpkiBase64: stored.publicKeySpkiBase64,
+    cryptoVersion: 2,
+  });
 }
 
 async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestInit): Promise<T> {
