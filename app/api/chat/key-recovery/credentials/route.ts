@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { HISTORY_RECOVERY_ENABLED } from '@/lib/chat/recoveryFeature';
 import { z } from 'zod';
 import { parseBody } from '@/lib/api/parseBody';
 import { createChatGatekeeperAdmin, requireBearerUser } from '@/lib/server/chatGatekeeper';
@@ -15,6 +16,7 @@ const schema = z.object({
 
 // These are opaque WebAuthn PRF-wrapped backup keys. The server cannot decrypt them.
 export async function GET(req: NextRequest) {
+  if (!HISTORY_RECOVERY_ENABLED) return NextResponse.json({ error: 'Recovery not enabled' }, { status: 404 });
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
   const { data, error } = await createChatGatekeeperAdmin()
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!HISTORY_RECOVERY_ENABLED) return NextResponse.json({ error: 'Recovery not enabled' }, { status: 404 });
   const auth = await requireBearerUser(req);
   if (!auth.ok) return auth.response;
   const parsed = await parseBody(req, schema);
