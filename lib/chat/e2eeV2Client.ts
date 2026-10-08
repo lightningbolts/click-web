@@ -320,7 +320,11 @@ async function unwrapSession(
       });
       keys.set(row.epoch, key);
     } catch {
-      if (row.epoch === currentEpoch) throw new E2eeV2UnavailableError('Unable to unlock the current E2EE v2 epoch');
+      // A matching authenticated passkey recovery may supply this epoch instead.
+      if (row.epoch === currentEpoch &&
+          !(accountId && recoveredHistoryFor(scope, state.chat_id, accountId)?.has(currentEpoch))) {
+        throw new E2eeV2UnavailableError('Unable to unlock the current E2EE v2 epoch');
+      }
     }
   }
   // A passkey-unlocked backup is held only in memory and bound to the signed-in account.
