@@ -239,12 +239,11 @@ describe('ticket scans at the same door', () => {
     expect(checkInCalls(other)).toHaveLength(0);
   });
 
-  it('treats tickets as invalid while ticketing is off', async () => {
+  it('still admits an issued ticket while sales are off', async () => {
     process.env.TICKETING_ENABLED = 'false';
     const db = world();
-    expect((await (await scan(ticketURL())).json()).result).toBe('invalid');
-    expect((await (await scan({ ticket_id: TICKET_ID })).json()).result).toBe('invalid');
-    expect(checkInCalls(db)).toHaveLength(0);
+    expect((await (await scan(ticketURL())).json()).result).toBe('checked_in');
+    expect(checkInCalls(db)).toHaveLength(1);
   });
 
   it('retires the separate ticket check-in endpoint', async () => {

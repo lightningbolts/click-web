@@ -5,7 +5,6 @@ import { parsePassCredential, passTokenVersion, verifyEventPassToken, verifyTick
 import { eventPassKey, hasRsvpPass, loadPassHolder } from '@/lib/server/eventPass';
 import { recordDoorCheckIn } from '@/lib/server/events/doorCheckIn';
 import { hashTicketToken } from '@/lib/server/ticketing/credentials';
-import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
 import { parseBody } from '@/lib/api/parseBody';
 import { passScanBodySchema } from '@/lib/api/schemas/beacons';
 import { apiError } from '@/lib/api/errors';
@@ -41,6 +40,7 @@ const TICKET_RESULTS: Record<string, PassScanResult> = {
  * so two scanners can't admit it twice. Either way a first scan checks the guest in and opens the
  * event chat to them; a repeat answers `already_checked_in` with the time, so a shared screenshot
  * is caught. Every outcome is a 200 with the holder's name and photo for the host to match.
+ * Admission doesn't depend on sales being open: a ticket that was issued still gets its holder in.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ beaconId: string }> }) {
   try {
@@ -56,7 +56,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       NextResponse.json({ result, attendee: null, checked_in_at: null, ...extra });
 
     if ('ticket_id' in parsed.data) {
-      if (!ticketingEnabled()) return reply('invalid');
       const { data, error } = await manager.admin
         .from('tickets')
         .select('beacon_id, qr_token_hash')
@@ -74,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (credential.beaconId && credential.beaconId !== beaconId.toLowerCase()) return reply('wrong_event');
 
     if (passTokenVersion(credential.token) === 2) {
-      if (!ticketingEnabled() || !verifyTicketToken(key, beaconId, credential.token)) return reply('invalid');
+      if (!verifyTicketToken(key, beaconId, credential.token)) return reply('invalid');
       return await admitTicket(manager, beaconId, hashTicketToken(credential.token), reply);
     }
 

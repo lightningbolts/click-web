@@ -15,7 +15,6 @@ import {
 } from '@/lib/server/eventPass';
 import { cssRgb, passArt } from '@/lib/server/wallet/passArt';
 import { listOwnedTickets } from '@/lib/server/ticketing/ownedTickets';
-import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
 import { apiError } from '@/lib/api/errors';
 
 export const runtime = 'nodejs';
@@ -41,7 +40,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const admin = createAdminSupabaseClient();
     const ticketId = request.nextUrl.searchParams.get('ticket');
     if (ticketId) {
-      if (!ticketingEnabled() || !EVENT_BEACON_UUID_RE.test(ticketId)) return apiError('Ticket not found', 404);
+      // Only the viewer's own minted tickets, so turning sales off never strands a held ticket.
+      if (!EVENT_BEACON_UUID_RE.test(ticketId)) return apiError('Ticket not found', 404);
       const [event, [ticket]] = await Promise.all([
         loadPublicEventPayload(admin, beaconId),
         listOwnedTickets(admin, user.id, { beaconId, ticketId }),

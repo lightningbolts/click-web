@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
-import { requireTicketingEnabled } from '@/lib/server/ticketing/flags';
+import { requireTicketWallet } from '@/lib/server/ticketing/flags';
 import { loadOwnedTicket } from '@/lib/server/ticketing/ownedTickets';
 import { EVENT_BEACON_UUID_RE } from '@/lib/events/eventMetadata';
 import { apiError } from '@/lib/api/errors';
@@ -14,9 +14,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ ticketId: string }> },
 ) {
-  const gate = requireTicketingEnabled();
-  if (gate) return gate;
-
   const { ticketId } = await params;
   if (!EVENT_BEACON_UUID_RE.test(ticketId)) return apiError('Invalid ticket id', 400);
 
@@ -24,7 +21,10 @@ export async function GET(
   if (authError || !user) return apiError('Unauthorized', 401);
 
   try {
-    const detail = await loadOwnedTicket(createAdminSupabaseClient(), user.id, ticketId);
+    const admin = createAdminSupabaseClient();
+    const gate = await requireTicketWallet(admin, user.id);
+    if (gate) return gate;
+    const detail = await loadOwnedTicket(admin, user.id, ticketId);
     if (!detail) return apiError('Ticket not found', 404);
     return NextResponse.json(detail);
   } catch (e) {
