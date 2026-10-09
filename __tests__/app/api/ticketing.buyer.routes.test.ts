@@ -21,6 +21,7 @@ import { GET as getEventTickets } from '@/app/api/beacons/[beaconId]/tickets/rou
 import { GET as getMyTickets } from '@/app/api/me/tickets/route';
 import { GET as getTicket } from '@/app/api/tickets/[ticketId]/route';
 import { GET as getOrder } from '@/app/api/orders/[orderId]/route';
+import { GET as getFeatures } from '@/app/api/me/features/route';
 
 const ME = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SOMEONE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -197,5 +198,43 @@ describe('buyer ticket routes', () => {
 
     mockGetUser.mockResolvedValue({ user: { id: SOMEONE }, authError: null });
     expect((await getOrder(get(`/api/orders/${ORDER}`), { params: Promise.resolve({ orderId: ORDER }) })).status).toBe(404);
+  });
+});
+
+describe('ticket wallet while sales are off', () => {
+  beforeEach(() => {
+    process.env.TICKETING_ENABLED = 'false';
+  });
+
+  it('keeps a ticket holder\'s wallet and passes open', async () => {
+    const wallet = await getMyTickets(get('/api/me/tickets'));
+    expect(wallet.status).toBe(200);
+    expect((await wallet.json()).groups.length).toBeGreaterThan(0);
+    const one = await getTicket(get(`/api/tickets/${T_VALID}`), { params: Promise.resolve({ ticketId: T_VALID }) });
+    expect(one.status).toBe(200);
+    const event = await getEventTickets(get(`/api/beacons/${SOON}/tickets`), { params: Promise.resolve({ beaconId: SOON }) });
+    expect(event.status).toBe(200);
+  });
+
+  it('stays dark for someone without tickets', async () => {
+    mockGetUser.mockResolvedValue({ user: { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }, authError: null });
+    const res = await getMyTickets(get('/api/me/tickets'));
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('ticketing_disabled');
+  });
+
+  it('reports wallet and sales separately in features', async () => {
+    const holder = (await (await getFeatures(get('/api/me/features'))).json()).features;
+    expect(holder.ticket_sales.enabled).toBe(false);
+    expect(holder.ticket_wallet.enabled).toBe(true);
+
+    mockGetUser.mockResolvedValue({ user: { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }, authError: null });
+    const stranger = (await (await getFeatures(get('/api/me/features'))).json()).features;
+    expect(stranger.ticket_wallet.enabled).toBe(false);
+
+    process.env.TICKETING_ENABLED = 'true';
+    const open = (await (await getFeatures(get('/api/me/features'))).json()).features;
+    expect(open.ticket_sales.enabled).toBe(true);
+    expect(open.ticket_wallet.enabled).toBe(true);
   });
 });

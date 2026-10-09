@@ -11,7 +11,8 @@ import { SignOutRow } from '@/components/me/SignOutRow';
 import { AppearanceControl } from '@/components/settings/AppearanceSettings';
 import { PERSONALITY_REQUIRED_TAG_COUNT } from '@/lib/personality/taxonomy';
 import { loadMe } from '@/lib/server/me/loadMe';
-import { ticketingEnabled } from '@/lib/server/ticketing/enabled';
+import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
+import { hasTicketWallet } from '@/lib/server/ticketing/flags';
 import { settingsHref } from '@/lib/settings/sections';
 
 export const metadata: Metadata = { title: 'Me · Click' };
@@ -21,6 +22,7 @@ export default async function MePage() {
   const me = await loadMe();
   if (!me) redirect('/login?next=/me');
   const { viewer } = me;
+  const ticketWallet = await hasTicketWallet(createAdminSupabaseClient(), viewer.id).catch(() => false);
   const latestExpiry = Math.max(0, ...me.intents.map((i) => Date.parse(i.expires_at) || 0));
   const untilLabel = latestExpiry
     ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: me.timeZone }).format(latestExpiry)
@@ -59,7 +61,7 @@ export default async function MePage() {
         <div className="flex flex-col gap-8">
           <MeSocial intents={me.intents} placesEnabled={me.placesEnabled} untilLabel={untilLabel} />
 
-          {ticketingEnabled() ? (
+          {ticketWallet ? (
             <ListGroup>
               <ListRow icon={Ticket} title="Tickets" href="/tickets" chevron />
             </ListGroup>

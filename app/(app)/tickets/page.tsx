@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { TicketWallet, type TicketScope } from "@/components/events/tickets/TicketWallet";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
 import { getServerUser } from "@/lib/server/getServerUser";
-import { ticketingEnabled } from "@/lib/server/ticketing/enabled";
+import { hasTicketWallet, ticketingEnabled } from "@/lib/server/ticketing/flags";
 import { listTicketGroups } from "@/lib/server/ticketing/ownedTickets";
 import { loginHref } from "@/lib/shell/appNav";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
@@ -14,16 +14,21 @@ export const metadata: Metadata = { title: "Tickets · Click", robots: { index: 
 
 /** Your tickets (spec §5.5). The first list renders with the page; switching scope loads in place. */
 export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ scope?: string | string[] }> }) {
-  if (!ticketingEnabled()) notFound();
   const query = await searchParams;
   const scope: TicketScope = query.scope === "past" ? "past" : "upcoming";
   const user = await getServerUser();
-  if (!user) redirect(loginHref(scope === "past" ? "/tickets?scope=past" : "/tickets"));
+  if (!user) {
+    // Dark ticketing stays indistinguishable from absent until someone signs in.
+    if (!ticketingEnabled()) notFound();
+    redirect(loginHref(scope === "past" ? "/tickets?scope=past" : "/tickets"));
+  }
+  const admin = createAdminSupabaseClient();
+  if (!(await hasTicketWallet(admin, user.id).catch(() => false))) notFound();
 
   const [jar, groups] = await Promise.all([
     cookies(),
     // eslint-disable-next-line react-hooks/purity -- server component, rendered per request
-    listTicketGroups(createAdminSupabaseClient(), user.id, scope, Date.now()).catch(() => undefined),
+    listTicketGroups(admin, user.id, scope, Date.now()).catch(() => undefined),
   ]);
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? "UTC";
 

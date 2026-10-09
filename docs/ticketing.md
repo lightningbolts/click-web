@@ -146,8 +146,12 @@ flow keeps its original insert-once guard.
 
 ## Rollout
 
-`TICKETING_ENABLED=false` keeps every route and page dark (the event page
-falls back to RSVPs). Apply the migrations with `npm run db:migrate` before
+`TICKETING_ENABLED=false` keeps selling, organizing and refunding dark (the
+event page falls back to RSVPs). The wallet is separate: anyone who already
+holds a ticket keeps `/tickets`, `GET /api/me/tickets`, their passes and door
+check-in, so pausing sales never strands a ticket. `GET /api/me/features`
+reports both as `ticket_sales` and `ticket_wallet`; iOS shows Tickets from the
+latter. Apply the migrations with `npm run db:migrate` before
 turning it on. Launch prerequisites before enabling in production: Click business bank account connected to the
 platform account, live Connect settings + settlement-merchant policy
 reviewed, production webhook secret configured (pinned API version), refund
