@@ -5,8 +5,8 @@ import { NextResponse } from 'next/server';
 /**
  * Server-side sign-out handler.
  *
- * Clears the Supabase auth session on the server and removes auth cookies,
- * ensuring the user is fully signed out (not just on the client side).
+ * Ends this browser's Supabase session on the server and removes its auth cookies, so the
+ * browser is fully signed out (not just on the client side). Other devices stay signed in.
  */
 export async function POST() {
   try {
@@ -32,7 +32,9 @@ export async function POST() {
       }
     );
 
-    await supabase.auth.signOut();
+    // This browser only: the default (`global`) revokes every session of the account, signing
+    // its phones and other browsers out too. Settings › Sign out everywhere is the global one.
+    await supabase.auth.signOut({ scope: 'local' });
 
     return NextResponse.json({ success: true });
   } catch (error) {
