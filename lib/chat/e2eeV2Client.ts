@@ -467,8 +467,8 @@ const sessionReadsInFlight = new Map<string, Promise<E2eeV2Session | null>>();
 export async function resolveWebE2eeV2Session(options: ResolveSessionOptions): Promise<E2eeV2Session | null> {
   const key = sessionKey(options);
   const cached = sessionCache.get(key);
-  // Writes re-check membership and rotation, but not on every message: a session resolved in
-  // the last minute is reused (iOS `sendSessionReuse`), so a send is one round trip, not four.
+  // Writes re-check membership and rotation, but not on every message: a session a write checked
+  // in the last minute is reused (iOS `sendSessionReuse`), so a send is one round trip, not four.
   if (cached && (options.forceRefresh || options.allowUpgrade)) {
     if (Date.now() - (sessionResolvedAt.get(key) ?? 0) < SEND_SESSION_REUSE_MS) return cached;
     if (options.staleWhileRevalidate) {
@@ -592,7 +592,9 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   }
   const session = await unwrapSession(identity, own.id, state, scope, authenticatedAccountId(headers));
   sessionCache.set(sessionKey(options), session);
-  sessionResolvedAt.set(sessionKey(options), Date.now());
+  // Only a write's check (devices compared, rotated if they changed) vouches for sends: a read
+  // must not, or a send keeps an epoch the server refuses after a device joins or is removed.
+  if (options.allowUpgrade) sessionResolvedAt.set(sessionKey(options), Date.now());
   return session;
 }
 
