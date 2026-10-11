@@ -123,11 +123,40 @@ export async function requestHistoryApprovalForNewDevice(
       .select('id')
       .maybeSingle();
     if (!reopened) return 'exists';
-    await notify(row.id, device.device_label ?? null);
+    await notifyUnlessAlreadyAsking(admin, user.id, row.id, () => notify(row.id, device.device_label ?? null));
     return 'requested';
   }
-  await notify(request.id as string, device.device_label ?? null);
+  const requestId = request.id as string;
+  await notifyUnlessAlreadyAsking(admin, user.id, requestId, () => notify(requestId, device.device_label ?? null));
   return 'requested';
+}
+
+/** A push only when the account's devices weren't already asked about another sign-in this recently. */
+export const APPROVAL_PUSH_COOLDOWN_MS = 10 * 60_000;
+
+/**
+ * Pushes for [requestId] unless another of the account's requests is still waiting and was asked
+ * within `APPROVAL_PUSH_COOLDOWN_MS`: a browser that keeps losing its storage (or several sign-ins
+ * at once) mustn't buzz every phone each time. The apps still list every waiting request.
+ */
+async function notifyUnlessAlreadyAsking(
+  admin: SupabaseClient,
+  userId: string,
+  requestId: string,
+  notify: () => Promise<unknown>,
+): Promise<void> {
+  const { data, error } = await admin
+    .from('chat_device_history_requests')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .neq('id', requestId)
+    .gt('created_at', new Date(Date.now() - APPROVAL_PUSH_COOLDOWN_MS).toISOString())
+    .limit(1);
+  // The request is recorded either way; a failed check pushes as before.
+  if (error) console.error('[deviceHistory] approval push cooldown:', error.message);
+  else if (data && data.length > 0) return;
+  await notify();
 }
 
 export type BackfillRow = {

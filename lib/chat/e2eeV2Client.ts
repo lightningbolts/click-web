@@ -6,8 +6,9 @@ import {
   decryptMediaPayload,
   encryptMessage,
   encryptMediaPayload,
+  exportPublicKeySpkiBase64,
   generateEpochKey,
-  generateDeviceIdentity,
+  importPublicKeySpkiBase64,
   parseE2eeV2Envelope,
   unwrapEpochKey,
   wrapEpochKey,
@@ -52,17 +53,33 @@ export type E2eeV2Session = {
 
 export class E2eeV2UnavailableError extends Error {
   readonly code = 'E2EE_V2_UNAVAILABLE';
+  /** The API's error code, when a request failed with one. */
+  readonly reason?: string;
+
+  constructor(message?: string, reason?: string) {
+    super(message);
+    this.reason = reason;
+  }
 }
 
+type WrappedPrivateKey = { key: CryptoKey; iv: Uint8Array<ArrayBuffer>; privateKey: ArrayBuffer };
+
+/**
+ * This browser's identity as IndexedDB keeps it. Chrome and Firefox keep the non-extractable
+ * private key itself. Safari stores X25519 keys but reads them back as null, which made every
+ * load a new device (a push to the account's phones each time, and approvals that never matched
+ * this browser), so there the private key is kept wrapped by a non-extractable AES-GCM key.
+ */
 type StoredIdentity = {
-  privateKey: CryptoKey;
-  publicKey: CryptoKey;
   publicKeySpkiBase64: string;
+  privateKey?: CryptoKey;
+  wrapped?: WrappedPrivateKey;
 };
 
 const DB_NAME = 'click-e2ee-v2';
 const STORE_NAME = 'identities';
 const IDENTITY_KEY = 'current';
+const AES_GCM_IV_BYTES = 12;
 const sessionCache = new Map<string, E2eeV2Session>();
 /** When each cached session was resolved; writes reuse one for `SEND_SESSION_REUSE_MS` (iOS parity). */
 const sessionResolvedAt = new Map<string, number>();
@@ -94,17 +111,35 @@ function openIdentityDb(): Promise<IDBDatabase> {
   });
 }
 
-async function readStoredIdentity(): Promise<StoredIdentity | null> {
+/** Runs [body] in one transaction on the identity store and resolves with its result once committed. */
+async function inIdentityStore<T>(mode: IDBTransactionMode, body: (store: IDBObjectStore) => () => T): Promise<T> {
   const db = await openIdentityDb();
   try {
-    return await new Promise((resolve, reject) => {
-      const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(IDENTITY_KEY);
-      request.onsuccess = () => resolve((request.result as StoredIdentity | undefined) ?? null);
-      request.onerror = () => reject(request.error ?? new Error('Unable to read E2EE v2 key storage'));
+    return await new Promise<T>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, mode);
+      const result = body(transaction.objectStore(STORE_NAME));
+      const fail = () => reject(transaction.error ?? new Error('Unable to use E2EE v2 key storage'));
+      transaction.oncomplete = () => resolve(result());
+      transaction.onerror = fail;
+      transaction.onabort = fail;
     });
   } finally {
     db.close();
   }
+}
+
+/** [value] when it is a usable stored identity (Safari reads a stored X25519 key back as null). */
+function storedIdentity(value: unknown): StoredIdentity | null {
+  const stored = value as Partial<StoredIdentity> | null | undefined;
+  if (typeof stored?.publicKeySpkiBase64 !== 'string') return null;
+  return stored.privateKey || stored.wrapped ? (stored as StoredIdentity) : null;
+}
+
+function readStoredIdentity(): Promise<StoredIdentity | null> {
+  return inIdentityStore('readonly', (store) => {
+    const request = store.get(IDENTITY_KEY);
+    return () => storedIdentity(request.result);
+  });
 }
 
 /**
@@ -112,25 +147,45 @@ async function readStoredIdentity(): Promise<StoredIdentity | null> {
  * the stored one. The read and the write share one readwrite transaction, which IndexedDB runs one
  * at a time across tabs, so a browser never ends up with two identities.
  */
-async function storeIdentityIfAbsent(value: StoredIdentity): Promise<StoredIdentity> {
-  const db = await openIdentityDb();
-  try {
-    return await new Promise<StoredIdentity>((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      let stored = value;
-      const existing = store.get(IDENTITY_KEY);
-      existing.onsuccess = () => {
-        if (existing.result) stored = existing.result as StoredIdentity;
-        else store.put(value, IDENTITY_KEY);
-      };
-      transaction.oncomplete = () => resolve(stored);
-      transaction.onerror = () => reject(transaction.error ?? new Error('Unable to persist E2EE v2 key storage'));
-      transaction.onabort = () => reject(transaction.error ?? new Error('Unable to persist E2EE v2 key storage'));
-    });
-  } finally {
-    db.close();
-  }
+function storeIdentityIfAbsent(value: StoredIdentity): Promise<StoredIdentity> {
+  return inIdentityStore('readwrite', (store) => {
+    let kept = value;
+    const existing = store.get(IDENTITY_KEY);
+    existing.onsuccess = () => {
+      const stored = storedIdentity(existing.result);
+      if (stored) kept = stored;
+      else store.put(value, IDENTITY_KEY);
+    };
+    return () => kept;
+  });
+}
+
+/** Drops the stored identity if it is still [publicKeySpkiBase64] (another tab may have replaced it). */
+function forgetStoredIdentity(publicKeySpkiBase64: string): Promise<void> {
+  return inIdentityStore('readwrite', (store) => {
+    const existing = store.get(IDENTITY_KEY);
+    existing.onsuccess = () => {
+      if (storedIdentity(existing.result)?.publicKeySpkiBase64 === publicKeySpkiBase64) store.delete(IDENTITY_KEY);
+    };
+    return () => undefined;
+  });
+}
+
+function unwrapPrivateKey({ key, iv, privateKey }: WrappedPrivateKey): Promise<CryptoKey> {
+  return crypto.subtle.unwrapKey('pkcs8', privateKey, key, { name: 'AES-GCM', iv }, { name: 'X25519' }, false, ['deriveBits']);
+}
+
+/** A new identity in both storable forms. The private key's bytes never reach JavaScript. */
+async function newStoredIdentity(): Promise<{ direct: StoredIdentity; wrapped: StoredIdentity }> {
+  const pair = (await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveBits'])) as CryptoKeyPair;
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['wrapKey', 'unwrapKey']);
+  const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));
+  const wrapped = { key, iv, privateKey: await crypto.subtle.wrapKey('pkcs8', pair.privateKey, key, { name: 'AES-GCM', iv }) };
+  const publicKeySpkiBase64 = await exportPublicKeySpkiBase64(pair.publicKey);
+  return {
+    direct: { publicKeySpkiBase64, privateKey: await unwrapPrivateKey(wrapped) },
+    wrapped: { publicKeySpkiBase64, wrapped },
+  };
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -146,40 +201,59 @@ async function deviceIdForSpki(spki: string): Promise<string> {
   return bytesToHex(new Uint8Array(digest));
 }
 
-async function identityWithDeviceId(identity: DeviceIdentity): Promise<DeviceIdentity & { deviceId: string }> {
-  return { ...identity, deviceId: await deviceIdForSpki(identity.publicKeySpkiBase64) };
+async function identityFrom(stored: StoredIdentity): Promise<DeviceIdentity & { deviceId: string }> {
+  const privateKey = stored.privateKey ?? (await unwrapPrivateKey(stored.wrapped!));
+  if (privateKey.type !== 'private' || privateKey.extractable) {
+    throw new E2eeV2UnavailableError('Stored E2EE v2 identity is not non-extractable');
+  }
+  return {
+    privateKey,
+    publicKey: await importPublicKeySpkiBase64(stored.publicKeySpkiBase64),
+    publicKeySpkiBase64: stored.publicKeySpkiBase64,
+    cryptoVersion: 2,
+    deviceId: await deviceIdForSpki(stored.publicKeySpkiBase64),
+  };
 }
 
 /**
- * This browser's one device identity. Concurrent callers share one load: on a first visit the
- * page's chat, approval and sharing code all ask at once, and each minting its own identity made
- * the server see several new devices (a push, an approval prompt and an email for each). Once the
- * load settles, IndexedDB stays the source of truth, so later callers read it again.
+ * This browser's one device identity, loaded once per page. Every caller shares that load: on a
+ * first visit the page's chat, approval and sharing code all ask at once, and each minting its own
+ * identity made the server see several new devices (a push, an approval prompt and an email for
+ * each). Even a browser that can't keep it (a private window) is then one device per page.
  */
 let identityLoad: Promise<DeviceIdentity & { deviceId: string }> | null = null;
 
 export function loadOrCreateWebE2eeV2Identity(): Promise<DeviceIdentity & { deviceId: string }> {
-  identityLoad ??= loadOrCreateIdentity().finally(() => {
-    identityLoad = null;
+  identityLoad ??= loadOrCreateIdentity().catch((error: unknown) => {
+    identityLoad = null; // e.g. storage was briefly unavailable: the next caller tries again
+    throw error;
   });
   return identityLoad;
 }
 
 async function loadOrCreateIdentity(): Promise<DeviceIdentity & { deviceId: string }> {
-  let stored = await readStoredIdentity();
-  if (!stored) {
-    const { privateKey, publicKey, publicKeySpkiBase64 } = await generateDeviceIdentity();
-    stored = await storeIdentityIfAbsent({ privateKey, publicKey, publicKeySpkiBase64 });
-  }
-  if (stored.privateKey.type !== 'private' || stored.privateKey.extractable || stored.publicKey.type !== 'public') {
-    throw new E2eeV2UnavailableError('Stored E2EE v2 identity is not non-extractable');
-  }
-  return identityWithDeviceId({
-    privateKey: stored.privateKey,
-    publicKey: stored.publicKey,
-    publicKeySpkiBase64: stored.publicKeySpkiBase64,
-    cryptoVersion: 2,
-  });
+  const stored = await readStoredIdentity();
+  if (stored) return identityFrom(stored);
+  const { direct, wrapped } = await newStoredIdentity();
+  let kept = await storeIdentityIfAbsent(direct);
+  // Kept, but unreadable (Safari): keep it wrapped instead (see `StoredIdentity`).
+  if (kept === direct && !(await readStoredIdentity())) kept = await storeIdentityIfAbsent(wrapped);
+  return identityFrom(kept);
+}
+
+/**
+ * This browser was removed from the account (Settings › Devices). Its key can't come back, so it
+ * starts over as a new device, which asks to be approved like any other.
+ */
+async function replaceRemovedIdentity(
+  removed: DeviceIdentity & { deviceId: string },
+): Promise<DeviceIdentity & { deviceId: string }> {
+  await forgetStoredIdentity(removed.publicKeySpkiBase64);
+  identityLoad = null;
+  clearWebE2eeV2SessionCaches();
+  const fresh = await loadOrCreateWebE2eeV2Identity();
+  if (fresh.deviceId === removed.deviceId) throw new E2eeV2UnavailableError('This browser was removed from your account');
+  return fresh;
 }
 
 async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestInit): Promise<T> {
@@ -187,40 +261,47 @@ async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestIni
     ...init,
     headers: { ...headers, ...(init?.headers ?? {}) },
   });
-  const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string } | string };
+  const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string } | string; code?: string };
   if (!response.ok) {
     const message = typeof payload.error === 'string' ? payload.error : payload.error?.message;
-    throw new E2eeV2UnavailableError(message || `E2EE v2 request failed (${response.status})`);
+    throw new E2eeV2UnavailableError(message || `E2EE v2 request failed (${response.status})`, payload.code);
   }
   return payload as T;
 }
 
 /**
- * Registers this browser (idempotent; "already registered" is success). The label says what
+ * Registers this browser (idempotent; "already registered" is success) and returns the identity
+ * it registered: a new one when this browser was removed from the account. The label says what
  * kind of device it is ("Chrome on Mac") so the account's other devices know what they approve;
  * registering again also marks the device as active.
  */
-async function registerDevice(identity: DeviceIdentity & { deviceId: string }, headers: HeadersInit): Promise<void> {
-  if (registeredDeviceIds.has(identity.deviceId)) return;
-  await fetchJson<{ device?: DeviceRow }>('/api/chat/devices', headers, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      device_id: identity.deviceId,
-      identity_public_key: identity.publicKeySpkiBase64,
-      device_label: thisBrowserDeviceLabel(),
-    }),
-  }).catch((error: unknown) => {
-    if (error instanceof E2eeV2UnavailableError && /already registered/i.test(error.message)) return null;
-    throw error;
-  });
+async function registerDevice(
+  identity: DeviceIdentity & { deviceId: string },
+  headers: HeadersInit,
+): Promise<DeviceIdentity & { deviceId: string }> {
+  if (registeredDeviceIds.has(identity.deviceId)) return identity;
+  try {
+    await fetchJson<{ device?: DeviceRow }>('/api/chat/devices', headers, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: identity.deviceId,
+        identity_public_key: identity.publicKeySpkiBase64,
+        device_label: thisBrowserDeviceLabel(),
+      }),
+    });
+  } catch (error) {
+    if (!(error instanceof E2eeV2UnavailableError)) throw error;
+    if (error.reason === 'DEVICE_REVOKED') return registerDevice(await replaceRemovedIdentity(identity), headers);
+    if (!/already registered/i.test(error.message)) throw error;
+  }
   registeredDeviceIds.add(identity.deviceId);
+  return identity;
 }
 
 /** Registers this browser for the signed-in account, so chats started from now on include it. */
 export async function registerWebE2eeV2Device(getAuthHeaders: () => Promise<HeadersInit>): Promise<void> {
-  const identity = await loadOrCreateWebE2eeV2Identity();
-  await registerDevice(identity, await getAuthHeaders());
+  await registerDevice(await loadOrCreateWebE2eeV2Identity(), await getAuthHeaders());
 }
 
 /**
@@ -292,7 +373,7 @@ async function createEpoch(
       senderDeviceId: identity.deviceId,
       recipientDeviceId: recipient.device_id,
       epochKey,
-      recipientPublicKey: await importPublicKey(recipient.identity_public_key),
+      recipientPublicKey: await importPublicKeySpkiBase64(recipient.identity_public_key),
     }),
   })));
   await fetchJson(`${scopeBase(scope)}/epochs`, headers, {
@@ -316,17 +397,6 @@ async function createInitialEpoch(
   scope: E2eeV2Scope = 'chat',
 ): Promise<void> {
   return createEpoch(chatId, identity, devices, 1, headers, scope);
-}
-
-async function importPublicKey(spki: string): Promise<CryptoKey> {
-  const binary = atob(spki);
-  return crypto.subtle.importKey(
-    'spki',
-    Uint8Array.from(binary, (character) => character.charCodeAt(0)),
-    { name: 'X25519' },
-    true,
-    [],
-  );
 }
 
 async function unwrapSession(
@@ -457,10 +527,10 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   const scope = options.scope ?? 'chat';
   const id = options.chatId;
   const headers = await options.getAuthHeaders();
-  const identity = await loadOrCreateWebE2eeV2Identity();
+  let identity = await loadOrCreateWebE2eeV2Identity();
   const shouldRegister = options.registerDeviceIfNeeded !== false;
   const wasRegistered = registeredDeviceIds.has(identity.deviceId);
-  if (shouldRegister) await registerDevice(identity, headers);
+  if (shouldRegister) identity = await registerDevice(identity, headers);
   // Independent reads: the device list and this device's epoch envelopes, together.
   const read = () => {
     const epochState = getEpochState(id, identity.deviceId, headers, scope);
@@ -472,7 +542,7 @@ async function resolveSessionUncached(options: ResolveSessionOptions): Promise<E
   if (shouldRegister && wasRegistered && !devices.some((device) => device.device_id === identity.deviceId)) {
     // Registered from this page under another account (or revoked since): register again, re-read once.
     registeredDeviceIds.delete(identity.deviceId);
-    await registerDevice(identity, headers);
+    identity = await registerDevice(identity, headers);
     reads = read();
     devices = await reads.devices;
   }
@@ -554,8 +624,7 @@ export async function resolveWebHubE2eeV2Session(options: {
   getAuthHeaders: () => Promise<HeadersInit>;
 }): Promise<E2eeV2Session | null> {
   const headers = await options.getAuthHeaders();
-  const identity = await loadOrCreateWebE2eeV2Identity();
-  await registerDevice(identity, headers);
+  const identity = await registerDevice(await loadOrCreateWebE2eeV2Identity(), headers);
   const { devices: rows } = await fetchJson<{ devices: DeviceRow[] }>(
     `/api/hub/devices?hub_id=${encodeURIComponent(options.hubId)}`, headers,
   );
@@ -584,7 +653,7 @@ export async function resolveWebHubE2eeV2Session(options: {
         envelope: await wrapEpochKey({
           chatId: options.hubId, epoch, senderDeviceId: identity.deviceId,
           recipientDeviceId: recipient.device_id, epochKey,
-          recipientPublicKey: await importPublicKey(recipient.identity_public_key),
+          recipientPublicKey: await importPublicKeySpkiBase64(recipient.identity_public_key),
         }),
       })));
       await fetchJson('/api/hub/epochs', headers, {
@@ -629,7 +698,7 @@ export async function approveWebE2eeV2KeyTransfer(options: {
   if (selectedEpochs.length === 0) {
     throw new E2eeV2UnavailableError('No readable historical E2EE v2 epochs are available for transfer');
   }
-  const recipientPublicKey = await importPublicKey(options.recipientDevice.identity_public_key);
+  const recipientPublicKey = await importPublicKeySpkiBase64(options.recipientDevice.identity_public_key);
   const historicalEnvelopes = await Promise.all(selectedEpochs.map(async (epoch) => {
     const epochKey = options.session.epochKeys.get(epoch);
     if (!epochKey) throw new E2eeV2UnavailableError(`Missing readable E2EE v2 epoch ${epoch}`);
@@ -713,9 +782,9 @@ async function shareHistoryOnce({
   getAuthHeaders: () => Promise<HeadersInit>;
   registerDeviceIfNeeded?: boolean;
 }): Promise<number> {
-  const identity = await loadOrCreateWebE2eeV2Identity();
+  let identity = await loadOrCreateWebE2eeV2Identity();
   const headers = await getAuthHeaders();
-  if (registerDeviceIfNeeded) await registerDevice(identity, headers);
+  if (registerDeviceIfNeeded) identity = await registerDevice(identity, headers);
   const { items = [] } = await fetchJson<{ items?: HistoryBackfillItem[] }>(
     `/api/chat/devices/history-backfill?device_id=${encodeURIComponent(identity.deviceId)}`,
     headers,

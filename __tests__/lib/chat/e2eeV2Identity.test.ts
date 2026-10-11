@@ -5,11 +5,15 @@
 
 type Store = Map<string, unknown>;
 
+const holdsX25519Key = (value: unknown) =>
+  Object.values(value as object).some((field) => (field as CryptoKey | null)?.algorithm?.name === 'X25519');
+
 /**
  * Minimal async IndexedDB: one shared store, readwrite transactions run one at a time (as real
- * IndexedDB does across tabs), callbacks fire on later ticks.
+ * IndexedDB does across tabs), callbacks fire on later ticks. `safari` reads a record holding an
+ * X25519 CryptoKey back as null, as Safari does.
  */
-function fakeIndexedDb() {
+function fakeIndexedDb({ safari = false } = {}) {
   const store: Store = new Map();
   let queue = Promise.resolve();
   const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -22,7 +26,8 @@ function fakeIndexedDb() {
         const request: { result?: unknown; onsuccess?: () => void } = {};
         ops.push(async () => {
           await tick();
-          request.result = store.get(key);
+          const value = store.get(key);
+          request.result = safari && value && holdsX25519Key(value) ? null : value;
           request.onsuccess?.();
         });
         return request;
@@ -31,6 +36,13 @@ function fakeIndexedDb() {
         ops.push(async () => {
           await tick();
           store.set(key, value);
+        });
+        return {};
+      },
+      delete(key: string) {
+        ops.push(async () => {
+          await tick();
+          store.delete(key);
         });
         return {};
       },
@@ -96,5 +108,49 @@ describe('loadOrCreateWebE2eeV2Identity', () => {
     const first = await loadTab().loadOrCreateWebE2eeV2Identity();
     const later = await loadTab().loadOrCreateWebE2eeV2Identity();
     expect(later.deviceId).toBe(first.deviceId);
+  });
+
+  it('keeps one identity for the page even when storage loses it', async () => {
+    const tab = loadTab();
+    const first = await tab.loadOrCreateWebE2eeV2Identity();
+    db.store.clear();
+    expect((await tab.loadOrCreateWebE2eeV2Identity()).deviceId).toBe(first.deviceId);
+  });
+
+  it('keeps the identity in Safari, which reads stored X25519 keys back as null', async () => {
+    db = fakeIndexedDb({ safari: true });
+    Object.defineProperty(globalThis, 'indexedDB', { value: db.factory, configurable: true });
+    const first = await loadTab().loadOrCreateWebE2eeV2Identity();
+    const [a, b] = await Promise.all([loadTab().loadOrCreateWebE2eeV2Identity(), loadTab().loadOrCreateWebE2eeV2Identity()]);
+    expect([a.deviceId, b.deviceId]).toEqual([first.deviceId, first.deviceId]);
+    expect(first.privateKey.extractable).toBe(false);
+  });
+
+  describe('a browser removed from the account', () => {
+    const originalFetch = global.fetch;
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('starts over as a new device', async () => {
+      const tab = loadTab();
+      const removed = await tab.loadOrCreateWebE2eeV2Identity();
+      const registered: string[] = [];
+      global.fetch = jest.fn(async (_url: unknown, init?: RequestInit) => {
+        const { device_id: deviceId } = JSON.parse(String(init?.body)) as { device_id: string };
+        registered.push(deviceId);
+        const body = deviceId === removed.deviceId
+          ? { error: 'This device was removed from your account', code: 'DEVICE_REVOKED' }
+          : { device: {} };
+        return { ok: !('error' in body), status: 'error' in body ? 409 : 200, json: async () => body };
+      }) as unknown as typeof fetch;
+
+      await tab.registerWebE2eeV2Device(async () => ({}));
+
+      const fresh = await tab.loadOrCreateWebE2eeV2Identity();
+      expect(fresh.deviceId).not.toBe(removed.deviceId);
+      expect(registered).toEqual([removed.deviceId, fresh.deviceId]);
+      expect((await loadTab().loadOrCreateWebE2eeV2Identity()).deviceId).toBe(fresh.deviceId);
+    });
   });
 });

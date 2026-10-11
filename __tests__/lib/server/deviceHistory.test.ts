@@ -3,6 +3,7 @@
 jest.mock('server-only', () => ({}));
 
 import {
+  APPROVAL_PUSH_COOLDOWN_MS,
   deviceApprovalPath,
   groupBackfillRows,
   requestHistoryApprovalForNewDevice,
@@ -99,5 +100,24 @@ describe('requestHistoryApprovalForNewDevice', () => {
     await expect(requestHistoryApprovalForNewDevice(denied.client as never, user, NEW_DEVICE, notify)).resolves.toBe('exists');
     await expect(requestHistoryApprovalForNewDevice(denied.client as never, user, NEW_DEVICE, notify, { reopen: true })).resolves.toBe('requested');
     expect(denied.rows('chat_device_history_requests')[0].status).toBe('pending');
+  });
+
+  it('pushes once while another sign-in is still waiting from the last few minutes', async () => {
+    const recent = new Date(Date.now() - 60_000).toISOString();
+    const stale = new Date(Date.now() - APPROVAL_PUSH_COOLDOWN_MS - 60_000).toISOString();
+    const waiting = (status: string, created_at: string) =>
+      world({ chat_device_history_requests: [{ id: 'req-other', user_id: 'user-1', recipient_device_id: 'row-other', status, created_at, expires_at: '2999-01-01T00:00:00Z' }] });
+
+    const burst = waiting('pending', recent);
+    const quiet = jest.fn(async () => true);
+    await expect(requestHistoryApprovalForNewDevice(burst.client as never, user, NEW_DEVICE, quiet)).resolves.toBe('requested');
+    expect(burst.rows('chat_device_history_requests')).toHaveLength(2);
+    expect(quiet).not.toHaveBeenCalled();
+
+    for (const [status, created_at] of [['approved', recent], ['pending', stale]]) {
+      const notify = jest.fn(async () => true);
+      await requestHistoryApprovalForNewDevice(waiting(status, created_at).client as never, user, NEW_DEVICE, notify);
+      expect(notify).toHaveBeenCalledTimes(1);
+    }
   });
 });
