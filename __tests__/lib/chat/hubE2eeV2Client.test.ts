@@ -12,11 +12,18 @@ beforeEach(async () => {
   Object.defineProperty(global, 'indexedDB', { configurable: true, value: {
     open: () => {
       const request: Record<string, unknown> = {};
-      const db = { close: jest.fn(), transaction: () => ({ objectStore: () => ({ get: () => {
-        const read: Record<string, unknown> = { result: stored };
-        queueMicrotask(() => (read.onsuccess as () => void)());
-        return read;
-      } }) }) };
+      const db = { close: jest.fn(), transaction: () => {
+        const transaction: Record<string, unknown> = {};
+        transaction.objectStore = () => ({ get: () => {
+          const read: Record<string, unknown> = { result: stored };
+          queueMicrotask(() => {
+            (read.onsuccess as (() => void) | undefined)?.();
+            (transaction.oncomplete as () => void)();
+          });
+          return read;
+        } });
+        return transaction;
+      } };
       queueMicrotask(() => { request.result = db; (request.onsuccess as () => void)(); });
       return request;
     },
@@ -52,7 +59,7 @@ test('reads hub envelopes using row-id recipients and the shared mobile wire for
 test('does not upgrade a legacy hub until every participant has a device', async () => {
   server({ hub_id: 'hub-test', device_id: identity.deviceId, current_epoch: null, envelopes: [] });
   await expect(resolveWebHubE2eeV2Session({ hubId: 'hub-test', participantUserIds: ['user-1', 'user-2'], getAuthHeaders: auth })).resolves.toBeNull();
-  expect(global.fetch).toHaveBeenCalledTimes(3);
+  expect(global.fetch).not.toHaveBeenCalledWith('/api/hub/epochs', expect.objectContaining({ method: 'POST' }));
 });
 
 test('fails closed for an upgraded hub without a key envelope for this device', async () => {

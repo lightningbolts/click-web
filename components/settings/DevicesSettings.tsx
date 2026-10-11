@@ -143,7 +143,7 @@ export function DevicesSettings() {
     const name = device.label ?? 'this device';
     const ok = await confirm({
       title: `Remove ${name}?`,
-      message: 'It won’t be able to read new messages until it signs in and is approved again.',
+      message: 'It stops getting new messages. If it’s opened again while signed in, it comes back as a new device, and your earlier messages need your approval.',
       confirmLabel: 'Remove device',
       cancelLabel: 'Keep device',
       destructive: true,

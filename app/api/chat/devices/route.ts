@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { apiError } from '@/lib/api/errors';
 import { parseBody } from '@/lib/api/parseBody';
 import {
   assertChatWritable,
@@ -199,15 +200,23 @@ export async function POST(request: NextRequest) {
         // after an update): a device missing keys asks itself (POST /api/chat/devices/history-requests).
         // It marks the device active (Settings › Devices, "approve from …" copy), and newer builds
         // also record what kind of device this is.
-        runAfterResponse('chat/devices seen', async () => {
-          const scope = () => admin.from('chat_devices');
-          await scope().update({ last_seen_at: lastSeenAt })
-            .eq('user_id', auth.user.id).eq('device_id', deviceId).is('revoked_at', null);
-          if (deviceLabel) {
+        const scope = () => admin.from('chat_devices');
+        const { data: seen, error: seenError } = await scope().update({ last_seen_at: lastSeenAt })
+          .eq('user_id', auth.user.id).eq('device_id', deviceId).is('revoked_at', null)
+          .select('id').maybeSingle();
+        if (seenError) {
+          console.error('[chat/devices] re-registration failed:', seenError.message);
+          return errorResponse();
+        }
+        // Removed from the account (Settings › Devices): its key stays out. The device starts
+        // over with a new key, which asks to be approved like any new device.
+        if (!seen) return apiError('This device was removed from your account', 409, 'DEVICE_REVOKED');
+        if (deviceLabel) {
+          runAfterResponse('chat/devices label', async () => {
             await scope().update({ device_label: deviceLabel })
               .eq('user_id', auth.user.id).eq('device_id', deviceId).is('device_label', null);
-          }
-        });
+          });
+        }
         return NextResponse.json({ error: 'Device already registered' }, { status: 409 });
       }
       if (error) console.error('[chat/devices] registration failed:', error.message);
@@ -290,15 +299,28 @@ export async function DELETE(request: NextRequest) {
   if (!deviceId) return NextResponse.json({ error: 'device_id is required' }, { status: 400 });
 
   try {
-    const { error } = await createChatGatekeeperAdmin()
+    const admin = createChatGatekeeperAdmin();
+    const now = new Date().toISOString();
+    const { data: removed, error } = await admin
       .from('chat_devices')
-      .update({ revoked_at: new Date().toISOString() })
+      .update({ revoked_at: now })
       .eq('user_id', auth.user.id)
       .eq('device_id', deviceId)
-      .is('revoked_at', null);
+      .is('revoked_at', null)
+      .select('id')
+      .maybeSingle();
     if (error) {
       console.error('[chat/devices] revocation failed:', error.message);
       return errorResponse();
+    }
+    if (removed) {
+      // A removed device's waiting request ends with it: no approval email for it later.
+      const { error: requestError } = await admin
+        .from('chat_device_history_requests')
+        .update({ expires_at: now })
+        .eq('recipient_device_id', (removed as { id: string }).id)
+        .eq('status', 'pending');
+      if (requestError) console.error('[chat/devices] ending the removed device’s request failed:', requestError.message);
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

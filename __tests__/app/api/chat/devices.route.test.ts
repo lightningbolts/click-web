@@ -129,8 +129,7 @@ describe('/api/chat/devices', () => {
     });
   });
 
-  it('returns conflict instead of reactivating or replacing a revoked device', async () => {
-    authenticated();
+  function reRegistration(seen: { id: string } | null) {
     const single = jest.fn().mockResolvedValue({
       data: null,
       error: { code: '23505', message: 'duplicate key value violates unique constraint' },
@@ -139,28 +138,50 @@ describe('/api/chat/devices', () => {
       select: jest.fn(() => ({ single })),
     }));
     // Registering again only marks an active row seen; it never touches revoked_at.
-    const activeOnly = jest.fn().mockResolvedValue({ error: null });
+    const maybeSingle = jest.fn().mockResolvedValue({ data: seen, error: null });
+    const activeOnly = jest.fn(() => ({ select: jest.fn(() => ({ maybeSingle })) }));
     type Filters = { eq: jest.Mock; is: jest.Mock };
     const filters: Filters = { eq: jest.fn((): Filters => filters), is: activeOnly };
     const update = jest.fn(() => filters);
     const upsert = jest.fn();
     mockCreateAdmin.mockReturnValue({ from: jest.fn(() => ({ insert, update, upsert })) });
+    return { insert, update, activeOnly, upsert };
+  }
 
-    const response = await POST(
+  function register() {
+    return POST(
       request('/api/chat/devices', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ device_id: DEVICE_ID, identity_public_key: PUBLIC_KEY }),
       }),
     );
+  }
+
+  it('marks an already registered device seen', async () => {
+    authenticated();
+    const { insert, update, activeOnly, upsert } = reRegistration({ id: 'device-row-1' });
+
+    const response = await register();
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: 'Device already registered' });
     expect(insert).toHaveBeenCalledWith(expect.not.objectContaining({ revoked_at: expect.anything() }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(update).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledWith({ last_seen_at: expect.any(String) });
     expect(activeOnly).toHaveBeenCalledWith('revoked_at', null);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('tells a removed device so instead of reactivating or replacing it', async () => {
+    authenticated();
+    const { update, upsert } = reRegistration(null);
+
+    const response = await register();
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'This device was removed from your account', code: 'DEVICE_REVOKED' });
+    expect(update).toHaveBeenCalledWith({ last_seen_at: expect.any(String) });
     expect(upsert).not.toHaveBeenCalled();
   });
 
@@ -276,25 +297,32 @@ describe('/api/chat/devices', () => {
     expect(from).not.toHaveBeenCalled();
   });
 
-  it('revokes only the caller-owned active device and preserves the row', async () => {
+  it('revokes only the caller-owned active device, keeps the row, and ends its waiting request', async () => {
     authenticated();
     const userFilter = jest.fn();
     const deviceFilter = jest.fn();
-    const activeFilter = jest.fn().mockResolvedValue({ error: null });
+    const maybeSingle = jest.fn().mockResolvedValue({ data: { id: 'device-row-1' }, error: null });
+    const activeFilter = jest.fn(() => ({ select: jest.fn(() => ({ maybeSingle })) }));
     userFilter.mockReturnValue({ eq: deviceFilter });
     deviceFilter.mockReturnValue({ is: activeFilter });
     const update = jest.fn(() => ({ eq: userFilter }));
-    const from = jest.fn(() => ({ update }));
+    const pendingFilter = jest.fn().mockResolvedValue({ error: null });
+    const recipientFilter = jest.fn(() => ({ eq: pendingFilter }));
+    const endRequest = jest.fn(() => ({ eq: recipientFilter }));
+    const from = jest.fn((table: string) => (table === 'chat_devices' ? { update } : { update: endRequest }));
     mockCreateAdmin.mockReturnValue({ from });
 
     const response = await DELETE(request(`/api/chat/devices?deviceId=${DEVICE_ID}`));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(from).toHaveBeenCalledWith('chat_devices');
     expect(update).toHaveBeenCalledWith({ revoked_at: expect.any(String) });
     expect(userFilter).toHaveBeenCalledWith('user_id', USER_ID);
     expect(deviceFilter).toHaveBeenCalledWith('device_id', DEVICE_ID);
     expect(activeFilter).toHaveBeenCalledWith('revoked_at', null);
+    expect(from).toHaveBeenCalledWith('chat_device_history_requests');
+    expect(endRequest).toHaveBeenCalledWith({ expires_at: expect.any(String) });
+    expect(recipientFilter).toHaveBeenCalledWith('recipient_device_id', 'device-row-1');
+    expect(pendingFilter).toHaveBeenCalledWith('status', 'pending');
   });
 });
