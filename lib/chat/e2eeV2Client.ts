@@ -278,6 +278,7 @@ async function fetchJson<T>(url: string, headers: HeadersInit, init?: RequestIni
 async function registerDevice(
   identity: DeviceIdentity & { deviceId: string },
   headers: HeadersInit,
+  replaced = false,
 ): Promise<DeviceIdentity & { deviceId: string }> {
   if (registeredDeviceIds.has(identity.deviceId)) return identity;
   try {
@@ -292,7 +293,9 @@ async function registerDevice(
     });
   } catch (error) {
     if (!(error instanceof E2eeV2UnavailableError)) throw error;
-    if (error.reason === 'DEVICE_REVOKED') return registerDevice(await replaceRemovedIdentity(identity), headers);
+    // One new key per call: a new key turned away too is the server's answer, not a loop to run.
+    if (error.reason === 'DEVICE_REVOKED' && !replaced) return registerDevice(await replaceRemovedIdentity(identity), headers, true);
+    if (error.reason === 'DEVICE_REVOKED') throw error;
     if (!/already registered/i.test(error.message)) throw error;
   }
   registeredDeviceIds.add(identity.deviceId);

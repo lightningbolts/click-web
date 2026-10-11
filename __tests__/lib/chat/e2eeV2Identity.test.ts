@@ -152,5 +152,17 @@ describe('loadOrCreateWebE2eeV2Identity', () => {
       expect(registered).toEqual([removed.deviceId, fresh.deviceId]);
       expect((await loadTab().loadOrCreateWebE2eeV2Identity()).deviceId).toBe(fresh.deviceId);
     });
+
+    it('makes one new key per attempt when the server turns that away too', async () => {
+      const tab = loadTab();
+      const registered: string[] = [];
+      global.fetch = jest.fn(async (_url: unknown, init?: RequestInit) => {
+        registered.push((JSON.parse(String(init?.body)) as { device_id: string }).device_id);
+        return { ok: false, status: 409, json: async () => ({ error: 'This device was removed from your account', code: 'DEVICE_REVOKED' }) };
+      }) as unknown as typeof fetch;
+
+      await expect(tab.registerWebE2eeV2Device(async () => ({}))).rejects.toMatchObject({ reason: 'DEVICE_REVOKED' });
+      expect(registered).toHaveLength(2);
+    });
   });
 });
