@@ -195,7 +195,7 @@ export function AuthProvider({
         ]);
         // Then sign out on client side
         await Promise.race([
-          supabase.auth.signOut(),
+          supabase.auth.signOut({ scope: 'local' }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
         ]);
       } catch (error) {
