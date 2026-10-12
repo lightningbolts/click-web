@@ -12,8 +12,8 @@ export default function MapScene({
   actions?: PlaygroundActions;
 }) {
   return (
-    <div data-testid="playground-scene-map">
-      <div className="mb-6 flex items-center gap-3">
+    <div data-testid="playground-scene-map" className="flex h-full min-h-0 flex-col">
+      <div className="mb-3 flex shrink-0 items-center gap-3">
         <div className="rounded-xl bg-action/20 p-2">
           <MapPin className="h-5 w-5 text-accent" />
         </div>
@@ -22,7 +22,7 @@ export default function MapScene({
           <p className="text-sm text-fg-secondary">Where your memories were made</p>
         </div>
       </div>
-      <PlaygroundMap state={state} actions={actions} />
+      <div className="min-h-0 flex-1"><PlaygroundMap state={state} actions={actions} fill /></div>
     </div>
   );
 }

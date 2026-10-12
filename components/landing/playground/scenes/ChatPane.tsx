@@ -2,26 +2,29 @@
 
 import { AnimatePresence, m as motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
 import { PlaygroundAvatar, VolumeBars } from '../DeviceChrome';
 import { PLAYGROUND_PEOPLE } from '../mockData';
 import DemoThread, { isNewClick } from './DemoThread';
+import GroupsPane from './GroupsPane';
 import type { PlaygroundActions, PlaygroundState } from '../types';
 
 export default function ChatPane({
   state,
   actions,
   compact = false,
+  phone = false,
 }: {
   state: PlaygroundState;
   actions: PlaygroundActions;
   compact?: boolean;
+  phone?: boolean;
 }) {
   const connected = PLAYGROUND_PEOPLE.filter((p) => state.connectedIds.has(p.id));
   const open = connected.find((p) => p.id === state.openChatId) ?? null;
   const memory = open ? (state.memories[open.id] ?? open.memory) : undefined;
   const thread = open ? (state.messages[open.id] ?? []) : [];
-  const [listTab, setListTab] = useState<'active' | 'archived'>('active');
+  const listTab = state.inboxTab;
+  const setListTab = actions.setInboxTab;
 
   return (
     <div className={compact ? 'flex h-full min-h-0 flex-col' : undefined}>
@@ -72,9 +75,9 @@ export default function ChatPane({
             <p className="text-xs text-fg-secondary">Chat with your Clicks</p>
           </div>
           <div className="mb-4 inline-flex items-center gap-1.5 rounded-2xl border border-hairline bg-surface-raised p-1.5">
-            {(['active', 'archived'] as const).map((tab) => {
+            {(['active', 'groups', 'archived'] as const).map((tab) => {
               const selected = listTab === tab;
-              const count = tab === 'active' ? connected.length : 0;
+              const count = tab === 'active' ? connected.length : tab === 'groups' ? Number(Boolean(state.groupName)) + Number(state.joinedHub) : 0;
               return (
                 <button
                   key={tab}
@@ -99,6 +102,7 @@ export default function ChatPane({
               );
             })}
           </div>
+          {listTab === 'groups' ? <GroupsPane state={state} actions={actions} phone={phone} /> : null}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={listTab}
@@ -107,7 +111,7 @@ export default function ChatPane({
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.2 }}
             >
-              {listTab === 'archived' ? (
+              {listTab === 'groups' ? null : listTab === 'archived' ? (
                 <p className="rounded-[16px] border border-hairline bg-surface px-4 py-8 text-center text-sm text-fg-secondary">
                   No archived chats in this demo.
                 </p>
@@ -124,9 +128,9 @@ export default function ChatPane({
                           type="button"
                           onClick={() => {
                             actions.setOpenChatId(person.id);
-                            if (compact) actions.setDashboardTab('chat');
+                            if (compact) actions.setDashboardTab('clicks');
                           }}
-                          data-testid={`playground-chat-${person.id}`}
+                          data-testid={`playground-${phone ? 'clicks-chat' : 'chat'}-${person.id}`}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised"
                         >
                           <PlaygroundAvatar initials={person.initials} online={person.online} />

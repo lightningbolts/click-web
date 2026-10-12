@@ -7,7 +7,7 @@ export default function SettingsScene() {
   return (
     <div className="flex h-full flex-col overflow-auto bg-bg" data-testid="playground-scene-settings">
       <div className="border-b border-hairline px-4 py-3">
-        <h3 className="text-lg font-bold text-fg">Settings</h3>
+        <h3 className="text-lg font-bold text-fg">Me</h3>
         <p className="text-xs text-fg-secondary">Account, privacy, and notifications</p>
       </div>
       <ul className="space-y-2 p-3">

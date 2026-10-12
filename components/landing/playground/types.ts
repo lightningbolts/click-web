@@ -1,6 +1,19 @@
-export type PlaygroundScene = 'connect' | 'events' | 'dashboard' | 'clicks' | 'map' | 'settings';
+export type PlaygroundScene =
+  | "home"
+  | "connect"
+  | "events"
+  | "dashboard"
+  | "clicks"
+  | "map"
+  | "hubs"
+  | "settings";
 
-export type DashboardTab = 'memory' | 'map' | 'chat' | 'identity';
+import type { AppNavId } from "@/lib/shell/appNav";
+export type DashboardTab =
+  | Exclude<AppNavId, "business">
+  | "add"
+  | "me"
+  | "hubs";
 
 export type MemoryCapsule = {
   place: string;
@@ -21,7 +34,7 @@ export type DemoPlan = {
 
 export type ChatMessage = {
   id: string;
-  from: 'you' | 'them' | 'system';
+  from: "you" | "them" | "system";
   text: string;
   time: string;
   plan?: DemoPlan;
@@ -34,7 +47,7 @@ export type PlaygroundPerson = {
   nearbyMeters?: number;
   memory?: MemoryCapsule;
   geo: { lat: number; lng: number };
-  status: 'active' | 'kept';
+  status: "active" | "kept";
   dateMet: string;
   chatPreview: string;
   chatTime: string;
@@ -60,6 +73,16 @@ export type PlaygroundState = {
   messages: Readonly<Record<string, ChatMessage[]>>;
   openChatId: string | null;
   dashboardTab: DashboardTab;
+  intents: ReadonlySet<string>;
+  hubMessages: readonly string[];
+  joinedHub: boolean;
+  selectedEventId: string;
+  savedEventIds: ReadonlySet<string>;
+  inboxTab: "active" | "groups" | "archived";
+  groupName: string | null;
+  groupMessages: readonly string[];
+  hubName: string;
+  hubMode: "browse" | "create";
 };
 
 export type PlaygroundActions = {
@@ -67,9 +90,19 @@ export type PlaygroundActions = {
   toggleRsvp: (eventId: string) => void;
   toggleRoute: (eventId: string) => void;
   sendMessage: (personId: string, text: string) => void;
-  sendPlan: (personId: string, plan: Omit<DemoPlan, 'going'>) => void;
+  sendPlan: (personId: string, plan: Omit<DemoPlan, "going">) => void;
   togglePlanGoing: (personId: string, messageId: string) => void;
   setOpenChatId: (id: string | null) => void;
   setDashboardTab: (tab: DashboardTab) => void;
   setScene: (scene: PlaygroundScene) => void;
+  toggleIntent: (intent: string) => void;
+  joinHub: () => void;
+  sendHubMessage: (text: string) => void;
+  setSelectedEventId: (id: string) => void;
+  toggleSavedEvent: (id: string) => void;
+  setInboxTab: (tab: PlaygroundState["inboxTab"]) => void;
+  createGroup: (name: string) => void;
+  sendGroupMessage: (text: string) => void;
+  createHub: (name: string) => void;
+  setHubMode: (mode: PlaygroundState["hubMode"]) => void;
 };
