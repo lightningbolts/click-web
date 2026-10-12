@@ -268,7 +268,7 @@ export function renderFlyer(format: FlyerFormat, content: FlyerContent, art: Fly
   const [out, ctx] = canvas(W * SCALE, H * SCALE);
   ctx.scale(SCALE, SCALE);
   const display = (size: number) => `800 ${size}px ${art.displayFamily}`;
-  const sans = (weight: number, size: number) => `${weight} ${size}px ${SANS}`;
+  const sans = (weight: number, size: number) => `${weight} ${size}px ${art.displayFamily}, ${SANS}`;
   const wash = art.picture ? swatch(art.picture) : null;
   const accent = wash ? deepenedAccent(...averageColor(wash)) : '#7C3AED';
 
