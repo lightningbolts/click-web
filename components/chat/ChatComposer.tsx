@@ -232,19 +232,21 @@ export function ChatComposer({
           <IconButton icon={Check} variant="action" aria-label="Save edit" className="size-10" disabled={!hasText} onClick={onSubmit} />
         ) : !hasText && voiceSupported ? (
           <IconButton
+            key="mic"
             icon={Mic}
             variant="glass"
             aria-label="Record a voice message"
-            className="size-10"
+            className="ds-scale-in size-10"
             disabled={disabled || mediaBusy}
             onClick={() => void beginVoiceRecording()}
           />
         ) : (
           <IconButton
+            key="send"
             icon={ArrowUp}
             variant="action"
             aria-label="Send"
-            className="size-10"
+            className="ds-scale-in size-10"
             disabled={disabled || !hasText || mediaBusy}
             onClick={onSubmit}
           />

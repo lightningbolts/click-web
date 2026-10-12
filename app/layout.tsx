@@ -17,14 +17,12 @@ import { publicOrigin } from "@/lib/events/eventUrls";
 import { brandShareImage } from "@/lib/brand/shareImage";
 
 /**
- * Manrope is the only typeface on the site: body (400–600) and titles (700–800).
+ * Manrope is the heading face (600–800); body text uses the system stack (`--font-sans`).
  * Self-hosted (Fontsource, OFL) so builds never fetch Google Fonts: in Workers
  * Builds, next/font/google failed with "queries have exactly one entry".
  */
 const manrope = localFont({
   src: [
-    { path: "./fonts/manrope-latin-400-normal.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/manrope-latin-500-normal.woff2", weight: "500", style: "normal" },
     { path: "./fonts/manrope-latin-600-normal.woff2", weight: "600", style: "normal" },
     { path: "./fonts/manrope-latin-700-normal.woff2", weight: "700", style: "normal" },
     { path: "./fonts/manrope-latin-800-normal.woff2", weight: "800", style: "normal" },

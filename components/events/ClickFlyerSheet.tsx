@@ -42,9 +42,7 @@ async function loadPicture(url: string | null): Promise<ImageBitmap | null> {
 /** Manrope as next/font registered it, loaded before drawing so the title isn't in a fallback face. */
 async function displayFamily(): Promise<string> {
   const family = getComputedStyle(document.documentElement).getPropertyValue('--font-manrope').trim() || 'sans-serif';
-  await Promise.all(
-    [400, 500, 600, 800].map((w) => document.fonts?.load(`${w} 16px ${family}`).catch(() => undefined)),
-  );
+  await document.fonts?.load(`800 27px ${family}`).catch(() => undefined);
   return family;
 }
 

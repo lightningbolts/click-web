@@ -109,7 +109,6 @@ export default function LandingPage({
       <div
         ref={pageRef}
         className="min-h-screen bg-bg text-fg overflow-x-clip isolate"
-        style={{ fontFamily: 'var(--font-sans)' }}
       >
         <FoldMapHero
           onJoinWaitlist={openWaitlist}

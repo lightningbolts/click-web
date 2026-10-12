@@ -574,6 +574,22 @@ export default function ChatView({
   }
   const unreadId = unreadAnchor?.chatId === chatId ? unreadAnchor.id : null;
 
+  // Messages that arrive after the thread opens animate in; what it opened with, and older pages
+  // loaded above, don't. Anchored on the last message present once loading finished.
+  const [openTail, setOpenTail] = useState<{ chatId: string; key: string | null } | null>(null);
+  if (!loading && chatId && openTail?.chatId !== chatId) {
+    const tail = messages.at(-1);
+    setOpenTail({ chatId, key: tail ? bubbleStableListKey(tail) : null });
+  }
+  const enteringKeys = useMemo(() => {
+    if (!openTail || openTail.chatId !== chatId) return null;
+    const keys = messages.map(bubbleStableListKey);
+    const at = openTail.key === null ? -1 : keys.indexOf(openTail.key);
+    // The anchor was removed (deleted, re-keyed): animate nothing rather than everything.
+    if (openTail.key !== null && at < 0) return null;
+    return new Set(keys.slice(at + 1));
+  }, [chatId, messages, openTail]);
+
   // Jump-to-latest counts what arrived from others since the reader scrolled away.
   const lastId = messages.at(-1)?.id ?? null;
   const [scrollBaseline, setScrollBaseline] = useState<string | null>(null);
@@ -764,8 +780,9 @@ export default function ChatView({
                 }
                 const m = entry.message;
                 const run = runs.get(m.id) ?? { first: true, last: true };
+                const key = bubbleStableListKey(m);
                 return (
-                  <Fragment key={bubbleStableListKey(m)}>
+                  <Fragment key={key}>
                     {m.id === unreadId ? <NewMessagesSeparator /> : null}
                     <MessageBubble
                       message={m}
@@ -790,13 +807,14 @@ export default function ChatView({
                       onJumpTo={jumpToMessage}
                       drop={dropStateFor(m)}
                       lockedText={lockedText}
+                      entering={enteringKeys?.has(key) ?? false}
                     />
                   </Fragment>
                 );
               })}
 
               {typingIndicator ? (
-                <div className="mt-2 flex" role="status" aria-label={`${isGroupClique ? 'Someone' : firstName} is typing`}>
+                <div className="msg-in mt-2 flex origin-bottom-left" role="status" aria-label={`${isGroupClique ? 'Someone' : firstName} is typing`}>
                   <div className="flex h-9 items-center gap-1 rounded-bubble rounded-bl-xs bg-bubble-in px-3.5">
                     {[0, 1, 2].map((i) => (
                       <span key={i} className="ds-typing-dot size-[7px] rounded-full bg-fg-tertiary" style={{ animationDelay: `${i * 160}ms` }} />
@@ -814,7 +832,7 @@ export default function ChatView({
               type="button"
               onClick={() => scrollToBottom()}
               aria-label={unseenCount ? `Jump to latest, ${unseenCount} new` : 'Jump to latest'}
-              className="material-glass press absolute bottom-3 right-4 z-20 flex h-9 items-center gap-1 rounded-pill px-3 text-fg shadow-overlay"
+              className="material-glass press ds-scale-in absolute bottom-3 right-4 z-20 flex h-9 items-center gap-1 rounded-pill px-3 text-fg shadow-overlay"
             >
               {unseenCount ? <span className="type-badge tabular text-accent">{unseenCount}</span> : null}
               <ChevronDown size={18} aria-hidden />
