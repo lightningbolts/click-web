@@ -17,6 +17,8 @@ const securityHeaders = [
     key: 'Content-Security-Policy-Report-Only',
     value:
       "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; " +
+      // Admin resume previews: a same-origin route that redirects to a short-lived Supabase Storage URL.
+      "frame-src 'self' https://*.supabase.co; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; worker-src 'self'; " +
       "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; " +
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://*.tiles.mapbox.com https://*.cartocdn.com https://api.klipy.com;",

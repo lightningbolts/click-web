@@ -97,6 +97,14 @@
         "limit": 30,
         "period": 60
       }
+    },
+    {
+      "name": "CAREERS_APPLY_RATE_LIMITER",
+      "namespace_id": "1006",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
     }
   ]
 }

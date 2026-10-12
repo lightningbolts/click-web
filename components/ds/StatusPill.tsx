@@ -11,7 +11,7 @@ export type StatusPillVariant =
   | "destructive"
   | "on-media";
 
-const VARIANT: Record<StatusPillVariant, string> = {
+export const STATUS_PILL_VARIANT: Record<StatusPillVariant, string> = {
   live: "bg-live text-white",
   tinted: "bg-selection text-accent",
   neutral: "bg-fill-subtle text-fg-secondary",
@@ -38,7 +38,7 @@ export function StatusPill({
     <span
       className={cn(
         "type-badge inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-2.5",
-        VARIANT[variant],
+        STATUS_PILL_VARIANT[variant],
         className,
       )}
     >
