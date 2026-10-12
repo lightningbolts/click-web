@@ -1,19 +1,21 @@
-import type { ReactNode } from 'react';
-import { Home, MapPin, PlusCircle, Settings, Users } from 'lucide-react';
-import type { PlaygroundScene } from './types';
+import type { ReactNode } from "react";
+import { Home, MapPin, PlusCircle, UserCircle, Users } from "lucide-react";
+import type { PlaygroundScene } from "./types";
 
-export type PhoneNavId = 'home' | 'add' | 'clicks' | 'map' | 'settings';
+export type PhoneNavId = "home" | "add" | "clicks" | "map" | "settings";
 
 export function PhoneChrome({
   children,
   label,
   activeNav,
   onNav,
+  hideNav = false,
 }: {
   children: ReactNode;
   label: string;
   activeNav: PhoneNavId;
   onNav: (scene: PlaygroundScene) => void;
+  hideNav?: boolean;
 }) {
   return (
     <div className="mx-auto w-full max-w-[300px] shrink-0">
@@ -24,42 +26,48 @@ export function PhoneChrome({
         <div className="flex items-center justify-center bg-surface-raised py-2">
           <div className="h-4 w-20 rounded-full bg-fg/15" aria-hidden />
         </div>
-        <div className="relative h-[560px] overflow-hidden bg-bg">{children}</div>
-        <nav
-          className="grid grid-cols-5 border-t border-hairline bg-surface px-1 py-2"
-          aria-label="App tabs"
+        <div
+          className={`relative overflow-hidden bg-bg ${hideNav ? "h-[619px]" : "h-[560px]"}`}
         >
-          <PhoneNavButton
-            label="Home"
-            active={activeNav === 'home'}
-            onClick={() => onNav('home')}
-            icon={<Home className="h-4 w-4" />}
-          />
-          <PhoneNavButton
-            label="Add Click"
-            active={activeNav === 'add'}
-            onClick={() => onNav('connect')}
-            icon={<PlusCircle className="h-4 w-4" />}
-          />
-          <PhoneNavButton
-            label="Clicks"
-            active={activeNav === 'clicks'}
-            onClick={() => onNav('clicks')}
-            icon={<Users className="h-4 w-4" />}
-          />
-          <PhoneNavButton
-            label="Map"
-            active={activeNav === 'map'}
-            onClick={() => onNav('map')}
-            icon={<MapPin className="h-4 w-4" />}
-          />
-          <PhoneNavButton
-            label="Settings"
-            active={activeNav === 'settings'}
-            onClick={() => onNav('settings')}
-            icon={<Settings className="h-4 w-4" />}
-          />
-        </nav>
+          {children}
+        </div>
+        {!hideNav ? (
+          <nav
+            className="grid grid-cols-5 border-t border-hairline bg-surface px-1 py-2"
+            aria-label="App tabs"
+          >
+            <PhoneNavButton
+              label="Home"
+              active={activeNav === "home"}
+              onClick={() => onNav("home")}
+              icon={<Home className="h-4 w-4" />}
+            />
+            <PhoneNavButton
+              label="Add Click"
+              active={activeNav === "add"}
+              onClick={() => onNav("connect")}
+              icon={<PlusCircle className="h-4 w-4" />}
+            />
+            <PhoneNavButton
+              label="Clicks"
+              active={activeNav === "clicks"}
+              onClick={() => onNav("clicks")}
+              icon={<Users className="h-4 w-4" />}
+            />
+            <PhoneNavButton
+              label="Map"
+              active={activeNav === "map"}
+              onClick={() => onNav("map")}
+              icon={<MapPin className="h-4 w-4" />}
+            />
+            <PhoneNavButton
+              label="Me"
+              active={activeNav === "settings"}
+              onClick={() => onNav("settings")}
+              icon={<UserCircle className="h-4 w-4" />}
+            />
+          </nav>
+        ) : null}
       </div>
     </div>
   );
@@ -81,10 +89,12 @@ function PhoneNavButton({
       type="button"
       onClick={onClick}
       className={`flex min-h-11 flex-col items-center justify-center gap-1 px-0.5 text-center text-[10px] font-semibold leading-tight ${
-        active ? 'text-accent' : 'text-fg-secondary'
+        active ? "text-accent" : "text-fg-secondary"
       }`}
     >
-      <span className={active ? 'rounded-full bg-action/15 p-1' : 'p-1'}>{icon}</span>
+      <span className={active ? "rounded-full bg-action/15 p-1" : "p-1"}>
+        {icon}
+      </span>
       {label}
     </button>
   );
@@ -94,7 +104,7 @@ export function WebChrome({
   children,
   label,
   lockScroll = false,
-  address = 'joinclick.co',
+  address = "joinclick.co",
 }: {
   children: ReactNode;
   label: string;
@@ -119,8 +129,8 @@ export function WebChrome({
         <div
           className={
             lockScroll
-              ? 'flex h-[560px] flex-col overflow-hidden bg-bg lg:h-[640px]'
-              : 'min-h-[420px] flex-1 overflow-auto bg-bg sm:min-h-[560px] lg:min-h-[640px]'
+              ? "flex h-[560px] flex-col overflow-hidden bg-bg lg:h-[640px]"
+              : "min-h-[420px] flex-1 overflow-auto bg-bg sm:min-h-[560px] lg:min-h-[640px]"
           }
         >
           {children}
@@ -132,14 +142,19 @@ export function WebChrome({
 
 export function PlaygroundAvatar({
   initials,
-  size = 'md',
+  size = "md",
   online,
 }: {
   initials: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
   online?: boolean;
 }) {
-  const dim = size === 'lg' ? 'h-14 w-14 text-base' : size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm';
+  const dim =
+    size === "lg"
+      ? "h-14 w-14 text-base"
+      : size === "sm"
+        ? "h-8 w-8 text-xs"
+        : "h-10 w-10 text-sm";
   return (
     <span className="relative inline-flex shrink-0" aria-hidden="true">
       <span
@@ -161,7 +176,7 @@ export function VolumeBars({ count }: { count: 1 | 2 | 3 }) {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`w-[3px] rounded-sm ${i < count ? 'bg-action' : 'bg-fg/20'}`}
+          className={`w-[3px] rounded-sm ${i < count ? "bg-action" : "bg-fg/20"}`}
           style={{ height: heights[i] }}
         />
       ))}

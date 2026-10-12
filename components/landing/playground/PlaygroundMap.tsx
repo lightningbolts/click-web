@@ -318,7 +318,7 @@ export default function PlaygroundMap({
         'aria-label',
         cluster.events[0]?.title ?? cluster.people[0]?.name ?? 'Map pin',
       );
-      el.style.bg = 'none';
+      el.style.background = 'none';
       el.style.border = 'none';
       el.style.padding = '0';
       el.style.cursor = 'pointer';

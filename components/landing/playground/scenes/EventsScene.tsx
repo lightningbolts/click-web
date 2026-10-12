@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarDays, MapPin, Navigation, Users } from 'lucide-react';
-import { CardVisualHero } from '@/components/ui/CardVisualSurface';
+import { CardVisual } from '@/components/ds/CardVisual';
 import { PlaygroundAvatar } from '../DeviceChrome';
 import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from '../mockData';
 import type { PlaygroundActions, PlaygroundState } from '../types';
@@ -56,7 +56,7 @@ export default function EventsScene({
           onClick={() => setOpenId(featured.id)}
           className="mx-3 mt-3 overflow-hidden rounded-[16px] border-2 border-hairline bg-surface text-left"
         >
-          <CardVisualHero id={featured.id} chipLabel="Featured event" className="h-20" />
+          <CardVisual seed={featured.id} className="h-20" />
           <div className="p-3">
           <p className="mt-1 text-sm font-bold text-accent">{featured.title}</p>
           <p className="text-xs text-accent">
@@ -105,6 +105,7 @@ export default function EventsScene({
             <MapPin className="h-3 w-3" /> {open.venue} · Host {open.host}
           </p>
           <p className="mt-2 text-xs text-fg-secondary">{open.description}</p>
+          <button type="button" aria-pressed={state.savedEventIds.has(open.id)} onClick={() => actions.toggleSavedEvent(open.id)} className="mt-3 rounded-full border border-hairline px-3 py-2 text-xs font-semibold">{state.savedEventIds.has(open.id) ? 'Unsave event' : 'Save event'}</button>
           {goingPeople.length > 0 ? (
             <div className="mt-3">
               <p className="text-[11px] font-semibold text-fg">

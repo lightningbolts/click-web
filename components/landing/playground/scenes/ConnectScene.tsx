@@ -28,13 +28,17 @@ export default function ConnectScene({
 
   useEffect(() => {
     if (phase !== 'handshake') return undefined;
-    const id = window.setTimeout(() => setPhase('memory'), 900);
+    const id = window.setTimeout(() => {
+      actions.connectPerson(JORDAN.id, JORDAN_DEFAULT_MEMORY);
+      setPhase('memory');
+    }, 900);
     return () => window.clearTimeout(id);
-  }, [phase]);
+  }, [phase, actions]);
 
   const startTap = () => {
     if (already || phase !== 'idle') return;
     if (reduceMotion) {
+      actions.connectPerson(JORDAN.id, JORDAN_DEFAULT_MEMORY);
       setPhase('memory');
       return;
     }
@@ -56,7 +60,7 @@ export default function ConnectScene({
       <div className="border-b border-hairline px-4 py-3">
         <h3 className="text-lg font-bold text-fg">Add Click</h3>
         <p className="mt-1 text-xs text-fg-secondary">
-          Connect with QR or Tap to Connect, or join a venue community hub
+          Connect in person or join a nearby community
         </p>
       </div>
 
@@ -65,7 +69,7 @@ export default function ConnectScene({
           [
             { id: 'tap' as const, label: 'Tap', icon: Smartphone },
             { id: 'qr' as const, label: 'My QR', icon: QrCode },
-            { id: 'scan' as const, label: 'Scan', icon: ScanLine },
+            { id: 'scan' as const, label: 'Scan QR', icon: ScanLine },
           ]
         ).map((item) => {
           const Icon = item.icon;
@@ -127,7 +131,7 @@ export default function ConnectScene({
 
             {phase === 'memory' ? (
               <div className="mt-4 space-y-3">
-                <p className="text-sm font-semibold text-fg">How did you meet?</p>
+                <p className="text-sm font-semibold text-fg">You’re connected. Add a memory?</p>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Encounter labels">
                   {MEMORY_PRESETS.map((preset) => (
                     <button
@@ -150,6 +154,7 @@ export default function ConnectScene({
                 <button type="button" onClick={confirmMemory} className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 w-full py-2.5">
                   Save memory
                 </button>
+                <button type="button" className="w-full text-sm text-accent underline" onClick={() => { actions.setOpenChatId(JORDAN.id); actions.setInboxTab('active'); actions.setDashboardTab('clicks'); actions.setScene('clicks'); }}>Open chat</button>
               </div>
             ) : null}
 
@@ -162,6 +167,7 @@ export default function ConnectScene({
                 <p className="mt-1 flex items-center gap-2 text-[11px] text-fg-secondary">
                   {jordanMemory.weather} <VolumeBars count={jordanMemory.volume} /> {jordanMemory.noise}
                 </p>
+                <button type="button" className="mt-3 text-sm font-semibold text-accent underline" onClick={() => { actions.setOpenChatId(JORDAN.id); actions.setInboxTab('active'); actions.setDashboardTab('clicks'); actions.setScene('clicks'); }}>Open chat</button>
               </div>
             ) : null}
           </div>
@@ -197,6 +203,11 @@ export default function ConnectScene({
         </div>
       ) : null}
 
+      <div className="space-y-2 px-4 pb-4">
+        <button type="button" className="w-full rounded-xl border border-hairline bg-surface p-3 text-left text-sm font-semibold" onClick={() => { actions.setOpenChatId(null); actions.setInboxTab('groups'); actions.setDashboardTab('clicks'); actions.setScene('clicks'); }}>Create Group Chat<span className="mt-1 block text-xs font-normal text-fg-secondary">Start a verified group with your Clicks</span></button>
+        <button type="button" className="w-full rounded-xl border border-hairline bg-surface p-3 text-left text-sm font-semibold" onClick={() => { actions.setHubMode('create'); actions.setDashboardTab('hubs'); actions.setScene('hubs'); }}>Create Community Hub<span className="mt-1 block text-xs font-normal text-fg-secondary">Host a venue for nearby Clicks</span></button>
+        <button type="button" className="w-full rounded-xl border border-hairline bg-surface p-3 text-left text-sm font-semibold" onClick={() => { actions.setHubMode('browse'); actions.setDashboardTab('hubs'); actions.setScene('hubs'); }}>Join Community Hub<span className="mt-1 block text-xs font-normal text-fg-secondary">Discover a nearby venue</span></button>
+      </div>
       <div className="mt-auto border-t border-hairline px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">
           Your Clicks
