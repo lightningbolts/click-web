@@ -1,6 +1,7 @@
 /**
- * Open roles shown on /careers. Add a role here to list it; remove it when it closes.
- * `applyUrl` is the public Google Form link (the /viewform URL, not /edit).
+ * Open roles shown on /careers. Add a role here to list it and open its application at
+ * /careers/[id]; remove it when it closes. `id` is also the `position` stored on each
+ * application, and `interests` are the role's "Areas of interest" choices.
  */
 export type CareerRole = {
   id: string;
@@ -11,7 +12,9 @@ export type CareerRole = {
   summary: string;
   responsibilities: string[];
   lookingFor: string[];
-  applyUrl: string;
+  /** The application's "What could you bring…" prompt. */
+  pitchPrompt: string;
+  interests: readonly { value: string; label: string }[];
 };
 
 export const OPEN_ROLES: CareerRole[] = [
@@ -34,7 +37,18 @@ export const OPEN_ROLES: CareerRole[] = [
       "You are comfortable starting conversations with people you just met",
       "Bonus: you already make content or run a club",
     ],
-    applyUrl:
-      "https://docs.google.com/forms/d/1ns06Hl-sHS7XMpAljoe5IFAkwt0POw5BfMkznRlu2ks/viewform",
+    pitchPrompt: "What could you bring to Click as a marketing intern?",
+    interests: [
+      { value: "social_media", label: "Social media & content creation" },
+      { value: "campus_outreach", label: "Campus outreach & tabling" },
+      { value: "events_rso", label: "Events & RSO partnerships" },
+      { value: "growth_analytics", label: "Growth strategy & analytics" },
+      { value: "design_branding", label: "Graphic design & branding" },
+      { value: "other", label: "Other" },
+    ],
   },
 ];
+
+export function findRole(id: string): CareerRole | undefined {
+  return OPEN_ROLES.find((role) => role.id === id);
+}

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { ArrowUpRight } from "lucide-react";
-import { buttonClassName } from "@/components/ds/Button";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ds/Button";
 import { OPEN_ROLES } from "@/components/careers/roles";
 
 export const metadata: Metadata = {
@@ -50,18 +50,15 @@ export default function CareersPage() {
                         {role.team} · {role.location} · {role.type}
                       </p>
                     </div>
-                    <a
-                      href={role.applyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Apply for ${role.title} (opens Google Form in a new tab)`}
-                      className={buttonClassName({ variant: "primary", size: "lg" })}
+                    <Button
+                      href={`/careers/${role.id}`}
+                      aria-label={`Apply for ${role.title}`}
+                      variant="primary"
+                      size="lg"
+                      trailingIcon={ArrowRight}
                     >
-                      <span className="inline-flex items-center gap-2">
-                        Apply
-                        <ArrowUpRight size={18} strokeWidth={2} aria-hidden />
-                      </span>
-                    </a>
+                      Apply
+                    </Button>
                   </div>
 
                   <p className="type-reading mt-6 text-fg-secondary">{role.summary}</p>
