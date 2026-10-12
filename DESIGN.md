@@ -44,7 +44,7 @@ Legacy names (`primary`, `surface-container-*`, `on-surface-variant`, `outline`,
 
 ### Type
 
-Body is the **system stack** (SF Pro / Segoe / Roboto), so there is no body-font request. **Manrope 700/800** (`font-display`) is used for titles only. Use the `type-*` utilities, never raw sizes:
+**Manrope** is the only typeface: 400–600 for body (`font-sans`) and 700/800 for titles (`font-display`). `font-mono` also resolves to Manrope; use `tabular-nums` for codes. Use the `type-*` utilities, never raw sizes:
 
 | Utility | Mobile → ≥768 (size/line, weight) | Use |
 |---|---|---|
