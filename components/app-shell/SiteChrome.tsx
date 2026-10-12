@@ -20,6 +20,7 @@ const DRAWER_LINKS = [
   { href: '/events', label: 'Events' },
   { href: '/#how-it-works', label: 'How it works' },
   { href: '/enterprise', label: 'For business' },
+  { href: '/careers', label: 'Careers' },
   { href: '/about', label: 'About' },
 ];
 

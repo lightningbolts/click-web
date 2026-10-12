@@ -35,6 +35,10 @@ export default function Footer() {
               Terms
             </Link>
             <span className="text-fg-tertiary">•</span>
+            <Link href="/careers" className="text-fg hover:text-accent">
+              Careers
+            </Link>
+            <span className="text-fg-tertiary">•</span>
             <Link href="/about" className="text-fg hover:text-accent">
               About
             </Link>
