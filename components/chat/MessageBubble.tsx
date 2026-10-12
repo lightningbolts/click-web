@@ -80,6 +80,8 @@ interface MessageBubbleProps {
    * yet, or set up after those messages): ciphertext says this at once instead of shimmering.
    */
   lockedText?: string | null;
+  /** Arrived while the thread was open: rises in from the sender's side. */
+  entering?: boolean;
 }
 
 /**
@@ -164,11 +166,14 @@ export default function MessageBubble({
   onJumpTo,
   drop,
   lockedText = null,
+  entering = false,
 }: MessageBubbleProps) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** Bumped by a double-click heart; keys the burst so a repeat replays it. */
+  const [heartBurst, setHeartBurst] = useState(0);
 
   const meta = (message.metadata && typeof message.metadata === 'object' ? message.metadata : {}) as Record<string, unknown>;
   const mediaUrl = mediaUrlFromMetadata(message.metadata);
@@ -422,9 +427,14 @@ export default function MessageBubble({
       ) : null}
 
       <div
-        className={cn('relative flex min-w-0 max-w-[min(75%,520px)] flex-col', isMine ? 'items-end' : 'items-start')}
+        className={cn(
+          'relative flex min-w-0 max-w-[min(75%,520px)] flex-col',
+          isMine ? 'items-end origin-bottom-right' : 'items-start origin-bottom-left',
+          entering && 'msg-in',
+        )}
         onDoubleClick={() => {
           window.getSelection()?.removeAllRanges();
+          if (!myReactions.has('❤️')) setHeartBurst((n) => n + 1);
           react('❤️');
         }}
       >
@@ -451,27 +461,71 @@ export default function MessageBubble({
 
         {body}
 
-        {reactions.length > 0 ? (
-          <div className={cn('relative z-[1] -mt-1 flex flex-wrap gap-1 px-2', isMine ? 'justify-end' : 'justify-start')}>
-            {reactions.map((r) => (
-              <button
-                key={r.emoji}
-                type="button"
-                onClick={() => react(r.emoji)}
-                aria-pressed={r.mine}
-                aria-label={`${r.emoji} ${r.count}${r.mine ? ', including you' : ''}`}
-                className={cn(
-                  'press type-badge tabular inline-flex items-center gap-1 rounded-pill border px-2 py-[3px]',
-                  r.mine ? 'border-[color-mix(in_srgb,var(--accent)_45%,transparent)] bg-selection text-accent' : 'border-hairline bg-bubble-in text-fg-secondary',
-                )}
-              >
-                <span aria-hidden>{r.emoji}</span>
-                {r.count > 1 ? <span aria-hidden className="font-semibold">{r.count}</span> : null}
-              </button>
-            ))}
-          </div>
+        {heartBurst ? (
+          <span
+            key={heartBurst}
+            aria-hidden
+            onAnimationEnd={() => setHeartBurst(0)}
+            className="reaction-burst pointer-events-none absolute left-1/2 top-1/2 z-20 text-[44px] leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+          >
+            ❤️
+          </span>
         ) : null}
+
+        <ReactionChips reactions={reactions} mine={isMine} onReact={react} />
       </div>
+    </div>
+  );
+}
+
+type ChipReaction = { emoji: string; count: number; mine: boolean };
+
+/**
+ * Reactions under the bubble. Stays mounted while empty so it can tell what changed since the
+ * bubble appeared: a new chip springs in and a changed count pops; history never animates.
+ */
+function ReactionChips({ reactions, mine, onReact }: { reactions: ChipReaction[]; mine: boolean; onReact: (emoji: string) => void }) {
+  const [seen, setSeen] = useState(() => ({
+    counts: new Map(reactions.map((r) => [r.emoji, r.count])),
+    added: new Set<string>(),
+    bumped: new Set<string>(),
+  }));
+  if (reactions.length !== seen.counts.size || reactions.some((r) => seen.counts.get(r.emoji) !== r.count)) {
+    const added = new Set<string>();
+    const bumped = new Set<string>();
+    for (const r of reactions) {
+      const before = seen.counts.get(r.emoji);
+      if (before === undefined) added.add(r.emoji);
+      else if (before !== r.count) bumped.add(r.emoji);
+    }
+    setSeen({ counts: new Map(reactions.map((r) => [r.emoji, r.count])), added, bumped });
+  }
+
+  if (reactions.length === 0) return null;
+  return (
+    <div className={cn('relative z-[1] -mt-1 flex flex-wrap gap-1 px-2', mine ? 'justify-end' : 'justify-start')}>
+      {reactions.map((r) => (
+        <button
+          key={r.emoji}
+          type="button"
+          onClick={() => onReact(r.emoji)}
+          aria-pressed={r.mine}
+          aria-label={`${r.emoji} ${r.count}${r.mine ? ', including you' : ''}`}
+          className={cn(
+            'press type-badge tabular inline-flex items-center gap-1 rounded-pill border px-2 py-[3px]',
+            r.mine
+              ? 'border-[color-mix(in_srgb,var(--accent)_45%,transparent)] bg-selection text-accent'
+              : 'border-hairline bg-bubble-in text-fg-secondary hover:border-fill-strong hover:text-fg',
+            seen.added.has(r.emoji) && 'reaction-in',
+          )}
+        >
+          {/* Keyed by count so a change remounts it and replays the pop. */}
+          <span key={r.count} aria-hidden className={cn('inline-block', seen.bumped.has(r.emoji) && 'reaction-pop')}>
+            {r.emoji}
+          </span>
+          {r.count > 1 ? <span aria-hidden className="font-semibold">{r.count}</span> : null}
+        </button>
+      ))}
     </div>
   );
 }

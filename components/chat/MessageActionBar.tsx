@@ -49,8 +49,8 @@ export function MessageActionBar({
       role="toolbar"
       aria-label="Message actions"
       className={cn(
-        'absolute -top-10 z-10 flex h-9 items-center gap-0.5 rounded-pill bg-bg-elevated px-1 shadow-overlay',
-        mine ? 'right-0' : 'left-0',
+        'msg-actions-in absolute -top-10 z-10 flex h-9 items-center gap-0.5 rounded-pill bg-bg-elevated px-1 shadow-overlay',
+        mine ? 'right-0 origin-bottom-right' : 'left-0 origin-bottom-left',
       )}
     >
       {QUICK_REACTIONS.map((emoji) => (
@@ -60,9 +60,11 @@ export function MessageActionBar({
           aria-label={`React ${emoji}`}
           aria-pressed={myReactions.has(emoji)}
           onClick={() => onReact(emoji)}
-          className={cn(barButton, 'text-[20px] leading-none', myReactions.has(emoji) && 'bg-selection')}
+          className={cn(barButton, 'group text-[20px] leading-none', myReactions.has(emoji) && 'bg-selection')}
         >
-          {emoji}
+          <span aria-hidden className="inline-block transition-transform duration-[var(--d-fast)] ease-out-expo group-hover:scale-[1.2]">
+            {emoji}
+          </span>
         </button>
       ))}
       <EmojiPopover open={pickerOpen} onOpenChange={onPickerOpenChange} onSelect={onReact}>

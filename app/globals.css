@@ -170,14 +170,14 @@ body:has([data-app-shell]) [data-site-chrome] {
   --color-read-receipt: var(--read-receipt);
 
 
+  /* Body is the platform's own UI face (SF Pro, Segoe UI Variable, Roboto): no request, and
+     text reads like the OS. Manrope is for headings only (`--font-display`, every h1–h6). */
   --font-sans:
-    var(--font-manrope), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --font-display:
     var(--font-manrope), ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  /* Codes and ticket numbers stay Manrope; `tabular-nums` keeps digits aligned. */
-  --font-mono: var(--font-sans);
 
   /* Radius (spec §4.4). Legacy 2xl/3xl map onto card / hero radii. */
   --radius-xs: 6px;
@@ -255,8 +255,8 @@ body:has([data-app-shell]) [data-site-chrome] {
   text-wrap: balance;
 }
 
+/* No family: a heading gets Manrope from the base layer, a row label keeps the body face. */
 @utility type-headline {
-  font-family: var(--font-sans);
   font-size: 17px;
   line-height: 24px;
   font-weight: 600;
@@ -398,6 +398,15 @@ body {
 /* Base layer, so utilities win: the `text-wrap` shorthand resets `text-wrap-mode`, which would
    otherwise undo `truncate` on any heading or paragraph. */
 @layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+
   h1,
   h2,
   h3 {
@@ -736,6 +745,67 @@ a {
   animation: reaction-pop 360ms var(--ease-out-expo);
 }
 
+/* A reaction chip that's added springs in from nothing. */
+@keyframes reaction-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+}
+.reaction-in {
+  animation: reaction-in 320ms var(--ease-out-expo) backwards;
+}
+
+/* Double-click to heart: a heart blooms over the message and floats off. Under Reduce Motion
+   the global 1 ms rule ends it at once, so only the chip remains. */
+@keyframes reaction-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -90%) scale(1.05);
+  }
+}
+.reaction-burst {
+  animation: reaction-burst 760ms var(--ease) both;
+}
+
+/* A message that arrives while the thread is open rises in from its sender's side, and the
+   hover bar eases out of the bubble. Backwards fill only, so no transform lingers. */
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+.msg-in {
+  animation: msg-in var(--d-base) var(--ease-out-expo) backwards;
+}
+@keyframes msg-actions-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+}
+.msg-actions-in {
+  animation: msg-actions-in var(--d-fast) var(--ease-out-expo) backwards;
+}
+
 /* A control that appears (a reply's send button) scales in rather than popping. */
 @keyframes ds-scale-in {
   from {
@@ -763,7 +833,10 @@ a {
   .reaction-pop {
     animation-duration: 1ms;
   }
-  .ds-scale-in {
+  .ds-scale-in,
+  .reaction-in,
+  .msg-in,
+  .msg-actions-in {
     animation: none;
   }
 }
