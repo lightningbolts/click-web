@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 const EnterprisePlayground = dynamic(() => import("./EnterprisePlayground"), {
   ssr: false,
-  loading: () => <div className="h-[640px] rounded-[16px] bg-surface-raised" aria-hidden />,
+  loading: () => <div className="h-[clamp(600px,calc(100svh-120px),820px)] rounded-xl bg-fill-subtle" aria-hidden />,
 });
 
 export default function EnterprisePlaygroundLazy() {

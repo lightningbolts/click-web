@@ -130,11 +130,12 @@ export default function TribeChart({ tribes }: TribeChartProps) {
                 <motion.circle
                   cx={tribe.x}
                   cy={tribe.y}
-                  r={svgRadius + 2}
+                  // `r` is set, not animated: framer can't tween an SVG radius from its
+                  // initial attribute and logs "r: Expected length" on every bubble.
+                  r={isHovered ? svgRadius + 4 : svgRadius + 2}
                   fill={tribe.color}
                   opacity={isHovered || isSelected ? 0.3 : 0.1}
                   animate={{
-                    r: isHovered ? svgRadius + 4 : svgRadius + 2,
                     opacity: isHovered || isSelected ? 0.4 : isRelated ? 0.25 : 0.1,
                   }}
                   transition={{ duration: 0.3 }}

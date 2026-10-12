@@ -52,7 +52,7 @@ export default function TribesPage({ placeId }: { placeId: string }) {
   const { user } = useAuth();
   const venueId = placeId;
   const insightsUrl = `/api/insights/${placeId}`;
-  const { data: apiPayload } = useSWR(user && insightsUrl ? insightsUrl : null, tribesFetcher);
+  const { data: apiPayload } = useSWR(user && insightsUrl && !demoMode ? insightsUrl : null, tribesFetcher);
 
   const tribes: TribeBubble[] = useMemo(() => {
     if (demoMode) return mockVenueInsights.tribes;

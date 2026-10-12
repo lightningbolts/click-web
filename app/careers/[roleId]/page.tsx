@@ -25,7 +25,7 @@ export default async function CareerApplicationPage({ params }: { params: Promis
   return (
     <div className="flex-1 py-12 md:py-16">
       <div className="container-page">
-        <div className="mx-auto max-w-2xl">
+        <div className="max-w-2xl">
           <Link
             href="/careers"
             className="type-meta inline-flex items-center gap-1.5 rounded-pill font-semibold text-fg-secondary hover:text-fg"
@@ -35,7 +35,7 @@ export default async function CareerApplicationPage({ params }: { params: Promis
           </Link>
 
           <header className="mt-6">
-            <h1 className="type-title-1 font-display">{role.title}</h1>
+            <h1 className="type-title-1 text-fg">{role.title}</h1>
             <p className="type-meta mt-2 text-fg-secondary">
               {role.team} · {role.location} · {role.type}
             </p>

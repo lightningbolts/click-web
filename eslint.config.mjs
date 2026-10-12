@@ -15,6 +15,15 @@ const REDESIGNED = [
   'components/me/**',
   'components/place/**',
   'app/(app)/**',
+  'components/landing/playground/**',
+  'components/enterprise/**',
+  'components/marketing/**',
+  'components/Footer.tsx',
+  'app/about/**',
+  'app/careers/**',
+  'app/enterprise/**',
+  'app/privacy/**',
+  'app/terms/**',
 ];
 
 const classLiteral = (regex, message) => [

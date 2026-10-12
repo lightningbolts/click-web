@@ -74,7 +74,8 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
   const chart = useInsightsChartTheme();
   const { demoMode } = useInsightsDemo();
   const { user } = useAuth();
-  const insightsUrl = user ? `/api/insights/${placeId}` : null;
+  // Demo mode shows sample zones only, so it never fetches.
+  const insightsUrl = user && !demoMode ? `/api/insights/${placeId}` : null;
   const { data: apiPayload } = useSWR(insightsUrl, insightsFetcher);
 
   const verifiedNodes: VerifiedConnectionMapNode[] = useMemo(() => {
@@ -182,18 +183,20 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
         <HeatmapView zones={zones} />
       </motion.div>
 
-      {/* Verified connection map — client-side centroid clustering of raw encounter GPS */}
-      <motion.div variants={itemVariants}>
-        <GlassPanel className="p-6">
-          <div className="mb-4">
-            <h3 className="text-base font-semibold text-fg">Verified Connection Map</h3>
-            <p className="text-xs text-fg-secondary mt-0.5">
-              Raw GPS is stored per participant; multi-user handshakes snap to a centroid here only.
-            </p>
-          </div>
-          <InsightsMap nodes={verifiedNodes} venueCenter={venueCenter} />
-        </GlassPanel>
-      </motion.div>
+      {/* Verified connection map — client-side centroid clustering of raw encounter GPS. No sample data yet. */}
+      {demoMode ? null : (
+        <motion.div variants={itemVariants}>
+          <GlassPanel className="p-6">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-fg">Verified Connection Map</h3>
+              <p className="text-xs text-fg-secondary mt-0.5">
+                Raw GPS is stored per participant; multi-user handshakes snap to a centroid here only.
+              </p>
+            </div>
+            <InsightsMap nodes={verifiedNodes} venueCenter={venueCenter} />
+          </GlassPanel>
+        </motion.div>
+      )}
 
       {/* Zone table + type distribution */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

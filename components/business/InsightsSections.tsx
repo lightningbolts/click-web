@@ -87,7 +87,8 @@ export function InsightsSectionView({
           ) : section === 'crowd' ? (
             <>
               <Tribes placeId={placeId} />
-              <SocialActivity placeId={placeId} />
+              {/* No sample data yet: hidden in demo mode rather than mixing in this Place's numbers. */}
+              {demo ? null : <SocialActivity placeId={placeId} />}
             </>
           ) : section === 'vibe' ? (
             <>
@@ -97,7 +98,7 @@ export function InsightsSectionView({
           ) : (
             <>
               <EventEngagement placeId={placeId} />
-              <NetworkHealth placeId={placeId} />
+              {demo ? null : <NetworkHealth placeId={placeId} />}
             </>
           )}
         </div>

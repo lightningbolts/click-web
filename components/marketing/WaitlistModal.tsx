@@ -78,7 +78,7 @@ export default function WaitlistModal({
       testId="waitlist-modal"
     >
       {status === 'success' ? (
-        <div className="rounded-[16px] border border-hairline bg-selection p-5 text-center">
+        <div className="rounded-lg bg-selection p-5 text-center">
           <CheckCircle className="mx-auto mb-3 h-10 w-10 text-accent" aria-hidden />
           <p className="font-bold text-accent">You&apos;re on the list</p>
           <p role="status" className="mt-2 text-accent">

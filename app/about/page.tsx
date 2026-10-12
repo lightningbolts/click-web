@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CardVisual } from "@/components/ds/CardVisual";
+import { Avatar } from "@/components/ds/Avatar";
+import { Button } from "@/components/ds/Button";
+import { PageHeader } from "@/components/marketing/PageHeader";
 import { ABOUT_TEAM } from "@/components/about/team";
 
 export const metadata: Metadata = {
@@ -11,64 +12,59 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="flex-1 py-20">
-      <div className="container-page">
-          <h1
-            id="about-heading"
-            data-testid="about-heading"
-            className="mkt-page-title text-center text-5xl font-bold md:text-6xl"
-          >
-          About <span className="text-accent">Click</span>
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-center text-lg leading-relaxed text-fg-secondary">
-          We&apos;re five Computer Science students at the University of Washington. After class we
-          kept adding people on Instagram and never talking again. Click is how we stay in touch
-          with the people we actually met.
-        </p>
-        <p className="mx-auto mt-4 max-w-xl text-center text-sm leading-relaxed text-fg-secondary">
-          See how it works and join the waitlist on the{" "}
-          <Link href="/" className="font-medium text-accent underline-offset-4 hover:underline">
-            homepage
-          </Link>
-          .
-        </p>
+    <div className="container-page flex-1 pb-24">
+      <PageHeader
+        id="about-heading"
+        title="We kept meeting people and losing them"
+        lead="We’re six Computer Science and Computer Engineering students at the University of Washington. After class we kept adding people on Instagram and never talking again. Click is how we stay in touch with the people we actually met."
+      >
+        <Button href="/#how-it-works" variant="primary" size="lg">
+          Try the demo
+        </Button>
+      </PageHeader>
 
-        <section className="mt-16">
-          <h2 className="text-center text-3xl font-bold md:text-4xl">Why we started</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-center leading-relaxed text-fg-secondary">
-            Orientation and Dawg Daze are full of conversations that should continue. A follow is
-            not a plan to get coffee. We wanted a record of the room you were in, and a way to find
-            each other the next time you are both free.
-          </p>
-        </section>
+      <section aria-labelledby="why-heading" className="max-w-[62ch]">
+        <h2 id="why-heading" className="type-title-2 text-fg">
+          Why we started
+        </h2>
+        <p className="type-reading mt-3 text-fg-secondary">
+          Orientation and Dawg Daze are full of conversations that should continue. A follow is not a plan to get coffee. We
+          wanted a record of the room you were in, and a way to find each other the next time you are both free.
+        </p>
+      </section>
 
-        <section className="mt-20">
-          <h2 className="text-center text-3xl font-bold md:text-4xl">
-            Meet the <span className="text-accent">team</span>
-          </h2>
-          <p className="mx-auto mt-4 mb-12 max-w-2xl text-center text-fg-secondary">
-            We split product, mobile, and web. Campus is the first home for Click because that is
-            where a lot of people start over at the same time.
-          </p>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {ABOUT_TEAM.map((member) => (
-              <div key={member.email} className="rounded-lg bg-surface p-8 text-center dark:shadow-[inset_0_0_0_1px_var(--hairline)]">
-                <div className="mx-auto mb-6 h-24 w-24 overflow-hidden rounded-full">
-                  <CardVisual seed={member.email} radius={0} className="flex size-24 items-center justify-center">
-                    <span className="font-display text-4xl font-extrabold text-white">{member.initials}</span>
-                  </CardVisual>
+      <section aria-labelledby="team-heading" className="mt-16 md:mt-20">
+        <h2 id="team-heading" className="type-title-2 text-fg">
+          The team
+        </h2>
+        <p className="type-reading mt-3 max-w-[62ch] text-fg-secondary">
+          We split product, mobile, and web. Campus is the first home for Click because that is where a lot of people start
+          over at the same time.
+        </p>
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {ABOUT_TEAM.map((member) => (
+            <li
+              key={member.email}
+              className="flex flex-col rounded-lg bg-surface p-6 dark:shadow-[inset_0_0_0_1px_var(--hairline)]"
+            >
+              <div className="flex items-center gap-4">
+                <Avatar seed={member.email} name={member.name} size={56} />
+                <div className="min-w-0">
+                  <h3 className="type-headline text-fg">{member.name}</h3>
+                  <p className="type-meta text-fg-secondary">{member.subtitle}</p>
                 </div>
-                <h3 className="text-2xl font-bold">{member.name}</h3>
-                <p className="mt-2 text-fg-secondary">{member.subtitle}</p>
-                <p className="mt-4 text-left text-sm leading-relaxed text-fg-secondary">{member.text}</p>
-                <a href={`mailto:${member.email}`} className="mt-4 inline-block text-sm text-accent hover:underline">
-                  {member.email}
-                </a>
               </div>
-            ))}
-          </div>
-        </section>
-      </div>
+              <p className="type-body mt-4 flex-1 text-fg-secondary">{member.text}</p>
+              <a
+                href={`mailto:${member.email}`}
+                className="type-body-strong mt-4 self-start text-accent underline-offset-4 hover:underline"
+              >
+                {member.email}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -1,146 +1,124 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import { useState } from 'react';
-import {
-  CalendarDays,
-  LayoutDashboard,
-  MapPin,
-  MessageSquare,
-  type LucideIcon,
-} from 'lucide-react';
-import { WebChrome } from '@/components/landing/playground/DeviceChrome';
-import {
-  EventsScene,
-  HeatmapScene,
-  LiveScene,
-  OverviewScene,
-} from './EnterpriseInsightsScenes';
+import { CardVisual } from '@/components/ds/CardVisual';
+import { InlineNotice } from '@/components/ds/InlineNotice';
+import { Skeleton } from '@/components/ds/Skeleton';
+import { StatusPill } from '@/components/ds/StatusPill';
+import { ConnectionDensityCard, LiveCountCard, StickyScoreCard } from '@/components/insights/StickyScoreCard';
+import { InsightsDemoProvider } from '@/components/insights/InsightsDemoContext';
+import { INSIGHTS_NAV } from '@/components/business/InsightsSections';
+import { BrowserFrame } from '@/components/landing/playground/Frames';
+import { mockVenueInsights } from '@/lib/insights/mockData';
+import { cn } from '@/lib/cn';
+import type { InsightsSection } from '@/lib/places/workspace';
 
-const TABS: { id: TabId; label: string; eyebrow: string; icon: LucideIcon }[] = [
-  { id: 'overview', label: 'Overview', eyebrow: 'At a glance', icon: LayoutDashboard },
-  { id: 'heatmap', label: 'Heatmap', eyebrow: 'Where people meet', icon: MapPin },
-  { id: 'events', label: 'Events', eyebrow: 'What converts', icon: CalendarDays },
-  { id: 'live', label: 'Vibe Stream', eyebrow: 'What is happening now', icon: MessageSquare },
-];
+// The real Insights sections, in demo mode: sample data, no requests (spec §9.5).
+const loading = () => <Skeleton rounded="lg" className="h-72" />;
+const PlaceInsights = dynamic(() => import('@/components/insights/sections/PlaceInsightsClient'), { ssr: false, loading });
+const LiveMetrics = dynamic(() => import('@/components/insights/sections/LiveMetricsClient'), { ssr: false, loading });
+const Heatmap = dynamic(() => import('@/components/insights/sections/HeatmapClient'), { ssr: false, loading });
+const Tribes = dynamic(() => import('@/components/insights/sections/TribesClient'), { ssr: false, loading });
+const VibeStream = dynamic(() => import('@/components/insights/sections/VibeStreamClient'), { ssr: false, loading });
+const EventEngagement = dynamic(() => import('@/components/insights/sections/EventEngagementClient'), { ssr: false, loading });
 
-type TabId = 'overview' | 'heatmap' | 'events' | 'live';
+const PLACE = { id: 'demo', name: 'Northlight Hall' };
 
-const COMPANION: Record<TabId, { title: string; body: string; signal: string }> = {
-  overview: {
-    title: 'A Place-level read, not vanity analytics',
-    body: 'The overview combines connection density, activity, and attendance into one operating view using sample HUB data.',
-    signal: 'Use this to understand whether people are actually meeting, not just opening an app.',
-  },
-  heatmap: {
-    title: 'See where real-world interaction concentrates',
-    body: 'The heatmap mirrors the Place dashboard with floor-level pins and connection density, so operators can compare spaces rather than raw traffic alone.',
-    signal: 'Use this to identify high-value areas, dead zones, and changes after programming or layout decisions.',
-  },
-  events: {
-    title: 'Connect programming to actual interaction',
-    body: 'Event performance pairs RSVPs with downstream meeting activity instead of treating attendance as the end metric.',
-    signal: 'Use this to distinguish events that draw a crowd from events that create meaningful interaction.',
-  },
-  live: {
-    title: 'A lightweight pulse of the room',
-    body: 'Anonymous floor notes provide qualitative context alongside the quantitative views without exposing individual identities.',
-    signal: 'Use this to explain sudden changes in density or event behavior while they are happening.',
-  },
+/** What each section answers, in the operator's words. */
+const ANSWERS: Record<InsightsSection, string> = {
+  overview: 'Are people meeting here, and coming back?',
+  traffic: 'Which parts of the venue do people meet in?',
+  crowd: 'Which communities make up the room?',
+  vibe: 'How does the room feel right now?',
+  events: 'Which events turn RSVPs into check-ins?',
 };
 
-function EnterprisePlaygroundInner() {
-  const [tab, setTab] = useState<TabId>('overview');
-  const active = TABS.find((item) => item.id === tab) ?? TABS[0];
-
-  return (
-    <div data-testid="enterprise-playground" className="space-y-5">
-      <div className="flex flex-col gap-3 rounded-[20px] border border-hairline bg-surface px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Interactive business demo</p>
-          <h3 className="mt-1 text-xl font-bold tracking-tight text-fg sm:text-2xl">See how Click turns in-person activity into an operating signal.</h3>
-        </div>
-        <p className="max-w-md text-sm leading-relaxed text-fg-secondary">
-          Explore the same sample Place from four angles. This demo contains no customer or live production data.
-        </p>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="min-w-0 overflow-hidden rounded-[20px] border border-hairline bg-surface shadow-sm">
-          <WebChrome label="Insights · HUB demo" address="joinclick.co / insights" lockScroll>
-            <div className="flex h-full min-h-0 flex-col lg:flex-row lg:items-stretch">
-              <nav
-                className="flex shrink-0 gap-1 overflow-x-auto border-b border-hairline bg-surface p-2 lg:w-44 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r"
-                role="tablist"
-                aria-label="Place demo"
-              >
-                {TABS.map((item) => {
-                  const Icon = item.icon;
-                  const selected = tab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      onClick={() => setTab(item.id)}
-                      className={`flex min-w-max items-center gap-2 rounded-[10px] px-3 py-2.5 text-left text-xs font-semibold transition-colors lg:min-w-0 ${
-                        selected
-                          ? 'bg-action text-on-action shadow-sm'
-                          : 'text-fg-secondary hover:bg-surface-raised hover:text-fg'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-
-              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
-                <div className="mb-5 flex items-start justify-between gap-4 border-b border-hairline pb-4">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-accent">{active.eyebrow}</p>
-                    <p className="mt-1 text-sm text-fg-secondary">Sample HUB data · Seattle campus Place</p>
-                  </div>
-                  <span className="rounded-full border border-hairline bg-surface-raised px-3 py-1 text-[11px] font-semibold text-fg-secondary">
-                    Demo data
-                  </span>
-                </div>
-
-                {tab === 'overview' ? (
-                  <OverviewScene />
-                ) : tab === 'heatmap' ? (
-                  <HeatmapScene />
-                ) : tab === 'events' ? (
-                  <EventsScene />
-                ) : (
-                  <LiveScene />
-                )}
-              </div>
-            </div>
-          </WebChrome>
-        </div>
-
-        <aside className="h-fit rounded-[20px] border border-hairline bg-surface p-5 shadow-sm xl:sticky xl:top-24">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">What this view answers</p>
-          <h4 className="mt-3 text-lg font-bold leading-snug text-fg">{COMPANION[tab].title}</h4>
-          <p className="mt-3 text-sm leading-relaxed text-fg-secondary">{COMPANION[tab].body}</p>
-          <div className="mt-5 rounded-[14px] bg-surface-raised p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-fg">Operator signal</p>
-            <p className="mt-2 text-sm leading-relaxed text-fg-secondary">{COMPANION[tab].signal}</p>
+function Section({ id }: { id: InsightsSection }) {
+  switch (id) {
+    case 'overview':
+      return (
+        <>
+          <div className="grid gap-4 @3xl:grid-cols-3">
+            <StickyScoreCard data={mockVenueInsights.stickyScore} />
+            <ConnectionDensityCard data={mockVenueInsights.connectionDensity} />
+            <LiveCountCard data={mockVenueInsights.liveCount} />
           </div>
-        </aside>
-      </div>
-    </div>
-  );
+          <PlaceInsights placeId={PLACE.id} range={90} />
+          <LiveMetrics placeId={PLACE.id} />
+        </>
+      );
+    case 'traffic':
+      return <Heatmap placeId={PLACE.id} />;
+    case 'crowd':
+      return <Tribes placeId={PLACE.id} />;
+    case 'vibe':
+      return <VibeStream placeId={PLACE.id} />;
+    case 'events':
+      return <EventEngagement placeId={PLACE.id} />;
+  }
 }
 
-/** Framer loads only its domAnimation feature set, and only on this route (spec §11.2). */
+/**
+ * A sample Place's Insights tab, as a manager sees it on joinclick.co. The sections are the
+ * product's own components fed sample data, so the demo can't drift from the real thing.
+ */
 export default function EnterprisePlayground() {
+  const [section, setSection] = useState<InsightsSection>('overview');
+  const path = `/business/places/${PLACE.id}/insights${section === 'overview' ? '' : `/${section}`}`;
+
   return (
-    <LazyMotion features={domAnimation}>
-      <EnterprisePlaygroundInner />
-    </LazyMotion>
+    <div data-testid="enterprise-playground">
+      <BrowserFrame path={path} testId="enterprise-browser" className="h-[clamp(600px,calc(100svh-120px),820px)]">
+        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-hairline px-4 @2xl:px-6">
+          <CardVisual seed={PLACE.id} radius="sm" className="size-8 shrink-0" />
+          <span className="type-headline min-w-0 truncate text-fg">{PLACE.name}</span>
+          <StatusPill variant="success">Live</StatusPill>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col @4xl:flex-row">
+          <nav
+            aria-label="Insights sections"
+            className="shrink-0 border-b border-hairline px-3 py-2 @4xl:w-[200px] @4xl:border-b-0 @4xl:border-r @4xl:px-3 @4xl:py-4"
+          >
+            <ul className="no-scrollbar flex gap-2 overflow-x-auto @4xl:flex-col @4xl:gap-0.5">
+              {INSIGHTS_NAV.map((item) => {
+                const active = item.id === section;
+                return (
+                  <li key={item.id} className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSection(item.id)}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'type-body inline-flex h-9 items-center rounded-pill px-3.5 font-semibold @4xl:flex @4xl:h-10 @4xl:w-full @4xl:rounded-md @4xl:px-3',
+                        active
+                          ? 'bg-selection text-accent'
+                          : 'bg-fill-subtle text-fg hover:bg-fill-strong @4xl:bg-transparent @4xl:hover:bg-hover',
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <div className="no-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-6 p-4 @2xl:p-6" data-testid={`enterprise-section-${section}`}>
+              <InlineNotice variant="warning">Demo data. These numbers are samples, not a real Place.</InlineNotice>
+              <p className="type-title-3 text-fg">{ANSWERS[section]}</p>
+              <InsightsDemoProvider demoMode>
+                <LazyMotion features={domAnimation}>
+                  <div className="flex min-w-0 flex-col gap-10">
+                    <Section id={section} />
+                  </div>
+                </LazyMotion>
+              </InsightsDemoProvider>
+            </div>
+          </div>
+        </div>
+      </BrowserFrame>
+    </div>
   );
 }

@@ -78,7 +78,8 @@ export default function VibeStreamPage({ placeId }: { placeId: string }) {
   const chart = useInsightsChartTheme();
   const { demoMode } = useInsightsDemo();
   const { user } = useAuth();
-  const insightsUrl = user ? `/api/insights/${placeId}` : null;
+  // Demo mode shows sample messages only, so it never fetches.
+  const insightsUrl = user && !demoMode ? `/api/insights/${placeId}` : null;
   const { data: apiPayload } = useSWR(insightsUrl, insightsFetcher);
 
   const messages: VibeMessage[] = useMemo(() => {
