@@ -166,8 +166,11 @@ export default function PrivacyPolicy() {
             2 Type II compliant)
           </li>
           <li>
-            <strong>Cloudflare:</strong> Website hosting and cookieless
-            analytics (page views only, no personal data)
+            <strong>Cloudflare:</strong> Website hosting and delivery. To serve
+            and protect the site, Cloudflare processes request data such as IP
+            addresses. We also use Cloudflare Web Analytics, which is cookieless
+            and measures page views and page performance, not individual
+            visitors.
           </li>
         </ul>
         <p>

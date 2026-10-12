@@ -16,7 +16,7 @@ export default function AboutPage() {
       <PageHeader
         id="about-heading"
         title="We kept meeting people and losing them"
-        lead="We’re five Computer Science students at the University of Washington. After class we kept adding people on Instagram and never talking again. Click is how we stay in touch with the people we actually met."
+        lead="We’re six Computer Science and Computer Engineering students at the University of Washington. After class we kept adding people on Instagram and never talking again. Click is how we stay in touch with the people we actually met."
       >
         <Button href="/#how-it-works" variant="primary" size="lg">
           Try the demo

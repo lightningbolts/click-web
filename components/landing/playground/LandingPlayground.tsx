@@ -6,11 +6,13 @@ import { SegmentedControl } from '@/components/ds/SegmentedControl';
 import { cn } from '@/lib/cn';
 import { PhoneApp } from './PhoneApp';
 import { WebApp } from './WebApp';
-import { REPLIES } from './mockData';
+import { INITIAL_MESSAGES, REPLIES } from './mockData';
 import { DemoContext, guideSteps, initialState, reducer, type DemoAction, type FocusTarget } from './state';
 import type { Device, ThreadId } from './types';
 
 const REPLY_DELAY_MS = 1400;
+/** Seeded history never triggers a reply; only what the visitor sends does. */
+const SEEDED_IDS = new Set(Object.values(INITIAL_MESSAGES).flatMap((thread) => thread.map((m) => m.id)));
 
 /**
  * Click on an iPhone and on the web, driven by one shared state: what you do on one device
@@ -37,7 +39,7 @@ export default function LandingPlayground() {
   useEffect(() => {
     for (const [thread, reply] of Object.entries(REPLIES)) {
       const last = state.messages[thread]?.at(-1);
-      if (last?.from !== 'you' || replied.current.has(thread)) continue;
+      if (last?.from !== 'you' || SEEDED_IDS.has(last.id) || replied.current.has(thread)) continue;
       replied.current.add(thread);
       setTyping((s) => new Set(s).add(thread));
       timers.current.set(

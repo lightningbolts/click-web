@@ -127,7 +127,9 @@ export default function PlaygroundMap({
       });
       observer.observe(container);
       map.on('click', () => onSelectRef.current(null));
+      let loaded = false;
       map.on('load', () => {
+        loaded = true;
         map.resize();
         const reveal = () => {
           if (fallback != null) window.clearTimeout(fallback);
@@ -136,7 +138,10 @@ export default function PlaygroundMap({
         fallback = window.setTimeout(reveal, 2800);
         map.once('idle', reveal);
       });
-      map.on('error', () => setFailed(true));
+      // A tile failing after load leaves a working map; only a map that never loads failed.
+      map.on('error', () => {
+        if (!loaded) setFailed(true);
+      });
     } catch {
       setFailed(true);
     }

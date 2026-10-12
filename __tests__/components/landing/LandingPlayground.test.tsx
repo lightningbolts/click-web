@@ -67,6 +67,13 @@ describe("LandingPlayground", () => {
     expect(phoneThread().getByText("Sounds good to me")).toBeInTheDocument();
   });
 
+  it("never replies to the seeded history on its own", async () => {
+    const user = renderPlayground();
+    act(() => jest.advanceTimersByTime(5000));
+    await user.click(screen.getByTestId("phone-tab-clicks"));
+    expect(phone().getByTestId("thread-row-priya")).toHaveTextContent("Still laughing about the ferry bit.");
+  });
+
   it("hides the iPhone tab bar inside a thread and brings it back on Back", async () => {
     const user = renderPlayground();
     await user.click(screen.getByTestId("phone-tab-clicks"));
