@@ -124,7 +124,7 @@ export default function ChatPane({
                           type="button"
                           onClick={() => {
                             actions.setOpenChatId(person.id);
-                            if (compact) actions.setDashboardTab('chat');
+                            if (compact) actions.setDashboardTab('clicks');
                           }}
                           data-testid={`playground-chat-${person.id}`}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised"

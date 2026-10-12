@@ -1,6 +1,7 @@
-export type PlaygroundScene = 'connect' | 'events' | 'dashboard' | 'clicks' | 'map' | 'settings';
+export type PlaygroundScene = 'home' | 'connect' | 'events' | 'dashboard' | 'clicks' | 'map' | 'hubs' | 'settings';
 
-export type DashboardTab = 'memory' | 'map' | 'chat' | 'identity';
+import type { AppNavId } from '@/lib/shell/appNav';
+export type DashboardTab = Exclude<AppNavId, 'business'> | 'add' | 'me' | 'hubs';
 
 export type MemoryCapsule = {
   place: string;
@@ -60,6 +61,10 @@ export type PlaygroundState = {
   messages: Readonly<Record<string, ChatMessage[]>>;
   openChatId: string | null;
   dashboardTab: DashboardTab;
+  intents: ReadonlySet<string>;
+  hubMessages: readonly string[];
+  joinedHub: boolean;
+  selectedEventId: string;
 };
 
 export type PlaygroundActions = {
@@ -72,4 +77,8 @@ export type PlaygroundActions = {
   setOpenChatId: (id: string | null) => void;
   setDashboardTab: (tab: DashboardTab) => void;
   setScene: (scene: PlaygroundScene) => void;
+  toggleIntent: (intent: string) => void;
+  joinHub: () => void;
+  sendHubMessage: (text: string) => void;
+  setSelectedEventId: (id: string) => void;
 };

@@ -208,7 +208,7 @@ export default function LandingPage({
                   Try Click in your browser.
                 </h2>
                 <p className="mt-3 max-w-xl text-base text-fg-secondary">
-                  Connect with someone, RSVP to an event, then see how the same relationship carries into the companion dashboard.
+                  Explore Home, connect with someone, make a plan, or join a community hub. See your actions carry between the iOS and web previews.
                 </p>
               </div>
               <p className="max-w-xs text-sm leading-relaxed text-fg-secondary">

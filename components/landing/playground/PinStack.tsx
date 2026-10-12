@@ -37,7 +37,7 @@ export function applyPinStack(
     span.style.borderRadius = '9999px';
     span.style.fontWeight = '700';
     span.style.color = '#ffffff';
-    span.style.backgroundColor = pin.kind === 'person' ? PIN_PRIMARY : PIN_SECONDARY;
+    span.style.bgColor = pin.kind === 'person' ? PIN_PRIMARY : PIN_SECONDARY;
     span.style.border = `3px solid ${borderColor}`;
     span.style.fontSize = size >= 34 ? '11px' : '9px';
     span.style.boxShadow =
@@ -70,7 +70,7 @@ export default function PinStack({
             height: size,
             marginLeft: index === 0 ? 0 : -overlap,
             zIndex: pins.length - index,
-            backgroundColor: pin.kind === 'person' ? PIN_PRIMARY : PIN_SECONDARY,
+            bgColor: pin.kind === 'person' ? PIN_PRIMARY : PIN_SECONDARY,
             border: `3px solid ${borderColor}`,
             fontSize: size >= 34 ? 11 : 9,
             boxShadow:

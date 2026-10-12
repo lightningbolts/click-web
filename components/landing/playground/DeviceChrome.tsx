@@ -20,7 +20,7 @@ export function PhoneChrome({
       <p className="mb-2 text-center text-sm font-semibold uppercase tracking-wider text-fg-secondary">
         {label}
       </p>
-      <div className="relative overflow-hidden rounded-[28px] border border-hairline bg-surface shadow-sm">
+      <div className="relative overflow-hidden rounded-[28px] border-2 border-hairline bg-surface shadow-sm">
         <div className="flex items-center justify-center bg-surface-raised py-2">
           <div className="h-4 w-20 rounded-full bg-fg/15" aria-hidden />
         </div>
@@ -32,7 +32,7 @@ export function PhoneChrome({
           <PhoneNavButton
             label="Home"
             active={activeNav === 'home'}
-            onClick={() => onNav('events')}
+            onClick={() => onNav('home')}
             icon={<Home className="h-4 w-4" />}
           />
           <PhoneNavButton
@@ -80,7 +80,7 @@ function PhoneNavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-11 flex-col items-center justify-center gap-0.5 px-0.5 text-center text-[14px] font-semibold leading-tight ${
+      className={`flex min-h-11 flex-col items-center justify-center gap-1 px-0.5 text-center text-[10px] font-semibold leading-tight ${
         active ? 'text-accent' : 'text-fg-secondary'
       }`}
     >
@@ -141,7 +141,7 @@ export function PlaygroundAvatar({
 }) {
   const dim = size === 'lg' ? 'h-14 w-14 text-base' : size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm';
   return (
-    <span className="relative inline-flex shrink-0">
+    <span className="relative inline-flex shrink-0" aria-hidden="true">
       <span
         className={`flex items-center justify-center rounded-full bg-action font-bold text-on-action ${dim}`}
       >

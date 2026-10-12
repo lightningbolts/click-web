@@ -1,7 +1,6 @@
 'use client';
 
-import { LazyMotion, domMax } from 'framer-motion';
-import { AnimatePresence, m as motion } from 'framer-motion';
+import { AnimatePresence, LazyMotion, domMax, m as motion } from 'framer-motion';
 import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
 import CompanionPanel from './CompanionPanel';
 import { PhoneChrome, WebChrome } from './DeviceChrome';
@@ -10,12 +9,15 @@ import {
   INITIAL_MESSAGES,
   INITIAL_RSVP_IDS,
   PLAYGROUND_PEOPLE,
+  PLAYGROUND_EVENTS,
 } from './mockData';
 import ConnectScene from './scenes/ConnectScene';
 import ClicksScene from './scenes/ClicksScene';
 import DashboardScene from './scenes/DashboardScene';
 import EventsScene from './scenes/EventsScene';
 import SettingsScene from './scenes/SettingsScene';
+import HomeScene from './scenes/HomeScene';
+import HubsScene from './scenes/HubsScene';
 import PlaygroundMap from './PlaygroundMapLazy';
 import type {
   ChatMessage,
@@ -27,8 +29,13 @@ import type {
 } from './types';
 
 const SCENES: { id: PlaygroundScene; label: string }[] = [
+  { id: 'home', label: 'Home' },
   { id: 'connect', label: 'Connect' },
   { id: 'events', label: 'Events' },
+  { id: 'clicks', label: 'Clicks' },
+  { id: 'map', label: 'Map' },
+  { id: 'hubs', label: 'Hubs' },
+  { id: 'settings', label: 'Settings' },
   { id: 'dashboard', label: 'Dashboard' },
 ];
 
@@ -38,8 +45,8 @@ for (const person of PLAYGROUND_PEOPLE) {
 }
 
 function LandingPlaygroundInner() {
-  const [scene, setScene] = useState<PlaygroundScene>('connect');
-  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('memory');
+  const [scene, setScene] = useState<PlaygroundScene>('home');
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('home');
   const [openChatId, setOpenChatId] = useState<string | null>(null);
   const [connectedIds, setConnectedIds] = useState<Set<string>>(
     () => new Set(INITIAL_CONNECTED_IDS),
@@ -49,6 +56,23 @@ function LandingPlaygroundInner() {
   const [memories, setMemories] = useState<Record<string, MemoryCapsule>>(seedMemories);
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
   const [announcement, setAnnouncement] = useState('');
+  const [intents, setIntents] = useState<Set<string>>(() => new Set(['Coffee']));
+  const [joinedHub, setJoinedHub] = useState(false);
+  const [hubMessages, setHubMessages] = useState<string[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState(PLAYGROUND_EVENTS[0].id);
+  const [resetVersion, setResetVersion] = useState(0);
+  const toggleIntent = useCallback((intent: string) => {
+    setIntents((prev) => {
+      const next = new Set(prev);
+      if (next.has(intent)) next.delete(intent);
+      else next.add(intent);
+      return next;
+    });
+  }, []);
+  const joinHub = useCallback(() => setJoinedHub(true), []);
+  const sendHubMessage = useCallback((text: string) => {
+    if (text.trim()) setHubMessages((prev) => [...prev, text.trim()]);
+  }, []);
 
   const state: PlaygroundState = useMemo(
     () => ({
@@ -59,8 +83,12 @@ function LandingPlaygroundInner() {
       messages,
       openChatId,
       dashboardTab,
+      intents,
+      joinedHub,
+      hubMessages,
+      selectedEventId,
     }),
-    [connectedIds, rsvpIds, routeIds, memories, messages, openChatId, dashboardTab],
+    [connectedIds, rsvpIds, routeIds, memories, messages, openChatId, dashboardTab, intents, joinedHub, hubMessages, selectedEventId],
   );
 
   const connectPerson = useCallback((id: string, memory: MemoryCapsule) => {
@@ -146,14 +174,18 @@ function LandingPlaygroundInner() {
       setOpenChatId,
       setDashboardTab,
       setScene: goToScene,
+      toggleIntent,
+      joinHub,
+      sendHubMessage,
+      setSelectedEventId,
     }),
-    [connectPerson, toggleRsvp, toggleRoute, sendMessage, sendPlan, togglePlanGoing, goToScene],
+    [connectPerson, toggleRsvp, toggleRoute, sendMessage, sendPlan, togglePlanGoing, goToScene, toggleIntent, joinHub, sendHubMessage],
   );
 
   const isPhone = scene !== 'dashboard';
 
   const phoneNav =
-    scene === 'events' ? 'home'
+    scene === 'home' || scene === 'events' || scene === 'hubs' ? 'home'
     : scene === 'clicks' ? 'clicks'
     : scene === 'map' ? 'map'
     : scene === 'settings' ? 'settings'
@@ -162,13 +194,20 @@ function LandingPlaygroundInner() {
   const onTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const index = SCENES.findIndex((item) => item.id === scene);
     if (index < 0) return;
+    let nextIndex: number;
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       event.preventDefault();
-      setScene(SCENES[(index + 1) % SCENES.length].id);
+      nextIndex = (index + 1) % SCENES.length;
     } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault();
-      setScene(SCENES[(index - 1 + SCENES.length) % SCENES.length].id);
-    }
+      nextIndex = (index - 1 + SCENES.length) % SCENES.length;
+    } else if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      nextIndex = event.key === 'Home' ? 0 : SCENES.length - 1;
+    } else return;
+    const next = SCENES[nextIndex].id;
+    setScene(next);
+    document.getElementById(`playground-tab-${next}`)?.focus();
   };
 
   return (
@@ -190,7 +229,10 @@ function LandingPlaygroundInner() {
               aria-selected={selected}
               aria-controls={`playground-panel-${item.id}`}
               tabIndex={selected ? 0 : -1}
-              onClick={() => setScene(item.id)}
+              onClick={() => {
+                setScene(item.id);
+                if (item.id === 'dashboard') setDashboardTab('home');
+              }}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 selected
                   ? 'bg-action text-on-action'
@@ -212,11 +254,12 @@ function LandingPlaygroundInner() {
         {isPhone ? (
           <>
             <PhoneChrome
-              label="App"
+              key={`phone-${resetVersion}`}
+              label="Click on iOS"
               activeNav={phoneNav}
               onNav={(next) => {
                 if (next === 'map') setDashboardTab('map');
-                if (next === 'clicks') setDashboardTab('chat');
+                if (next === 'clicks') setDashboardTab('clicks');
                 setScene(next);
               }}
             >
@@ -229,13 +272,17 @@ function LandingPlaygroundInner() {
                   transition={{ duration: 0.3 }}
                   className="h-full"
                 >
-                  {scene === 'events' ? (
-                    <EventsScene state={state} actions={actions} onAnnounce={setAnnouncement} />
+                  {scene === 'home' ? (
+                    <HomeScene state={state} actions={actions} phone />
+                  ) : scene === 'hubs' ? (
+                    <HubsScene state={state} actions={actions} />
+                  ) : scene === 'events' ? (
+                    <EventsScene state={state} actions={actions} onAnnounce={setAnnouncement} phone />
                   ) : scene === 'clicks' ? (
                     <ClicksScene state={state} actions={actions} />
                   ) : scene === 'map' ? (
                     <div className="h-full p-0" data-testid="playground-scene-phone-map">
-                      <PlaygroundMap state={state} actions={actions} fill />
+                      <PlaygroundMap state={state} actions={actions} fill phone />
                     </div>
                   ) : scene === 'settings' ? (
                     <SettingsScene />
@@ -245,7 +292,7 @@ function LandingPlaygroundInner() {
                 </motion.div>
               </AnimatePresence>
             </PhoneChrome>
-            <CompanionPanel state={state} actions={actions} />
+            <CompanionPanel key={`web-${resetVersion}`} state={state} actions={actions} />
           </>
         ) : (
           <motion.div
@@ -256,11 +303,36 @@ function LandingPlaygroundInner() {
             transition={{ duration: 0.3 }}
             className="flex min-h-0 min-w-0 flex-1 self-stretch"
           >
-            <WebChrome label="Website companion" lockScroll>
+            <WebChrome label="Click on the web" lockScroll>
               <DashboardScene state={state} actions={actions} />
             </WebChrome>
           </motion.div>
         )}
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          className="min-h-11 rounded-xl border-2 border-hairline px-4 py-2 text-sm font-semibold hover:bg-surface-raised"
+          onClick={() => {
+            setConnectedIds(new Set(INITIAL_CONNECTED_IDS));
+            setRsvpIds(new Set(INITIAL_RSVP_IDS));
+            setRouteIds(new Set());
+            setMemories(seedMemories);
+            setMessages(INITIAL_MESSAGES);
+            setIntents(new Set(['Coffee']));
+            setJoinedHub(false);
+            setHubMessages([]);
+            setOpenChatId(null);
+            setSelectedEventId(PLAYGROUND_EVENTS[0].id);
+            setDashboardTab('home');
+            setScene('home');
+            setResetVersion((version) => version + 1);
+            setAnnouncement('Demo reset. You’re back on Home.');
+          }}
+        >
+          Reset demo
+        </button>
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">
@@ -270,11 +342,6 @@ function LandingPlaygroundInner() {
   );
 }
 
-/** Framer loads only its domMax feature set, and only on this route (spec §11.2). */
 export default function LandingPlayground() {
-  return (
-    <LazyMotion features={domMax}>
-      <LandingPlaygroundInner />
-    </LazyMotion>
-  );
+  return <LazyMotion features={domMax}><LandingPlaygroundInner /></LazyMotion>;
 }

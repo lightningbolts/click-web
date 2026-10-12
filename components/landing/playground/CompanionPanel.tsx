@@ -11,7 +11,7 @@ export default function CompanionPanel({
 }) {
   return (
     <aside className="hidden min-w-0 flex-1 flex-col lg:flex" aria-label="Web companion preview">
-      <WebChrome label="Website companion" lockScroll>
+      <WebChrome label="Click on the web" lockScroll>
         <DashboardScene state={state} actions={actions} />
       </WebChrome>
     </aside>

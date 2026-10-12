@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarDays, MapPin, Navigation, Users } from 'lucide-react';
-import { useState } from 'react';
+import { CardVisualHero } from '@/components/ui/CardVisualSurface';
 import { PlaygroundAvatar } from '../DeviceChrome';
 import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from '../mockData';
 import type { PlaygroundActions, PlaygroundState } from '../types';
@@ -10,13 +10,15 @@ export default function EventsScene({
   state,
   actions,
   onAnnounce,
+  phone = false,
 }: {
   state: PlaygroundState;
   actions: PlaygroundActions;
   onAnnounce: (message: string) => void;
+  phone?: boolean;
 }) {
-  const [openId, setOpenId] = useState<string | null>(PLAYGROUND_EVENTS[0]?.id ?? null);
-  const open = PLAYGROUND_EVENTS.find((e) => e.id === openId) ?? PLAYGROUND_EVENTS[0];
+  const open = PLAYGROUND_EVENTS.find((e) => e.id === state.selectedEventId) ?? PLAYGROUND_EVENTS[0];
+  const setOpenId = actions.setSelectedEventId;
   const featured = PLAYGROUND_EVENTS[0];
 
   const goingPeople = (open?.attendeeIds ?? [])
@@ -44,24 +46,18 @@ export default function EventsScene({
   return (
     <div className="flex h-full flex-col overflow-auto bg-bg" data-testid="playground-scene-events">
       <div className="border-b border-hairline px-4 py-3">
-        <p className="text-xs text-fg-secondary">Good evening, Alex.</p>
-        <h3 className="text-lg font-bold text-fg">Ready to connect today?</h3>
-      </div>
-
-      <div className="px-3 pt-3">
-        <div className="flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-2 text-xs text-fg-secondary">
-          <span className="font-semibold text-accent">Search</span>
-          people, events, places
-        </div>
+        <h3 className="text-lg font-bold text-fg">Events</h3>
+        <p className="text-xs text-fg-secondary">Find something to look forward to.</p>
       </div>
 
       {featured ? (
         <button
           type="button"
           onClick={() => setOpenId(featured.id)}
-          className="mx-3 mt-3 rounded-[16px] border border-action bg-selection p-3 text-left"
+          className="mx-3 mt-3 overflow-hidden rounded-[16px] border-2 border-hairline bg-surface text-left"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">Featured</p>
+          <CardVisualHero id={featured.id} chipLabel="Featured event" className="h-20" />
+          <div className="p-3">
           <p className="mt-1 text-sm font-bold text-accent">{featured.title}</p>
           <p className="text-xs text-accent">
             {featured.when} · {featured.venue}
@@ -69,25 +65,9 @@ export default function EventsScene({
           {state.rsvpIds.has(featured.id) ? (
             <p className="mt-1 text-[11px] font-semibold text-accent">You&apos;re going</p>
           ) : null}
+          </div>
         </button>
       ) : null}
-
-      <div className="px-3 pt-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-secondary">I&apos;m down for…</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {['Coffee', 'Live music'].map((intent) => (
-            <span
-              key={intent}
-              className="rounded-full bg-action px-3 py-1 text-[11px] font-semibold text-on-action"
-            >
-              {intent}
-            </span>
-          ))}
-          <span className="rounded-full border border-hairline px-3 py-1 text-[11px] font-semibold text-fg-secondary">
-            Edit intents
-          </span>
-        </div>
-      </div>
 
       <ul className="space-y-2 px-3 py-3">
         {PLAYGROUND_EVENTS.slice(1).map((event) => {
@@ -140,7 +120,8 @@ export default function EventsScene({
                       className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-raised"
                       onClick={() => {
                         actions.setOpenChatId(person.id);
-                        actions.setDashboardTab('chat');
+                        actions.setDashboardTab('clicks');
+                        if (phone) actions.setScene('clicks');
                       }}
                     >
                       <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
@@ -174,7 +155,8 @@ export default function EventsScene({
                         className="flex w-full items-center gap-2 rounded-[10px] px-1 py-1 text-left hover:bg-surface-raised"
                         onClick={() => {
                           actions.setOpenChatId(person.id);
-                          actions.setDashboardTab('chat');
+                          actions.setDashboardTab('clicks');
+                          if (phone) actions.setScene('clicks');
                         }}
                       >
                         <PlaygroundAvatar initials={person.initials} size="sm" online={person.online} />
@@ -190,7 +172,7 @@ export default function EventsScene({
               type="button"
               data-testid={`playground-rsvp-${open.id}`}
               onClick={toggleRsvp}
-              className={`py-2.5 text-xs ${rsvped ? 'inline-flex items-center justify-center gap-2 rounded-pill bg-fill-subtle font-semibold text-fg transition-colors hover:bg-fill-strong disabled:cursor-not-allowed disabled:opacity-40' : 'inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40'}`}
+              className={`py-2.5 text-xs ${rsvped ? 'rounded-pill border border-hairline bg-surface font-semibold text-fg' : 'rounded-pill bg-action font-semibold text-on-action disabled:opacity-40'}`}
             >
               {rsvped ? 'Cancel RSVP' : 'RSVP'}
             </button>

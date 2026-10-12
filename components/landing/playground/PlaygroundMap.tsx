@@ -26,8 +26,8 @@ import { PLAYGROUND_EVENTS, PLAYGROUND_PEOPLE } from './mockData';
 import type { PlaygroundActions, PlaygroundEvent, PlaygroundPerson, PlaygroundState } from './types';
 
 const CLUSTER_METERS = 90;
-const PRIMARY = '#7c3aed';
-const SECONDARY = '#6d28d9';
+const PRIMARY = 'var(--action)';
+const SECONDARY = 'var(--action)';
 
 type Cluster = {
   id: string;
@@ -133,12 +133,12 @@ function buildPinPopupHtml(cluster: Cluster, state: PlaygroundState, actions?: P
   const chatPerson = cluster.people[0];
   const chatBtn =
     chatPerson && actions
-      ? `<button type="button" data-playground-chat="${escapeHtml(chatPerson.id)}" style="display:block;width:100%;margin-top:10px;padding:6px 12px;background:linear-gradient(135deg, #7c3aed, #6d28d9);color:white;font-size:12px;font-weight:600;border:none;border-radius:8px;cursor:pointer;text-align:center;">Chat →</button>`
+      ? `<button type="button" data-playground-chat="${escapeHtml(chatPerson.id)}" style="display:block;width:100%;margin-top:10px;padding:8px 12px;background:var(--action);color:var(--on-action);font-size:12px;font-weight:600;border:2px solid var(--action);border-radius:8px;cursor:pointer;text-align:center;">Chat →</button>`
       : '';
   return `<div data-testid="playground-pin-overlay">
-    <div data-testid="playground-pin-popup-card" style="color:#fff;background:#18181b;padding:14px;border-radius:14px;border:1px solid #27272a;box-shadow:0 8px 32px rgba(0,0,0,0.4);min-width:200px;max-width:260px;">
+    <div data-testid="playground-pin-popup-card" style="color:var(--fg);background:var(--surface);padding:14px;border-radius:14px;border:2px solid var(--hairline);min-width:200px;max-width:260px;">
       <strong style="color:${PRIMARY};font-size:14px;display:block;line-height:1.25;">${escapeHtml(headline)}</strong>
-      ${subline ? `<span style="color:#a1a1aa;font-size:12px;display:block;margin-top:4px;line-height:1.35;">${escapeHtml(subline)}</span>` : ''}
+      ${subline ? `<span style="color:var(--fg-secondary);font-size:12px;display:block;margin-top:4px;line-height:1.35;">${escapeHtml(subline)}</span>` : ''}
       ${going ? `<span style="color:${SECONDARY};font-size:12px;font-weight:600;display:block;margin-top:8px;">You're going</span>` : ''}
       ${chatBtn}
     </div>
@@ -149,10 +149,12 @@ export default function PlaygroundMap({
   state,
   actions,
   fill = false,
+  phone = false,
 }: {
   state: PlaygroundState;
   actions?: PlaygroundActions;
   fill?: boolean;
+  phone?: boolean;
 }) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,6 +162,7 @@ export default function PlaygroundMap({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const actionsRef = useRef(actions);
+  const phoneRef = useRef(phone);
   const themeRef = useRef(theme);
   const appliedThemeRef = useRef(theme);
   const initialFitDoneRef = useRef(false);
@@ -169,7 +172,10 @@ export default function PlaygroundMap({
   const [showEvents, setShowEvents] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  actionsRef.current = actions;
+  useEffect(() => {
+    actionsRef.current = actions;
+    phoneRef.current = phone;
+  }, [actions, phone]);
 
   const people = useMemo(
     () => (showNetwork ? PLAYGROUND_PEOPLE.filter((p) => state.connectedIds.has(p.id)) : []),
@@ -253,7 +259,8 @@ export default function PlaygroundMap({
       const next = actionsRef.current;
       if (!id || !next) return;
       next.setOpenChatId(id);
-      next.setDashboardTab('chat');
+      next.setDashboardTab('clicks');
+      if (phoneRef.current) next.setScene('clicks');
     };
     container.addEventListener('click', onPopupClick);
 
@@ -311,7 +318,7 @@ export default function PlaygroundMap({
         'aria-label',
         cluster.events[0]?.title ?? cluster.people[0]?.name ?? 'Map pin',
       );
-      el.style.background = 'none';
+      el.style.bg = 'none';
       el.style.border = 'none';
       el.style.padding = '0';
       el.style.cursor = 'pointer';

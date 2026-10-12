@@ -62,7 +62,7 @@ export default function ClicksScene({
                     data-testid={`playground-clicks-chat-${person.id}`}
                     onClick={() => {
                       actions.setOpenChatId(person.id);
-                      actions.setDashboardTab('chat');
+                      actions.setDashboardTab('clicks');
                     }}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised"
                   >
