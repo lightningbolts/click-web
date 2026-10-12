@@ -1,6 +1,7 @@
 'use client';
 
 import { Smartphone } from 'lucide-react';
+import { Button } from '@/components/ds/Button';
 import ClickLogo from '@/components/ClickLogo';
 import { IOS_TESTFLIGHT_URL } from '@/lib/config';
 import FoldMapLazy from '@/components/landing/fold-map/FoldMapLazy';
@@ -50,26 +51,26 @@ export default function FoldMapHero({
             met.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <a
+            <Button
               href={IOS_TESTFLIGHT_URL}
               target="_blank"
               rel="noopener noreferrer"
               data-testid="testflight-cta"
-              className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 inline-flex h-11 items-center gap-2 px-6 py-2.5"
+              variant="primary"
+              size="lg"
+              icon={Smartphone}
             >
-              <Smartphone className="h-4 w-4" aria-hidden />
               Join the iOS beta
-            </a>
-            <button
-              type="button"
+            </Button>
+            <Button
+              size="lg"
               onClick={onJoinWaitlist}
               onPointerEnter={onPrefetchWaitlist}
               onFocus={onPrefetchWaitlist}
               data-testid="waitlist-cta"
-              className="h-11 rounded-[8px] border border-hairline bg-surface px-6 py-2.5 text-sm font-bold text-fg hover:border-action hover:text-accent"
             >
-              Join the Waitlist
-            </button>
+              Join the waitlist
+            </Button>
           </div>
           <p className="mt-3 text-xs font-medium text-fg-secondary">
             iPhone beta via TestFlight. Android coming soon: join the waitlist to hear first.

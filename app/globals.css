@@ -189,6 +189,9 @@ body:has([data-app-shell]) [data-site-chrome] {
   --radius-3xl: 26px;
   --radius-bubble: 18px;
   --radius-pill: 9999px;
+  /* Device frames in the marketing demos (iPhone screen corner, then its bezel). */
+  --radius-device: 44px;
+  --radius-device-frame: 54px;
 
   --shadow-overlay: var(--shadow-overlay);
   --shadow-pin: var(--shadow-pin);
@@ -1136,20 +1139,10 @@ a {
 }
 
 /*
- * Marketing motion: Quiet Presence hairlines and one map settle.
- * Headings stay painted (LCP); a 1px rule draws under them.
+ * Marketing motion: one map settle.
  * The fold map canvas is opacity-0 only until JS marks it ready;
  * reduced-motion visitors see the framed city immediately.
  */
-@keyframes mkt-seam {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
 @keyframes mkt-map-settle {
   from {
     opacity: 0;
@@ -1185,35 +1178,11 @@ a {
   animation: landing-fade-up 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.mkt-page-title {
-  position: relative;
-}
-
-.mkt-page-title::after {
-  content: "";
-  display: block;
-  width: min(12rem, 40%);
-  height: 1px;
-  margin-inline: 0;
-  margin-top: 1rem;
-  background-color: var(--hairline);
-  transform-origin: left center;
-}
-
-.mkt-page-title.text-center::after {
-  margin-inline: auto;
-  transform-origin: center;
-}
-
 .mkt-map-canvas:not(.is-ready) {
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .mkt-page-title::after {
-    animation: mkt-seam 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
   .mkt-map-canvas.is-ready {
     animation: mkt-map-settle 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }

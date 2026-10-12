@@ -69,7 +69,7 @@ describe('LandingPage', () => {
     expect(screen.getByText(/from handshake to friendship/)).toBeInTheDocument();
     expect(screen.getByText(/Stop scrolling. Start living./)).toBeInTheDocument();
     expect(screen.getByText(/Your phones confirm you were in the same room/)).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Join the Waitlist' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /join the waitlist/i }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: 'Why Click exists' })).not.toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe('LandingPage', () => {
     renderLanding();
 
     expect(screen.getByRole('heading', { name: /Try Click in your browser/i })).toBeInTheDocument();
-    expect(screen.getByText(/Demo state is local to this page/i)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing here touches a real account/i)).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground-heading')).toBeInTheDocument();
     expect(screen.getByTestId('landing-playground')).toBeInTheDocument();
     expect(screen.queryByAltText(/Click web — Personal dashboard/i)).not.toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('LandingPage', () => {
     const user = userEvent.setup();
     renderLanding();
 
-    await user.click(screen.getAllByRole('button', { name: 'Join the Waitlist' })[0]);
+    await user.click(screen.getAllByRole('button', { name: /join the waitlist/i })[0]);
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Join the Waitlist' })).toBeInTheDocument();
     });

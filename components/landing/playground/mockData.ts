@@ -1,141 +1,144 @@
-import type { ChatMessage, MemoryCapsule, PlaygroundEvent, PlaygroundPerson } from './types';
+import type { DemoDrop, DemoEvent, DemoMessage, DemoPerson, ThreadId } from './types';
+
+/** The visitor plays Alex, the account in the App Store screenshots. */
+export const ME = { id: 'alex', name: 'Alex Rivera', first: 'Alex', bio: 'Coffee, live music and long walks.' } as const;
 
 export const JORDAN_ID = 'jordan';
 
-export const JORDAN: PlaygroundPerson = {
-  id: JORDAN_ID,
-  name: 'Jordan Hale',
-  initials: 'JH',
-  nearbyMeters: 4,
-  geo: { lat: 47.6566, lng: -122.3091 },
-  status: 'active',
-  dateMet: 'Just now',
-  chatPreview: 'You Clicked in Kane Hall lobby.',
-  chatTime: 'now',
-  online: true,
-};
-
-export const PLAYGROUND_PEOPLE: PlaygroundPerson[] = [
+/** Seattle fixtures: the playground map is clamped to the city (see playgroundMapStyle). */
+export const PEOPLE: readonly DemoPerson[] = [
   {
     id: 'maya',
-    name: 'Maya Chen',
-    initials: 'MC',
-    memory: {
-      place: 'Red Square',
-      label: 'Outdoor concert',
-      weather: 'Sunny · 68°F',
-      when: 'Yesterday afternoon',
-      noise: 'Loud',
-      volume: 3,
-    },
-    geo: { lat: 47.6553, lng: -122.3095 },
-    status: 'kept',
-    dateMet: 'Aug 11, 2026',
-    chatPreview: 'You going to comedy night?',
-    chatTime: '2h',
+    name: 'Maya Lin',
+    first: 'Maya',
+    core: true,
     online: true,
+    met: { place: 'Suzzallo Library', label: 'Study session', when: 'Aug 21' },
+    geo: { lat: 47.6546, lng: -122.3086 },
   },
   {
-    id: 'historia',
-    name: 'Historia',
-    initials: 'H',
-    memory: {
-      place: 'Pike Place',
-      label: 'Indoor comedy show',
-      weather: 'Drizzle · 52°F',
-      when: 'Last week',
-      noise: 'Moderate',
-      volume: 2,
-    },
-    geo: { lat: 47.6097, lng: -122.3421 },
-    status: 'active',
-    dateMet: 'Aug 5, 2026',
-    chatPreview: 'That set was wild',
-    chatTime: 'Sat',
+    id: 'sam',
+    name: 'Sam Ortiz',
+    first: 'Sam',
+    core: true,
+    met: { place: 'IMA climbing wall', label: 'Climbing', when: 'Sep 30' },
+    geo: { lat: 47.6528, lng: -122.3005 },
   },
   {
-    id: 'ymir',
-    name: 'Ymir',
-    initials: 'Y',
-    memory: {
-      place: 'IMA Climbing Wall',
-      label: 'Climbing session',
-      weather: 'Clear · 61°F',
-      when: '3 days ago',
-      noise: 'Quiet',
-      volume: 1,
-    },
-    geo: { lat: 47.6536, lng: -122.3015 },
-    status: 'active',
-    dateMet: 'Aug 9, 2026',
-    chatPreview: 'Friday night climb?',
-    chatTime: 'Mon',
+    id: 'priya',
+    name: 'Priya Nair',
+    first: 'Priya',
     online: true,
+    met: { place: 'Pike Place Market', label: 'Comedy show', when: 'Oct 4' },
+    geo: { lat: 47.6612, lng: -122.3132 },
   },
-  JORDAN,
+  {
+    id: JORDAN_ID,
+    name: 'Jordan Hale',
+    first: 'Jordan',
+    online: true,
+    met: { place: 'Kane Hall', label: 'Dawg Daze Mixer', when: 'Today' },
+    geo: { lat: 47.6574, lng: -122.3104 },
+  },
 ];
 
-export const PLAYGROUND_EVENTS: PlaygroundEvent[] = [
+export const PERSON: Readonly<Record<string, DemoPerson>> = Object.fromEntries(PEOPLE.map((p) => [p.id, p]));
+
+export const EVENTS: readonly DemoEvent[] = [
   {
     id: 'mixer',
     title: 'Dawg Daze Mixer',
     venue: 'Kane Hall',
-    when: 'Tonight · 7:00–10:00 PM',
+    address: '4069 Spokane Ln NE',
+    month: 'Oct',
+    day: 12,
+    when: 'Tonight, 7–10 PM',
+    live: true,
     host: 'ASUW',
-    description: 'Orientation week mixer. Bring a Click. The room is built for same-room intros.',
-    attendeeIds: ['maya'],
+    tags: ['Social', 'Campus'],
+    about: 'Orientation week mixer. The room is set up for same-room intros, so bring your phone.',
+    goingIds: ['maya', 'priya'],
+    going: 48,
     geo: { lat: 47.6566, lng: -122.3091 },
   },
   {
     id: 'climb',
     title: 'Friday Night Climb',
-    venue: 'IMA Climbing Wall',
-    when: 'Fri · 6:00–9:00 PM',
+    venue: 'IMA climbing wall',
+    address: '3924 Montlake Blvd NE',
+    month: 'Oct',
+    day: 16,
+    when: 'Fri, 6–9 PM',
     host: 'UW Climbing Club',
-    description: 'Open belay night. RSVP so your Clicks can find you on the wall.',
-    attendeeIds: ['ymir'],
+    tags: ['Sports', 'Beginner friendly'],
+    about: 'Open belay night. Shoes provided. RSVP so your Clicks can find you on the wall.',
+    goingIds: ['sam'],
+    going: 21,
     geo: { lat: 47.6536, lng: -122.3015 },
   },
   {
     id: 'comedy',
     title: 'Campus Comedy Night',
     venue: 'Husky Union Building',
-    when: 'Sat · 8:00–10:30 PM',
+    address: '4001 E Stevens Way NE',
+    month: 'Oct',
+    day: 17,
+    when: 'Sat, 8–10:30 PM',
     host: 'HUB Activities',
-    description: 'Student comics, then hang in the lobby. Historia is already in.',
-    attendeeIds: ['historia', 'maya'],
+    tags: ['Comedy', 'Live'],
+    about: 'Student comics, then everyone hangs out in the lobby.',
+    goingIds: ['priya', 'maya'],
+    going: 112,
     geo: { lat: 47.6554, lng: -122.305 },
   },
 ];
 
-export const INITIAL_CONNECTED_IDS = ['maya', 'historia', 'ymir'] as const;
-export const INITIAL_RSVP_IDS = ['comedy'] as const;
+export const EVENT: Readonly<Record<string, DemoEvent>> = Object.fromEntries(EVENTS.map((e) => [e.id, e]));
 
-export const MEMORY_PRESETS = ['Party', 'Class', 'Show', 'Coffee'] as const;
+/** Event chats are threads keyed `event:<id>`. */
+export const eventThreadId = (eventId: string): ThreadId => `event:${eventId}`;
 
-export const JORDAN_DEFAULT_MEMORY: MemoryCapsule = {
-  place: 'Kane Hall lobby',
-  label: 'Party',
-  weather: 'Clear · 64°F',
-  when: 'Just now',
-  noise: 'Loud',
-  volume: 3,
-};
+export const GROUP = { id: 'group', memberIds: ['maya', 'sam'], defaultName: 'Study group' } as const;
 
-export const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
+export const HUB = { id: 'hub', defaultName: 'Kane Hall community', place: 'Kane Hall', members: 12, distance: '40 m away' } as const;
+
+/** "What brought you together?" suggestions from the iOS Tap result. */
+export const CONTEXT_TAGS = ['🎉 Party', '☕ Cafe / Coffee', '📚 Study Session', '🎓 Lecture / Class', '🏟️ Campus Event'] as const;
+
+/** Suggestions in the availability sheet. */
+export const INTENT_OPTIONS = ['Coffee', 'Study session', 'Walk', 'Live music', 'Dinner'] as const;
+export const INITIAL_INTENTS = ['Coffee'] as const;
+
+/** Maya's own availability, which makes the "matching plans" row on Home. */
+export const MAYA_INTENT = 'Coffee';
+
+export const INITIAL_MESSAGES: Readonly<Record<ThreadId, readonly DemoMessage[]>> = {
   maya: [
-    { id: 'm1', from: 'them', text: 'You going to comedy night?', time: '2:14 PM' },
+    { id: 'm1', from: 'maya', text: 'Are you going to comedy night on Saturday?', time: '2:14 PM' },
     { id: 'm2', from: 'you', text: 'Already RSVP’d. Meet in the HUB lobby?', time: '2:16 PM' },
+    { id: 'm3', from: 'maya', text: 'Perfect, see you there', time: '2:17 PM' },
   ],
-  historia: [
-    { id: 'h1', from: 'them', text: 'That set was wild', time: 'Sat 10:41 PM' },
-    { id: 'h2', from: 'you', text: 'Still laughing about the Pike Place bit.', time: 'Sat 10:44 PM' },
+  sam: [{ id: 's1', from: 'sam', text: 'Friday night climb?', time: 'Mon' }],
+  priya: [
+    { id: 'p1', from: 'priya', text: 'That set was wild', time: 'Sat' },
+    { id: 'p2', from: 'you', text: 'Still laughing about the ferry bit.', time: 'Sat' },
   ],
-  ymir: [
-    { id: 'y1', from: 'them', text: 'Friday night climb?', time: 'Mon 4:02 PM' },
-  ],
+  [HUB.id]: [{ id: 'hub1', from: 'maya', text: 'Anyone heading to the mixer after class?', time: '5:02 PM' }],
 };
+
+/** One reply per 1:1 thread after you write, so a conversation feels like one. */
+export const REPLIES: Readonly<Record<string, string>> = {
+  jordan: 'Great meeting you too! That mixer was packed 😄',
+  maya: 'Sounds good to me',
+  sam: 'Yes! I’ll bring an extra harness',
+  priya: 'Haha same. Next show?',
+};
+
+/** Shared Drops on Home. A new drop develops an hour after it's taken, like the app. */
+export const DROPS: readonly DemoDrop[] = [
+  { id: 'drop-maya', personId: 'maya', caption: 'Golden hour on the Quad', age: '2h' },
+  { id: 'drop-sam', personId: 'sam', caption: 'Sent my first V4', age: '5h' },
+  { id: 'drop-priya', personId: 'priya', caption: 'Ferry ride home', age: '12m', developsIn: '48m' },
+];
 
 export const DEMO_QR_URL = 'https://joinclick.co/c/demo-ck-1842';
-export const DEMO_CLICK_ID = 'CK-1842';
-export const DEMO_USER_NAME = 'Alex Rivera';

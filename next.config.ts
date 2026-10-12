@@ -31,7 +31,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
-  env: { NEXT_PUBLIC_BUILD_VERSION: buildVersion },
+  // BUILD_YEAR: what prerendered HTML says, so the footer hydrates cleanly after New Year.
+  env: { NEXT_PUBLIC_BUILD_VERSION: buildVersion, NEXT_PUBLIC_BUILD_YEAR: String(new Date().getFullYear()) },
   // OpenNext on Workers needs an IMAGES binding (Cloudflare Images) for /_next/image.
   // Without it, optimized URLs 404; serve public assets as-is on the free plan.
   images: {

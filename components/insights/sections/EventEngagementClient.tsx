@@ -47,19 +47,16 @@ export default function EventEngagementPage({ placeId }: { placeId: string }) {
   const chart = useInsightsChartTheme();
   const { user } = useAuth();
   const venueId = placeId;
-  const url = `/api/insights/${placeId}/event-engagement`;
-  const { data, error, isLoading } = useSWR<EventEngagementResponse>(
-    user && url ? url : null,
-    fetcher,
-  );
   const { demoMode } = useInsightsDemo();
+  // Demo mode is sample data only (the page says so), so it never fetches.
+  const url = user && !demoMode ? `/api/insights/${placeId}/event-engagement` : null;
+  const { data, isLoading } = useSWR<EventEngagementResponse>(url, fetcher);
 
   const payload = useMemo(() => {
-    if (demoMode && (!data || data.error || error)) return mockEventEngagement;
-    if (data && !data.error) return data;
     if (demoMode) return mockEventEngagement;
+    if (data && !data.error) return data;
     return null;
-  }, [data, demoMode, error]);
+  }, [data, demoMode]);
 
   const funnelBars = payload
     ? [

@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowRight, MapPin, Radar, Smartphone } from 'lucide-react';
+import { Button } from '@/components/ds/Button';
 import { IOS_TESTFLIGHT_URL } from '@/lib/config';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
@@ -193,30 +194,19 @@ export default function LandingPage({
         <section
           data-landing-reveal
           id="how-it-works"
-          className={cn('container-page', 'relative z-10 py-16 sm:py-20')}
+          className={cn('container-page', 'relative z-10 scroll-mt-16 py-16 sm:py-20')}
           aria-labelledby="how-it-works-heading"
         >
-          <div className="overflow-hidden rounded-[28px] border border-hairline bg-surface p-4 shadow-sm sm:p-6 lg:p-8">
-            <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Interactive demo</p>
-                <h2
-                  id="how-it-works-heading"
-                  data-testid="landing-playground-heading"
-                  className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
-                >
-                  Try Click in your browser.
-                </h2>
-                <p className="mt-3 max-w-xl text-base text-fg-secondary">
-                  Explore Home, connect with someone, make a plan, or join a community hub. See your actions carry between the iOS and web previews.
-                </p>
-              </div>
-              <p className="max-w-xs text-sm leading-relaxed text-fg-secondary">
-                Demo state is local to this page. Nothing here changes a real account.
-              </p>
-            </div>
-            <LandingPlaygroundLazy />
+          <div className="mb-8 max-w-2xl">
+            <h2 id="how-it-works-heading" data-testid="landing-playground-heading" className="type-display text-fg">
+              Try Click in your browser
+            </h2>
+            <p className="type-reading mt-3 text-fg-secondary">
+              Tap to Connect with Jordan, say hi, make a plan and RSVP. The iPhone and the web app share one account, so
+              what you do on one shows up on the other. Nothing here touches a real account.
+            </p>
           </div>
+          <LandingPlaygroundLazy />
         </section>
 
         <section data-landing-reveal className={cn('container-page', 'relative z-10 pb-8')}>
@@ -238,24 +228,24 @@ export default function LandingPage({
               Install TestFlight, tap the invite, and start connecting. Android coming soon. Full launch Fall 2026. No ads. No feed. Built at UW.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <a
+              <Button
                 href={IOS_TESTFLIGHT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-pill bg-action font-semibold text-on-action transition-colors hover:bg-action-hover active:bg-action-pressed disabled:cursor-not-allowed disabled:opacity-40 inline-flex h-11 items-center gap-2 px-8"
+                variant="primary"
+                size="lg"
+                icon={Smartphone}
               >
-                <Smartphone className="h-4 w-4" aria-hidden />
                 Get the iOS beta
-              </a>
-              <button
-                type="button"
+              </Button>
+              <Button
+                size="lg"
                 onClick={openWaitlist}
                 onPointerEnter={prefetchWaitlist}
                 onFocus={prefetchWaitlist}
-                className="h-11 rounded-[8px] border border-hairline bg-surface px-8 text-sm font-bold text-fg hover:border-action hover:text-accent"
               >
-                Join the Waitlist
-              </button>
+                Join the waitlist
+              </Button>
             </div>
           </div>
         </section>

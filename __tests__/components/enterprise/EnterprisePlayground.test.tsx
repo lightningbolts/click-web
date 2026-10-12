@@ -1,46 +1,36 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EnterprisePlayground from "@/components/enterprise/EnterprisePlayground";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 
-jest.mock("next/dynamic", () => () => {
-  const Mock = () => <div data-testid="pin-map" />;
-  Mock.displayName = "PinMapMock";
-  return Mock;
-});
-
-jest.mock("framer-motion", () => {
-  const React = require("react");
-  const Forward = (tag: string) =>
-    React.forwardRef((props: Record<string, unknown>, ref: unknown) =>
-      React.createElement(tag, { ...props, ref }),
-    );
-  return {
-    motion: new Proxy({}, { get: (_target: unknown, prop: string) => Forward(prop) }),
-    m: new Proxy({}, { get: (_target: unknown, prop: string) => Forward(prop) }),
-    LazyMotion: ({ children }: { children: React.ReactNode }) => children,
-    domAnimation: {},
-    domMax: {},
-    AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
-    useReducedMotion: () => true,
-  };
-});
-
 describe("EnterprisePlayground", () => {
-  it("walks venue scenes without invented metric jargon", async () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("walks the sample Place's Insights sections on sample data without requests", async () => {
     const user = userEvent.setup();
     render(
       <ThemeProvider>
         <EnterprisePlayground />
       </ThemeProvider>,
     );
-    expect(screen.getByTestId("enterprise-playground")).toBeInTheDocument();
-    expect(screen.getByText("Demo data")).toBeInTheDocument();
-    expect(screen.queryByText(/Connection Velocity/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Tri-Factor Handshake/i)).not.toBeInTheDocument();
+    const nav = within(screen.getByRole("navigation", { name: "Insights sections" }));
+    expect(nav.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText(/Demo data/)).toBeInTheDocument();
     expect(await screen.findByText("Social Sticky Score")).toBeInTheDocument();
-    expect(screen.getByText("Popular times")).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Events" }));
-    expect(screen.getByText("Club fair")).toBeInTheDocument();
+    expect(screen.getByText("joinclick.co/business/places/demo/insights")).toBeInTheDocument();
+
+    await user.click(nav.getByRole("button", { name: "Events" }));
+    expect(screen.getByTestId("enterprise-section-events")).toHaveTextContent(
+      "Which events turn RSVPs into check-ins?",
+    );
+    expect(screen.getByText("joinclick.co/business/places/demo/insights/events")).toBeInTheDocument();
+    expect(screen.queryByText(/Connection Velocity|Tri-Factor Handshake/i)).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

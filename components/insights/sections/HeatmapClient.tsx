@@ -74,7 +74,8 @@ export default function HeatmapPage({ placeId }: { placeId: string }) {
   const chart = useInsightsChartTheme();
   const { demoMode } = useInsightsDemo();
   const { user } = useAuth();
-  const insightsUrl = user ? `/api/insights/${placeId}` : null;
+  // Demo mode shows sample zones only, so it never fetches.
+  const insightsUrl = user && !demoMode ? `/api/insights/${placeId}` : null;
   const { data: apiPayload } = useSWR(insightsUrl, insightsFetcher);
 
   const verifiedNodes: VerifiedConnectionMapNode[] = useMemo(() => {

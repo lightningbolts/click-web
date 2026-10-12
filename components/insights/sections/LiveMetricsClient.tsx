@@ -54,13 +54,10 @@ export default function LiveMetricsPage({ placeId }: { placeId: string }) {
   const { user } = useAuth();
   const chart = useInsightsChartTheme();
   const insightsUrl = `/api/insights/${placeId}`;
-  const { data } = useSWR<InsightsResponse>(user ? insightsUrl : null, fetcher);
-
   const { demoMode } = useInsightsDemo();
-  const isDemoFallback =
-    demoMode &&
-    !!data &&
-    (data.status === 'no_venue' || data.status === 'insufficient_data');
+  // Demo mode is sample data only (the page says so), so it never fetches.
+  const { data } = useSWR<InsightsResponse>(user && !demoMode ? insightsUrl : null, fetcher);
+  const isDemoFallback = demoMode;
 
   const liveCount: LiveCount = useMemo(
     () =>

@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as maplibregl from "maplibre-gl";
 import LandingPlayground from "@/components/landing/playground";
@@ -16,459 +10,168 @@ jest.mock("@/components/landing/playground/PlaygroundMapLazy", () => ({
   default: require("@/components/landing/playground/PlaygroundMap").default,
 }));
 
-jest.mock("framer-motion", () => {
-  const React = require("react");
-  const Forward = (tag: string) =>
-    React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
-      const domProps = { ...props };
-      for (const key of [
-        "initial",
-        "animate",
-        "exit",
-        "transition",
-        "layoutId",
-        "layout",
-        "whileHover",
-        "whileTap",
-      ])
-        delete domProps[key];
-      return React.createElement(tag, { ...domProps, ref });
-    });
-  const elements: Record<string, unknown> = {};
-  return {
-    motion: new Proxy(
-      {},
-      {
-        get: (_target: unknown, prop: string) =>
-          elements[prop] ?? (elements[prop] = Forward(prop)),
-      },
-    ),
-    m: new Proxy(
-      {},
-      {
-        get: (_target: unknown, prop: string) =>
-          elements[prop] ?? (elements[prop] = Forward(prop)),
-      },
-    ),
-    LazyMotion: ({ children }: { children: React.ReactNode }) => children,
-    domMax: {},
-    AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
-    useReducedMotion: () => true,
-  };
-});
-
 function renderPlayground() {
-  const result = render(
+  render(
     <ThemeProvider>
       <ThemeToggle />
       <LandingPlayground />
     </ThemeProvider>,
   );
-  fireEvent.click(sceneTab("Connect"));
-  return result;
+  return userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 }
 
-function sceneTab(name: string) {
-  return within(
-    screen.getByRole("tablist", { name: "Product playground" }),
-  ).getByRole("tab", { name });
-}
-
-function dashboardTab(name: string) {
-  return within(
-    screen.getByRole("tablist", { name: "Dashboard tabs" }),
-  ).getByRole("tab", { name });
-}
-
-async function openDashboardMap(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("tab", { name: "Dashboard" }));
-  await user.click(dashboardTab("Map"));
-  await waitFor(() => {
-    expect(screen.getByTestId("playground-scene-map")).toBeInTheDocument();
-  });
-  await waitFor(() => {
-    expect(screen.getByLabelText("My Network")).toBeInTheDocument();
-  });
-}
+const phone = () => within(screen.getByTestId("demo-phone"));
+const web = () => within(screen.getByTestId("demo-web"));
+const phoneThread = () => within(screen.getByTestId("phone-route-thread"));
 
 describe("LandingPlayground", () => {
-  it("opens a new Click immediately and hides the iOS tab bar inside a thread", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    await user.click(screen.getByTestId("playground-tap-jordan"));
-    await user.click(
-      within(screen.getByTestId("playground-scene-connect")).getByRole(
-        "button",
-        { name: "Open chat" },
-      ),
-    );
-    expect(
-      within(screen.getByTestId("playground-scene-clicks")).getByRole(
-        "textbox",
-        { name: "Message" },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("navigation", { name: "App tabs" }),
-    ).not.toBeInTheDocument();
-    await user.click(
-      within(screen.getByTestId("playground-scene-clicks")).getByRole(
-        "button",
-        { name: "Back to messages" },
-      ),
-    );
-    expect(
-      screen.getByRole("navigation", { name: "App tabs" }),
-    ).toBeInTheDocument();
-  });
-
-  it("shares a created group and resets it without changing a real account", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    await user.click(
-      screen.getByRole("button", { name: /Create Group Chat Start/ }),
-    );
-    const phone = within(screen.getByTestId("playground-scene-clicks"));
-    await user.click(phone.getByRole("button", { name: "Create group" }));
-    await user.type(
-      phone.getByRole("textbox", { name: "Group message" }),
-      "Coffee at ten?",
-    );
-    await user.click(phone.getByRole("button", { name: "Send" }));
-    await user.click(sceneTab("Dashboard"));
-    await user.click(dashboardTab("Clicks"));
-    expect(
-      screen.getByRole("list", { name: "Group messages" }),
-    ).toHaveTextContent("Coffee at ten?");
-    await user.click(screen.getByRole("button", { name: "Reset demo" }));
-    await user.click(sceneTab("Dashboard"));
-    await user.click(dashboardTab("Clicks"));
-    await user.click(screen.getByRole("button", { name: /groups/i }));
-    expect(
-      screen.getByRole("button", { name: "Create group" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Coffee at ten?")).not.toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("keeps event saving independent of RSVP and restores the saved list on reset", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    await user.click(sceneTab("Events"));
-    const events = within(screen.getByTestId("playground-scene-events"));
-    await user.click(events.getByRole("button", { name: "Save event" }));
-    expect(events.getByTestId("playground-rsvp-mixer")).toHaveTextContent(
-      "RSVP",
-    );
-    await user.click(sceneTab("Home"));
-    const home = within(screen.getAllByTestId("playground-scene-home")[0]);
-    expect(
-      home.getByRole("region", { name: "Saved events" }),
-    ).toHaveTextContent("Dawg Daze Mixer");
-    await user.click(screen.getByRole("button", { name: "Reset demo" }));
-    expect(
-      within(screen.getAllByTestId("playground-scene-home")[0]).getByRole(
-        "region",
-        { name: "Saved events" },
-      ),
-    ).not.toHaveTextContent("Dawg Daze Mixer");
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("starts on Home and shares availability with the web preview", async () => {
-    const user = userEvent.setup();
-    render(
-      <ThemeProvider>
-        <LandingPlayground />
-      </ThemeProvider>,
-    );
-    expect(sceneTab("Home")).toHaveAttribute("aria-selected", "true");
-    const phone = within(screen.getAllByTestId("playground-scene-home")[0]);
-    await user.click(phone.getByRole("button", { name: "Walk" }));
-    await user.click(sceneTab("Dashboard"));
-    expect(screen.getByRole("button", { name: "Walk" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    for (const label of [
-      "Home",
-      "Clicks",
-      "Map",
-      "Events",
-      "Add Click",
-      "Me",
-    ]) {
-      expect(dashboardTab(label)).toBeInTheDocument();
-    }
-  });
-
-  it("opens the selected nearby event and routes a phone attendee into chat", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    await user.click(sceneTab("Home"));
-    const phone = within(screen.getAllByTestId("playground-scene-home")[0]);
-    await user.type(
-      phone.getByRole("textbox", { name: "Search people, places, events" }),
-      "Friday",
-    );
-    await user.click(
-      within(phone.getByRole("region", { name: "Explore nearby" })).getByRole(
-        "button",
-        { name: /Friday Night Climb/ },
-      ),
-    );
-    const events = within(screen.getAllByTestId("playground-scene-events")[0]);
-    expect(events.getByTestId("playground-rsvp-climb")).toBeInTheDocument();
-    await user.click(events.getByRole("button", { name: "Ymir" }));
-    expect(
-      within(screen.getByTestId("playground-scene-clicks")).getByRole(
-        "textbox",
-        { name: "Message" },
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps a joined hub conversation when switching between iOS and web", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    await user.click(sceneTab("Hubs"));
-    const phone = within(screen.getByTestId("playground-scene-hubs"));
-    await user.click(phone.getByRole("button", { name: "Find nearby hubs" }));
-    await user.click(phone.getByRole("button", { name: "Join hub" }));
-    await user.type(
-      phone.getByRole("textbox", { name: "Hub message" }),
-      "See you at the mixer!",
-    );
-    await user.click(phone.getByRole("button", { name: "Send" }));
-    await user.click(sceneTab("Dashboard"));
-    await user.click(screen.getByRole("button", { name: "Explore hubs" }));
-    await user.click(screen.getByRole("button", { name: "Open hub" }));
-    expect(
-      screen.getByRole("list", { name: "Hub messages" }),
-    ).toHaveTextContent("See you at the mixer!");
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("moves focus with the scene tabs and returns to Home from the app navigation", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    sceneTab("Connect").focus();
-    await user.keyboard("{ArrowLeft}");
-    expect(sceneTab("Home")).toHaveFocus();
-    expect(sceneTab("Home")).toHaveAttribute("aria-selected", "true");
-    await user.click(screen.getByRole("button", { name: "Add Click" }));
-    await user.click(screen.getByRole("button", { name: "Home" }));
-    expect(sceneTab("Home")).toHaveAttribute("aria-selected", "true");
-  });
-
   beforeEach(() => {
+    jest.useFakeTimers();
     global.fetch = jest.fn();
   });
 
   afterEach(() => {
+    expect(global.fetch).not.toHaveBeenCalled();
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
-  it("switches scenes from the tablist", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
+  it("taps to connect with Jordan, then says hi from the result screen", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("guide-tap"));
+    expect(screen.getByTestId("phone-route-tap")).toHaveTextContent("Hold phones together");
 
-    expect(screen.getByTestId("playground-scene-connect")).toBeInTheDocument();
+    // Three co-presence checks, one at a time.
+    for (let i = 0; i < 4; i++) act(() => jest.advanceTimersByTime(450));
+    expect(screen.getByTestId("tap-result")).toHaveTextContent("Jordan");
+    expect(screen.getByRole("button", { name: "Tap to Connect with Jordan, done" })).toBeInTheDocument();
 
-    await user.click(sceneTab("Events"));
-    expect(screen.getByTestId("playground-scene-events")).toBeInTheDocument();
+    await user.click(phone().getByRole("button", { name: "Say hi" }));
+    expect(phoneThread().getByTestId("say-hi")).toBeInTheDocument();
+    // A new Click is a say-hi thread on the web too.
+    await user.click(screen.getByTestId("web-nav-clicks"));
+    expect(web().getByTestId("thread-row-jordan")).toHaveTextContent("48h left");
+    await user.type(phoneThread().getByRole("textbox", { name: "Message" }), "Hey!");
+    await user.click(phoneThread().getByRole("button", { name: "Send" }));
+    expect(screen.getByRole("button", { name: "Say hi before the 48 hours are up, done" })).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole("tab", { name: "Dashboard" }));
-    expect(
-      screen.getByTestId("playground-scene-dashboard"),
-    ).toBeInTheDocument();
+  it("sends a message on the phone that shows on the web, then gets a reply", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("guide-hi"));
+    await user.type(phoneThread().getByRole("textbox", { name: "Message" }), "Coffee soon?");
+    await user.click(phoneThread().getByRole("button", { name: "Send" }));
 
-    await openDashboardMap(user);
-    expect(screen.getByLabelText("Events")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByTestId("playground-pin-overlay")).toBeInTheDocument();
-    });
-    expect(screen.getAllByTestId("playground-map-pin").length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.getByTestId("playground-pin-overlay")).toHaveTextContent(
-      "Campus Comedy Night",
-    );
-    expect(screen.getByTestId("playground-pin-popup-card")).toHaveStyle({
-      background: "var(--surface)",
-    });
-    expect(global.fetch).not.toHaveBeenCalled();
-    const mapOptions = (maplibregl.Map as unknown as jest.Mock).mock
-      .calls[0][0] as {
+    expect(within(screen.getByTestId("web-thread")).getByText("Coffee soon?")).toBeInTheDocument();
+    act(() => jest.advanceTimersByTime(1500));
+    expect(phoneThread().getByText("Sounds good to me")).toBeInTheDocument();
+  });
+
+  it("hides the iPhone tab bar inside a thread and brings it back on Back", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("phone-tab-clicks"));
+    await user.click(phone().getByTestId("thread-row-maya"));
+    expect(screen.queryByRole("navigation", { name: "iPhone tabs" })).not.toBeInTheDocument();
+    await user.click(phone().getByRole("button", { name: /^Back/ }));
+    expect(screen.getByRole("navigation", { name: "iPhone tabs" })).toBeInTheDocument();
+  });
+
+  it("sends a plan that lands in Upcoming on both devices", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("guide-plan"));
+    await user.click(phoneThread().getByTestId("composer-plan"));
+
+    const cards = screen.getAllByTestId("plan-card");
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByRole("button", { name: "Going" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(phone().getByRole("button", { name: /^Back/ }));
+    await user.click(screen.getByTestId("phone-tab-home"));
+    await user.click(screen.getByTestId("web-nav-home"));
+    for (const upcoming of screen.getAllByTestId("upcoming")) expect(upcoming).toHaveTextContent("Coffee with Maya");
+  });
+
+  it("keeps RSVP and save separate, syncs RSVP to the web and resets everything", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("guide-rsvp"));
+    const phoneEvent = within(screen.getByTestId("phone-route-event"));
+    await user.click(phoneEvent.getByRole("button", { name: "Save event" }));
+    expect(phoneEvent.getByTestId("rsvp-mixer")).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(phoneEvent.getByTestId("rsvp-mixer"));
+    expect(web().getByTestId("rsvp-mixer")).toHaveTextContent("You’re going");
+
+    await user.click(screen.getByRole("button", { name: "Start over" }));
+    expect(screen.getByText("0 of 5 done")).toBeInTheDocument();
+    await user.click(screen.getByTestId("web-nav-events"));
+    await user.click(web().getByRole("button", { name: /Dawg Daze Mixer/ }));
+    expect(web().getByTestId("rsvp-mixer")).toHaveTextContent("RSVP");
+    expect(web().getByRole("button", { name: "Save event" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shares availability between the phone and the web", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("guide-intent"));
+    await user.click(within(screen.getByTestId("phone-route-availability")).getByRole("button", { name: "Walk" }));
+    await user.click(web().getByRole("button", { name: "Your profile" }));
+    expect(web().getByTestId("me-content")).toHaveTextContent("Coffee, Walk");
+  });
+
+  it("creates a group and joins a hub from Add", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("phone-tab-add"));
+    await user.click(phone().getByRole("button", { name: /Group/ }));
+    await user.click(phone().getByRole("button", { name: "Create group" }));
+    expect(screen.getByTestId("phone-route-thread")).toBeInTheDocument();
+
+    await user.click(phone().getByRole("button", { name: /^Back/ }));
+    await user.click(screen.getByTestId("phone-tab-add"));
+    await user.click(phone().getByRole("button", { name: /Join hub/ }));
+    await user.click(within(screen.getByTestId("phone-route-hub")).getByRole("button", { name: "Join hub" }));
+    expect(phoneThread().getByRole("list", { name: "Messages" })).toBeInTheDocument();
+  });
+
+  it("renders a real QR code on My QR", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("phone-tab-add"));
+    await user.click(phone().getByRole("button", { name: /My QR/ }));
+    expect(phone().getByTitle("Click QR code for Alex Rivera")).toBeInTheDocument();
+  });
+
+  it("maps Clicks and events offline, and restyles without remounting on theme change", async () => {
+    const user = renderPlayground();
+    await user.click(screen.getByTestId("web-nav-map"));
+    act(() => jest.advanceTimersByTime(3000));
+    await waitFor(() => expect(screen.getAllByTestId("playground-map-pin").length).toBeGreaterThan(0));
+
+    const mapMock = maplibregl.Map as unknown as jest.Mock;
+    const options = mapMock.mock.calls[0][0] as {
       style: unknown;
       transformRequest: (url: string) => { url: string };
       maxBounds: unknown;
       pixelRatio: number;
     };
-    expect(mapOptions.style).toBe(
-      "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    );
-    expect(mapOptions.pixelRatio).toBe(1);
-    expect(mapOptions.maxBounds).toEqual([
+    expect(options.style).toBe("https://basemaps.cartocdn.com/gl/positron-gl-style/style.json");
+    expect(options.pixelRatio).toBe(1);
+    expect(options.maxBounds).toEqual([
       [-122.38, 47.58],
       [-122.25, 47.68],
     ]);
-    expect(
-      mapOptions.transformRequest(`${window.location.origin}/api/map/beacons`)
-        .url,
-    ).toBe("about:blank");
-  });
+    expect(options.transformRequest(`${window.location.origin}/api/map/beacons`).url).toBe("about:blank");
 
-  it("keeps the map mounted and does not fetch when toggling theme", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-    await openDashboardMap(user);
-    await waitFor(() => {
-      expect(screen.getByTestId("playground-pin-overlay")).toBeInTheDocument();
-    });
+    // Selecting a pin swaps the sheet for its card.
+    await user.click(within(web().getByTestId("map-sheet")).getByRole("button", { name: /Campus Comedy Night/ }));
+    expect(web().getByTestId("map-sheet")).toHaveTextContent("View");
 
-    const mapMock = maplibregl.Map as unknown as jest.Mock;
     const constructed = mapMock.mock.calls.length;
-    const mapInstance = mapMock.mock.results[0]?.value as {
-      remove: jest.Mock;
-      setStyle: jest.Mock;
-    };
-    const removeCalls = mapInstance.remove.mock.calls.length;
-
-    await user.click(
-      screen.getByRole("button", { name: "Toggle light or dark theme" }),
-    );
-
+    const instance = mapMock.mock.results[0]?.value as { remove: jest.Mock; setStyle: jest.Mock };
+    const removed = instance.remove.mock.calls.length;
+    await user.click(screen.getByRole("button", { name: "Toggle light or dark theme" }));
     expect(mapMock).toHaveBeenCalledTimes(constructed);
-    expect(mapInstance.remove).toHaveBeenCalledTimes(removeCalls);
-    expect(mapInstance.setStyle).toHaveBeenCalledWith(
+    expect(instance.remove).toHaveBeenCalledTimes(removed);
+    expect(instance.setStyle).toHaveBeenCalledWith(
       "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       { diff: true },
     );
-    expect(global.fetch).not.toHaveBeenCalled();
-    expect(screen.getByTestId("playground-scene-map")).toBeInTheDocument();
-    expect(screen.getByTestId("playground-pin-overlay")).toHaveTextContent(
-      "Campus Comedy Night",
-    );
-    expect(screen.getByLabelText("My Network")).toBeInTheDocument();
-  });
-
-  it("opens chats from the app Clicks tab", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByRole("button", { name: "Clicks" }));
-    expect(screen.getByTestId("playground-scene-clicks")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("playground-clicks-chat-maya"));
-    expect(
-      within(screen.getByTestId("playground-scene-clicks")).getByLabelText(
-        "Message",
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("playground-scene-clicks")).getByText(
-        "You going to comedy night?",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("opens Me from the iOS tab bar", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByRole("button", { name: "Me" }));
-    expect(screen.getByTestId("playground-scene-settings")).toBeInTheDocument();
-    expect(screen.queryByText("Dark mode")).not.toBeInTheDocument();
-    expect(screen.queryByText("Appearance")).not.toBeInTheDocument();
-  });
-
-  it("renders a real QR code on My QR", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByRole("button", { name: "My QR" }));
-    expect(
-      screen.getByTitle("Click QR Code for Alex Rivera"),
-    ).toBeInTheDocument();
-  });
-
-  it("adds a Tap connection that appears on the Dashboard", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByTestId("playground-tap-jordan"));
-    await user.click(screen.getByRole("button", { name: "Save memory" }));
-    await user.click(screen.getByRole("tab", { name: "Dashboard" }));
-
-    expect(
-      screen.getByRole("button", { name: "Say hi to Jordan Hale" }),
-    ).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("toggles an event RSVP onto the Dashboard", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(sceneTab("Events"));
-    expect(screen.getByTestId("playground-rsvp-mixer")).toHaveTextContent(
-      "RSVP",
-    );
-
-    await user.click(screen.getByTestId("playground-rsvp-mixer"));
-    expect(screen.getByTestId("playground-rsvp-mixer")).toHaveTextContent(
-      "Cancel RSVP",
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Dashboard" }));
-    expect(screen.getAllByText("Dawg Daze Mixer").length).toBeGreaterThan(0);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("opens a chat thread from the dashboard inbox", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByRole("tab", { name: "Dashboard" }));
-    await user.click(dashboardTab("Clicks"));
-    await user.click(screen.getByRole("button", { name: /Maya Chen/i }));
-
-    expect(screen.getByText("You going to comedy night?")).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it("shows a new Click as say-hi, then sends a plan that lands in Coming up", async () => {
-    const user = userEvent.setup();
-    renderPlayground();
-
-    await user.click(screen.getByTestId("playground-tap-jordan"));
-    await user.click(screen.getByRole("button", { name: "Save memory" }));
-    await user.click(screen.getByRole("button", { name: "Clicks" }));
-    const clicks = screen.getByTestId("playground-scene-clicks");
-    expect(within(clicks).getByText("New Click · say hi")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("playground-clicks-chat-jordan"));
-    const thread = screen.getByTestId("playground-scene-clicks");
-    expect(within(thread).getByTestId("playground-say-hi")).toBeInTheDocument();
-    await user.click(
-      within(thread).getByRole("button", {
-        name: "Plan a hangout with Jordan",
-      }),
-    );
-    // The phone thread and the web companion show the same conversation.
-    const cards = screen.getAllByTestId("playground-plan-card");
-    expect(cards[0]).toHaveTextContent("Coffee");
-    expect(
-      within(cards[0]).getByRole("button", { name: "Going" }),
-    ).toHaveAttribute("aria-pressed", "true");
-
-    await user.click(screen.getByRole("tab", { name: "Dashboard" }));
-    await user.click(dashboardTab("Home"));
-    expect(screen.getByTestId("playground-coming-up")).toHaveTextContent(
-      "Coffee with Jordan",
-    );
-    expect(
-      screen.queryByText(/Retention Rate|Connection Streak/),
-    ).not.toBeInTheDocument();
   });
 });

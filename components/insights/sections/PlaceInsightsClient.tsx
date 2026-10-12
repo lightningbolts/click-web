@@ -15,7 +15,7 @@ const fetcher = (url: string) => fetchInsightsApiJson<PlaceStats>(url);
 export default function PlaceInsightsClient({ placeId, range = 90 }: { placeId: string; range?: 30 | 90 }) {
   const { demoMode } = useInsightsDemo();
   const { data, error, isLoading, mutate } = useSWR<PlaceStats>(
-    `/api/places/${encodeURIComponent(placeId)}/stats?range=${range}d&detail=full`,
+    demoMode ? null : `/api/places/${encodeURIComponent(placeId)}/stats?range=${range}d&detail=full`,
     fetcher,
   );
   const stats: PlaceStats | null = demoMode ? (mockPlaceStats as PlaceStats) : (data ?? null);
