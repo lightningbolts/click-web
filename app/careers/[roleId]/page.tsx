@@ -3,15 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ApplicationForm } from "@/components/careers/ApplicationForm";
-import { findRole, OPEN_ROLES } from "@/components/careers/roles";
+import { findRole } from "@/components/careers/roles";
 
 type Params = { roleId: string };
-
-export const dynamicParams = false;
-
-export function generateStaticParams(): Params[] {
-  return OPEN_ROLES.map((role) => ({ roleId: role.id }));
-}
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const role = findRole((await params).roleId);
@@ -20,7 +14,10 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     : {};
 }
 
-/** Native application for one open role (replaces the external Google Form). */
+/**
+ * Native application for one open role (replaces the external Google Form). Rendered per request,
+ * not prerendered: the Worker has no incremental cache, so prerendered dynamic routes 404 there.
+ */
 export default async function CareerApplicationPage({ params }: { params: Promise<Params> }) {
   const role = findRole((await params).roleId);
   if (!role) notFound();
