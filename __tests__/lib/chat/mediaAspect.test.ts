@@ -1,9 +1,13 @@
 import { mediaAspectFields, mediaAspectFromMetadata, mediaAspectOf } from '@/lib/chat/mediaMetadata';
+import type { MessageMediaMetadata } from '@/lib/chat/types';
+
+/** Rows come from JSON, so a field can hold any type. */
+const row = (media_aspect: unknown) => ({ media_aspect }) as MessageMediaMetadata;
 
 describe('mediaAspectFromMetadata (iOS MediaAspect.parse)', () => {
   it('reads numbers and numeric strings', () => {
     expect(mediaAspectFromMetadata({ media_aspect: 0.75 })).toBe(0.75);
-    expect(mediaAspectFromMetadata({ media_aspect: '1.33' })).toBe(1.33);
+    expect(mediaAspectFromMetadata(row('1.33'))).toBe(1.33);
   });
 
   it('clamps extremes to 0.2…5', () => {
@@ -16,7 +20,7 @@ describe('mediaAspectFromMetadata (iOS MediaAspect.parse)', () => {
     expect(mediaAspectFromMetadata(null)).toBeNull();
     expect(mediaAspectFromMetadata({ media_aspect: 0 })).toBeNull();
     expect(mediaAspectFromMetadata({ media_aspect: -1 })).toBeNull();
-    expect(mediaAspectFromMetadata({ media_aspect: 'wide' })).toBeNull();
+    expect(mediaAspectFromMetadata(row('wide'))).toBeNull();
   });
 });
 
