@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { uploadChatMediaBlob } from '@/lib/chat/chatMediaStorage';
+import { mediaAspectFields } from '@/lib/chat/mediaMetadata';
 import { computeClickDropRevealTtlIso } from '@/lib/collaboration/clickDropReveal';
 import type { CollaborationSessionResponse } from '@/lib/userProfile/profileModalTypes';
 
@@ -47,7 +48,10 @@ export function useClickDrop(connectionId: string | null, currentUserId: string 
         const encounterId = typeof session.encounter_id === 'string' ? session.encounter_id.trim() : '';
         if (!sessionRes.ok || !encounterId) throw new Error('session');
         setStatus('uploading');
-        const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
+        const [{ publicUrl }, aspect] = await Promise.all([
+          uploadChatMediaBlob(currentUserId, file, file.type),
+          mediaAspectFields(file),
+        ]);
         const res = await fetch('/api/chat/messages', {
           method: 'POST',
           headers: await jsonHeaders(),
@@ -61,6 +65,7 @@ export function useClickDrop(connectionId: string | null, currentUserId: string 
               disposable_roll: true,
               encounter_id: encounterId,
               collaboration_ttl: computeClickDropRevealTtlIso(),
+              ...aspect,
             },
           }),
         });

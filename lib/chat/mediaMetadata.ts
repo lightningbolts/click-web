@@ -52,6 +52,44 @@ export function durationSecondsFromMetadata(metadata: MessageMediaMetadata | und
   return undefined;
 }
 
+/** Extremes are clamped as on iOS (`MediaAspect.range`): a sliver photo stays tappable. */
+const MEDIA_ASPECT_MIN = 0.2;
+const MEDIA_ASPECT_MAX = 5;
+
+function clampMediaAspect(raw: unknown): number | null {
+  const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.min(Math.max(value, MEDIA_ASPECT_MIN), MEDIA_ASPECT_MAX);
+}
+
+/** A photo's width ÷ height from `metadata.media_aspect` (iOS `MediaAspect.parse`). */
+export function mediaAspectFromMetadata(metadata: MessageMediaMetadata | undefined | null): number | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  return clampMediaAspect(metadata.media_aspect);
+}
+
+/**
+ * The same value for a photo being sent (iOS `MediaAspect.of`): as displayed, so EXIF rotation
+ * is applied, rounded to 0.01. Null when the browser can't decode it; the field is optional.
+ */
+export async function mediaAspectOf(file: Blob): Promise<number | null> {
+  if (typeof createImageBitmap !== 'function') return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const ratio = bitmap.width / bitmap.height;
+    bitmap.close();
+    return clampMediaAspect(Math.round(ratio * 100) / 100);
+  } catch {
+    return null;
+  }
+}
+
+/** `{ media_aspect }` for a photo's metadata, or nothing when it can't be read. */
+export async function mediaAspectFields(file: Blob): Promise<{ media_aspect?: number }> {
+  const aspect = await mediaAspectOf(file);
+  return aspect ? { media_aspect: aspect } : {};
+}
+
 export function isEncryptedMediaFromMetadata(
   metadata: MessageMediaMetadata | undefined | null,
 ): boolean {

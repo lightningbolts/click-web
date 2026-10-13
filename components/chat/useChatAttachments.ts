@@ -12,6 +12,7 @@ import type { ChatNotify } from './chatNotify';
 import { uploadChatMediaBlob, uploadChatMediaV2Blob } from '@/lib/chat/chatMediaStorage';
 import { uploadChatAttachmentBlob, uploadChatAttachmentV2Blob } from '@/lib/chat/chatAttachmentStorage';
 import { validateAttachment } from '@/lib/chat/attachmentValidator';
+import { mediaAspectFields } from '@/lib/chat/mediaMetadata';
 import {
   encodeEnvelope,
   encodeFileMasterKeyBase64,
@@ -98,7 +99,7 @@ export function useChatAttachments({
       try {
         const caption = inputTextRef.current.trim();
         setInputText('');
-        const v2Session = await getE2eeV2Session(true, true);
+        const [v2Session, aspect] = await Promise.all([getE2eeV2Session(true, true), mediaAspectFields(file)]);
         let wireContent: string;
         let metadata: Record<string, unknown>;
         if (v2Session) {
@@ -124,6 +125,7 @@ export function useChatAttachments({
             media_path: upload.path,
             original_mime_type: file.type,
             is_encrypted_media: true,
+            ...aspect,
           });
         } else {
           const { publicUrl } = await uploadChatMediaBlob(currentUserId, file, file.type);
@@ -133,7 +135,7 @@ export function useChatAttachments({
               : e2eKeys && caption
                 ? await encryptContent(caption, e2eKeys)
                 : caption;
-          metadata = await appendReplyToMetadata({ media_url: publicUrl });
+          metadata = await appendReplyToMetadata({ media_url: publicUrl, ...aspect });
         }
         const headers = await getAuthHeaders();
         const res = await fetch('/api/chat/messages', {
