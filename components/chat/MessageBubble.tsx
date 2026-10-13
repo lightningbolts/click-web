@@ -12,6 +12,7 @@ import {
   chatAttachmentPathFromSignedUrl,
   durationSecondsFromMetadata,
   isEncryptedMediaFromMetadata,
+  mediaAspectFromMetadata,
   mediaPathFromMetadata,
   mediaUrlFromMetadata,
   originalMimeTypeFromMetadata,
@@ -35,6 +36,10 @@ import { dropReplyFromMetadata } from '@/lib/drops/dropReply';
 import { MessageActionBar } from './MessageActionBar';
 import { MessageMeta, callLogLabel, formatMessageTime, isSafeMediaUrl } from './messageMeta';
 import { PlanCard } from './PlanCard';
+
+/** The most a photo bubble takes up (its `max-w` / `max-h`). */
+const PHOTO_MAX_W = 320;
+const PHOTO_MAX_H = 360;
 
 /** How long ciphertext shimmers before we call it undecryptable. */
 const DECRYPT_GRACE_MS = 6000;
@@ -236,6 +241,9 @@ export default function MessageBubble({
   const jumpToReply = reply && onJumpTo ? () => onJumpTo(reply.id) : undefined;
   const optimistic = isClientOptimisticMessageId(message.id);
   const imageSrc = secureMedia.src && isSafeMediaUrl(secureMedia.src) ? secureMedia.src : null;
+  // A photo's box from its recorded shape, within the same 320 × 360 a decoded photo fits.
+  const aspect = isImage ? mediaAspectFromMetadata(message.metadata) : null;
+  const photoBox = aspect ? { width: Math.min(PHOTO_MAX_W, Math.round(PHOTO_MAX_H * aspect)), aspectRatio: aspect } : undefined;
   const variant = isMine ? 'mine' : 'theirs';
   const tail = last ? (isMine ? 'rounded-br-xs' : 'rounded-bl-xs') : '';
   const bubbleTone = isMine ? 'bg-bubble-out text-white' : 'bg-bubble-in text-fg';
@@ -355,10 +363,22 @@ export default function MessageBubble({
         {reply ? <ReplyQuote author={replyAuthor} snippet={replySnippet} mine={isMine} inBubble={false} onClick={jumpToReply} /> : null}
         {isImage ? (
           secureMedia.isLoading ? (
-            <div className="aspect-[4/3] w-[320px] max-w-full animate-pulse rounded-lg bg-fill-subtle" aria-busy aria-label="Decrypting photo" />
+            <div
+              className={cn('max-w-full animate-pulse rounded-lg bg-fill-subtle', !photoBox && 'aspect-[4/3] w-[320px]')}
+              style={photoBox}
+              aria-busy
+              aria-label="Decrypting photo"
+            />
+          ) : imageSrc && photoBox ? (
+            // The sender recorded its shape: placeholder and photo share one box, nothing moves.
+            <div className="relative max-w-full overflow-hidden rounded-lg bg-fill-subtle" style={photoBox}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- decrypted or signed media URL */}
+              <img src={imageSrc} alt="Photo" loading="lazy" onLoad={revealImage} className="img-reveal block size-full object-cover" />
+              {!caption ? metaOverlay : null}
+            </div>
           ) : imageSrc ? (
-            // Holds the decrypting placeholder's box until the photo decodes, so it changes size
-            // once (to its own) instead of collapsing to nothing first, and fades in.
+            // Older rows have no shape: hold the placeholder's box until the photo decodes, so it
+            // changes size once (to its own) instead of collapsing to nothing first.
             <div className="relative max-w-[min(100%,320px)] overflow-hidden rounded-lg bg-fill-subtle [&:has(>img:not([data-loaded]))]:aspect-[4/3] [&:has(>img:not([data-loaded]))]:w-[320px]">
               {/* eslint-disable-next-line @next/next/no-img-element -- decrypted or signed media URL */}
               <img

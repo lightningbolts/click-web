@@ -38,6 +38,8 @@ export interface MessageMediaMetadata {
   original_mime_type?: string;
   /** Voice note length in seconds (optional). */
   duration_seconds?: number;
+  /** A photo's width ÷ height as displayed, so its bubble is sized before it loads (iOS `MediaAspect`). */
+  media_aspect?: number;
   /** Reply threading (existing). */
   reply_to_id?: string;
   reply_to_content?: string;
