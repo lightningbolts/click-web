@@ -38,7 +38,7 @@ import { chatNotify } from './chatNotify';
 import { useClickDrop } from '@/components/people/useClickDrop';
 import { InlineNotice } from '@/components/ds/InlineNotice';
 import { Button } from '@/components/ds/Button';
-import { Skeleton } from '@/components/ds/Skeleton';
+import { ThreadSkeleton } from './ChatSkeleton';
 import { Spinner } from '@/components/ds/Spinner';
 import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION } from '@/lib/chat/plans';
 import { previewLabelForMessage } from '@/lib/chat/mediaMetadata';
@@ -184,10 +184,9 @@ export default function ChatView({
   const [isDraggingAttachment, setIsDraggingAttachment] = useState(false);
   const searchFocusConsumedRef = useRef<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  /** Set in layout when the thread identity changes; cleared after an open snap session completes. */
-  const snapScrollToLatestOnOpenRef = useRef(false);
+  /** Pins the thread to the latest message while the reader is there (see `useMessageLoading`). */
+  const stickToBottomRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputTextRef = useRef('');
   const channelRef = useRef<ReturnType<typeof getSupabaseClient> extends null ? never : any>(null);
@@ -237,7 +236,7 @@ export default function ChatView({
   const {
     scrollToBottom,
     isNearBottom,
-    snapThreadViewportToBottom,
+    stickToBottom,
     handleScroll,
   } = useMessageLoading({
     connection,
@@ -262,8 +261,7 @@ export default function ChatView({
     setShowScrollBtn,
     setHighlightedMessageId,
     scrollContainerRef,
-    messagesEndRef,
-    snapScrollToLatestOnOpenRef,
+    stickToBottomRef,
     searchFocusConsumedRef,
     readReceiptsEnabled: active,
     getAuthHeaders,
@@ -334,7 +332,7 @@ export default function ChatView({
     inputRef,
     getAuthHeaders,
     appendReplyToMetadata,
-    snapThreadViewportToBottom,
+    stickToBottom,
     gifCustomerId,
   });
 
@@ -449,6 +447,7 @@ export default function ChatView({
     (messageId: string) => {
       const el = scrollContainerRef.current?.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
       if (el) {
+        stickToBottomRef.current = false;
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         setHighlightedMessageId(messageId);
         window.setTimeout(() => setHighlightedMessageId((cur) => (cur === messageId ? null : cur)), 1200);
@@ -735,7 +734,18 @@ export default function ChatView({
         />
 
         <div className="relative min-h-0 flex-1">
-          {banner ? <div className="absolute inset-x-3 top-3 z-20 mx-auto max-w-[720px]">{banner}</div> : null}
+          {banner || loadingMore ? (
+            <div className="pointer-events-none absolute inset-x-3 top-3 z-20 mx-auto flex max-w-[720px] flex-col gap-2">
+              {banner ? <div className="pointer-events-auto">{banner}</div> : null}
+              {/* Floats over the thread: in the flow it pushed every message down and back up. */}
+              {loadingMore ? (
+                <span role="status" className="material-glass ds-scale-in flex size-8 items-center justify-center self-center rounded-full shadow-overlay">
+                  <Spinner size={16} />
+                  <span className="sr-only">Loading older messages</span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -747,20 +757,8 @@ export default function ChatView({
             className="chat-thread-scroll relative h-full"
           >
             <div className={cn('mx-auto flex min-h-full max-w-[720px] flex-col px-3 pb-3 md:px-6', banner ? 'pt-20' : 'pt-4')}>
-              {loadingMore ? (
-                <div className="flex justify-center py-2" role="status">
-                  <Spinner size={16} />
-                  <span className="sr-only">Loading older messages</span>
-                </div>
-              ) : null}
-
               {loading ? (
-                <div aria-busy aria-label="Loading messages" className="flex flex-1 flex-col justify-end gap-2 py-4">
-                  <Skeleton className="h-9 w-48 rounded-bubble" />
-                  <Skeleton className="ml-auto h-9 w-40 rounded-bubble" />
-                  <Skeleton className="h-14 w-64 rounded-bubble" />
-                  <Skeleton className="ml-auto h-9 w-56 rounded-bubble" />
-                </div>
+                <ThreadSkeleton />
               ) : null}
 
               {!loading && !error && messages.length === 0 ? (
@@ -823,7 +821,6 @@ export default function ChatView({
                 </div>
               ) : null}
 
-              <div ref={messagesEndRef} />
             </div>
           </div>
 

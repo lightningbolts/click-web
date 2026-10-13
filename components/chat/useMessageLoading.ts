@@ -39,8 +39,8 @@ export function chatThreadCacheKey(connectionId: string): string {
 
 /**
  * Chat bootstrap and message loading: get/create the chat row, initial page,
- * older-page pagination, scroll management (open snap, scroll-to-bottom,
- * search focus), and read receipts. Extracted verbatim from ChatView.
+ * older-page pagination, scroll management (stick to bottom, scroll-to-bottom,
+ * search focus), and read receipts.
  */
 export function useMessageLoading({
   connection,
@@ -65,8 +65,7 @@ export function useMessageLoading({
   setShowScrollBtn,
   setHighlightedMessageId,
   scrollContainerRef,
-  messagesEndRef,
-  snapScrollToLatestOnOpenRef,
+  stickToBottomRef,
   searchFocusConsumedRef,
   readReceiptsEnabled = true,
   getAuthHeaders,
@@ -95,8 +94,8 @@ export function useMessageLoading({
   setShowScrollBtn: Dispatch<SetStateAction<boolean>>;
   setHighlightedMessageId: Dispatch<SetStateAction<string | null>>;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
-  messagesEndRef: RefObject<HTMLDivElement | null>;
-  snapScrollToLatestOnOpenRef: MutableRefObject<boolean>;
+  /** On while the reader is at the latest message (and on open); see the layout effects below. */
+  stickToBottomRef: MutableRefObject<boolean>;
   searchFocusConsumedRef: MutableRefObject<string | null>;
   /** False while the thread is not on screen (hidden tab pane); nothing is marked read then. */
   readReceiptsEnabled?: boolean;
@@ -109,8 +108,10 @@ export function useMessageLoading({
   const restoredForRef = useRef<string | null | undefined>(restored ? connection.groupChatId ?? null : undefined);
   const isRestored = () => restoredForRef.current === (connection.groupChatId ?? null);
 
+  // Scrolls only the thread (scrollIntoView could move the page around it too).
   const scrollToBottom = useCallback((smooth = true) => {
-    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    const root = scrollContainerRef.current;
+    root?.scrollTo({ top: root.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,84 +133,46 @@ export function useMessageLoading({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection.id, connection.groupChatId, isGroupClique]);
 
-  /** Must run in layout phase so it executes before the snap below on the same paint. */
+  /** Layout phase, so it's set before the pinning effect below runs on the same commit. */
   useLayoutEffect(() => {
-    snapScrollToLatestOnOpenRef.current = !targetMessageId?.trim();
+    stickToBottomRef.current = !targetMessageId?.trim();
     searchFocusConsumedRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection.id, connection.groupChatId, isGroupClique, targetMessageId]);
 
-  /** Scroll the messages scroller to the true bottom (dimension-safe; avoids document scroll). */
-  const snapThreadViewportToBottom = useCallback(() => {
+  /** Scroll position and height just before an older page is prepended. */
+  const prependRef = useRef<{ top: number; height: number } | null>(null);
+
+  // Every list change settles before paint: a prepended page keeps the same messages on screen,
+  // and a thread stuck to the bottom stays there, so opening one never paints it scrolled to the
+  // top first and arrivals never shove what's on screen.
+  useLayoutEffect(() => {
     const root = scrollContainerRef.current;
     if (!root) return;
-    const max = Math.max(0, root.scrollHeight - root.clientHeight);
-    root.scrollTop = max;
+    const prepend = prependRef.current;
+    if (prepend) {
+      prependRef.current = null;
+      root.scrollTop = prepend.top + (root.scrollHeight - prepend.height);
+    } else if (stickToBottomRef.current && !loading) {
+      root.scrollTop = root.scrollHeight;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, messages]);
+
+  // So does every size change while stuck: photos decoding, banners, the composer growing, the
+  // window or details panel resizing. ResizeObserver runs after layout and before paint.
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const content = root?.firstElementChild;
+    if (!root || !content || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (stickToBottomRef.current) root.scrollTop = root.scrollHeight;
+    });
+    ro.observe(root);
+    ro.observe(content);
+    return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /**
-   * After opening a thread, keep pinning to the bottom while layout settles (flex, dvh, images,
-   * ResizeObserver). Does not re-run on every new message — only when `loading` becomes ready for this chat.
-   */
-  useEffect(() => {
-    if (loading || !chatId || !snapScrollToLatestOnOpenRef.current) return;
-
-    const root = scrollContainerRef.current;
-    if (!root) return;
-
-    const tick = () => {
-      snapThreadViewportToBottom();
-    };
-
-    tick();
-    const raf0 = requestAnimationFrame(tick);
-    let rafInner = 0;
-    const rafOuter = requestAnimationFrame(() => {
-      rafInner = requestAnimationFrame(tick);
-    });
-    const timeouts = [0, 32, 96, 220, 420].map((ms) => window.setTimeout(tick, ms));
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => {
-        tick();
-      });
-      ro.observe(root);
-    }
-
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-    vv?.addEventListener('resize', tick);
-    vv?.addEventListener('scroll', tick);
-
-    let doneTimer: number | null = null;
-    const finalize = () => {
-      tick();
-      snapScrollToLatestOnOpenRef.current = false;
-      ro?.disconnect();
-      ro = null;
-      vv?.removeEventListener('resize', tick);
-      vv?.removeEventListener('scroll', tick);
-      timeouts.forEach((id) => window.clearTimeout(id));
-      cancelAnimationFrame(raf0);
-      cancelAnimationFrame(rafOuter);
-      cancelAnimationFrame(rafInner);
-    };
-
-    doneTimer = window.setTimeout(finalize, 720) as unknown as number;
-
-    return () => {
-      if (doneTimer != null) window.clearTimeout(doneTimer);
-      timeouts.forEach((id) => window.clearTimeout(id));
-      cancelAnimationFrame(raf0);
-      cancelAnimationFrame(rafOuter);
-      cancelAnimationFrame(rafInner);
-      ro?.disconnect();
-      vv?.removeEventListener('resize', tick);
-      vv?.removeEventListener('scroll', tick);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, chatId, connection.id, connection.groupChatId, isGroupClique, snapThreadViewportToBottom]);
 
   useEffect(() => {
     if (isRestored()) return;
@@ -381,11 +344,11 @@ export function useMessageLoading({
     setLoadingMore(true);
 
     const oldest = messages[0].time_created;
-    const container = scrollContainerRef.current;
-    const prevScrollHeight = container?.scrollHeight ?? 0;
 
     try {
       const older = await fetchMessages(chatId, oldest);
+      const container = scrollContainerRef.current;
+      if (container) prependRef.current = { top: container.scrollTop, height: container.scrollHeight };
       setMessages((prev) => [...older, ...prev]);
       setHasMore(older.length === PAGE_SIZE);
 
@@ -397,13 +360,6 @@ export function useMessageLoading({
         )
         .map((m) => m.id);
       void firePeerDeliveredAck(ackIds);
-
-      // Maintain scroll position after prepend
-      requestAnimationFrame(() => {
-        if (container) {
-          container.scrollTop = container.scrollHeight - prevScrollHeight;
-        }
-      });
     } catch (err: any) {
       console.error('Could not load older messages:', err);
     } finally {
@@ -419,7 +375,7 @@ export function useMessageLoading({
     const el = scrollContainerRef.current?.querySelector(`[data-message-id="${CSS.escape(id)}"]`);
     if (!el) return;
     searchFocusConsumedRef.current = id;
-    snapScrollToLatestOnOpenRef.current = false;
+    stickToBottomRef.current = false;
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     setHighlightedMessageId(id);
     const timeout = window.setTimeout(() => {
@@ -434,6 +390,8 @@ export function useMessageLoading({
     if (!el) return;
 
     setShowScrollBtn(!isNearBottom());
+    // A few px of slack for fractional zoom; the reader scrolling up unsticks it.
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
 
     // Load more when scrolled to top
     if (el.scrollTop < 80 && hasMore && !loadingMore) {
@@ -497,10 +455,15 @@ export function useMessageLoading({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, getAuthHeaders, unreadIncomingMessageIds, readReceiptsEnabled, documentVisible]);
 
+  const stickToBottom = useCallback(() => {
+    stickToBottomRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return {
     scrollToBottom,
     isNearBottom,
-    snapThreadViewportToBottom,
+    stickToBottom,
     fetchMessages,
     loadMore,
     handleScroll,

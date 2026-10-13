@@ -9,6 +9,7 @@ import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
 import { getSupabaseClient } from '@/lib/supabase';
 import { displayNameFromUserMetadata } from '@/lib/userDisplayName';
 import { ChatView } from '@/components/chat';
+import { ChatSkeleton } from '@/components/chat/ChatSkeleton';
 import { ChatBackground } from '@/components/chat/ChatBackground';
 import { useChatMutes } from '@/components/chat/useConversationExtras';
 import type { ChatListConnection } from './types';
@@ -87,8 +88,13 @@ function WorkspaceFrame({
   );
 }
 
-/** The conversation pane with nothing open (or the open one still loading). */
-function ConversationPlaceholder({ seed, hint }: { seed: string; hint: boolean }) {
+/**
+ * The conversation pane with nothing open, or an open one still loading: a chat thread shows
+ * `ChatView`'s own frame so it mounts in place.
+ */
+function ConversationPlaceholder({ seed, thread }: { seed: string; thread: ClicksThread | null }) {
+  if (thread && thread.kind !== 'h') return <ChatSkeleton seed={thread.id} />;
+  const hint = !thread;
   return (
     <div className="relative flex h-full items-center justify-center">
       <ChatBackground seed={seed} />
@@ -149,7 +155,7 @@ function BootWorkspace({ userId }: { userId: string }) {
           hubs={<HubsList selectedHubId={thread?.kind === 'h' ? thread.id : null} />}
         />
       }
-      conversation={<ConversationPlaceholder seed={userId} hint={!thread} />}
+      conversation={<ConversationPlaceholder seed={userId} thread={thread} />}
     />
   );
 }
@@ -407,7 +413,7 @@ function Workspace({
             />
           </div>
         ) : (
-          <ConversationPlaceholder seed={user.id} hint={!thread} />
+          <ConversationPlaceholder seed={user.id} thread={thread} />
         )
       }
     >

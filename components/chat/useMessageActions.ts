@@ -48,7 +48,7 @@ export function useMessageActions({
   inputRef,
   getAuthHeaders,
   appendReplyToMetadata,
-  snapThreadViewportToBottom,
+  stickToBottom,
   gifCustomerId,
 }: {
   connection: ConnectionRecord;
@@ -77,7 +77,8 @@ export function useMessageActions({
   inputRef: RefObject<HTMLTextAreaElement | null>;
   getAuthHeaders: () => Promise<HeadersInit>;
   appendReplyToMetadata: (meta: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  snapThreadViewportToBottom: () => void;
+  /** Pin the thread to the latest message (before the next paint). */
+  stickToBottom: () => void;
   gifCustomerId: string | null;
 }) {
   /**
@@ -150,11 +151,9 @@ export function useMessageActions({
       reactions: {},
     };
 
+    // Your own send always lands at the bottom, pinned before it paints.
+    stickToBottom();
     setMessages((prev) => [...prev, optimisticMsg]);
-    requestAnimationFrame(() => {
-      snapThreadViewportToBottom();
-      requestAnimationFrame(() => snapThreadViewportToBottom());
-    });
 
     try {
       const headers = await getAuthHeaders();
@@ -193,7 +192,7 @@ export function useMessageActions({
     currentUserId,
     getAuthHeaders,
     buildTextPost,
-    snapThreadViewportToBottom,
+    stickToBottom,
   ]);
 
   /** Sends a hangout plan; whoever proposes it is going (iOS `ConversationModel.sendPlan`). */

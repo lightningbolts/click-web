@@ -25,6 +25,7 @@ import { PLAN_DECLINED_REACTION, PLAN_GOING_REACTION, parsePlan } from '@/lib/ch
 import { useSecureMedia } from '@/lib/chat/useSecureMedia';
 import type { E2eeV2Session } from '@/lib/chat/e2eeV2Client';
 import { cn } from '@/lib/cn';
+import { revealImage } from '@/lib/ui/revealImage';
 import AttachmentBubble from './AttachmentBubble';
 import BeaconChatCard from './BeaconChatCard';
 import ChatThemeAudioPlayer from './ChatThemeAudioPlayer';
@@ -356,9 +357,17 @@ export default function MessageBubble({
           secureMedia.isLoading ? (
             <div className="aspect-[4/3] w-[320px] max-w-full animate-pulse rounded-lg bg-fill-subtle" aria-busy aria-label="Decrypting photo" />
           ) : imageSrc ? (
-            <div className="relative max-w-[min(100%,320px)] overflow-hidden rounded-lg bg-fill-subtle">
+            // Holds the decrypting placeholder's box until the photo decodes, so it changes size
+            // once (to its own) instead of collapsing to nothing first, and fades in.
+            <div className="relative max-w-[min(100%,320px)] overflow-hidden rounded-lg bg-fill-subtle [&:has(>img:not([data-loaded]))]:aspect-[4/3] [&:has(>img:not([data-loaded]))]:w-[320px]">
               {/* eslint-disable-next-line @next/next/no-img-element -- decrypted or signed media URL */}
-              <img src={imageSrc} alt="Photo" loading="lazy" className="block max-h-[360px] w-auto max-w-full object-cover" />
+              <img
+                src={imageSrc}
+                alt="Photo"
+                loading="lazy"
+                onLoad={revealImage}
+                className="img-reveal block max-h-[360px] w-auto max-w-full object-cover [&:not([data-loaded])]:absolute [&:not([data-loaded])]:inset-0"
+              />
               {!caption ? metaOverlay : null}
             </div>
           ) : (
