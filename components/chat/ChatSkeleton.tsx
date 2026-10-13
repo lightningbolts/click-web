@@ -1,10 +1,13 @@
 import { Skeleton } from '@/components/ds/Skeleton';
 import { ChatBackground } from './ChatBackground';
 
-/** A loading thread's bubbles, bottom-aligned like the messages that replace them. */
+/**
+ * A loading thread's bubbles, bottom-aligned like the messages that replace them. Invisible for
+ * the first 150 ms (`route-loading`), so a thread that loads quickly never flashes them.
+ */
 export function ThreadSkeleton() {
   return (
-    <div aria-busy aria-label="Loading messages" className="flex flex-1 flex-col justify-end gap-2 py-4">
+    <div aria-busy aria-label="Loading messages" className="route-loading flex flex-1 flex-col justify-end gap-2 py-4">
       <Skeleton className="h-9 w-48 rounded-bubble" />
       <Skeleton className="ml-auto h-9 w-40 rounded-bubble" />
       <Skeleton className="h-14 w-64 rounded-bubble" />

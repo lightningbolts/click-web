@@ -231,7 +231,7 @@ export default function ChatView({
     setDisplayGroupName,
     groupMemberProfileRows,
     sharedInterestTags,
-  } = useChatConnectionMeta({ isGroupClique, connection, otherUserName, peerUserId, getAuthHeaders });
+  } = useChatConnectionMeta({ isGroupClique, connection, otherUserName, peerUserId, currentUserId, getAuthHeaders });
 
   const {
     scrollToBottom,
@@ -756,7 +756,15 @@ export default function ChatView({
             }}
             className="chat-thread-scroll relative h-full"
           >
-            <div className={cn('mx-auto flex min-h-full max-w-[720px] flex-col px-3 pb-3 md:px-6', banner ? 'pt-20' : 'pt-4')}>
+            <div
+              className={cn(
+                'mx-auto flex min-h-full max-w-[720px] flex-col px-3 pb-3 md:px-6',
+                banner ? 'pt-20' : 'pt-4',
+                // A thread loaded from the network fades in over the backdrop; one restored from
+                // the session cache was on screen from the first frame.
+                !restoredThread && !loading && 'content-enter',
+              )}
+            >
               {loading ? (
                 <ThreadSkeleton />
               ) : null}
