@@ -31,7 +31,7 @@ export function HostContactMenu({ beaconId, contact, trigger }: { beaconId: stri
         ) : null}
         {contact.host ? (
           <MenuItem asChild icon={MessageCircle}>
-            <Link href={threadHref(contact.host.connectionId)}>Message {contact.host.firstName}</Link>
+            <Link href={threadHref(contact.host.connectionId)} unstable_dynamicOnHover>Message {contact.host.firstName}</Link>
           </MenuItem>
         ) : null}
         <MenuItem asChild icon={MessagesSquare}>

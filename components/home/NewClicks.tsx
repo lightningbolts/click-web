@@ -19,7 +19,7 @@ export function NewClicks({ items, nowMs }: { items: HomeSayHi[]; nowMs: number 
             title={`Say hi to ${c.person.name.split(/\s+/)[0]}`}
             subtitle={<TimeLeft deadlineMs={c.deadlineMs} nowMs={nowMs} />}
             trailing={
-              <Button href={threadHref(c.connectionId)} variant="tinted" size="sm">
+              <Button href={threadHref(c.connectionId)} unstable_dynamicOnHover variant="tinted" size="sm">
                 Say hi
               </Button>
             }

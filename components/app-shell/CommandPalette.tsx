@@ -1,7 +1,8 @@
 'use client';
 
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { PrefetchKind } from 'next/dist/client/components/router-reducer/router-reducer-types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { CalendarPlus, Hash, Map, QrCode, Search, Settings, type LucideIcon } from 'lucide-react';
@@ -11,6 +12,7 @@ import { Chip } from '@/components/ds/Chip';
 import { overlayClassName } from '@/components/ds/Dialog';
 import { authedJson } from '@/lib/api/authedJson';
 import { cn } from '@/lib/cn';
+import { isClicksPath, navigateClicks } from '@/lib/clicks/route';
 import { categoryLabel } from '@/lib/places/categories';
 import type { PlaceCategory } from '@/lib/places/types';
 import { eventHref, groupThreadHref, hubThreadHref, personHref, threadHref } from '@/lib/shell/appNav';
@@ -155,6 +157,7 @@ export function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function CommandPalette() {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<PaletteScope>('all');
@@ -187,11 +190,20 @@ export function CommandPalette() {
 
   const results = useMemo(() => (searching ? paletteResults(data, scope) : QUICK_ACTIONS), [searching, data, scope]);
   const activeIndex = Math.min(active, Math.max(0, results.length - 1));
+  // Over the workspace a thread opens in place; from elsewhere the highlighted one is fetched
+  // whole ahead of Enter, as a chat link is on hover.
+  const inPlace = isClicksPath(pathname);
+  const activeHref = open ? results[activeIndex]?.href : undefined;
+  const prefetchHref = activeHref && !inPlace && isClicksPath(activeHref) ? activeHref : null;
+  useEffect(() => {
+    if (prefetchHref) router.prefetch(prefetchHref, { kind: PrefetchKind.FULL });
+  }, [router, prefetchHref]);
 
   const go = (r: PaletteResult) => {
     setOpen(false);
     setQuery('');
-    router.push(r.href);
+    if (inPlace && isClicksPath(r.href)) navigateClicks(r.href);
+    else router.push(r.href);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {

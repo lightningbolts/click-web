@@ -109,6 +109,7 @@ export function AvailabilityCard({
             <ListRow
               key={m.connectionId}
               href={threadHref(m.connectionId)}
+              unstable_dynamicOnHover
               chevron={false}
               leading={<Avatar seed={m.person.id} name={m.person.name} src={m.person.avatarUrl} size={32} />}
               title={m.person.name}

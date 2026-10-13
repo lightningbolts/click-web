@@ -88,7 +88,7 @@ function MapScreenContent({ preload }: { preload?: Promise<InboxPreload | null> 
       userId={userId}
       connections={mapConnectionRecords}
       connectionsLoading={!connectionsLoaded}
-      onConnectionClick={(conn) => router.push(threadHref(conn.id))}
+      connectionHref={(conn) => threadHref(conn.id)}
       onOpenProfile={(otherUserId) => router.push(personHref(otherUserId))}
     />
   );

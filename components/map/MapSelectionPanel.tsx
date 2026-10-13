@@ -37,11 +37,11 @@ function metaString(meta: Record<string, unknown>, ...keys: string[]): string | 
 
 function ConnectionDetail({
   connections,
-  onMessage,
+  messageHref,
   onProfile,
 }: {
   connections: ConnectionRecord[];
-  onMessage?: (c: ConnectionRecord) => void;
+  messageHref?: (c: ConnectionRecord) => string;
   onProfile?: (c: ConnectionRecord) => void;
 }) {
   if (connections.length === 1) {
@@ -63,8 +63,8 @@ function ConnectionDetail({
         {c.context ? <StatusPill variant="tinted" className="mt-3">{c.context}</StatusPill> : null}
         {ambience ? <p className="type-meta mt-2 text-fg-secondary">{ambience}</p> : null}
         <div className="mt-5 flex gap-2">
-          {onMessage ? (
-            <Button variant="primary" icon={MessageCircle} className="flex-1" onClick={() => onMessage(c)}>
+          {messageHref ? (
+            <Button href={messageHref(c)} unstable_dynamicOnHover variant="primary" icon={MessageCircle} className="flex-1">
               Message
             </Button>
           ) : null}
@@ -92,7 +92,9 @@ function ConnectionDetail({
               <p className="type-body-strong truncate text-fg">{c.name}</p>
               <p className="type-meta text-fg-tertiary">{metDate(c.dateMet)}</p>
             </div>
-            {onMessage ? <IconButton icon={MessageCircle} size="sm" variant="filled" aria-label={`Message ${c.name}`} onClick={() => onMessage(c)} /> : null}
+            {messageHref ? (
+              <IconButton href={messageHref(c)} unstable_dynamicOnHover icon={MessageCircle} size="sm" variant="filled" aria-label={`Message ${c.name}`} />
+            ) : null}
             {onProfile && c.otherUserId ? (
               <IconButton icon={UserRound} size="sm" variant="filled" aria-label={`${c.name}’s profile`} onClick={() => onProfile(c)} />
             ) : null}
@@ -198,7 +200,7 @@ export function MapSelectionPanel({
   beacon,
   place,
   onClose,
-  onMessage,
+  messageHref,
   onProfile,
 }: {
   selection: MapSelection;
@@ -206,7 +208,7 @@ export function MapSelectionPanel({
   beacon: MapBeaconRecord | null;
   place?: PlaceSummary | null;
   onClose: () => void;
-  onMessage?: (c: ConnectionRecord) => void;
+  messageHref?: (c: ConnectionRecord) => string;
   onProfile?: (c: ConnectionRecord) => void;
 }) {
   // eslint-disable-next-line react-hooks/purity -- relative Pulse ages only
@@ -229,7 +231,7 @@ export function MapSelectionPanel({
           <p className="type-body px-4 pb-4 text-fg-secondary">This Place is no longer in view.</p>
         )
       ) : connections.length > 0 ? (
-        <ConnectionDetail connections={connections} onMessage={onMessage} onProfile={onProfile} />
+        <ConnectionDetail connections={connections} messageHref={messageHref} onProfile={onProfile} />
       ) : (
         <p className="type-body px-4 pb-4 text-fg-secondary">This connection is no longer on your map.</p>
       )}
