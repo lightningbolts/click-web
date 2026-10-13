@@ -7,10 +7,13 @@ import { EmptyState } from "@/components/ds/EmptyState";
 import { Timeline, TimelineDay } from "@/components/ds/Timeline";
 import { DirectoryEventRow } from "@/components/events/DirectoryEventRow";
 import { EventDirectoryControls } from "@/components/events/EventDirectoryControls";
-import { YourEventsStrip } from "@/components/events/YourEventsStrip";
+import { YourEventsStrip, type YourEventsInitial } from "@/components/events/YourEventsStrip";
 import { buildEventDirectory, directoryHref, parseDirectoryQuery, PUBLIC_EVENTS_TAG } from "@/lib/events/directory";
 import { loadPublicPastEvents, loadPublicUpcomingEvents, type PublicEventListItem } from "@/lib/events/publicEvent";
 import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
+import { loadEventBookmarks } from "@/lib/server/events/eventBookmarks";
+import { loadMineEvents } from "@/lib/server/events/mineEvents";
+import { listTicketGroups } from "@/lib/server/ticketing/ownedTickets";
 import { getServerUser } from "@/lib/server/getServerUser";
 import { ticketingEnabled } from "@/lib/server/ticketing/enabled";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
@@ -39,6 +42,24 @@ const loadPast = unstable_cache(
   { revalidate: 60, tags: [PUBLIC_EVENTS_TAG] },
 );
 
+/**
+ * "Your events" read with the page, so the strip is there at first paint instead of popping in
+ * above the list. Null (the strip then loads in the browser) if any read fails.
+ */
+async function loadYourEvents(userId: string, ticketing: boolean): Promise<YourEventsInitial | null> {
+  const admin = createAdminSupabaseClient();
+  try {
+    const [events, saved, ticketGroups] = await Promise.all([
+      loadMineEvents(admin, userId),
+      loadEventBookmarks(admin, userId, { limit: 50 }),
+      ticketing ? listTicketGroups(admin, userId, "upcoming", Date.now()) : null,
+    ]);
+    return { events, bookmarks: saved.bookmarks, ticketGroups };
+  } catch {
+    return null;
+  }
+}
+
 export default async function PublicEventsPage({
   searchParams,
 }: {
@@ -47,16 +68,17 @@ export default async function PublicEventsPage({
   const [params, user, jar] = await Promise.all([searchParams, getServerUser(), cookies()]);
   const query = parseDirectoryQuery(params);
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? "UTC";
-  let items: PublicEventListItem[] = [];
-  try {
-    items = await (query.tab === "past" ? loadPast() : loadUpcoming());
-  } catch {
+  const searching = Boolean(query.q);
+  const ticketing = ticketingEnabled();
+  const showYours = Boolean(user) && query.tab === "upcoming" && !searching;
+  const [items, yours] = await Promise.all([
     // CI / local without SUPABASE_SERVICE_ROLE_KEY still render the page.
-  }
+    (query.tab === "past" ? loadPast() : loadUpcoming()).catch((): PublicEventListItem[] => []),
+    showYours && user ? loadYourEvents(user.id, ticketing) : null,
+  ]);
   // eslint-disable-next-line react-hooks/purity -- server component, rendered per request
   const nowMs = Date.now();
   const dir = buildEventDirectory(items, query, { timeZone, nowMs });
-  const searching = Boolean(query.q);
   const flat = query.sort !== "date";
 
   return (
@@ -83,7 +105,9 @@ export default async function PublicEventsPage({
         <EventDirectoryControls query={query} />
       </div>
 
-      {user && query.tab === "upcoming" && !searching ? <YourEventsStrip timeZone={timeZone} initialFilter={params.view === "saved" ? "saved" : null} ticketing={ticketingEnabled()} /> : null}
+      {showYours ? (
+        <YourEventsStrip timeZone={timeZone} initialFilter={params.view === "saved" ? "saved" : null} ticketing={ticketing} initial={yours} />
+      ) : null}
 
       {dir.featured ? (
         <div className="mb-10">

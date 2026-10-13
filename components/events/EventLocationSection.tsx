@@ -9,7 +9,8 @@ import { SectionHeader } from '@/components/ds/SectionHeader';
 import { EventWeatherLine } from '@/components/events/EventWeatherLine';
 import { MapsMenu } from '@/components/events/MapsMenu';
 
-const PinMap = dynamic(() => import('@/components/maps/PinMap'), { ssr: false, loading: () => <MapPanel loading /> });
+// The panel stays underneath while MapLibre loads; the map fades in over it.
+const PinMap = dynamic(() => import('@/components/maps/PinMap'), { ssr: false });
 
 function MapPanel({ loading, onShow }: { loading?: boolean; onShow?: () => void }) {
   return (
@@ -83,16 +84,15 @@ export function EventLocationSection({
         />
       </div>
       {hasPin ? (
-        <div ref={ref} className="mt-3">
+        <div ref={ref} className="relative mt-3">
+          <MapPanel loading={show} onShow={show ? undefined : () => setShow(true)} />
           {show ? (
             <PinMap
               testId="event-pin-map"
-              className="h-[220px] rounded-lg border-0"
+              className="absolute inset-0 h-[220px] rounded-lg border-0 bg-transparent"
               markers={[{ id: beaconId, lat, lng, label }]}
             />
-          ) : (
-            <MapPanel onShow={() => setShow(true)} />
-          )}
+          ) : null}
         </div>
       ) : null}
     </section>

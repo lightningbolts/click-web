@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as maplibregl from '@/lib/maps/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { dropSameOriginMapRequest } from '@/lib/map/dropSameOriginMapRequest';
@@ -61,6 +61,8 @@ export default function PinMap({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const themeRef = useRef(theme);
+  // The map fades in once its first frame is drawn, instead of tiles snapping onto a blank box.
+  const [drawn, setDrawn] = useState(false);
   const onPinMoveRef = useRef(onPinMove);
   useEffect(() => {
     onPinMoveRef.current = onPinMove;
@@ -99,7 +101,10 @@ export default function PinMap({
       ...(maxBounds ? { maxBounds } : {}),
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    // An unreachable style still reveals the map (its controls), as before.
+    map.once('error', () => setDrawn(true));
     map.on('load', () => {
+      setDrawn(true);
       map.resize();
       if (markers.length > 1) {
         map.fitBounds(padBounds(markers), { padding: 48, duration: 0, maxZoom: 16 });
@@ -149,7 +154,13 @@ export default function PinMap({
       data-testid={testId}
       className={cn('relative h-64 overflow-hidden rounded-[16px] border border-hairline bg-surface-raised', className)}
     >
-      <div ref={containerRef} className="absolute inset-0" />
+      <div
+        ref={containerRef}
+        className={cn(
+          'absolute inset-0 transition-opacity duration-[var(--d-base)] ease-[var(--ease)] motion-reduce:transition-none',
+          drawn ? 'opacity-100' : 'opacity-0',
+        )}
+      />
     </div>
   );
 }

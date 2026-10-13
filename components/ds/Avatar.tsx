@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useHydrated } from "@/lib/react/useHydrated";
+import { revealIfLoaded, revealImage } from "@/lib/ui/revealImage";
 import { avatarFallbackColor, avatarInitials } from "@/lib/ui/avatarFallback";
 
 export type AvatarSize = 20 | 24 | 32 | 40 | 48 | 56 | 72 | 96 | 120;
@@ -39,6 +41,11 @@ export function Avatar({
   priority,
 }: AvatarProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  // Mounted in the browser (a list arriving, a section opened), the photo fades in over its
+  // color once it has arrived instead of snapping in. Server-rendered avatars stay as they are,
+  // so they never wait for hydration to show. Read once: the choice never changes after mount.
+  const hydrated = useHydrated();
+  const [fade] = useState(hydrated);
   const url = src?.trim() || null;
   const showImage = Boolean(url) && failedSrc !== url;
   const dot = Math.max(10, Math.round(size * 0.22));
@@ -68,7 +75,9 @@ export function Avatar({
             height={size}
             sizes={`${size}px`}
             priority={priority}
-            className="size-full object-cover"
+            className={cn("size-full object-cover", fade && "img-reveal")}
+            ref={fade ? revealIfLoaded : undefined}
+            onLoad={fade ? revealImage : undefined}
             onError={() => setFailedSrc(url)}
           />
         ) : (
@@ -186,7 +195,8 @@ export function AvatarStack({
       {shown.map((p, i) => (
         <span
           key={p.seed}
-          className="rounded-full"
+          // Flex, so a photo sits flush like initials do (no descender gap under an inline image).
+          className="flex rounded-full"
           style={{
             marginLeft: i === 0 ? 0 : -overlap,
             boxShadow: `0 0 0 2px ${ringColor}`,

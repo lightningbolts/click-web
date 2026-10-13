@@ -18,96 +18,15 @@ import { cronPushBearer, pushFunctionUrl } from "@/lib/server/cronAuth";
 import {
   decideMemberRsvp,
   listingOptionsFromBeacon,
-  loadRequestStatus,
   upsertRsvpRequest,
 } from "@/lib/events/eventRsvpPolicy";
 import { rsvpEnabledFromMetadata } from "@/lib/events/eventMetadata";
 import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
-import { countEventRsvps } from "@/lib/events/publicEvent";
 import { recordRsvpActivity } from "@/lib/server/activity";
+import { displayNameFromUser } from "@/lib/events/attendeeDirectory";
+import { loadAttendeeProfiles, loadEventRsvpPayload } from "@/lib/server/events/eventRsvpPayload";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
-
-type UserProfileRow = {
-  id: string;
-  name: string | null;
-  image: string | null;
-  first_name: string | null;
-  last_name: string | null;
-};
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
-/** PostgREST may return an embedded FK row as an object or a one-element array. */
-function joinedUserProfile(raw: unknown): UserProfileRow | null {
-  if (raw == null) return null;
-  if (Array.isArray(raw)) {
-    return joinedUserProfile(raw[0] ?? null);
-  }
-  if (!isRecord(raw)) return null;
-  const id = typeof raw.id === "string" ? raw.id : null;
-  if (id == null) return null;
-  return {
-    id,
-    name: typeof raw.name === "string" ? raw.name : null,
-    image: typeof raw.image === "string" ? raw.image : null,
-    first_name: typeof raw.first_name === "string" ? raw.first_name : null,
-    last_name: typeof raw.last_name === "string" ? raw.last_name : null,
-  };
-}
-
-function displayNameFromUser(user: UserProfileRow | null): string {
-  if (user == null) return "Attendee";
-  const first = user.first_name?.trim() ?? "";
-  const last = user.last_name?.trim() ?? "";
-  const combined = [first, last].filter((s) => s.length > 0).join(" ").trim();
-  if (combined.length > 0) return combined;
-  const name = user.name?.trim();
-  if (name != null && name.length > 0) return name;
-  return "Attendee";
-}
-
-function parseAttendeeRows(data: unknown): Array<{ user_id: string; signed_up_at: string }> {
-  if (!Array.isArray(data)) return [];
-  const rows: Array<{ user_id: string; signed_up_at: string }> = [];
-  for (const item of data) {
-    if (!isRecord(item)) continue;
-    const userId = typeof item.user_id === "string" ? item.user_id : null;
-    const signedUpAt =
-      (typeof item.created_at === "string" ? item.created_at : null) ??
-      (typeof item.rsvpd_at === "string" ? item.rsvpd_at : null);
-    if (userId == null || signedUpAt == null) continue;
-    rows.push({ user_id: userId, signed_up_at: signedUpAt });
-  }
-  return rows;
-}
-
-async function loadAttendeeProfiles(
-  admin: ReturnType<typeof createAdminSupabaseClient>,
-  userIds: string[],
-): Promise<Map<string, UserProfileRow>> {
-  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
-  if (unique.length === 0) return new Map();
-
-  const { data, error } = await admin
-    .from("users")
-    .select("id, name, image, first_name, last_name")
-    .in("id", unique);
-
-  if (error != null || !Array.isArray(data)) {
-    console.error("loadAttendeeProfiles:", error?.message);
-    return new Map();
-  }
-
-  const out = new Map<string, UserProfileRow>();
-  for (const raw of data) {
-    const profile = joinedUserProfile(raw);
-    if (profile != null) out.set(profile.id, profile);
-  }
-  return out;
-}
 
 /**
  * GET — list RSVP attendees for an event beacon (avatars + display names).
@@ -133,52 +52,14 @@ export async function GET(
     const loaded = await loadEventBeaconOrResponse(admin, beaconId, { allowExpired: true });
     if ("response" in loaded) return loaded.response;
 
-    const { data, error } = await admin
-      .from("beacon_attendees")
-      .select("user_id, created_at, rsvpd_at")
-      .eq("beacon_id", beaconId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("GET /api/beacons/[beaconId]/rsvp:", error.message);
-      return NextResponse.json({ error: "Failed to load attendees" }, { status: 500 });
-    }
-
-    const attendeeRows = parseAttendeeRows(data);
-    const profiles = await loadAttendeeProfiles(
-      admin,
-      attendeeRows.map((row) => row.user_id),
-    );
-
     const listing = listingOptionsFromBeacon(loaded.beacon);
-    const isHost = await userMayManageBeacon(admin, user.id, {
+    const mayManage = await userMayManageBeacon(admin, user.id, {
       creator_id: loaded.beacon.creator_id ?? "",
       venue_id: loaded.beacon.venue_id,
     });
-    const visibleRows =
-      listing.guest_list_visibility === "hosts_only" && !isHost
-        ? attendeeRows.filter((row) => row.user_id === user.id)
-        : attendeeRows;
-    const attendees = visibleRows.map((row) => {
-      const profile = profiles.get(row.user_id) ?? null;
-      return {
-        user_id: row.user_id,
-        name: displayNameFromUser(profile),
-        avatar_url: profile?.image ?? null,
-        signed_up_at: row.signed_up_at,
-      };
-    });
-
-    const requestStatus = await loadRequestStatus(admin, beaconId, user.id);
-    const rsvpCount = await countEventRsvps(admin, beaconId);
-
-    return NextResponse.json({
-      beacon_id: beaconId,
-      attendees,
-      current_user_signed_up: attendeeRows.some((row) => row.user_id === user.id),
-      request_status: requestStatus,
-      rsvp_count: rsvpCount,
-    });
+    return NextResponse.json(
+      await loadEventRsvpPayload(admin, beaconId, user.id, { mayManage, guestListVisibility: listing.guest_list_visibility }),
+    );
   } catch (e) {
     console.error("GET /api/beacons/[beaconId]/rsvp:", e);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

@@ -62,7 +62,7 @@ export default async function EventManageTabPage({ params }: { params: Params })
   const { event, access } = ctx;
   // eslint-disable-next-line react-hooks/purity -- server component, rendered per request
   const nowMs = Date.now();
-  const ended = eventIsPast({ event_end_at: event.event_end_at, event_start_at: event.event_start_at }, nowMs);
+  const ended = eventIsPast(event, nowMs);
 
   switch (tab) {
     case "overview": {

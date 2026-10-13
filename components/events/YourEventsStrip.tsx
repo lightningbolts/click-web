@@ -9,11 +9,12 @@ import { SegmentedControl } from '@/components/ds/SegmentedControl';
 import { Skeleton } from '@/components/ds/Skeleton';
 import { useAuth } from '@/lib/AuthContext';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
-import { eventDisplayTitle } from '@/lib/events/eventMetadata';
+import { eventDisplayTitle, eventIsPast } from '@/lib/events/eventMetadata';
 import { formatEventWhen } from '@/lib/home/format';
 import type { MineEvent } from '@/lib/server/events/mineEvents';
 import { eventHref } from '@/lib/shell/appNav';
 import { fetchMyTickets } from '@/lib/ticketing/ticketingClient';
+import type { MyTicketsGroup } from '@/lib/ticketing/types';
 
 /** Same key and response shape as every other `/api/beacons/mine` reader, so they share SWR's cache. */
 export const MINE_EVENTS_KEY = '/api/beacons/mine';
@@ -26,7 +27,14 @@ async function fetchMine(url: string): Promise<{ events?: MineEvent[] }> {
 
 type Filter = 'hosting' | 'going' | 'saved';
 
-type Bookmark = { beacon_id: string; title: string | null; event_start_at: string | null; event_end_at: string | null; created_at: string | null };
+type Bookmark = {
+  beacon_id: string;
+  title: string | null;
+  event_start_at: string | null;
+  event_end_at: string | null;
+  expires_at: string | null;
+  created_at: string | null;
+};
 const BOOKMARKS_KEY = '/api/me/event-bookmarks?limit=50';
 
 async function fetchSaved(url: string): Promise<{ bookmarks?: Bookmark[] }> {
@@ -35,14 +43,10 @@ async function fetchSaved(url: string): Promise<{ bookmarks?: Bookmark[] }> {
   return res.json();
 }
 
-type StripItem = { id: string; title: string; startAt: string | null; imageUrl: string | null };
+/** What the page read on the server, so the strip renders with it (SWR refreshes it after). */
+export type YourEventsInitial = { events: MineEvent[]; bookmarks: Bookmark[]; ticketGroups: MyTicketsGroup[] | null };
 
-function upcoming(e: Pick<MineEvent, 'event_start_at' | 'event_end_at'>, nowMs: number): boolean {
-  const end = Date.parse(e.event_end_at ?? '');
-  const start = Date.parse(e.event_start_at ?? '');
-  if (Number.isFinite(end)) return end > nowMs;
-  return !Number.isFinite(start) || start + 3 * 3_600_000 > nowMs;
-}
+type StripItem = { id: string; title: string; startAt: string | null; imageUrl: string | null };
 
 /**
  * "Your events" (spec §7.6.1): a horizontal strip of upcoming events you host, are going to or
@@ -53,19 +57,28 @@ export function YourEventsStrip({
   timeZone,
   initialFilter,
   ticketing = false,
+  initial = null,
 }: {
   timeZone: string;
   initialFilter?: Filter | null;
   /** Ticketing is on: link to the ticket wallet when you hold an upcoming ticket. */
   ticketing?: boolean;
+  initial?: YourEventsInitial | null;
 }) {
   const { user } = useAuth();
   // Same key as the ticket wallet's Upcoming list, so the two share SWR's cache.
   const { data: ticketGroups } = useSWR(user && ticketing ? ['my-tickets', 'upcoming'] : null, () => fetchMyTickets('upcoming'), {
     revalidateOnFocus: false,
+    fallbackData: initial?.ticketGroups ?? undefined,
   });
-  const { data, isLoading } = useSWR(user ? MINE_EVENTS_KEY : null, fetchMine, { revalidateOnFocus: false });
-  const { data: savedData } = useSWR(user ? BOOKMARKS_KEY : null, fetchSaved, { revalidateOnFocus: false });
+  const { data, isLoading } = useSWR(user ? MINE_EVENTS_KEY : null, fetchMine, {
+    revalidateOnFocus: false,
+    fallbackData: initial ? { events: initial.events } : undefined,
+  });
+  const { data: savedData } = useSWR(user ? BOOKMARKS_KEY : null, fetchSaved, {
+    revalidateOnFocus: false,
+    fallbackData: initial ? { bookmarks: initial.bookmarks } : undefined,
+  });
   const [nowMs] = useState(() => Date.now());
   const [filter, setFilter] = useState<Filter | null>(initialFilter ?? null);
   if (!user) return null;
@@ -79,7 +92,7 @@ export function YourEventsStrip({
     );
   }
   const soon = (data?.events ?? [])
-    .filter((e) => upcoming(e, nowMs))
+    .filter((e) => !eventIsPast(e, nowMs))
     .sort((a, b) => (Date.parse(a.event_start_at ?? '') || 0) - (Date.parse(b.event_start_at ?? '') || 0));
   const asItem = (e: MineEvent): StripItem => ({
     id: e.beacon_id,
@@ -90,7 +103,7 @@ export function YourEventsStrip({
   const hosting = soon.filter((e) => e.role === 'creator').map(asItem);
   const going = soon.filter((e) => e.role !== 'creator').map(asItem);
   const saved = (savedData?.bookmarks ?? [])
-    .filter((b) => b.created_at && upcoming(b, nowMs))
+    .filter((b) => b.created_at && !eventIsPast(b, nowMs))
     .map((b) => ({ id: b.beacon_id, title: eventDisplayTitle(b.title), startAt: b.event_start_at, imageUrl: null }));
   const ticketCount = (ticketGroups ?? []).reduce((sum, g) => sum + g.tickets.length, 0);
   const ticketsLink = ticketCount ? (

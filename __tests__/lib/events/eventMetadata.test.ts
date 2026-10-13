@@ -2,6 +2,7 @@ import {
   eventDescriptionPlainText,
   eventDisplayTitle,
   eventInstantFromRowOrMeta,
+  eventIsPast,
   eventStartAtFromMetadata,
   eventSubtitle,
   eventTimezoneFromMetadata,
@@ -76,5 +77,16 @@ describe("eventMetadata helpers", () => {
       "2026-09-01T12:00:00.000Z",
     );
     expect(eventInstantFromRowOrMeta(1_724_457_600_000, null)).toBe("2024-08-24T00:00:00.000Z");
+  });
+
+  it("ends an undated event when its beacon expires, as on iOS", () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    expect(eventIsPast({ expires_at: "2026-10-12T12:00:00.000Z" }, now)).toBe(true);
+    expect(eventIsPast({ expires_at: "2026-10-14T12:00:00.000Z" }, now)).toBe(false);
+    expect(eventIsPast({}, now)).toBe(false);
+    // A set time wins over the expiry.
+    expect(eventIsPast({ event_end_at: "2026-10-14T00:00:00.000Z", expires_at: "2026-10-12T00:00:00.000Z" }, now)).toBe(false);
+    expect(eventIsPast({ event_start_at: "2026-10-13T08:00:00.000Z", expires_at: "2026-10-12T00:00:00.000Z" }, now)).toBe(false);
+    expect(eventIsPast({ event_start_at: "2026-10-13T05:00:00.000Z" }, now)).toBe(true);
   });
 });

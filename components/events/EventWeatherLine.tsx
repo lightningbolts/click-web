@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { createElement } from 'react';
+import { Skeleton } from '@/components/ds/Skeleton';
 import useSWR from 'swr';
 import { leadReading, usesFahrenheit, weatherSummary, type PlaceWeather, type WeatherReading } from '@/lib/events/eventWeather';
 
@@ -42,7 +43,7 @@ async function fetchWeather(url: string): Promise<PlaceWeather | null> {
 
 /**
  * "64° Cloudy now · 58° Rain at 7:00 PM, 70% chance of rain" under the event's address (spec 06 §4).
- * Fetched after the page paints and hidden until (and unless) there's something to say.
+ * Fetched after the page paints, holding its line meanwhile; hidden if there's nothing to say.
  */
 export function EventWeatherLine({
   lat,
@@ -58,12 +59,20 @@ export function EventWeatherLine({
 }) {
   const params = new URLSearchParams({ lat: lat.toFixed(4), lng: lng.toFixed(4) });
   if (forecastAt) params.set('at', forecastAt);
-  const { data } = useSWR(`/api/geo/weather?${params}`, fetchWeather, {
+  const { data, error } = useSWR(`/api/geo/weather?${params}`, fetchWeather, {
     revalidateOnFocus: false,
     revalidateIfStale: false,
     dedupingInterval: 600_000,
     shouldRetryOnError: false,
   });
+  // Holds its line while it loads, so the map and everything under it don't shift down after.
+  if (data === undefined && !error) {
+    return (
+      <p className="type-meta mt-1 flex h-[1lh] items-center" aria-hidden>
+        <Skeleton rounded="sm" className="h-3 w-40" />
+      </p>
+    );
+  }
   if (!data) return null;
   const startLabel = forecastAt
     ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone }).format(Date.parse(forecastAt))

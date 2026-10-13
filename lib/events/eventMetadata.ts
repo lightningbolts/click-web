@@ -169,29 +169,25 @@ export function parseIsoMs(raw: string | null): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-export function isUpcomingEvent(meta: Record<string, unknown>, nowMs = Date.now()): boolean {
-  const end = parseIsoMs(eventEndAtFromMetadata(meta));
-  if (end != null) return end >= nowMs;
-  const start = parseIsoMs(eventStartAtFromMetadata(meta));
-  if (start != null) return start >= nowMs - 6 * 60 * 60 * 1000;
-  return true;
-}
-
 export function isEventEnded(meta: Record<string, unknown>, nowMs = Date.now()): boolean {
   const end = parseIsoMs(eventEndAtFromMetadata(meta));
   return end != null && end <= nowMs;
 }
 
-/** Whether an event is in the past (end_at, else start_at with a 6h grace). */
+/**
+ * Whether an event is in the past: its end, else its start with a 6h grace, else (no time set
+ * yet) its beacon's expiry, as on iOS, so an undated event doesn't stay "upcoming" for good.
+ */
 export function eventIsPast(
-  event: { event_end_at?: string | null; event_start_at?: string | null },
+  event: { event_end_at?: string | null; event_start_at?: string | null; expires_at?: string | null },
   nowMs = Date.now(),
 ): boolean {
   const end = parseIsoMs(event.event_end_at ?? null);
   if (end != null) return end < nowMs;
   const start = parseIsoMs(event.event_start_at ?? null);
   if (start != null) return start < nowMs - 6 * 60 * 60 * 1000;
-  return false;
+  const expires = parseIsoMs(event.expires_at ?? null);
+  return expires != null && expires <= nowMs;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

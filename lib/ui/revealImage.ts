@@ -7,3 +7,11 @@ import type { SyntheticEvent } from 'react';
 export function revealImage(event: SyntheticEvent<HTMLImageElement>) {
   event.currentTarget.dataset.loaded = '';
 }
+
+/**
+ * `ref` for the same image: one already in the browser's cache shows at once, with no fade
+ * (`onLoad` only arrives after a decode, a frame or more later).
+ */
+export function revealIfLoaded(img: HTMLImageElement | null) {
+  if (img?.complete && img.naturalWidth > 0) img.dataset.loaded = '';
+}

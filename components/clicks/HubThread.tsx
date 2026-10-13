@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import useSWRInfinite from 'swr/infinite';
-import { ArrowLeft, ArrowUp, CalendarDays, Check, LogOut, MoreHorizontal, Paperclip, Pencil, Reply, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowUp, CalendarDays, Check, Clock, LogOut, MoreHorizontal, Paperclip, Pencil, Reply, Search, Trash2, Users, X } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
 import { CardVisual } from '@/components/ds/CardVisual';
 import { useConfirm } from '@/components/ds/ConfirmDialog';
@@ -23,7 +23,8 @@ import type { HubThreadMessage } from '@/lib/hub/hubThread';
 import { forgetHub, rememberHub } from '@/lib/hub/recentHubs';
 import { parseE2eeV2Envelope } from '@/lib/chat/e2eeV2';
 import { uploadHubAttachment } from '@/lib/hub/mediaClient';
-import { decryptWebE2eeV2Message, encryptWebE2eeV2Message, resolveWebHubE2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { decryptWebE2eeV2ForDisplay, encryptWebE2eeV2Message, resolveWebHubE2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { hubSession, sendHubText } from '@/lib/hub/hubChatClient';
 import { eventHref, personHref } from '@/lib/shell/appNav';
 import { cn } from '@/lib/cn';
 
@@ -41,6 +42,11 @@ const zero = (s: Session) => s?.epochKeys.forEach((k) => k.fill(0));
 const replyTargetId = (m: HubThreadMessage) => {
   const meta = m.metadata && typeof m.metadata === 'object' ? (m.metadata as Record<string, unknown>) : {};
   return typeof meta.reply_to_id === 'string' ? meta.reply_to_id : null;
+};
+/** Stable from the sending bubble to the stored row: its client message id when it has one. */
+const messageKey = (m: HubThreadMessage) => {
+  const meta = m.metadata && typeof m.metadata === 'object' ? (m.metadata as Record<string, unknown>) : {};
+  return typeof meta.client_message_id === 'string' && meta.client_message_id ? meta.client_message_id : m.id;
 };
 const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
@@ -63,7 +69,12 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  /** Plaintext by ciphertext, so each body (and each edit of it) is decrypted once. */
   const [bodies, setBodies] = useState<Record<string, string>>({});
+  /** A text on its way: shown at the end of the thread from the moment it's sent. */
+  const [pending, setPending] = useState<HubThreadMessage | null>(null);
+  /** The newest message when the thread opened; later ones animate in. */
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
   const [encryptionError, setEncryptionError] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -112,11 +123,12 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
         : [],
     [data],
   );
-  const latestId = data?.messages.at(-1)?.id;
+  const latestKey = pending?.id ?? data?.messages.at(-1)?.id;
+  const decryptedCount = Object.keys(bodies).length;
   useEffect(() => {
     const el = scroller.current;
     if (el && followLatest.current) el.scrollTop = el.scrollHeight;
-  }, [latestId]);
+  }, [latestKey, decryptedCount]);
 
   const { data: people } = useSWR(
     visibleIds.length && !loadError ? ['hub-people', userId, hubId, visibleIds.join(',')] : null,
@@ -143,43 +155,29 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
     };
   }, [hubId, mutate]);
 
+  // Decrypts what isn't yet, with the hub's cached keys (re-read once when a message is from a
+  // newer epoch), so a new message costs one decrypt, not a key exchange and the whole thread.
   useEffect(() => {
     if (!data || loadError) return;
-    let cancelled = false;
-    void (async () => {
-      let session: Session = null;
-      try {
-        if (data.messages.some((m) => m.body.startsWith('e2e2:'))) {
-          session = await resolveWebHubE2eeV2Session({ hubId, participantUserIds: data.participant_ids, getAuthHeaders: getFreshAuthHeaders });
+    const todo = [...new Set(data.messages.map((m) => m.body).filter((b) => b.startsWith('e2e2:') && !(b in bodies)))];
+    if (todo.length === 0) return;
+    const keys = () => hubSession(hubId, data.participant_ids);
+    void Promise.all(
+      todo.map(async (body): Promise<[string, string]> => {
+        let plain: string | null = null;
+        try {
+          if (parseE2eeV2Envelope(body).chatId === hubId) plain = await decryptWebE2eeV2ForDisplay(hubId, body, keys, 'hub');
+        } catch {
+          // Malformed: shown as unavailable.
         }
-        const entries = await Promise.all(
-          data.messages.map(async (m): Promise<[string, string]> => {
-            if (!m.body.startsWith('e2e2:')) return [m.id, m.body];
-            try {
-              if (!session || parseE2eeV2Envelope(m.body).chatId !== hubId) throw new Error('Unavailable');
-              return [m.id, await decryptWebE2eeV2Message(session, m.body)];
-            } catch {
-              return [m.id, UNAVAILABLE];
-            }
-          }),
-        );
-        if (!cancelled) {
-          setBodies(Object.fromEntries(entries));
-          setEncryptionError('');
-        }
-      } catch {
-        if (!cancelled) {
-          setBodies({});
-          setEncryptionError('Some encrypted messages can’t be opened on this device yet.');
-        }
-      } finally {
-        zero(session);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [data, hubId, loadError]);
+        return [body, plain ?? UNAVAILABLE];
+      }),
+    ).then((entries) => {
+      if (!mounted.current) return;
+      setBodies((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      if (entries.some(([, plain]) => plain === UNAVAILABLE)) setEncryptionError('Some encrypted messages can’t be opened on this device yet.');
+    });
+  }, [bodies, data, hubId, loadError]);
 
   async function run(action: () => Promise<void>) {
     if (operation.current || loadError || !data) return;
@@ -201,11 +199,11 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
 
   async function send() {
     if (!data || (!draft.trim() && !file)) return;
+    if (!editing && !file) return sendText(data.participant_ids);
     let session: Session = null;
     try {
       const coords = await coordsFor();
       session = await resolveWebHubE2eeV2Session({ hubId, participantUserIds: data.participant_ids, getAuthHeaders: getFreshAuthHeaders });
-      const reply = replyTo ? { reply_to_id: replyTo.id } : {};
       if (editing) {
         if (!session && editing.body.startsWith('e2e2:')) throw new Error('Encryption keys are unavailable. Your message wasn’t changed.');
         const encrypted = session ? await encryptWebE2eeV2Message(session, hubId, draft.trim()) : null;
@@ -221,31 +219,51 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
         }
         return;
       }
-      if (file) {
-        if (!session) throw new Error('Everyone here needs encryption support before you can share an attachment.');
-        const attachment = await uploadHubAttachment({ file, userId, hubId, session, coords });
-        await hubRequest('/api/hub/messages', { hub_id: hubId, ...coords, ...attachment, metadata: { ...attachment.metadata, ...reply } });
-        if (mounted.current) {
-          setFile(null);
-          if (fileInput.current) fileInput.current.value = '';
-        }
-      } else {
-        const encrypted = session ? await encryptWebE2eeV2Message(session, hubId, draft.trim()) : null;
-        await hubRequest('/api/hub/messages', {
-          hub_id: hubId,
-          ...coords,
-          body: encrypted?.wireContent ?? draft.trim(),
-          message_type: 'text',
-          metadata: { ...encrypted?.metadata, ...reply },
-        });
-        if (mounted.current) setDraft('');
-      }
+      if (!session) throw new Error('Everyone here needs encryption support before you can share an attachment.');
+      const reply = replyTo ? { reply_to_id: replyTo.id } : {};
+      const attachment = await uploadHubAttachment({ file: file!, userId, hubId, session, coords });
+      await hubRequest('/api/hub/messages', { hub_id: hubId, ...coords, ...attachment, metadata: { ...attachment.metadata, ...reply } });
       if (mounted.current) {
+        setFile(null);
+        if (fileInput.current) fileInput.current.value = '';
         setReplyTo(null);
         followLatest.current = true;
       }
     } finally {
       zero(session);
+    }
+  }
+
+  /** A text: on screen and out of the field at once, then sent with the hub's cached keys. */
+  async function sendText(participantIds: string[]) {
+    const text = draft.trim();
+    const replying = replyTo;
+    const reply = replying ? { reply_to_id: replying.id } : {};
+    const clientMessageId = crypto.randomUUID();
+    setPending({
+      id: clientMessageId,
+      hub_id: hubId,
+      user_id: userId,
+      body: text,
+      created_at: new Date().toISOString(),
+      edited_at: null,
+      message_type: 'text',
+      metadata: { client_message_id: clientMessageId, ...reply },
+    });
+    setDraft('');
+    setReplyTo(null);
+    followLatest.current = true;
+    try {
+      const row = await sendHubText(hubId, text, participantIds, { clientMessageId, fields: await coordsFor(), metadata: reply });
+      // Its plaintext is known: no decrypt, and no "can't decrypt" flash when the row lands.
+      if (mounted.current) setBodies((prev) => ({ ...prev, [row.body]: text }));
+    } catch (e) {
+      if (mounted.current) {
+        setPending(null);
+        setDraft((current) => current || text);
+        setReplyTo((current) => current ?? replying);
+      }
+      throw e;
     }
   }
 
@@ -275,10 +293,20 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
     });
   }
 
-  const bodyFor = (m: HubThreadMessage) => (m.body.startsWith('e2e2:') ? (bodies[m.id] ?? UNAVAILABLE) : m.body);
+  // A sealed body renders once it's decrypted (a moment), never as "can't decrypt" first.
+  const ready = (m: HubThreadMessage) => !m.body.startsWith('e2e2:') || m.body in bodies;
+  const bodyFor = (m: HubThreadMessage) => (m.body.startsWith('e2e2:') ? (bodies[m.body] ?? '') : m.body);
+  // Opening: the skeleton holds until the first pass has decrypted the thread.
+  const opening = !data || (Object.keys(bodies).length === 0 && data.messages.some((m) => !ready(m)));
+  // The sent row replaces the sending bubble under the same key.
+  if (pending && data?.messages.some((m) => messageKey(m) === pending.id)) setPending(null);
+  // What the thread opened with stays put; what arrives after rises in, as in direct messages.
+  if (!opening && openedAt === null) setOpenedAt(data.messages.at(-1)?.created_at ?? '');
   const nameFor = (id: string) => (id === userId ? 'You' : visibleIds.includes(id) ? (people?.[id] ?? 'Hub member') : 'Hub member');
   const q = query.trim().toLocaleLowerCase();
-  const messages = (data?.messages ?? []).filter((m) => !q || bodyFor(m).toLocaleLowerCase().includes(q));
+  const messages = [...(data?.messages ?? []), ...(pending && !q ? [pending] : [])].filter(
+    (m) => ready(m) && (!q || bodyFor(m).toLocaleLowerCase().includes(q)),
+  );
   const hasOlder = pages?.[pages.length - 1]?.messages.length === PAGE;
 
   const jumpTo = (id: string) => {
@@ -361,7 +389,7 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
             >
               {(loadError ?? hubError).message}
             </InlineNotice>
-          ) : !data ? (
+          ) : opening ? (
             <div className="space-y-3" role="status" aria-label="Loading conversation">
               <Skeleton className="h-10 w-2/3 rounded-lg" />
               <Skeleton className="ml-auto h-10 w-1/2 rounded-lg" />
@@ -388,15 +416,17 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
                   const firstOfRun = messages[i - 1]?.user_id !== m.user_id;
                   const targetId = replyTargetId(m);
                   const target = targetId ? data.messages.find((x) => x.id === targetId) : null;
+                  const sending = m === pending;
                   const reactions = data.reactions.filter((r) => r.hub_message_id === m.id);
                   const grouped = Array.from(new Set(reactions.map((r) => r.reaction_type)));
                   return (
                     <li
-                      key={m.id}
+                      key={messageKey(m)}
                       id={`hub-msg-${m.id}`}
                       className={cn(
                         'group/msg relative flex flex-col rounded-md transition-colors duration-[var(--d-base)]',
-                        mine ? 'items-end pl-16' : 'items-start pr-16',
+                        mine ? 'origin-bottom-right items-end pl-16' : 'origin-bottom-left items-start pr-16',
+                        openedAt !== null && m.created_at > openedAt && 'msg-in',
                         firstOfRun && i > 0 && 'pt-2',
                         highlight === m.id && 'bg-selection',
                       )}
@@ -415,7 +445,7 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
                           'type-body relative max-w-[min(75%,520px)] whitespace-pre-wrap break-words rounded-bubble px-3 py-2',
                           mine ? 'rounded-br-[6px] bg-bubble-out text-white' : 'rounded-bl-[6px] bg-bubble-in text-fg',
                         )}
-                        onDoubleClick={() => void run(() => react(m, '❤️'))}
+                        onDoubleClick={sending ? undefined : () => void run(() => react(m, '❤️'))}
                       >
                         {target ? (
                           <button
@@ -435,9 +465,10 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
                         ) : (
                           <span className={body === UNAVAILABLE ? 'italic opacity-70' : undefined}>{body}</span>
                         )}
-                        <span className={cn('type-badge tabular float-right ml-2 mt-1.5 translate-y-1', mine ? 'text-white/70' : 'text-fg-tertiary')}>
+                        <span className={cn('type-badge tabular float-right ml-2 mt-1.5 inline-flex translate-y-1 items-center gap-1', mine ? 'text-white/70' : 'text-fg-tertiary')}>
                           {m.edited_at ? 'Edited · ' : ''}
                           {timeLabel(m.created_at)}
+                          {sending ? <Clock size={11} aria-label="Sending" /> : null}
                         </span>
                       </div>
                       {grouped.length ? (
@@ -465,7 +496,7 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
                           })}
                         </div>
                       ) : null}
-                      <div
+                      {sending ? null : <div
                         className={cn(
                           'absolute -top-4 z-10 hidden h-9 items-center gap-0.5 rounded-pill bg-bg-elevated px-1 shadow-overlay group-hover/msg:flex group-focus-within/msg:flex',
                           mine ? 'right-0' : 'left-0',
@@ -496,7 +527,7 @@ export function HubThread({ hubId, userId, onBack }: { hubId: string; userId: st
                           />
                         ) : null}
                         {mine ? <IconButton size="sm" icon={Trash2} aria-label="Delete" onClick={() => void remove(m)} /> : null}
-                      </div>
+                      </div>}
                     </li>
                   );
                 })}

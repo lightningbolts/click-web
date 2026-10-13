@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { ArrowUp, Bell, BellOff, Lock, MessageSquare } from 'lucide-react';
+import { ArrowUp, Bell, BellOff, Clock, Lock, MessageSquare } from 'lucide-react';
 import { Avatar } from '@/components/ds/Avatar';
 import { IconButton } from '@/components/ds/IconButton';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ds/Menu';
@@ -17,7 +17,6 @@ import {
   EventChatError,
   fetchHubTimeline,
   hubDisplayNames,
-  hubSession,
   resolveEventChat,
   sendHubText,
   toHubChatMessage,
@@ -40,6 +39,15 @@ function dayLabel(ms: number): string {
 
 function timeLabel(ms: number): string {
   return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+const byTime = (a: HubChatMessage, b: HubChatMessage) => a.createdAt - b.createdAt;
+
+/** `next` in place of the message it updates (same key or id), keeping that one's key and reactions. */
+function upsertMessage(prev: HubChatMessage[], next: HubChatMessage): HubChatMessage[] {
+  const existing = prev.find((m) => m.key === next.key || m.id === next.id);
+  const merged = existing ? { ...next, key: existing.key, reactions: existing.reactions } : next;
+  return [...prev.filter((m) => m !== existing), merged].sort(byTime);
 }
 
 function LockedState({ title, body }: { title: string; body: string }) {
@@ -76,16 +84,15 @@ export default function EventChatPanel({
 }) {
   const { user, loading: authLoading } = useAuth();
   const isHost = Boolean(user?.id && creatorId && user.id === creatorId);
-  const { data: rsvp } = useSWR(user && !isHost ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload, {
-    revalidateOnFocus: false,
-    fallbackData: initialGoing != null ? { current_user_signed_up: initialGoing } : undefined,
-  });
-  const going = Boolean(rsvp?.current_user_signed_up);
+  const { data: rsvp } = useSWR(user && !isHost ? eventRsvpKey(beaconId) : null, fetchEventRsvpPayload, { revalidateOnFocus: false });
+  const going = Boolean(rsvp?.current_user_signed_up ?? initialGoing);
   const canJoin = Boolean(user) && (isHost || going);
 
   const [hubId, setHubId] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<EventChatError | null>(null);
   const [messages, setMessages] = useState<HubChatMessage[]>([]);
+  // What the chat opened with; anything after rises in, as in direct messages.
+  const [openedKeys, setOpenedKeys] = useState<ReadonlySet<string> | null>(null);
   const [participantIds, setParticipantIds] = useState<string[]>([]);
   const [occupants, setOccupants] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -112,6 +119,7 @@ export default function EventChatPanel({
         const timeline = await fetchHubTimeline(target.hubId);
         if (cancelled) return;
         setMessages(timeline.messages);
+        setOpenedKeys(new Set(timeline.messages.map((m) => m.key)));
         setParticipantIds(timeline.participantIds);
         setOccupants(timeline.occupantCount);
       } catch (error) {
@@ -161,14 +169,8 @@ export default function EventChatPanel({
           }
           const row = normalizeHubMessageRow(payload.new ?? null);
           if (!row) return;
-          const session = row.body.startsWith('e2e2:') ? await hubSession(hubId, participantIds) : null;
-          const next = await toHubChatMessage(row, session);
-          setMessages((prev) => {
-            const existing = prev.find((m) => m.id === next.id);
-            const merged = existing ? { ...next, reactions: existing.reactions } : next;
-            const without = prev.filter((m) => m.id !== next.id && !(m.pending && m.userId === next.userId && m.text === next.text));
-            return [...without, merged].sort((a, b) => a.createdAt - b.createdAt);
-          });
+          const next = await toHubChatMessage(row, participantIds);
+          setMessages((prev) => upsertMessage(prev, next));
         },
       )
       .subscribe();
@@ -188,24 +190,18 @@ export default function EventChatPanel({
     if (!text || !hubId || sending || !user) return;
     setSending(true);
     setSendError(null);
-    const tempId = `pending-${crypto.randomUUID()}`;
+    // One key from the first frame to the realtime echo, so the bubble never re-mounts.
+    const key = crypto.randomUUID();
+    const base = { key, userId: user.id, text, messageType: 'text', edited: false, reactions: {} };
     stickToBottomRef.current = true;
-    setMessages((prev) => [
-      ...prev,
-      { id: tempId, userId: user.id, text, messageType: 'text', createdAt: Date.now(), edited: false, reactions: {}, pending: true },
-    ]);
+    setMessages((prev) => [...prev, { ...base, id: key, createdAt: Date.now(), pending: true }]);
     setDraft('');
     try {
-      const row = await sendHubText(hubId, text, participantIds);
-      setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== tempId && m.id !== row.id)
-          .concat({ id: row.id, userId: user.id, text, messageType: 'text', createdAt: Date.parse(row.created_at) || Date.now(), edited: false, reactions: {} })
-          .sort((a, b) => a.createdAt - b.createdAt),
-      );
+      const row = await sendHubText(hubId, text, participantIds, { clientMessageId: key });
+      setMessages((prev) => upsertMessage(prev, { ...base, id: row.id, createdAt: Date.parse(row.created_at) || Date.now() }));
     } catch (error) {
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
-      setDraft(text);
+      setMessages((prev) => prev.filter((m) => m.key !== key));
+      setDraft((current) => current || text);
       setSendError(error instanceof Error ? error.message : 'Could not send.');
     } finally {
       setSending(false);
@@ -295,7 +291,7 @@ export default function EventChatPanel({
               const sender = names[m.userId]?.name ?? (m.userId === creatorId ? 'Host' : 'Guest');
               const reactions = Object.entries(m.reactions).filter(([, users]) => users.length > 0);
               return (
-                <div key={m.id}>
+                <div key={m.key} className={cn(openedKeys && !openedKeys.has(m.key) && 'msg-in', mine ? 'origin-bottom-right' : 'origin-bottom-left')}>
                   {showDay ? (
                     <p className="type-meta py-2 text-center font-semibold text-fg-tertiary">{day}</p>
                   ) : null}
@@ -316,7 +312,6 @@ export default function EventChatPanel({
                         className={cn(
                           'type-body rounded-bubble px-3.5 py-2 break-words',
                           mine ? 'rounded-br-sm bg-bubble-out text-white' : 'rounded-bl-sm bg-bubble-in text-fg',
-                          m.pending && 'opacity-70',
                         )}
                       >
                         <LinkifiedText text={m.text} variant={mine ? 'mine' : 'theirs'} />
@@ -331,9 +326,10 @@ export default function EventChatPanel({
                         </div>
                       ) : null}
                       {!grouped || index === messages.length - 1 ? (
-                        <span className="type-badge mt-0.5 px-1 font-normal text-fg-tertiary">
-                          {m.pending ? 'Sending…' : timeLabel(m.createdAt)}
+                        <span className="type-badge mt-0.5 flex items-center gap-1 px-1 font-normal text-fg-tertiary">
+                          {timeLabel(m.createdAt)}
                           {m.edited ? ' · edited' : ''}
+                          {m.pending ? <Clock size={11} aria-label="Sending" /> : null}
                         </span>
                       ) : null}
                     </div>
