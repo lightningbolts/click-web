@@ -187,6 +187,7 @@ export function PersonTabs({
                 <li key={p.message_id}>
                   <Link
                     href={connectionId ? `${threadHref(connectionId)}?m=${encodeURIComponent(p.message_id)}` : '#'}
+                    unstable_dynamicOnHover
                     className="-mx-2 flex min-h-14 items-center gap-3 rounded-md px-2 py-2 hover:bg-hover"
                   >
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-selection text-accent">

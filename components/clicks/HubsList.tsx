@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState, useSyncExternalStore } from 'react';
 import { LocateFixed, MapPin, Plus } from 'lucide-react';
 import { Button } from '@/components/ds/Button';
@@ -10,6 +9,7 @@ import { EmptyState } from '@/components/ds/EmptyState';
 import { InlineNotice } from '@/components/ds/InlineNotice';
 import { Sheet } from '@/components/ds/Sheet';
 import { TextField } from '@/components/ds/TextField';
+import { navigateClicks } from '@/lib/clicks/route';
 import { freshHubLocation, hubRequest } from '@/lib/hub/client';
 import { hubThreadHref } from '@/lib/shell/appNav';
 import { readRecentHubs, rememberHub, subscribeRecentHubs, type RecentHub } from '@/lib/hub/recentHubs';
@@ -46,7 +46,6 @@ function HubRow({ hub, meta, selected, onOpen }: { hub: RecentHub; meta: string;
  * Location is only asked for when you tap "Find nearby hubs" or start one.
  */
 export function HubsList({ selectedHubId }: { selectedHubId: string | null }) {
-  const router = useRouter();
   // Recent hubs live on this device: the server can't know them, so it claims neither a list nor
   // "No hubs yet" (`null`), and the first client render shows the real list.
   const stored = useSyncExternalStore(subscribeRecentHubs, readRecentHubs, () => null);
@@ -78,7 +77,7 @@ export function HubsList({ selectedHubId }: { selectedHubId: string | null }) {
       const coords = hub.event_beacon_id ? {} : await freshHubLocation();
       await hubRequest('/api/hub/join', { hub_id: hub.id, ...coords });
       rememberHub({ id: hub.id, name: hub.name });
-      router.push(hubThreadHref(hub.id));
+      navigateClicks(hubThreadHref(hub.id));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -101,7 +100,7 @@ export function HubsList({ selectedHubId }: { selectedHubId: string | null }) {
       rememberHub({ id: result.hub_id, name: trimmed });
       setCreateOpen(false);
       setName('');
-      router.push(hubThreadHref(result.hub_id));
+      navigateClicks(hubThreadHref(result.hub_id));
     } catch (e) {
       setError((e as Error).message);
     } finally {

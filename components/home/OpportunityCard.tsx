@@ -174,7 +174,7 @@ export function OpportunityCard({ opportunity, timeZone, nowMs }: { opportunity:
           <TimeLeft deadlineMs={deadlineMs} nowMs={nowMs} />
         </p>
       </div>
-      <Button href={threadHref(connectionId)} variant="tinted" size="sm">
+      <Button href={threadHref(connectionId)} unstable_dynamicOnHover variant="tinted" size="sm">
         Say hi
       </Button>
     </Card>

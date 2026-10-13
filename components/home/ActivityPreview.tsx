@@ -29,6 +29,7 @@ export function ActivityPreview({ items: rendered, nowMs }: { items: HomeActivit
             <ListRow
               key={item.id}
               href={activityHref(item)}
+              unstable_dynamicOnHover
               chevron={false}
               icon={item.actor ? undefined : Bell}
               leading={

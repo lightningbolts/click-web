@@ -26,6 +26,7 @@ function PeopleList({ people }: { people: RecapPerson[] }) {
         <ListRow
           key={p.user_id}
           href={threadHref(p.connection_id)}
+          unstable_dynamicOnHover
           leading={<Avatar seed={p.user_id} name={p.name} src={p.avatar_url} size={40} />}
           title={p.name}
           strong

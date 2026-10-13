@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { MessageCircle, SearchX } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { getFreshAuthHeaders } from '@/lib/auth/freshAuthHeaders';
@@ -20,7 +20,17 @@ import { connectionRecordToArchiveRow, getArchiveCountdown } from '@/lib/dashboa
 import { deleteCliqueRpc, leaveCliqueRpc, renameCliqueRpc } from '@/lib/chat/createVerifiedClick';
 import { markChatUnread } from '@/lib/chat/conversationApi';
 import type { ChatSearchHit } from '@/lib/chat/searchSnippet';
-import { clicksHref, filterForThread, parseClicksFilter, parseClicksThread, type ClicksFilter, type ClicksThread } from '@/lib/clicks/route';
+import {
+  CLICKS_TITLES,
+  clicksHref,
+  filterForThread,
+  isClicksPath,
+  navigateClicks,
+  parseClicksFilter,
+  parseClicksThread,
+  type ClicksFilter,
+  type ClicksThread,
+} from '@/lib/clicks/route';
 import { useSessionCacheHydrated } from '@/lib/dashboard/sessionCache';
 import { groupThreadHref, hubThreadHref, personHref, threadHref } from '@/lib/shell/appNav';
 import { cn } from '@/lib/cn';
@@ -55,6 +65,20 @@ export function ClicksWorkspace({ preload }: { preload?: Promise<InboxPreload | 
   return <Workspace user={user} onlineUserIds={onlineUserIds} preload={preload} />;
 }
 
+/**
+ * Plain clicks on links to the inbox or a thread (rows, hubs, menus) open them in place; new-tab
+ * clicks and every other link keep the browser's and `next/link`'s handling.
+ */
+function openClicksLinksInPlace(e: MouseEvent) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const link = (e.target as Element).closest('a[href]');
+  if (!(link instanceof HTMLAnchorElement) || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+  const url = new URL(link.href);
+  if (url.origin !== location.origin || !isClicksPath(url.pathname)) return;
+  e.preventDefault();
+  navigateClicks(`${url.pathname}${url.search}`);
+}
+
 /** Inbox | conversation, shared by the workspace and its boot frame so nothing moves between them. */
 function WorkspaceFrame({
   thread,
@@ -73,6 +97,7 @@ function WorkspaceFrame({
       data-testid="clicks-workspace"
       className="flex h-[calc(100dvh-var(--topbar-height)-var(--tabbar-height))] min-h-0 overflow-hidden border-hairline max-md:data-[thread=true]:h-dvh md:container-frame md:border-x"
       data-thread={thread ? 'true' : undefined}
+      onClickCapture={openClicksLinksInPlace}
     >
       <aside
         aria-label="Clicks"
@@ -180,13 +205,18 @@ function Workspace({
   // On the bare inbox the URL owns the filter; while a thread is open the last one sticks.
   if (!thread && filter !== urlFilter) setFilter(urlFilter);
 
+  // In-place moves (`navigateClicks`) skip the pages' metadata.
+  useEffect(() => {
+    document.title = CLICKS_TITLES[thread?.kind ?? 'inbox'];
+  }, [thread?.kind]);
+
   // Old `/clicks?filter=hubs&hub=…` links (notifications, bookmarks) open the hub thread.
   const legacyHub = !thread ? searchParams.get('hub') : null;
   useEffect(() => {
-    if (legacyHub) router.replace(hubThreadHref(legacyHub));
-  }, [legacyHub, router]);
+    if (legacyHub) navigateClicks(hubThreadHref(legacyHub), { replace: true });
+  }, [legacyHub]);
 
-  const closeThread = useCallback(() => router.push(clicksHref(filter)), [router, filter]);
+  const closeThread = useCallback(() => navigateClicks(clicksHref(filter)), [filter]);
   const data = useClicksData({
     user: user as unknown as { id: string } & Record<string, unknown>,
     selectedId: thread && thread.kind !== 'h' ? thread.id : null,
@@ -215,8 +245,8 @@ function Workspace({
   const wantsNewGroup = !thread && searchParams.get('new') === 'group';
   if (wantsNewGroup && !createOpen) setCreateOpen(true);
   useEffect(() => {
-    if (wantsNewGroup) router.replace(clicksHref(filter), { scroll: false });
-  }, [wantsNewGroup, router, filter]);
+    if (wantsNewGroup) navigateClicks(clicksHref(filter), { replace: true });
+  }, [wantsNewGroup, filter]);
   const [reportTarget, setReportTarget] = useState<ChatListConnection | null>(null);
   const [renameTarget, setRenameTarget] = useState<ChatListConnection | null>(null);
 
@@ -340,12 +370,12 @@ function Workspace({
     );
     if (!conn) return;
     const href = conn.chatKind === 'group_clique' ? groupThreadHref(conn.id) : threadHref(conn.id);
-    router.push(`${href}?m=${encodeURIComponent(hit.messageId)}`);
+    navigateClicks(`${href}?m=${encodeURIComponent(hit.messageId)}`);
   };
 
   const onFilterChange = (next: ClicksFilter) => {
     setFilter(next);
-    if (!thread) router.replace(clicksHref(next), { scroll: false });
+    if (!thread) navigateClicks(clicksHref(next), { replace: true });
   };
 
   const selected = data.selectedConnection;
@@ -397,7 +427,7 @@ function Workspace({
             onBlock={() => lifecycle.blockUser(selected)}
             onUnblock={() => lifecycle.unblockUser(selected)}
             onClose={closeThread}
-            onRequestJump={(messageId) => router.replace(`${hrefFor(selected)}?m=${encodeURIComponent(messageId)}`, { scroll: false })}
+            onRequestJump={(messageId) => navigateClicks(`${hrefFor(selected)}?m=${encodeURIComponent(messageId)}`, { replace: true })}
             onOpenProfile={(id) => router.push(personHref(id))}
             onGroupChatChanged={data.reloadGroups}
             targetMessageId={targetMessageId}

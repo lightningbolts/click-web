@@ -4,8 +4,11 @@ import { GlobalShortcuts } from '@/components/app-shell/GlobalShortcuts';
 import { openCommandPalette } from '@/components/app-shell/commandPaletteEvents';
 
 const push = jest.fn();
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+const prefetch = jest.fn();
+let pathname = '/';
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push, prefetch }), usePathname: () => pathname }));
 jest.mock('@/lib/auth/freshAuthHeaders', () => ({ getFreshAuthHeaders: async () => ({}) }));
+jest.mock('@/lib/api/authedJson', () => ({ authedJson: async () => data }));
 
 const data = {
   people: [{ userId: 'u9', name: 'Grace', avatarUrl: null, context: 'In a group with you' }],
@@ -16,7 +19,17 @@ const data = {
   hubs: [{ hubId: 'h1', name: 'Hub', category: null }],
 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  pathname = '/';
+});
+
+async function searchFor(query: string) {
+  render(<CommandPalette />);
+  act(() => openCommandPalette());
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: query } });
+  await screen.findByRole('option', { name: /Ada/ });
+}
 
 describe('command palette (spec §7.10)', () => {
   it('puts your Clicks first, caps each group at five and links each kind', () => {
@@ -37,6 +50,23 @@ describe('command palette (spec §7.10)', () => {
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
     expect(push).toHaveBeenCalledWith('/events/new');
+  });
+
+  it('fetches the highlighted chat whole from another section, then opens it', async () => {
+    await searchFor('Ada');
+    expect(prefetch).toHaveBeenCalledWith('/clicks/c/c1', { kind: 'full' });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+    expect(push).toHaveBeenCalledWith('/clicks/c/c1');
+  });
+
+  it('opens a chat in place over the Clicks workspace', async () => {
+    pathname = '/clicks';
+    window.history.replaceState(null, '', '/clicks');
+    await searchFor('Ada');
+    expect(prefetch).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+    expect(push).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/clicks/c/c1');
   });
 
   it('ignores "/" while typing in a field', () => {

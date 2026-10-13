@@ -66,7 +66,7 @@ function ActionTile({
   );
   if (href) {
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cls} unstable_dynamicOnHover>
         {body}
       </Link>
     );

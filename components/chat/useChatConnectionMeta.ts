@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { ConnectionRecord } from '@/components/dashboard/ConnectionTable';
+import { useSessionCachedState } from '@/lib/dashboard/sessionCache';
 
 /**
  * Group header metadata (name, creator, member labels) and the peer's shared
@@ -13,19 +14,26 @@ export function useChatConnectionMeta({
   connection,
   otherUserName,
   peerUserId,
+  currentUserId,
   getAuthHeaders,
 }: {
   isGroupClique: boolean;
   connection: ConnectionRecord;
   otherUserName: string;
   peerUserId: string | undefined;
+  currentUserId: string;
   getAuthHeaders: () => Promise<HeadersInit>;
 }) {
   const [groupHeaderSubtitle, setGroupHeaderSubtitle] = useState<string | null>(null);
   const [groupCreatorId, setGroupCreatorId] = useState<string | null>(null);
   const [displayGroupName, setDisplayGroupName] = useState<string | null>(null);
   const [groupMemberProfileRows, setGroupMemberProfileRows] = useState<{ userId: string; label: string }[]>([]);
-  const [sharedInterestTags, setSharedInterestTags] = useState<string[]>([]);
+  // Cached per peer, so reopening a conversation paints its details panel complete.
+  const [sharedInterestTags, setSharedInterestTags] = useSessionCachedState<string[]>(
+    currentUserId,
+    `shared-interests:${peerUserId ?? ''}`,
+    [],
+  );
 
   useEffect(() => {
     if (!isGroupClique) {
@@ -131,7 +139,7 @@ export function useChatConnectionMeta({
     return () => {
       cancelled = true;
     };
-  }, [getAuthHeaders, peerUserId]);
+  }, [getAuthHeaders, peerUserId, setSharedInterestTags]);
 
   return {
     groupHeaderSubtitle,

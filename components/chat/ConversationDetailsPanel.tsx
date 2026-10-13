@@ -75,9 +75,19 @@ function Quick({ icon: Icon, label, onClick, pressed }: { icon: LucideIcon; labe
 }
 
 /** A titled group, styled like `ListGroup` (Settings, Me) so the panel reads as one list. */
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+function Section({
+  title,
+  action,
+  className,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="px-4 pt-6">
+    <section className={cn('px-4 pt-6', className)}>
       <div className="mb-2 flex min-h-5 items-center justify-between gap-2 px-4">
         <h3 className="type-meta font-semibold text-fg-secondary">{title}</h3>
         {action}
@@ -312,7 +322,8 @@ export function ConversationDetailsPanel({
         ) : null}
 
         {!isGroupClique && sharedInterests.length > 0 ? (
-          <Section title="Shared interests">
+          // Fetched after the panel opens on a first visit: it settles in rather than cutting in.
+          <Section title="Shared interests" className="content-enter">
             <ul className={cn(GROUP, 'flex flex-wrap gap-1.5 p-3')}>
               {sharedInterests.map((t) => (
                 <li key={t} className="type-meta rounded-pill bg-selection px-2.5 py-1 font-semibold text-accent">

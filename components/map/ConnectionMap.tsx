@@ -41,7 +41,8 @@ interface ConnectionMapProps {
   /** Keys the cached pins, so a revisit (or reload) paints the last ones while they refresh. */
   userId: string | undefined;
   connections: ConnectionRecord[];
-  onConnectionClick?: (connection: ConnectionRecord) => void;
+  /** Where a selected pin's Message action goes. */
+  connectionHref?: (connection: ConnectionRecord) => string;
   /** Open a person's profile from a selected pin. */
   onOpenProfile?: (otherUserId: string, connectionId: string) => void;
   /** False while the Map tab is hidden but kept mounted. */
@@ -87,7 +88,7 @@ function dedupeById(beacons: MapBeaconRecord[]): MapBeaconRecord[] {
 export default function ConnectionMap({
   userId,
   connections,
-  onConnectionClick,
+  connectionHref,
   onOpenProfile,
   active = true,
   connectionsLoading = false,
@@ -830,7 +831,7 @@ export default function ConnectionMap({
         beacon={selectedBeacon}
         place={selectedPlace}
         onClose={() => setSelection(null)}
-        onMessage={onConnectionClick}
+        messageHref={connectionHref}
         onProfile={onOpenProfile ? (c) => c.otherUserId && onOpenProfile(c.otherUserId, c.id) : undefined}
       />
     </div>

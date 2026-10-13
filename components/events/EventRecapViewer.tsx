@@ -176,6 +176,7 @@ export function EventRecapViewer({
                 <li key={p.user_id}>
                   <Link
                     href={threadHref(p.connection_id)}
+                    unstable_dynamicOnHover
                     className="flex min-h-14 items-center gap-3 rounded-lg px-3 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white"
                   >
                     <Avatar seed={p.user_id} name={p.name} src={p.avatar_url} size={40} ringColor="transparent" />

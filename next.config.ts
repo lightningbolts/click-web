@@ -73,6 +73,9 @@ const nextConfig: NextConfig = {
     // re-rendering it on the server and showing its loading state again. Mutations call
     // router.refresh(), which drops this cache, so changes still show at once.
     staleTimes: { dynamic: 60, static: 300 },
+    // Lets links that opt in with `unstable_dynamicOnHover` (those into a chat) fetch their whole
+    // page on hover or touch, not just its shell, so the click lands on the ready page.
+    dynamicOnHover: true,
     optimizePackageImports: ["lucide-react", "framer-motion"],
     // Larger multipart bodies for chat/hub media when a proxy/middleware path buffers the request (see Next docs).
     proxyClientMaxBodySize: '32mb',

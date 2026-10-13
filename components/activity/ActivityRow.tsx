@@ -91,7 +91,7 @@ export function ActivityRow({
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <Link href={activityHref(item)} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+          <Link href={activityHref(item)} unstable_dynamicOnHover className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
             <span className={cn('type-body block text-fg', isNew && 'font-semibold')}>
               {item.title} <span className="type-meta tabular font-normal text-fg-tertiary">{formatRelativeShort(item.created_at, nowMs)}</span>
             </span>

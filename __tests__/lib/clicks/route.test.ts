@@ -1,4 +1,4 @@
-import { clicksHref, filterForThread, parseClicksFilter, parseClicksThread } from '@/lib/clicks/route';
+import { clicksHref, filterForThread, isClicksPath, navigateClicks, parseClicksFilter, parseClicksThread } from '@/lib/clicks/route';
 
 describe('clicks routing', () => {
   it('parses filters with an Active default', () => {
@@ -26,5 +26,25 @@ describe('clicks routing', () => {
     expect(filterForThread({ kind: 'h', id: '1' }, false)).toBe('hubs');
     expect(filterForThread({ kind: 'c', id: '1' }, true)).toBe('archived');
     expect(filterForThread(null, false)).toBeNull();
+  });
+
+  it('knows which paths the workspace renders on its own', () => {
+    expect(isClicksPath('/clicks')).toBe(true);
+    expect(isClicksPath('/clicks/c/abc')).toBe(true);
+    expect(isClicksPath('/clicks/h/abc')).toBe(true);
+    expect(isClicksPath('/clicks/other')).toBe(false);
+    expect(isClicksPath('/people/abc')).toBe(false);
+  });
+
+  it('moves between clicks routes with history entries, never duplicating the current one', () => {
+    window.history.replaceState(null, '', '/clicks');
+    const before = window.history.length;
+    navigateClicks('/clicks/c/a');
+    expect(`${location.pathname}${location.search}`).toBe('/clicks/c/a');
+    expect(window.history.length).toBe(before + 1);
+    navigateClicks('/clicks/c/a');
+    navigateClicks('/clicks/c/a?m=1', { replace: true });
+    expect(`${location.pathname}${location.search}`).toBe('/clicks/c/a?m=1');
+    expect(window.history.length).toBe(before + 1);
   });
 });
