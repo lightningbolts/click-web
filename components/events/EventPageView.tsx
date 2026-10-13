@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { Suspense, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { ArrowUpRight, MapPin, ScanLine } from "lucide-react";
 import { CardVisual } from "@/components/ds/CardVisual";
-import { cardClassName } from "@/components/ds/Card";
 import { DateTile } from "@/components/ds/DateTile";
 import { IconButton } from "@/components/ds/IconButton";
 import { InlineNotice } from "@/components/ds/InlineNotice";
 import { MetaRow } from "@/components/ds/MetaRow";
 import { SectionHeader } from "@/components/ds/SectionHeader";
-import { Skeleton } from "@/components/ds/Skeleton";
 import { StatusPill } from "@/components/ds/StatusPill";
 import { Button } from "@/components/ds/Button";
 import { EventCalendarMenu } from "@/components/events/EventCalendarMenu";
@@ -19,6 +17,7 @@ import EventMarkdownContent from "@/components/events/EventMarkdownContent";
 import { EventGoingMetaRow, EventPeopleSection } from "@/components/events/EventPeopleSection";
 import { EventRsvpCard } from "@/components/events/EventRsvpCard";
 import { EventShareMenu } from "@/components/events/EventShareButton";
+import { EventViewerData } from "@/components/events/EventViewerData";
 import { TicketPurchaseCard } from "@/components/events/tickets/TicketPurchaseCard";
 import { MapsMenu } from "@/components/events/MapsMenu";
 import SeedRoomTeaser from "@/components/events/SeedRoomTeaser";
@@ -37,10 +36,7 @@ import { flyerEvent } from "@/lib/events/flyerEvent";
 import { eventMapsDestination } from "@/lib/events/mapsLinks";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
 import { dayKey } from "@/lib/home/selectOpportunity";
-import { loadEventViewer } from "@/lib/server/events/eventViewer";
-import { createAdminSupabaseClient } from "@/lib/server/admin/supabaseAdmin";
-import { countMyLiveTickets } from "@/lib/server/ticketing/offerings";
-import type { EventTicketing } from "@/lib/ticketing/types";
+import type { EventViewer } from "@/lib/server/events/eventViewer";
 import { generateCardVisual } from "@/lib/ui/generateCardVisual";
 
 
@@ -48,12 +44,10 @@ const THREE_HOURS = 3 * 3_600_000;
 
 
 /**
- * Host bar (spec §7.6.2): only hosts and Place managers, streamed after the cached body. Until the
- * event ends it opens the door scanner for Click Passes (spec 06 §7).
+ * Host bar (spec §7.6.2): only hosts and Place managers. Until the event ends it opens the door
+ * scanner for Click Passes (spec 06 §7).
  */
-async function HostBar({ event, ended }: { event: PublicEventPayload; ended: boolean }) {
-  const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
-  if (!viewer.canManage) return null;
+function HostBar({ beaconId, ended }: { beaconId: string; ended: boolean }) {
   return (
     <InlineNotice
       variant="info"
@@ -61,11 +55,11 @@ async function HostBar({ event, ended }: { event: PublicEventPayload; ended: boo
       action={
         <span className="flex gap-2">
           {ended ? null : (
-            <Button href={eventScanPath(event.beacon_id)} variant="secondary" size="sm" icon={ScanLine} aria-label="Scan Click Passes">
+            <Button href={eventScanPath(beaconId)} variant="secondary" size="sm" icon={ScanLine} aria-label="Scan Click Passes">
               <span className="sr-only min-[400px]:not-sr-only">Scan passes</span>
             </Button>
           )}
-          <Button href={eventManagePath(event.beacon_id)} variant="primary" size="sm">
+          <Button href={eventManagePath(beaconId)} variant="primary" size="sm">
             Manage
           </Button>
         </span>
@@ -76,51 +70,28 @@ async function HostBar({ event, ended }: { event: PublicEventPayload; ended: boo
   );
 }
 
-async function RsvpIsland(props: Omit<React.ComponentProps<typeof EventRsvpCard>, "initialViewer"> & { event: PublicEventPayload }) {
-  const { event, ...card } = props;
-  const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
-  return <EventRsvpCard {...card} initialViewer={viewer.rsvp} checkedIn={viewer.checkedIn} />;
-}
-
-/** Ticketed events (spec §5.2): the purchase card, with the viewer's live ticket count. */
-async function TicketIsland({ event, ticketing }: { event: PublicEventPayload; ticketing: EventTicketing }) {
-  const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
-  const myTicketCount = viewer.userId
-    ? await countMyLiveTickets(createAdminSupabaseClient(), event.beacon_id, viewer.userId).catch(() => 0)
-    : 0;
-  return (
-    <TicketPurchaseCard beaconId={event.beacon_id} ticketing={ticketing} myTicketCount={myTicketCount} signedIn={viewer.userId != null} />
-  );
-}
-
-async function ChatIsland({ event, ended }: { event: PublicEventPayload; ended: boolean }) {
-  const viewer = await loadEventViewer(event.beacon_id, event.creator_id, event.venue_id);
-  if (!viewer.userId) return null;
-  const going = viewer.rsvp.kind === "member" ? viewer.rsvp.going : null;
-  return <EventChatSheet beaconId={event.beacon_id} creatorId={event.creator_id} ended={ended} initialGoing={going} />;
-}
-
-function RsvpSkeleton() {
-  return (
-    <div className={cardClassName({ className: "rounded-xl" })} aria-hidden>
-      <Skeleton rounded="sm" className="h-4 w-24" />
-      <Skeleton rounded="full" className="mt-4 h-12 w-full" />
-    </div>
-  );
-}
-
 /**
  * The event page (spec §7.6.2): a sticky cover column beside the article. Renders the cached
- * public payload; viewer-specific parts stream in through the Suspense islands above.
+ * public payload with what the viewer sees (`loadEventViewer`) in one pass, so nothing pops in.
  */
-export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPayload; timeZone: string; nowMs: number }) {
+export function EventPageView({
+  event,
+  viewer,
+  timeZone,
+  nowMs,
+}: {
+  event: PublicEventPayload;
+  viewer: EventViewer;
+  timeZone: string;
+  nowMs: number;
+}) {
   const beaconId = event.beacon_id;
   const title = eventDisplayTitle(event.title, event.location_name, event.description);
   const subtitle = eventSubtitle(title, event.description);
   const description = subtitle ? withoutLeadingTitle(subtitle, title) || null : null;
   const where = eventWhereLabel(event.location_name);
   const when = eventWhenLines(event.event_start_at, event.event_end_at, timeZone, event.timezone);
-  const ended = eventIsPast({ event_end_at: event.event_end_at, event_start_at: event.event_start_at });
+  const ended = eventIsPast(event, nowMs);
   const start = Date.parse(event.event_start_at ?? "");
   const endMs = Date.parse(event.event_end_at ?? "");
   const live =
@@ -149,165 +120,174 @@ export function EventPageView({ event, timeZone, nowMs }: { event: PublicEventPa
   ) : null;
 
   return (
-    <div className="relative isolate">
-      <div aria-hidden className="event-tint pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px]" style={{ "--tint": tint } as CSSProperties} />
-      <div className="container-page grid gap-6 pb-24 pt-6 min-[900px]:grid-cols-[340px_minmax(0,1fr)] min-[900px]:gap-10 min-[900px]:pt-8">
-        <aside className="space-y-4 self-start min-[900px]:sticky min-[900px]:top-20">
-          <CardVisual
-            seed={seed}
-            photoUrl={event.image_url}
-            radius="xl"
-            priority
-            sizes="(max-width: 900px) 100vw, 340px"
-            className="aspect-video w-full min-[900px]:aspect-square"
-          />
-          <div className="hidden space-y-4 min-[900px]:block">
-            <EventHostCard
-              creatorId={event.creator_id}
-              name={event.host_name}
-              avatarUrl={event.host_avatar_url}
-              place={event.place}
-              reportHref={reportHref}
+    <EventViewerData fallback={viewer.fallback}>
+      <div className="relative isolate">
+        <div aria-hidden className="event-tint pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px]" style={{ "--tint": tint } as CSSProperties} />
+        <div className="container-page grid gap-6 pb-24 pt-6 min-[900px]:grid-cols-[340px_minmax(0,1fr)] min-[900px]:gap-10 min-[900px]:pt-8">
+          <aside className="space-y-4 self-start min-[900px]:sticky min-[900px]:top-20">
+            <CardVisual
+              seed={seed}
+              photoUrl={event.image_url}
+              radius="xl"
+              priority
+              sizes="(max-width: 900px) 100vw, 340px"
+              className="aspect-video w-full min-[900px]:aspect-square"
             />
-            {categories}
-          </div>
-        </aside>
-
-        <article className="min-w-0">
-          <Suspense fallback={null}>
-            <HostBar event={event} ended={ended} />
-          </Suspense>
-
-          {live || today || event.listing.event_visibility !== "public" ? (
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {live ? <StatusPill variant="live">Live now</StatusPill> : null}
-              {today ? <StatusPill variant="neutral">Today</StatusPill> : null}
-              {event.listing.event_visibility === "unlisted" ? <StatusPill variant="neutral">Unlisted</StatusPill> : null}
-              {event.listing.event_visibility === "invite_only" ? <StatusPill variant="neutral">Invite only</StatusPill> : null}
-            </div>
-          ) : null}
-          {event.ticketing?.cancelled ? (
-            <InlineNotice variant="destructive" className="mb-4">
-              This event was cancelled. Paid tickets are refunded automatically.
-            </InlineNotice>
-          ) : null}
-          <div className="flex items-start gap-3">
-            <h1 className="type-title-2 min-w-0 flex-1 text-fg [text-wrap:balance] min-[900px]:text-[36px] min-[900px]:leading-[42px]">{title}</h1>
-            <EventShareMenu event={flyer} />
-          </div>
-          <div className="mt-3 min-[900px]:hidden">
-            <EventHostRow creatorId={event.creator_id} name={event.host_name} avatarUrl={event.host_avatar_url} place={event.place} />
-          </div>
-
-          <div className="mt-6 space-y-4">
-            {when ? (
-              <MetaRow
-                leading={<DateTile month={when.month} day={when.day} />}
-                title={when.dateLine}
-                subtitle={
-                  when.eventLocal ? (
-                    <>
-                      {when.timeLine}
-                      <span className="block truncate">{when.eventLocal}</span>
-                    </>
-                  ) : (
-                    when.timeLine
-                  )
-                }
-                trailing={ended ? null : <EventCalendarMenu event={calendar} />}
+            <div className="hidden space-y-4 min-[900px]:block">
+              <EventHostCard
+                creatorId={event.creator_id}
+                name={event.host_name}
+                avatarUrl={event.host_avatar_url}
+                place={event.place}
+                reportHref={reportHref}
               />
-            ) : (
-              <MetaRow leading={<DateTile month="TBD" day="–" />} title="Date to be announced" />
-            )}
-            {where ? (
-              <MetaRow
-                icon={MapPin}
-                title={where}
-                trailing={
-                  destination ? (
-                    <MapsMenu destination={destination} trigger={<IconButton icon={ArrowUpRight} size="sm" aria-label="Open in Maps" />} />
-                  ) : null
-                }
-              />
-            ) : null}
-            <EventGoingMetaRow beaconId={beaconId} count={event.rsvp_count} ended={ended} />
-          </div>
-
-          <div className="mt-6">
-            <Suspense fallback={<RsvpSkeleton />}>
-              {event.ticketing ? (
-                <TicketIsland event={event} ticketing={event.ticketing} />
-              ) : (
-              <RsvpIsland
-                event={event}
-                beaconId={beaconId}
-                title={title}
-                listing={event.listing}
-                rsvpEnabled={event.rsvp_enabled}
-                ended={ended}
-                count={event.rsvp_count}
-                people={event.attendees}
-                calendar={calendar}
-                shareUrl={shareUrl}
-              />
-              )}
-            </Suspense>
-          </div>
-
-          <div className="mt-4">
-            <SeedRoomTeaser beaconId={beaconId} />
-          </div>
-
-          <div className="mt-10 space-y-10">
-            {description ? (
-              <section aria-labelledby="event-about">
-                <SectionHeader id="event-about" title="About" />
-                <EventMarkdownContent className="mt-3">{description}</EventMarkdownContent>
-              </section>
-            ) : null}
-
-            {where ? (
-              <EventLocationSection
-                beaconId={beaconId}
-                label={where}
-                address={event.address}
-                lat={event.latitude}
-                lng={event.longitude}
-                weather={ended ? null : { forecastAt: Number.isFinite(start) && start > nowMs ? event.event_start_at : null, timeZone }}
-              />
-            ) : null}
-
-            <EventPeopleSection beaconId={beaconId} ended={ended} />
-
-            {ended ? (
-              <section aria-labelledby="event-recap">
-                <SectionHeader id="event-recap" title="Drops & recap" />
-                <p className="type-body mt-2 text-fg-secondary">Everyone’s drops develop together the morning after.</p>
-                <Button variant="primary" href={`/e/${beaconId}/recap`} className="mt-4">
-                  Open the recap
-                </Button>
-              </section>
-            ) : null}
-
-            <Suspense fallback={null}>
-              <ChatIsland event={event} ended={ended} />
-            </Suspense>
-
-            <div className="space-y-4 min-[900px]:hidden">
               {categories}
-              <EventHostCard creatorId={event.creator_id} name={null} avatarUrl={null} reportHref={reportHref} />
+            </div>
+          </aside>
+
+          <article className="min-w-0">
+            {viewer.canManage ? <HostBar beaconId={beaconId} ended={ended} /> : null}
+
+            {live || today || event.listing.event_visibility !== "public" ? (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {live ? <StatusPill variant="live">Live now</StatusPill> : null}
+                {today ? <StatusPill variant="neutral">Today</StatusPill> : null}
+                {event.listing.event_visibility === "unlisted" ? <StatusPill variant="neutral">Unlisted</StatusPill> : null}
+                {event.listing.event_visibility === "invite_only" ? <StatusPill variant="neutral">Invite only</StatusPill> : null}
+              </div>
+            ) : null}
+            {event.ticketing?.cancelled ? (
+              <InlineNotice variant="destructive" className="mb-4">
+                This event was cancelled. Paid tickets are refunded automatically.
+              </InlineNotice>
+            ) : null}
+            <div className="flex items-start gap-3">
+              <h1 className="type-title-2 min-w-0 flex-1 text-fg [text-wrap:balance] min-[900px]:text-[36px] min-[900px]:leading-[42px]">{title}</h1>
+              <EventShareMenu event={flyer} />
+            </div>
+            <div className="mt-3 min-[900px]:hidden">
+              <EventHostRow creatorId={event.creator_id} name={event.host_name} avatarUrl={event.host_avatar_url} place={event.place} />
             </div>
 
-            {APP_CONFIG.app_launched ? (
-              <p className="type-meta text-fg-tertiary">
-                <a href={eventDeepLink(beaconId)} className="font-semibold text-accent hover:underline">
-                  Open in the Click app
-                </a>
-              </p>
-            ) : null}
-          </div>
-        </article>
+            <div className="mt-6 space-y-4">
+              {when ? (
+                <MetaRow
+                  leading={<DateTile month={when.month} day={when.day} />}
+                  title={when.dateLine}
+                  subtitle={
+                    when.eventLocal ? (
+                      <>
+                        {when.timeLine}
+                        <span className="block truncate">{when.eventLocal}</span>
+                      </>
+                    ) : (
+                      when.timeLine
+                    )
+                  }
+                  trailing={ended ? null : <EventCalendarMenu event={calendar} />}
+                />
+              ) : (
+                <MetaRow leading={<DateTile month="TBD" day="–" />} title="Date to be announced" />
+              )}
+              {where ? (
+                <MetaRow
+                  icon={MapPin}
+                  title={where}
+                  trailing={
+                    destination ? (
+                      <MapsMenu destination={destination} trigger={<IconButton icon={ArrowUpRight} size="sm" aria-label="Open in Maps" />} />
+                    ) : null
+                  }
+                />
+              ) : null}
+              <EventGoingMetaRow beaconId={beaconId} count={event.rsvp_count} ended={ended} />
+            </div>
+
+            <div className="mt-6">
+              {event.ticketing ? (
+                <TicketPurchaseCard
+                  beaconId={beaconId}
+                  ticketing={event.ticketing}
+                  myTicketCount={viewer.myTicketCount}
+                  signedIn={viewer.userId != null}
+                />
+              ) : (
+                <EventRsvpCard
+                  beaconId={beaconId}
+                  title={title}
+                  listing={event.listing}
+                  rsvpEnabled={event.rsvp_enabled}
+                  ended={ended}
+                  count={event.rsvp_count}
+                  people={event.attendees}
+                  calendar={calendar}
+                  shareUrl={shareUrl}
+                  initialViewer={viewer.rsvp}
+                  checkedIn={viewer.checkedIn}
+                />
+              )}
+            </div>
+
+            <div className="mt-4">
+              <SeedRoomTeaser beaconId={beaconId} />
+            </div>
+
+            <div className="mt-10 space-y-10">
+              {description ? (
+                <section aria-labelledby="event-about">
+                  <SectionHeader id="event-about" title="About" />
+                  <EventMarkdownContent className="mt-3">{description}</EventMarkdownContent>
+                </section>
+              ) : null}
+
+              {where ? (
+                <EventLocationSection
+                  beaconId={beaconId}
+                  label={where}
+                  address={event.address}
+                  lat={event.latitude}
+                  lng={event.longitude}
+                  weather={ended ? null : { forecastAt: Number.isFinite(start) && start > nowMs ? event.event_start_at : null, timeZone }}
+                />
+              ) : null}
+
+              <EventPeopleSection beaconId={beaconId} ended={ended} />
+
+              {ended ? (
+                <section aria-labelledby="event-recap">
+                  <SectionHeader id="event-recap" title="Drops & recap" />
+                  <p className="type-body mt-2 text-fg-secondary">Everyone’s drops develop together the morning after.</p>
+                  <Button variant="primary" href={`/e/${beaconId}/recap`} className="mt-4">
+                    Open the recap
+                  </Button>
+                </section>
+              ) : null}
+
+              {viewer.userId ? (
+                <EventChatSheet
+                  beaconId={beaconId}
+                  creatorId={event.creator_id}
+                  ended={ended}
+                  initialGoing={viewer.rsvp.kind === "member" ? viewer.rsvp.going : null}
+                />
+              ) : null}
+
+              <div className="space-y-4 min-[900px]:hidden">
+                {categories}
+                <EventHostCard creatorId={event.creator_id} name={null} avatarUrl={null} reportHref={reportHref} />
+              </div>
+
+              {APP_CONFIG.app_launched ? (
+                <p className="type-meta text-fg-tertiary">
+                  <a href={eventDeepLink(beaconId)} className="font-semibold text-accent hover:underline">
+                    Open in the Click app
+                  </a>
+                </p>
+              ) : null}
+            </div>
+          </article>
+        </div>
       </div>
-    </div>
+    </EventViewerData>
   );
 }

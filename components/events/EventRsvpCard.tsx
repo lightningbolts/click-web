@@ -95,12 +95,8 @@ export function EventRsvpCard({
   const [saving, setSaving] = useState(false);
   const serverMember = initialViewer.kind === "member" ? initialViewer : null;
   const key = eventRsvpKey(beaconId);
-  const { data } = useSWR<EventRsvpPayload>(user ? key : null, fetchEventRsvpPayload, {
-    fallbackData: serverMember
-      ? { current_user_signed_up: serverMember.going, request_status: serverMember.request_status === "denied" ? null : serverMember.request_status }
-      : undefined,
-    revalidateOnFocus: false,
-  });
+  // The page seeds this key with the server's read (`EventViewerData`); `serverMember` covers a miss.
+  const { data } = useSWR<EventRsvpPayload>(user ? key : null, fetchEventRsvpPayload, { revalidateOnFocus: false });
 
   // Server knowledge wins while the client session is still loading, so nothing flashes.
   const signedIn: boolean | null = user

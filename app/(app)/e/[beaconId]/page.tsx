@@ -13,6 +13,7 @@ import { eventShareUrl } from "@/lib/events/eventUrls";
 import { formatEventWhen } from "@/lib/events/formatEventWhen";
 import type { PublicEventPayload } from "@/lib/events/publicEvent";
 import { loadPublicEvent } from "@/lib/server/events/loadPublicEvent";
+import { loadEventViewer } from "@/lib/server/events/eventViewer";
 import { TIME_ZONE_COOKIE, validTimeZone } from "@/lib/time/viewerTimeZone";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function EventPage({ params }: { params: Promise<{ beaconId
   const [event, jar] = await Promise.all([loadEvent(beaconId), cookies()]);
   if (!event) notFound();
   const timeZone = validTimeZone(jar.get(TIME_ZONE_COOKIE)?.value) ?? event.timezone ?? "UTC";
+  const viewer = await loadEventViewer(event);
   // eslint-disable-next-line react-hooks/purity -- server component, rendered per request
-  return <EventPageView event={event} timeZone={timeZone} nowMs={Date.now()} />;
+  return <EventPageView event={event} viewer={viewer} timeZone={timeZone} nowMs={Date.now()} />;
 }

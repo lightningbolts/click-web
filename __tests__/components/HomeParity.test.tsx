@@ -4,13 +4,14 @@ import { RecapCard } from '@/components/home/RecapCard';
 import type { ActivityRecap } from '@/lib/me/activityRecap';
 import { HubsList } from '@/components/clicks/HubsList';
 import { HubThread } from '@/components/clicks/HubThread';
-import { resolveWebHubE2eeV2Session } from '@/lib/chat/e2eeV2Client';
+import { resolveWebE2eeV2Session } from '@/lib/chat/e2eeV2Client';
 
 jest.mock('@/lib/auth/freshAuthHeaders', () => ({ getFreshAuthHeaders: async () => ({ Authorization: 'Bearer test' }) }));
 jest.mock('@/lib/supabase', () => ({ getSupabaseClient: () => null }));
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn(), replace: jest.fn() }) }));
 jest.mock('@/lib/chat/e2eeV2Client', () => ({
-  resolveWebHubE2eeV2Session: jest.fn(), encryptWebE2eeV2Message: jest.fn(), decryptWebE2eeV2Message: jest.fn(),
+  resolveWebHubE2eeV2Session: jest.fn(), resolveWebE2eeV2Session: jest.fn(), invalidateWebE2eeV2Session: jest.fn(),
+  encryptWebE2eeV2Message: jest.fn(), decryptWebE2eeV2ForDisplay: jest.fn(),
 }));
 const originalFetch = global.fetch;
 beforeAll(() => {
@@ -57,7 +58,7 @@ test('retains the draft and never falls back to plaintext when hub key resolutio
   global.fetch = jest.fn(async (url) => String(url).includes('/messages?')
     ? response({ messages: [], participant_ids: ['user-1'], occupant_count: 1 })
     : response({ hub: { id: 'hub-1', name: 'Event room', category: 'event', event_beacon_id: 'event-1' } }));
-  jest.mocked(resolveWebHubE2eeV2Session).mockRejectedValue(new Error('Device not approved'));
+  jest.mocked(resolveWebE2eeV2Session).mockRejectedValue(new Error('Device not approved'));
   mount(<HubThread hubId="hub-1" userId="user-1" onBack={jest.fn()} />);
   await screen.findByText('No messages yet. Say hello to the room.');
   await screen.findByText('Event room');

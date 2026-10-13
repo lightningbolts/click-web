@@ -9,11 +9,11 @@ import {
   eventImageFromMetadata,
   eventLocationNameFromMetadata,
   eventInstantFromRowOrMeta,
+  eventIsPast,
   eventStartAtFromMetadata,
   eventTimezoneFromMetadata,
   eventTitleFromMetadata,
   isRecord,
-  isUpcomingEvent,
   metaString,
   parseBeaconMetadata,
   parseIsoMs,
@@ -163,18 +163,6 @@ async function loadHostProfilesByCreatorIds(
     });
   }
   return names;
-}
-
-function isUpcomingFromRow(
-  row: Record<string, unknown>,
-  meta: Record<string, unknown>,
-  nowMs: number,
-): boolean {
-  const end = parseIsoMs(eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)));
-  if (end != null) return end >= nowMs;
-  const start = parseIsoMs(eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)));
-  if (start != null) return start >= nowMs - 6 * 60 * 60 * 1000;
-  return isUpcomingEvent(meta, nowMs);
 }
 
 function sortInstantMs(eventEndAt: string | null, eventStartAt: string | null): number {
@@ -366,9 +354,11 @@ async function loadPublicDiscoverableEvents(
     const meta = parseBeaconMetadata(row.metadata);
     const listing = parseEventListingOptions(row, meta);
     if (listing.event_visibility !== "public") continue;
-    const isUpcoming = isUpcomingFromRow(row, meta, now);
-    if (temporal === "upcoming" && !isUpcoming) continue;
-    if (temporal === "past" && isUpcoming) continue;
+    const eventStartAt = eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta));
+    const eventEndAt = eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta));
+    const expiresAt = typeof row.expires_at === "string" ? row.expires_at : null;
+    const past = eventIsPast({ event_start_at: eventStartAt, event_end_at: eventEndAt, expires_at: expiresAt }, now);
+    if ((temporal === "upcoming") === past) continue;
     const coords = parseLatLngFromLocationField(row.location, Number.NaN, Number.NaN);
     const beaconId = typeof row.id === "string" ? row.id : "";
     pending.push({
@@ -376,8 +366,8 @@ async function loadPublicDiscoverableEvents(
       title: eventTitleFromMetadata(meta),
       description: eventDescriptionFromMetadata(meta),
       image_url: eventImageFromMetadata(meta),
-      event_start_at: eventInstantFromRowOrMeta(row.starts_at, eventStartAtFromMetadata(meta)),
-      event_end_at: eventInstantFromRowOrMeta(row.ends_at, eventEndAtFromMetadata(meta)),
+      event_start_at: eventStartAt,
+      event_end_at: eventEndAt,
       location_name: eventLocationNameFromMetadata(meta),
       latitude: Number.isFinite(coords.lat) ? coords.lat : null,
       longitude: Number.isFinite(coords.lng) ? coords.lng : null,

@@ -20,11 +20,11 @@ describe("event page source (spec §7.6.2)", () => {
     expect(src).toContain("event-tint");
   });
 
-  it("streams viewer-specific islands behind Suspense", () => {
+  it("renders the viewer's parts with the page, not streamed in after it", () => {
+    expect(page).toContain("loadEventViewer(event)");
+    expect(src).toContain("<EventViewerData fallback={viewer.fallback}>");
     expect(src).toContain("<HostBar");
-    expect(src).toContain("<RsvpIsland");
-    expect(src).toContain("<ChatIsland");
-    expect(src).toContain("loadEventViewer");
+    expect(src).not.toContain("Suspense");
   });
 
   it("drops the legacy shells", () => {

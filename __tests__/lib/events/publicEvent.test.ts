@@ -162,6 +162,26 @@ describe("loadPublicPastEvents", () => {
                 ends_at: futureStart,
                 metadata: { title: "Still upcoming", event_end_at: futureStart },
               },
+              {
+                id: "evt-undated-expired",
+                beacon_type: "event",
+                visibility_audience: "everyone",
+                creator_id: "user-1",
+                show_creator_name: true,
+                location: null,
+                expires_at: olderStart,
+                metadata: { title: "Never dated" },
+              },
+              {
+                id: "evt-undated-open",
+                beacon_type: "event",
+                visibility_audience: "everyone",
+                creator_id: "user-1",
+                show_creator_name: true,
+                location: null,
+                expires_at: futureStart,
+                metadata: { title: "Date to come" },
+              },
             ],
             error: null,
           });
@@ -180,7 +200,8 @@ describe("loadPublicPastEvents", () => {
     };
 
     const events = await loadPublicPastEvents(admin as never);
-    expect(events).toHaveLength(2);
+    // An event that never got a time is past once its beacon expires, not upcoming for good.
+    expect(events.map((e) => e.beacon_id).sort()).toEqual(["evt-past-1", "evt-past-2", "evt-undated-expired"]);
     expect(events[0]?.beacon_id).toBe("evt-past-1");
     expect(events[1]?.beacon_id).toBe("evt-past-2");
   });

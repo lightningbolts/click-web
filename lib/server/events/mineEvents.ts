@@ -27,6 +27,8 @@ export type MineEvent = {
   longitude: number | null;
   rsvp_count: number;
   rsvp_enabled: boolean;
+  /** The beacon's expiry: when an event with no time set yet stops being upcoming. */
+  expires_at: string | null;
   role: "creator" | "rsvp";
 };
 
@@ -35,7 +37,7 @@ export async function loadMineEvents(admin: SupabaseClient, userId: string): Pro
   const [{ data: created, error: createdErr }, { data: rsvps, error: rsvpsErr }] = await Promise.all([
     admin
       .from("map_beacons")
-      .select("id, metadata, location, beacon_type, starts_at, ends_at")
+      .select("id, metadata, location, beacon_type, starts_at, ends_at, expires_at")
       .eq("creator_id", userId)
       .eq("beacon_type", "event")
       .order("created_at", { ascending: false })
@@ -61,7 +63,7 @@ export async function loadMineEvents(admin: SupabaseClient, userId: string): Pro
   if (rsvpIds.length > 0) {
     const { data, error } = await admin
       .from("map_beacons")
-      .select("id, metadata, location, beacon_type, starts_at, ends_at")
+      .select("id, metadata, location, beacon_type, starts_at, ends_at, expires_at")
       .in("id", rsvpIds)
       .eq("beacon_type", "event");
     if (error) throw new Error(`mine rsvp events: ${error.message}`);
@@ -98,6 +100,7 @@ export async function loadMineEvents(admin: SupabaseClient, userId: string): Pro
       longitude: Number.isFinite(coords.lng) ? coords.lng : null,
       rsvp_count: rsvpCountById.get(row.id) ?? 0,
       rsvp_enabled: rsvpEnabledFromMetadata(meta),
+      expires_at: typeof row.expires_at === "string" ? row.expires_at : null,
       role: byId.get(row.id)?.role === "creator" ? "creator" : role,
     });
   };

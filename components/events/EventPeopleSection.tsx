@@ -11,8 +11,8 @@ import { SectionHeader } from '@/components/ds/SectionHeader';
 import { Sheet } from '@/components/ds/Sheet';
 import EventRsvpDirectory from '@/components/events/EventRsvpDirectory';
 import { useAuth } from '@/lib/AuthContext';
-import { eventRsvpKey } from '@/lib/events/eventRsvpKey';
-import { fetchEventRsvpPayload, fetchMutualAttendees, mutualAttendeesKey } from '@/lib/events/eventRsvpClient';
+import { eventRsvpKey, mutualAttendeesKey } from '@/lib/events/eventRsvpKey';
+import { fetchEventRsvpPayload, fetchMutualAttendees } from '@/lib/events/eventRsvpClient';
 import { personHref } from '@/lib/shell/appNav';
 
 const MAX_FACES = 12;

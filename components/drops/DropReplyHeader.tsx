@@ -77,7 +77,8 @@ export function DropReplyHeader({ reply, mine, emoji }: { reply: DropReplyMeta; 
   };
 
   return (
-    <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start', emoji && 'pb-2.5')}>
+    // A reaction keeps room for its emoji from the start, even while the emoji is still sealed.
+    <div className={cn('mb-1 flex flex-col gap-1.5', mine ? 'items-end' : 'items-start', reply.reaction && 'pb-2.5')}>
       <span className="type-meta px-1 text-fg-secondary">{label(reply, mine)}</span>
       <button
         ref={thumb}

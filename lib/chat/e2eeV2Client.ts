@@ -877,6 +877,7 @@ export async function decryptWebE2eeV2ForDisplay(
   chatId: string,
   wireContent: string,
   getSession: () => Promise<E2eeV2Session | null>,
+  scope: E2eeV2Scope = 'chat',
 ): Promise<string | null> {
   let epoch: number;
   try {
@@ -887,7 +888,7 @@ export async function decryptWebE2eeV2ForDisplay(
   let session = await getSession().catch(() => null);
   if (session && !session.epochKeys.has(epoch) && epoch > session.currentEpoch) {
     // Concurrent decrypts share one re-read: only the first to see this session drops it.
-    if (sessionCache.get(chatId) === session) invalidateWebE2eeV2Session(chatId);
+    if (sessionCache.get(sessionKey({ chatId, scope })) === session) invalidateWebE2eeV2Session(chatId, scope);
     session = await getSession().catch(() => null);
   }
   if (!session) return null;
