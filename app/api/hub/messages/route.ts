@@ -40,6 +40,7 @@ import {
   normalizeHubMessageRow,
   type HubThreadMessage,
 } from '@/lib/hub/hubThread';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 type HubMessageInsert = {
   hub_id: string;
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest) {
     !aroundMessageId && !before && !beforeId && !cursorIso && !sinceIso
   ) {
     const viewerId = auth.user.id;
-    runAfterResponse('place_hub_opened', () => emitProductEvent(admin, viewerId, 'place_hub_opened'));
+    runAfterResponse('place_hub_opened', () => emitProductEvent(admin, viewerId, 'place_hub_opened', {}, { platform: clientPlatform(request) }));
   }
   const eventBeaconId =
     hubVenue != null && typeof (hubVenue as { event_beacon_id?: unknown }).event_beacon_id === 'string'

@@ -13,7 +13,7 @@ const HOLD_MINUTES = 32; // small reconciliation window past session expiry
 
 export type CheckoutItemInput = { tierId: string; quantity: number };
 
-export type CheckoutClient = 'web' | 'ios';
+export type CheckoutClient = 'web' | 'ios' | 'android';
 
 export type CheckoutResult =
   | { ok: true; orderId: string; checkoutUrl: string }

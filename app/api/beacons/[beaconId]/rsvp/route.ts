@@ -25,6 +25,7 @@ import { userMayManageBeacon } from "@/lib/events/beaconManageAuth";
 import { recordRsvpActivity } from "@/lib/server/activity";
 import { displayNameFromUser } from "@/lib/events/attendeeDirectory";
 import { loadAttendeeProfiles, loadEventRsvpPayload } from "@/lib/server/events/eventRsvpPayload";
+import { clientPlatform } from "@/lib/server/telemetry/clientPlatform";
 
 const UUID_RE = /^[0-9a-fA-F-]{36}$/;
 
@@ -193,7 +194,7 @@ export async function POST(
     });
 
     const profile = (await loadAttendeeProfiles(admin, [user.id])).get(user.id) ?? null;
-    runAfterResponse("product events", () => emitProductEvent(admin, user.id, "beacon_joined", { type: "event" }));
+    runAfterResponse("product events", () => emitProductEvent(admin, user.id, "beacon_joined", { type: "event" }, { platform: clientPlatform(request) }));
     if (existingGoing == null && beacon.creator_id) {
       const hostId = beacon.creator_id;
       runAfterResponse("rsvp activity", () =>

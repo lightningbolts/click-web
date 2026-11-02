@@ -17,6 +17,7 @@ import {
   serializeEventDrops,
   visibleEventDrops,
 } from '@/lib/server/eventDrops';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest, { params }: Params): Promise<Re
       }
       return NextResponse.json({ error: 'Failed to save the drop. Try again.' }, { status: 500 });
     }
-    runAfterResponse('product events', () => emitProductEvent(admin, userId, 'drop_posted', { kind: 'event' }));
+    runAfterResponse('product events', () => emitProductEvent(admin, userId, 'drop_posted', { kind: 'event' }, { platform: clientPlatform(request) }));
     return NextResponse.json({ drop: (await serializeEventDrops(admin, [result.row], userId))[0] }, { status: 201 });
   } catch (e) {
     console.error('POST /api/beacons/[beaconId]/drops:', e);

@@ -21,10 +21,10 @@ jest.mock('@/lib/server/telemetry/productEvents', () => ({
 
 import { POST } from '@/app/api/telemetry/events/route';
 
-function post(body: Record<string, unknown>) {
+function post(body: Record<string, unknown>, headers: Record<string, string> = {}) {
   return POST(new NextRequest('https://click.example/api/telemetry/events', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   }));
 }
@@ -58,5 +58,17 @@ describe('POST /api/telemetry/events', () => {
     const res = await post({ event: 'app_open', platform: 'ios' });
     expect(res.status).toBe(202);
     expect(mockEmit.mock.calls.map((c) => c[2])).toEqual(['app_open', 'day2_return']);
+  });
+
+  it('falls back to the X-Click-Platform header when the body names no platform', async () => {
+    mockFrom.mockReturnValue(chain({ data: null }));
+    await post({ event: 'app_open' }, { 'X-Click-Platform': 'android' });
+    expect(mockEmit.mock.calls[0][4]).toMatchObject({ platform: 'android' });
+  });
+
+  it('prefers the body platform over the header', async () => {
+    mockFrom.mockReturnValue(chain({ data: null }));
+    await post({ event: 'app_open', platform: 'ios' }, { 'X-Click-Platform': 'android' });
+    expect(mockEmit.mock.calls[0][4]).toMatchObject({ platform: 'ios' });
   });
 });

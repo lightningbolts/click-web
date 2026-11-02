@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
 import { createAdminSupabaseClient } from '@/lib/server/admin/supabaseAdmin';
 import { parseBody } from '@/lib/api/parseBody';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
 import {
   CLIENT_PRODUCT_EVENTS,
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   try {
     const admin = createAdminSupabaseClient();
     const occurredAt = body.occurred_at && Date.parse(body.occurred_at) <= Date.now() + 60_000 ? body.occurred_at : null;
-    const meta = { platform: body.platform ?? null, appVersion: body.app_version ?? null, occurredAt };
+    const meta = { platform: body.platform ?? clientPlatform(request), appVersion: body.app_version ?? null, occurredAt };
     const recorded = await emitProductEvent(admin, user.id, body.event, body.props ?? {}, meta);
 
     if (recorded && body.event === 'app_open') {

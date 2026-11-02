@@ -14,6 +14,7 @@ import {
 import { loadConsumerPlace } from '@/lib/server/places/loadPlace';
 import { placeNotFound, placesRateLimitResponse, requirePlacesUser } from '@/lib/server/places/routeContext';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 type Ctx = { params: Promise<{ placeId: string }> };
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
 
     if (!proof.ok) {
       const reason = proof.reason;
-      runAfterResponse('place_check_in_rejected', () => emitProductEvent(admin, user.id, 'place_check_in_rejected', { reason }));
+      runAfterResponse('place_check_in_rejected', () => emitProductEvent(admin, user.id, 'place_check_in_rejected', { reason }, { platform: clientPlatform(request) }));
       return NextResponse.json(
         {
           error: REJECT_COPY[reason] ?? 'Check-in rejected',
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
       config,
       nowMs: Date.now(),
     });
-    runAfterResponse('place_check_in', () => emitProductEvent(admin, user.id, 'place_check_in', { proof: result.proof }));
+    runAfterResponse('place_check_in', () => emitProductEvent(admin, user.id, 'place_check_in', { proof: result.proof }, { platform: clientPlatform(request) }));
     return NextResponse.json(result);
   } catch (e) {
     console.error('POST /api/places/[placeId]/check-in:', e);

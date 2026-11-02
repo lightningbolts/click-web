@@ -18,6 +18,9 @@ export const FEATURE_KEYS = [
   'reconnect_nearby',
   'pilot_analytics',
   'click_places',
+  // Android kill switch: route QR/manual connects back to direct PostgREST inserts instead of
+  // POST /api/connections. No row means off.
+  'connect_postgrest_fallback',
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 

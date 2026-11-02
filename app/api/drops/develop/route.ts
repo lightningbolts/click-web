@@ -7,6 +7,7 @@ import { developDrops } from '@/lib/server/drops/develop';
 import { featureMutationRateLimitResponse } from '@/lib/server/rateLimit';
 import { runAfterResponse } from '@/lib/server/afterResponse';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 /**
  * POST /api/drops/develop { drops: [{ kind, id }] }
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const opened = results.filter((r) => r.status === 'developed' && Date.parse(r.developed_at) >= startedAt - 5_000);
     if (opened.length > 0) {
       runAfterResponse('product events', async () => {
-        for (const r of opened) await emitProductEvent(admin, user.id, 'drop_ready_opened', { kind: r.kind });
+        for (const r of opened) await emitProductEvent(admin, user.id, 'drop_ready_opened', { kind: r.kind }, { platform: clientPlatform(request) });
       });
     }
     return NextResponse.json({ drops: results }, { headers: { 'Cache-Control': 'no-store' } });

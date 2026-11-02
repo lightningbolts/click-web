@@ -7,6 +7,7 @@ import { loadConsumerPlace } from '@/lib/server/places/loadPlace';
 import { patchPulse } from '@/lib/server/places/pulses';
 import { placeNotFound, placesRateLimitResponse, requirePlacesUser } from '@/lib/server/places/routeContext';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 /** PATCH — fill a still-empty follow-up on the caller's own Pulse inside the edit window (§5.5). */
 export async function PATCH(
@@ -32,7 +33,7 @@ export async function PATCH(
       return NextResponse.json({ error: result.message, code: result.code, ...result.extra }, { status: result.status });
     }
     runAfterResponse('place_pulse', () =>
-      emitProductEvent(admin, user.id, 'place_pulse', { has_energy: false, has_followup: true }),
+      emitProductEvent(admin, user.id, 'place_pulse', { has_energy: false, has_followup: true }, { platform: clientPlatform(request) }),
     );
     return NextResponse.json({ summary: result.summary });
   } catch (e) {

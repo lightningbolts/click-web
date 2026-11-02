@@ -10,6 +10,7 @@ import { ensurePlaceHub } from '@/lib/server/places/placeHub';
 import { placeNotFound, requirePlaceManagerContext, requirePlacesUser } from '@/lib/server/places/routeContext';
 import { serializeManagerPlace } from '@/lib/server/places/serialize';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 const VIEW_SOURCES = new Set(['map', 'nearby', 'event', 'link', 'qr', 'history']);
 
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const source = request.nextUrl.searchParams.get('source');
     if (source && VIEW_SOURCES.has(source)) {
-      runAfterResponse('place_viewed', () => emitProductEvent(admin, user.id, 'place_viewed', { source }));
+      runAfterResponse('place_viewed', () => emitProductEvent(admin, user.id, 'place_viewed', { source }, { platform: clientPlatform(request) }));
     }
     return NextResponse.json({ place: detail });
   } catch (e) {

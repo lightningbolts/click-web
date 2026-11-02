@@ -7,6 +7,7 @@ import { loadConsumerPlace } from '@/lib/server/places/loadPlace';
 import { createPulse } from '@/lib/server/places/pulses';
 import { placeNotFound, placesRateLimitResponse, requirePlacesUser } from '@/lib/server/places/routeContext';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 /** POST /api/places/[placeId]/pulse — one Pulse from a present user (§5.5). */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ placeId: string }> }) {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: result.message, code: result.code, ...result.extra }, { status: result.status });
     }
     const props = { has_energy: parsed.data.energy != null, has_followup: result.hasFollowup };
-    runAfterResponse('place_pulse', () => emitProductEvent(admin, user.id, 'place_pulse', props));
+    runAfterResponse('place_pulse', () => emitProductEvent(admin, user.id, 'place_pulse', props, { platform: clientPlatform(request) }));
     return NextResponse.json({ pulse: result.pulse, summary: result.summary }, { status: 201 });
   } catch (e) {
     console.error('POST /api/places/[placeId]/pulse:', e);
