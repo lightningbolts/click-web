@@ -56,14 +56,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # Maestro's bundled ChromeDriver must match Chrome's major version
-      # (session not created if they drift). Maestro CLI 2.8.0 currently ships
-      # ChromeDriver 154; pin both together if you bump Maestro.
+      # Maestro's web driver must support Chrome's major version. Maestro 2.9.0
+      # fixed web tests on Chrome 150+ and 2.12.0 moved to Selenium 4.51.0
+      # (tested on Chrome 153-155), so Chrome is pinned to 155 with Maestro
+      # 2.12.0 below. Bump both together.
       - name: Set up Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
-          chrome-version: 154
+          chrome-version: 155
           install-dependencies: true
 
       # Maestro Selenium hardcodes binary: /usr/bin/google-chrome (maestro#2576).
@@ -96,7 +97,7 @@ jobs:
 
       - name: Install Maestro CLI
         env:
-          MAESTRO_VERSION: "2.8.0"
+          MAESTRO_VERSION: "2.12.0"
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
