@@ -84,19 +84,22 @@ jobs:
           if [ -e /usr/bin/google-chrome ] && [ ! -e /usr/bin/google-chrome.original ]; then
             sudo mv /usr/bin/google-chrome /usr/bin/google-chrome.original
           fi
-          # With webdriver.chrome.driver set, Selenium no longer passes a binary,
-          # so ChromeDriver searches for Chrome itself and finds the runner
-          # image's copy (/opt/google/chrome/chrome, a newer major) before
-          # /usr/bin. Move it aside so only the wrapper below can be found.
-          if [ -d /opt/google/chrome ]; then
-            sudo mv /opt/google/chrome /opt/google/chrome.runner-image
-          fi
           sudo tee /usr/bin/google-chrome >/dev/null <<EOF
           #!/bin/sh
           exec "$real" --no-sandbox --disable-dev-shm-usage "\$@"
           EOF
           sudo chmod +x /usr/bin/google-chrome
           /usr/bin/google-chrome --version
+          # With webdriver.chrome.driver set (Maestro step), Selenium passes no
+          # browser binary, so ChromeDriver looks for Chrome itself, starting at
+          # /opt/google/chrome/chrome: the runner image's own, newer Chrome.
+          # Swap that path for the wrapper so ChromeDriver's first hit is 154.
+          if [ -d /opt/google/chrome ] && [ ! -e /opt/google/chrome.runner-image ]; then
+            sudo mv /opt/google/chrome /opt/google/chrome.runner-image
+          fi
+          sudo mkdir -p /opt/google/chrome
+          sudo ln -sf /usr/bin/google-chrome /opt/google/chrome/chrome
+          /opt/google/chrome/chrome --version
 
       - name: Install dependencies
         run: npm ci
@@ -160,14 +163,23 @@ jobs:
         # Text asserts must match AX-tree nodes. Styled spans split "About Click"
         # and the handshake tagline, so substring text checks fail even when the
         # screenshot is correct. Smoke flows use unsplit copy and heading ids.
-        # Selenium's DriverFinder checks the webdriver.chrome.driver system
-        # property (and SE_CHROMEDRIVER) before falling back to Selenium Manager.
-        # ChromeDriver then finds /usr/bin/google-chrome, the wrapper above.
+        # Maestro lets Selenium pick ChromeDriver, which picked one newer than
+        # the pinned Chrome. Selenium's DriverFinder takes the
+        # webdriver.chrome.driver system property before Selenium Manager, so
+        # point it at setup-chrome's matching driver. The driver goes through a
+        # wrapper that writes a verbose log into ~/.maestro (uploaded below),
+        # because Maestro turns ChromeDriver's own logging off.
         env:
-          JAVA_TOOL_OPTIONS: -Dwebdriver.chrome.driver=${{ steps.chrome.outputs.chromedriver-path }}
-          SE_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+          REAL_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+          JAVA_TOOL_OPTIONS: -Dwebdriver.chrome.driver=${{ runner.temp }}/chromedriver
         run: |
-          "$SE_CHROMEDRIVER" --version
+          "$REAL_CHROMEDRIVER" --version
+          mkdir -p "$HOME/.maestro"
+          cat > "$RUNNER_TEMP/chromedriver" <<EOF
+          #!/bin/sh
+          exec "$REAL_CHROMEDRIVER" "\$@" --log-level=ALL --log-path="$HOME/.maestro/chromedriver.log"
+          EOF
+          chmod +x "$RUNNER_TEMP/chromedriver"
           xvfb-run --auto-servernum maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
 
       - name: Upload Maestro artifacts
