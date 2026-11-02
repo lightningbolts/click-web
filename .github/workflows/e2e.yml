@@ -56,14 +56,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # Maestro's bundled ChromeDriver must match Chrome's major version
-      # (session not created if they drift). Maestro CLI 2.8.0 currently ships
-      # ChromeDriver 154; pin both together if you bump Maestro.
+      # ChromeDriver must match Chrome's major version (session not created if
+      # they drift). Maestro builds ChromeDriverService without a driver path,
+      # so Selenium resolves one itself and picks up whatever is newest (156
+      # once the runner image moved on). Install the matching driver here and
+      # hand it to Selenium via webdriver.chrome.driver in the Maestro step.
       - name: Set up Chrome
         id: chrome
-        uses: browser-actions/setup-chrome@v2
+        uses: browser-actions/setup-chrome@v2.2.0
         with:
           chrome-version: 154
+          install-chromedriver: true
           install-dependencies: true
 
       # Maestro Selenium hardcodes binary: /usr/bin/google-chrome (maestro#2576).
@@ -150,7 +153,15 @@ jobs:
         # Text asserts must match AX-tree nodes. Styled spans split "About Click"
         # and the handshake tagline, so substring text checks fail even when the
         # screenshot is correct. Smoke flows use unsplit copy and heading ids.
-        run: xvfb-run --auto-servernum maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
+        # Selenium's DriverFinder checks the webdriver.chrome.driver system
+        # property (and SE_CHROMEDRIVER) before falling back to Selenium Manager.
+        # ChromeDriver then launches /usr/bin/google-chrome, the wrapper above.
+        env:
+          JAVA_TOOL_OPTIONS: -Dwebdriver.chrome.driver=${{ steps.chrome.outputs.chromedriver-path }}
+          SE_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+        run: |
+          "$SE_CHROMEDRIVER" --version
+          xvfb-run --auto-servernum maestro test .maestro --include-tags smoke -e BASE_URL=http://localhost:3000
 
       - name: Upload Maestro artifacts
         if: success() || failure()
