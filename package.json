@@ -28,7 +28,7 @@
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@opennextjs/cloudflare": "^1.20.15",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.25",
     "@radix-ui/react-popover": "^1.2.0",
@@ -46,7 +46,7 @@
     "livekit-server-sdk": "^2.14.0",
     "lucide-react": "^0.554.0",
     "maplibre-gl": "^6.9.0",
-    "next": "^16.3.8",
+    "next": "^16.4.3",
     "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -56,7 +56,7 @@
     "stripe": "^21.0.1",
     "swr": "^2.3.7",
     "tailwind-merge": "^3.4.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -71,7 +71,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "decode-ico": "^0.4.1",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.3.8",
+    "eslint-config-next": "^16.4.3",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
@@ -79,7 +79,7 @@
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5",
-    "wrangler": "^4.35.0"
+    "wrangler": "^4.156.1"
   },
   "overrides": {
     "@types/react": "19.2.7",
@@ -87,6 +87,13 @@
     "nanoid": "^3.3.18",
     "undici": "^7.29.0",
     "sharp": "0.35.5",
-    "qs": "6.16.0"
+    "qs": "6.17.1",
+    "@opennextjs/cloudflare": {
+      "glob": "^14.0.3",
+      "minimatch": "^11.0.3"
+    },
+    "@node-minify/core": {
+      "glob": "^14.0.3"
+    }
   }
 }
