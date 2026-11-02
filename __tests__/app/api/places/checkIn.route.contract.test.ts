@@ -74,7 +74,7 @@ describe('POST /api/places/[placeId]/check-in', () => {
     expect(JSON.stringify(row)).not.toContain(String(inside.latitude));
     // Joins the Place Hub right away.
     expect(mockState.db!.rows('hub_participants')).toEqual([{ id: expect.any(String), hub_id: `place-${IDS.cafe}`, user_id: IDS.viewer }]);
-    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_check_in', { proof: 'gps' });
+    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_check_in', { proof: 'gps' }, { platform: null });
   });
 
   it('rejects out of bounds with the distance and stores nothing', async () => {
@@ -82,7 +82,7 @@ describe('POST /api/places/[placeId]/check-in', () => {
     expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({ code: 'out_of_bounds', distance_meters: 300 });
     expect(checkIns(mockState.db!)).toHaveLength(0);
-    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_check_in_rejected', { reason: 'out_of_bounds' });
+    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_check_in_rejected', { reason: 'out_of_bounds' }, { platform: null });
   });
 
   it('rejects low accuracy', async () => {

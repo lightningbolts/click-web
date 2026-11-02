@@ -171,7 +171,7 @@ describe('GET /api/places/[placeId]', () => {
     expect(place.pulse_eligibility).toMatchObject({ can_pulse: false, reason: 'not_present' });
     expect(place.pulse_eligibility.questions.map((q: { key: string }) => q.key)).toEqual(['energy', 'category', 'talkable']);
     expect(place.pulse_eligibility.leaving_questions.map((q: { key: string }) => q.key)).toEqual(['would_return']);
-    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_viewed', { source: 'map' });
+    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_viewed', { source: 'map' }, { platform: null });
   });
 
   it('names only allowed people: no ghosts, blocked users or strangers anywhere', async () => {

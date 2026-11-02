@@ -135,6 +135,19 @@ describe('POST /api/beacons/[beaconId]/tickets/checkout', () => {
     ], { client: 'ios' });
   });
 
+  it('accepts the Android app as the checkout client', async () => {
+    mockCreateAdminSupabaseClient.mockReturnValue({});
+    mockCreateTicketCheckout.mockResolvedValue({ ok: true, orderId: ORDER_ID, fulfilled: true });
+    const res = await postCheckout(
+      checkoutRequest({ items: [{ ticket_tier_id: TIER_ID, quantity: 1 }], client: 'android' }),
+      beaconParams(),
+    );
+    expect(res.status).toBe(200);
+    expect(mockCreateTicketCheckout).toHaveBeenCalledWith({}, USER_ID, BEACON_ID, [
+      { tierId: TIER_ID, quantity: 1 },
+    ], { client: 'android' });
+  });
+
   it('rejects orders mixing free and paid tickets', async () => {
     mockCreateAdminSupabaseClient.mockReturnValue({});
     mockCreateTicketCheckout.mockResolvedValue({ ok: false, status: 400, code: 'mixed_order' });

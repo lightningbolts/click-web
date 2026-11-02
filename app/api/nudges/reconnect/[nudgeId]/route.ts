@@ -6,6 +6,7 @@ import { parseBody } from '@/lib/api/parseBody';
 import { placeCell } from '@/lib/nudges/reconnectNearby';
 import { runAfterResponse } from '@/lib/server/afterResponse';
 import { emitProductEvent } from '@/lib/server/telemetry/productEvents';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const row = data as { connection_id: string; encounter_id: string | null } | null;
     if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     if (parsed.data.action === 'acted') {
-      runAfterResponse('product events', () => emitProductEvent(admin, user.id, 'nudge_acted', { kind: 'reconnect_nearby' }));
+      runAfterResponse('product events', () => emitProductEvent(admin, user.id, 'nudge_acted', { kind: 'reconnect_nearby' }, { platform: clientPlatform(request) }));
     }
 
     if (parsed.data.action === 'dismissed' && parsed.data.mute) {

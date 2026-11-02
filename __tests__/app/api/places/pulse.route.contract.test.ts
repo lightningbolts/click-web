@@ -86,7 +86,7 @@ describe('POST /api/places/[placeId]/pulse', () => {
       category_answer: 2,
       count_for_insights: true,
     });
-    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_pulse', { has_energy: true, has_followup: true });
+    expect(mockEmit).toHaveBeenCalledWith(expect.anything(), IDS.viewer, 'place_pulse', { has_energy: true, has_followup: true }, { platform: null });
   });
 
   it('accepts presence from a recent verified handshake at the Place', async () => {

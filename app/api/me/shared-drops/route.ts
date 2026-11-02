@@ -15,6 +15,7 @@ import {
   serializeSharedDrops,
   sharedDropsConfigFrom,
 } from '@/lib/server/sharedDrops';
+import { clientPlatform } from '@/lib/server/telemetry/clientPlatform';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       }
       return NextResponse.json({ error: 'Failed to share the drop. Try again.' }, { status: 500 });
     }
-    runAfterResponse('product events', () => emitProductEvent(auth.admin, auth.userId, 'drop_posted', { kind: 'shared' }));
+    runAfterResponse('product events', () => emitProductEvent(auth.admin, auth.userId, 'drop_posted', { kind: 'shared' }, { platform: clientPlatform(request) }));
     return respond(result.row, 201);
   } catch (e) {
     console.error('POST /api/me/shared-drops:', e);

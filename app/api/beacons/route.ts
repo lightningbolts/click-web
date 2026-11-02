@@ -48,6 +48,7 @@ import {
   parseEventRecurrenceFromBody,
   validateEventRecurrence,
 } from "@/lib/events/eventRecurrence";
+import { clientPlatform } from "@/lib/server/telemetry/clientPlatform";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -601,7 +602,7 @@ export async function POST(request: NextRequest) {
     }
     const seriesCount = seriesId != null ? inserted.length : undefined;
     runAfterResponse("product events", () =>
-      emitProductEvent(createAdminSupabaseClient(), user.id, "beacon_created", { type: beacon_type }),
+      emitProductEvent(createAdminSupabaseClient(), user.id, "beacon_created", { type: beacon_type }, { platform: clientPlatform(request) }),
     );
 
     const beacon = parseInsertedBeacon(insertedRow, lon, lat);
