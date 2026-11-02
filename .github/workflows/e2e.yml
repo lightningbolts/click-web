@@ -84,6 +84,13 @@ jobs:
           if [ -e /usr/bin/google-chrome ] && [ ! -e /usr/bin/google-chrome.original ]; then
             sudo mv /usr/bin/google-chrome /usr/bin/google-chrome.original
           fi
+          # With webdriver.chrome.driver set, Selenium no longer passes a binary,
+          # so ChromeDriver searches for Chrome itself and finds the runner
+          # image's copy (/opt/google/chrome/chrome, a newer major) before
+          # /usr/bin. Move it aside so only the wrapper below can be found.
+          if [ -d /opt/google/chrome ]; then
+            sudo mv /opt/google/chrome /opt/google/chrome.runner-image
+          fi
           sudo tee /usr/bin/google-chrome >/dev/null <<EOF
           #!/bin/sh
           exec "$real" --no-sandbox --disable-dev-shm-usage "\$@"
@@ -155,7 +162,7 @@ jobs:
         # screenshot is correct. Smoke flows use unsplit copy and heading ids.
         # Selenium's DriverFinder checks the webdriver.chrome.driver system
         # property (and SE_CHROMEDRIVER) before falling back to Selenium Manager.
-        # ChromeDriver then launches /usr/bin/google-chrome, the wrapper above.
+        # ChromeDriver then finds /usr/bin/google-chrome, the wrapper above.
         env:
           JAVA_TOOL_OPTIONS: -Dwebdriver.chrome.driver=${{ steps.chrome.outputs.chromedriver-path }}
           SE_CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
