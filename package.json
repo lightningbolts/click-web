@@ -87,6 +87,13 @@
     "nanoid": "^3.3.18",
     "undici": "^7.29.0",
     "sharp": "0.35.5",
-    "qs": "6.17.1"
+    "qs": "6.17.1",
+    "@opennextjs/cloudflare": {
+      ".": "$@opennextjs/cloudflare",
+      "glob": "14.0.3"
+    },
+    "@node-minify/core": {
+      "glob": "14.0.3"
+    }
   }
 }
