@@ -349,6 +349,58 @@ describe('POST /api/connections/proximity contract', () => {
     dateSpy.mockRestore();
   });
 
+  describe('review poll over time', () => {
+    function poll(userId: string, pendingId: string) {
+      mockGetSupabaseFromRouteRequest.mockResolvedValueOnce({ supabase: {}, user: { id: userId }, authError: null });
+      return proximityGet(
+        new NextRequest(`http://localhost/api/connections/proximity?pending_handshake_id=${pendingId}`),
+      );
+    }
+
+    it('keeps peers paired just before the tap after the late-join window passes', async () => {
+      const t0 = Date.now();
+      const dateSpy = jest.spyOn(Date, 'now').mockReturnValue(t0);
+      try {
+        await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: ['2222', '3333'] }));
+        await proximityPost(makeRequest(userB, { my_token: '2222', heard_tokens: ['1111', '3333'] }));
+        dateSpy.mockReturnValue(t0 + 5_000);
+        const resC = await proximityPost(makeRequest(userC, { my_token: '3333', heard_tokens: ['1111', '2222'] }));
+        const { pending_handshake_id: tapC } = (await resC.json()) as { pending_handshake_id: string };
+
+        // C is still choosing 16 s after A and B paired (past the 15 s late-join window).
+        const pairedAt = adminStore._pending.find((r) => r.user_id === userA && r.matched_at != null)!.matched_at!;
+        dateSpy.mockReturnValue(Date.parse(pairedAt) + 16_000);
+        const res = await poll(userC, tapC);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { awaiting_selection?: boolean; matches: { id: string }[] };
+        expect(body.awaiting_selection).toBe(true);
+        expect(body.matches.map((m) => m.id).sort()).toEqual([userA, userB].sort());
+      } finally {
+        dateSpy.mockRestore();
+      }
+    });
+
+    it('does not answer for a tap that a newer tap replaced', async () => {
+      await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: ['2222'], gps_lat: sharedLat, gps_lon: sharedLon }));
+      await proximityPost(makeRequest(userB, { my_token: '2222', heard_tokens: ['3333'], gps_lat: sharedLat, gps_lon: sharedLon }));
+      const resC = await proximityPost(
+        makeRequest(userC, { my_token: '3333', heard_tokens: ['2222', '1111'], gps_lat: sharedLat, gps_lon: sharedLon }),
+      );
+      const { pending_handshake_id: tapC } = (await resC.json()) as { pending_handshake_id: string };
+      const original = adminStore._pending.find((r) => r.id === tapC)!;
+
+      const { currentReviewForPendingRow } = await import('@/lib/server/proximity/bindProximityHandshake');
+      // Simulate a newer unmatched tap from C replacing this row while a poll is in flight.
+      adminStore._pending.splice(adminStore._pending.indexOf(original), 1, {
+        ...original,
+        id: 'replacement-row',
+        created_at: new Date(Date.now() + 1_000).toISOString(),
+      });
+
+      expect(await currentReviewForPendingRow(adminStore as never, userC, original as never)).toBeNull();
+    });
+  });
+
   it('keeps a lone unmatched tap pending on GET', async () => {
     const res = await proximityPost(makeRequest(userA, { my_token: '1111', heard_tokens: [] }));
     const { pending_handshake_id } = (await res.json()) as { pending_handshake_id: string };

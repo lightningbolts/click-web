@@ -4,6 +4,7 @@ import {
   finiteBatteryPct,
   finiteNumber,
   handshakeCreatedAtMs,
+  peerEvidenceTokens,
   normalizeToken,
   PROXIMITY_GROUP_COALESCE_MIN_MS,
   PROXIMITY_LATE_JOIN_WINDOW_MS,
@@ -21,6 +22,7 @@ import {
   buildSensorPayload,
   markPendingHandshakesMatched,
   PENDING_HANDSHAKE_SELECT,
+  pendingRowToHandshakeLite,
   sleep,
   USER_PROFILE_SELECT,
   type BindContext,
@@ -622,21 +624,31 @@ export async function currentReviewForPendingRow(
   uid: string,
   row: PendingHandshakeRow,
 ): Promise<BindResult | null> {
-  const evidenceTokens = (Array.isArray(row.heard_tokens) ? row.heard_tokens : [])
-    .map(normalizeToken)
-    .filter((t): t is string => t != null);
+  // Same inputs confirm uses (confirmProximitySelection.ts), so the review shows exactly the
+  // people a confirm would accept: the tap's own evidence, and a late-join window anchored on
+  // when this tap was made (not on each poll, which would drop peers paired just before it).
+  const lite = pendingRowToHandshakeLite(row);
+  const evidenceTokens = [
+    ...peerEvidenceTokens(lite),
+    ...((Array.isArray(row.heard_tokens) ? row.heard_tokens : []) as string[]),
+  ];
+  const createdMs = handshakeCreatedAtMs(lite) ?? Date.now();
   const graph = await loadMatchGraph(admin, {
     nowIso: new Date().toISOString(),
     callerUserId: uid,
     evidenceTokens,
     lat: finiteNumber(row.lat),
     lon: finiteNumber(row.lon),
-    matchedSinceIso: new Date(Date.now() - PROXIMITY_LATE_JOIN_WINDOW_MS).toISOString(),
+    matchedSinceIso: new Date(createdMs - PROXIMITY_LATE_JOIN_WINDOW_MS).toISOString(),
   });
   if (graph.error) {
     console.error('[proximity] review re-query:', graph.error);
     return null;
   }
+  // A newer tap from this phone replaced the requested row mid-poll: never mix its candidates
+  // with this row's id and expiry.
+  const callerRow = graph.rows.find((r) => r.user_id === uid && r.id === row.id);
+  if (!callerRow || callerRow.matched_at != null || graph.latestByUser.get(uid)?.id !== row.id) return null;
   const peerIds = [...graph.matchedIds].sort();
   const memberIds = [uid, ...peerIds].sort();
   if (memberIds.length <= 2) return null;
