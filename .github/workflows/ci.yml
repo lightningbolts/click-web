@@ -60,6 +60,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Verify App Links / Universal Links files
+        run: npm run verify:well-known
+
       - name: Unit tests
         run: npm test -- --ci --coverage --passWithNoTests
 

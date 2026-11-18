@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.click.app",
+      "package_name": "compose.project.click.click",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_RELEASE_SHA256_HEX_COLON_SEPARATED"
+        "E5:91:46:09:38:03:79:2C:AB:51:A2:FE:A3:22:33:EC:04:FD:C4:26:8A:A8:6E:F4:46:A7:C8:CC:3B:C5:D2:EC"
       ]
     }
   }

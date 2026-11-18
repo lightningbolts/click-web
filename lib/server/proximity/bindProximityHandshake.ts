@@ -4,6 +4,7 @@ import {
   finiteBatteryPct,
   finiteNumber,
   handshakeCreatedAtMs,
+  peerEvidenceTokens,
   normalizeToken,
   PROXIMITY_GROUP_COALESCE_MIN_MS,
   PROXIMITY_LATE_JOIN_WINDOW_MS,
@@ -21,6 +22,7 @@ import {
   buildSensorPayload,
   markPendingHandshakesMatched,
   PENDING_HANDSHAKE_SELECT,
+  pendingRowToHandshakeLite,
   sleep,
   USER_PROFILE_SELECT,
   type BindContext,
@@ -333,50 +335,7 @@ export async function bindProximityHandshake(
   // Multi-peer (≥3 members): always let people review who was in the tap (and remove anyone)
   // before anything durable is written — for new and existing groups alike.
   if (memberIds.length > 2) {
-    const existingGroup = await lookupConnectionForMemberSet(admin, memberIds);
-    const existingGroupId = existingGroup?.id ? String(existingGroup.id) : null;
-    {
-      const { data: candidateUsers, error: candidateUsersErr } = await admin
-        .from('users')
-        .select(USER_PROFILE_SELECT)
-        .in('id', ids);
-      if (candidateUsersErr) {
-        console.error('[proximity] users (awaiting_selection):', candidateUsersErr);
-        return { kind: 'error', status: 500, body: { error: 'Failed to load user profiles' } };
-      }
-      const matches: ProximityMatchUserProfile[] = (candidateUsers ?? []).map((u: Record<string, unknown>) => ({
-        id: String(u.id),
-        name: (u.name as string | null | undefined) ?? null,
-        email: (u.email as string | null | undefined) ?? null,
-        image: (u.image as string | null | undefined) ?? null,
-        created_at:
-          typeof u.created_at === 'string'
-            ? Date.parse(u.created_at)
-            : typeof u.created_at === 'number'
-              ? u.created_at
-              : 0,
-        connection_id: existingGroupId,
-        encounter_logged: false,
-        is_new_connection: !existingGroupId,
-        encounter_persisted_on_bind: false,
-      }));
-      return {
-        kind: 'ok',
-        status: 200,
-        body: {
-          success: true,
-          encounter_logged: false,
-          matches,
-          awaiting_selection: true,
-          pending_handshake_id: insertedRow.id,
-          expires_at: insertedRow.expires_at,
-          is_group: true,
-          is_new_connection: !existingGroupId,
-          ...(existingGroupId ? { existing_connection_id: existingGroupId } : {}),
-          group_clique_candidate: { member_user_ids: memberIds },
-        },
-      };
-    }
+    return awaitingSelectionResult(admin, ids, memberIds, insertedRow);
   }
 
   const ensured = await ensureConnectionForMemberSet(admin, uid, encLat, encLon, memberIds);
@@ -599,4 +558,99 @@ export async function bindProximityHandshake(
   }
 
   return { kind: 'ok', status: 200, body: responseBody };
+}
+
+/**
+ * The "who's in this Click?" review for a multi-peer tap: the candidates as they stand now, with
+ * the existing group when this exact member set already has one. Writes nothing.
+ */
+export async function awaitingSelectionResult(
+  admin: SupabaseClient,
+  peerIds: string[],
+  memberIds: string[],
+  callerRow: PendingHandshakeRow,
+): Promise<BindResult> {
+  const existingGroup = await lookupConnectionForMemberSet(admin, memberIds);
+  const existingGroupId = existingGroup?.id ? String(existingGroup.id) : null;
+  const { data: candidateUsers, error: candidateUsersErr } = await admin
+    .from('users')
+    .select(USER_PROFILE_SELECT)
+    .in('id', peerIds);
+  if (candidateUsersErr) {
+    console.error('[proximity] users (awaiting_selection):', candidateUsersErr);
+    return { kind: 'error', status: 500, body: { error: 'Failed to load user profiles' } };
+  }
+  const matches: ProximityMatchUserProfile[] = (candidateUsers ?? []).map((u: Record<string, unknown>) => ({
+    id: String(u.id),
+    name: (u.name as string | null | undefined) ?? null,
+    email: (u.email as string | null | undefined) ?? null,
+    image: (u.image as string | null | undefined) ?? null,
+    created_at:
+      typeof u.created_at === 'string'
+        ? Date.parse(u.created_at)
+        : typeof u.created_at === 'number'
+          ? u.created_at
+          : 0,
+    connection_id: existingGroupId,
+    encounter_logged: false,
+    is_new_connection: !existingGroupId,
+    encounter_persisted_on_bind: false,
+  }));
+  return {
+    kind: 'ok',
+    status: 200,
+    body: {
+      success: true,
+      encounter_logged: false,
+      matches,
+      awaiting_selection: true,
+      pending_handshake_id: callerRow.id,
+      expires_at: callerRow.expires_at,
+      is_group: true,
+      is_new_connection: !existingGroupId,
+      ...(existingGroupId ? { existing_connection_id: existingGroupId } : {}),
+      group_clique_candidate: { member_user_ids: memberIds },
+    },
+  };
+}
+
+/**
+ * While an unmatched tap is under review, the group as it stands now: someone who tapped a
+ * moment later shows up here, so the reviewing phones can add them (`GET` recovery poll).
+ * Returns null when the tap is not (or no longer) a multi-peer review. Read-only.
+ */
+export async function currentReviewForPendingRow(
+  admin: SupabaseClient,
+  uid: string,
+  row: PendingHandshakeRow,
+): Promise<BindResult | null> {
+  // Same inputs confirm uses (confirmProximitySelection.ts), so the review shows exactly the
+  // people a confirm would accept: the tap's own evidence, and a late-join window anchored on
+  // when this tap was made (not on each poll, which would drop peers paired just before it).
+  const lite = pendingRowToHandshakeLite(row);
+  const evidenceTokens = [
+    ...peerEvidenceTokens(lite),
+    ...((Array.isArray(row.heard_tokens) ? row.heard_tokens : []) as string[]),
+  ];
+  const createdMs = handshakeCreatedAtMs(lite) ?? Date.now();
+  const graph = await loadMatchGraph(admin, {
+    nowIso: new Date().toISOString(),
+    callerUserId: uid,
+    evidenceTokens,
+    lat: finiteNumber(row.lat),
+    lon: finiteNumber(row.lon),
+    matchedSinceIso: new Date(createdMs - PROXIMITY_LATE_JOIN_WINDOW_MS).toISOString(),
+  });
+  if (graph.error) {
+    console.error('[proximity] review re-query:', graph.error);
+    return null;
+  }
+  // A newer tap from this phone replaced the requested row mid-poll: never mix its candidates
+  // with this row's id and expiry.
+  const callerRow = graph.rows.find((r) => r.user_id === uid && r.id === row.id);
+  if (!callerRow || callerRow.matched_at != null || graph.latestByUser.get(uid)?.id !== row.id) return null;
+  const peerIds = [...graph.matchedIds].sort();
+  const memberIds = [uid, ...peerIds].sort();
+  if (memberIds.length <= 2) return null;
+  return awaitingSelectionResult(admin, peerIds, memberIds, row);
 }

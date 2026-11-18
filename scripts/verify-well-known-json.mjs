@@ -16,7 +16,7 @@ const files = [
   join(root, 'public', '.well-known', 'assetlinks.json'),
 ];
 
-const PLACEHOLDER_PATTERNS = ['<%=', '{{', '__REPLACE__', 'REPLACE_ME'];
+const PLACEHOLDER_PATTERNS = ['<%=', '{{', '__REPLACE__', 'REPLACE_ME', 'REPLACE_WITH'];
 
 let failed = false;
 for (const f of files) {

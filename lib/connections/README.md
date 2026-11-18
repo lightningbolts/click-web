@@ -101,7 +101,7 @@ Lives in `lib/dashboard/connectionExtras.ts` (consumed by connections UI):
 | Route | Methods | Role |
 |-------|---------|------|
 | `/api/connections` | GET, POST | List/create/restore connections |
-| `/api/connections/proximity` | POST, GET | Async Tri-Factor bind + pending poll (`awaiting_selection` for first-time multi-peer) |
+| `/api/connections/proximity` | POST, GET | Async Tri-Factor bind + pending poll (`awaiting_selection` for first-time multi-peer; while a tap is under review, GET re-reads the group read-only so late joiners appear) |
 | `/api/connections/proximity/confirm` | POST | Host confirms selected members after `awaiting_selection` (≤12) |
 | `/api/connections/encounter` | POST | Log encounter with sensor payload |
 | `/api/connections/core` | GET, POST, DELETE | Core connection pins |

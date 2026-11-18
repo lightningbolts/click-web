@@ -36,6 +36,7 @@ Server helpers for **public event microsites**, organizer auth, recap / network-
 - Event Options live on `map_beacons` (`event_visibility`, `event_capacity`, `approval_required`, `guest_list_visibility`, `cover_theme_id`) plus `event_rsvp_requests`.
 - Click RSVP / bookmark / check-in: `beacon_attendees`, `event_bookmarks`, `event_check_ins`.
 - Guests: `event_guest_rsvps` only — never `event_participation`.
+- Ticketed events (`admission_type = 'ticketed'`) refuse a new member RSVP with `409 ticketed_event`, so an RSVP can't become a free Click Pass. An RSVP made before tickets went on sale still stands and still admits.
 - Map pin audience stays `visibility_audience` (`everyone | connections | core_connections`). Listing visibility is a separate column.
 
 **Still unused until [event-schema-scaling-followups.md](../../docs/event-schema-scaling-followups.md):**

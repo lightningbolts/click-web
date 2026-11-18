@@ -59,6 +59,8 @@ export type EventBeaconRow = {
   guest_list_visibility?: string | null;
   cover_theme_id?: string | null;
   creator_id?: string | null;
+  /** `rsvp` (default) or `ticketed`: a ticketed event admits by ticket, not by a new RSVP. */
+  admission_type?: string | null;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -287,7 +289,7 @@ export async function loadEventBeaconOrResponse(
   const { data, error } = await admin
     .from("map_beacons")
     .select(
-      "id, beacon_type, expires_at, venue_id, metadata, location, creator_id, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id",
+      "id, beacon_type, expires_at, venue_id, metadata, location, creator_id, event_visibility, event_capacity, approval_required, guest_list_visibility, cover_theme_id, admission_type",
     )
     .eq("id", beaconId)
     .maybeSingle();
@@ -338,6 +340,7 @@ export async function loadEventBeaconOrResponse(
       guest_list_visibility:
         typeof data.guest_list_visibility === "string" ? data.guest_list_visibility : null,
       cover_theme_id: typeof data.cover_theme_id === "string" ? data.cover_theme_id : null,
+      admission_type: typeof data.admission_type === "string" ? data.admission_type : null,
     },
   };
 }

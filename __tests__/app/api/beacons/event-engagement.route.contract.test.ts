@@ -536,6 +536,78 @@ describe("event engagement API contracts", () => {
     expect(types).toContain("rsvp_unset");
   });
 
+  describe("RSVP on a ticketed event", () => {
+    function ticketedAdmin(existingGoing: unknown) {
+      const upsert = jest.fn().mockResolvedValue({ error: null });
+      const admin = makeAdmin({
+        map_beacons: {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                  id: BEACON_ID,
+                  beacon_type: "event",
+                  expires_at: futureIso(),
+                  venue_id: null,
+                  metadata: liveEventMeta(),
+                  location: { type: "Point", coordinates: [-122.3, 47.65] },
+                  admission_type: "ticketed",
+                },
+                error: null,
+              }),
+            }),
+          }),
+        },
+        beacon_attendees: {
+          ...chainSelect({ data: existingGoing, error: null, count: existingGoing ? 1 : 0 }),
+          upsert,
+        },
+        event_guest_rsvps: chainSelect({ data: [], error: null, count: 0 }),
+        users: {
+          select: jest.fn().mockReturnValue({
+            in: jest.fn().mockResolvedValue({ data: [{ id: USER_ID, name: "Ada", image: null }], error: null }),
+          }),
+        },
+        event_engagement_events: { insert: jest.fn().mockResolvedValue({ error: null }) },
+      });
+      return { admin, upsert };
+    }
+
+    function post() {
+      return postRsvp(
+        new NextRequest(`http://localhost/api/beacons/${BEACON_ID}/rsvp`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        }),
+        { params: Promise.resolve({ beaconId: BEACON_ID }) },
+      );
+    }
+
+    beforeEach(() => {
+      mockGetSupabaseFromRouteRequest.mockResolvedValue({ supabase: {}, user: { id: USER_ID }, authError: null });
+    });
+
+    it("refuses a new RSVP so it can't become a free pass", async () => {
+      const { admin, upsert } = ticketedAdmin(null);
+      mockCreateAdminSupabaseClient.mockReturnValue(admin);
+
+      const res = await post();
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "This event uses tickets", code: "ticketed_event" });
+      expect(upsert).not.toHaveBeenCalled();
+    });
+
+    it("keeps an RSVP made before tickets went on sale", async () => {
+      const { admin } = ticketedAdmin({ user_id: USER_ID });
+      mockCreateAdminSupabaseClient.mockReturnValue(admin);
+
+      const res = await post();
+
+      expect(res.status).toBe(200);
+    });
+  });
+
   it("check-in rejects far coords with 403 even when event is not live yet", async () => {
     // Regression: not_live used to short-circuit before geofence → mobile treated 409 as
     // "checked in early" from 12km+ away.
