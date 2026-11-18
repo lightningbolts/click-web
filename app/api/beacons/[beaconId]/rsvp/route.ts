@@ -103,6 +103,15 @@ export async function POST(
       .eq("user_id", user.id)
       .maybeSingle();
 
+    // A ticketed event admits by ticket. An RSVP from before tickets went on sale still stands
+    // (re-POSTing it stays idempotent), but a new RSVP would mint a free Click Pass for a paid event.
+    if (beacon.admission_type === "ticketed" && existingGoing == null) {
+      return NextResponse.json(
+        { error: "This event uses tickets", code: "ticketed_event" },
+        { status: 409 },
+      );
+    }
+
     const decision = await decideMemberRsvp({
       admin,
       beaconId,

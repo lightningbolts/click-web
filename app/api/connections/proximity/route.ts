@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/server/connectionWriteAuth';
-import { bindProximityHandshake } from '@/lib/server/proximity/bindProximityHandshake';
+import { bindProximityHandshake, currentReviewForPendingRow } from '@/lib/server/proximity/bindProximityHandshake';
 import { PENDING_HANDSHAKE_SELECT } from '@/lib/server/proximity/bindSupport';
 import { RECENT_CONNECTION_LOCK_MS, sameMemberSet } from '@/lib/server/proximity/matching';
 import { getSupabaseFromRouteRequest } from '@/lib/server/supabaseRouteAuth';
@@ -84,6 +84,12 @@ export async function GET(request: NextRequest) {
 
     const pendingRow = row as PendingHandshakeRow;
     if (!pendingRow.matched_at) {
+      // Under review (multi-peer, nobody confirmed yet): report the group as it stands now so a
+      // late joiner shows up on the reviewing phones. Otherwise the tap is still waiting.
+      const review = await currentReviewForPendingRow(admin, user.id, pendingRow);
+      if (review?.kind === 'ok') {
+        return NextResponse.json(review.body, { status: review.status });
+      }
       return NextResponse.json(
         {
           success: true,
