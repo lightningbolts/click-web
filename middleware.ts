@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { hasSupabaseAuthCookie } from '@/lib/auth/authCookie';
-import { authCookieDomainFor, migrateAuthCookiesToDomain } from '@/lib/auth/cookieDomain';
+import {
+  appendHostOnlyExpiries,
+  AUTH_COOKIE_CLEANUP_MARKER,
+  authCookieDomainFor,
+  hasConflictingAuthCookies,
+  isSupabaseAuthCookieName,
+  migrateAuthCookiesToDomain,
+} from '@/lib/auth/cookieDomain';
 import { isSignedInAppPath } from '@/lib/shell/appRoutes';
 import { legacyTabRedirect } from '@/lib/shell/legacyTabRedirect';
 import { BIZ_PLACE_COOKIE } from '@/lib/places/workspace';
@@ -109,6 +116,23 @@ export async function middleware(request: NextRequest) {
   // original shows whether the browser sent an auth cookie twice (host-only + domain copy).
   const originalCookieHeader = request.headers.get('cookie');
   const cookieDomain = authCookieDomainFor(request.nextUrl.hostname);
+
+  // Host-only and domain copies of the session that don't form one session (a name sent twice,
+  // or whole and chunked at once): Supabase would merge chunks of both or read the stale one,
+  // and could delete the good shared session as invalid. Delete the host-only family and
+  // reload, so the session is read from the surviving domain cookies. GET/HEAD only — never
+  // redirect a Server Action POST — and at most once a minute, so it can't loop.
+  if (
+    cookieDomain &&
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    !request.cookies.has(AUTH_COOKIE_CLEANUP_MARKER) &&
+    hasConflictingAuthCookies(originalCookieHeader)
+  ) {
+    const reload = NextResponse.redirect(request.nextUrl, 307);
+    reload.cookies.set(AUTH_COOKIE_CLEANUP_MARKER, '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 });
+    appendHostOnlyExpiries(reload, request.cookies.getAll().map((c) => c.name).filter(isSupabaseAuthCookieName));
+    return reload;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

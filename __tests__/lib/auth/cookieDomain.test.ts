@@ -5,7 +5,7 @@ import {
   AUTH_COOKIE_DOMAIN_MARKER,
   authCookieDomainFor,
   authCookieOptions,
-  duplicatedCookieNames,
+  hasConflictingAuthCookies,
   hostOnlyExpiry,
   isSupabaseAuthCookieName,
   migrateAuthCookiesToDomain,
@@ -58,9 +58,15 @@ describe('cookie helpers', () => {
     expect(isSupabaseAuthCookieName('click_biz_place')).toBe(false);
   });
 
-  it('finds names the browser sent twice', () => {
-    expect([...duplicatedCookieNames(`${SESSION}.0=a; theme=dark; ${SESSION}.0=b`)]).toEqual([`${SESSION}.0`]);
-    expect(duplicatedCookieNames(null).size).toBe(0);
+  it.each([
+    [`${SESSION}.0=a; theme=dark; ${SESSION}.0=b`, true], // host-only + domain copy of one name
+    [`${SESSION}=old; ${SESSION}.0=a; ${SESSION}.1=b`, true], // whole and chunked at once
+    [`${SESSION}.0=a; ${SESSION}.1=b`, false],
+    [`${SESSION}=a; ${SESSION}-code-verifier=v`, false],
+    ['theme=dark; theme=light', false], // not an auth cookie
+    [null, false],
+  ])('detects conflicting auth cookies in %p', (header, expected) => {
+    expect(hasConflictingAuthCookies(header)).toBe(expected);
   });
 
   it('deletes only the host-only copy (no Domain attribute)', () => {
@@ -117,6 +123,13 @@ describe('migrateAuthCookiesToDomain', () => {
     const response = NextResponse.next();
     migrateAuthCookiesToDomain(response, marked, `${header}; ${SESSION}.0=old`, '.joinclick.co', true);
     expect(response.headers.getSetCookie()).toContain(hostOnlyExpiry(`${SESSION}.0`));
+  });
+
+  it('cleans up when an old whole cookie sits beside a migrated chunked session', () => {
+    const marked = [...cookies, { name: SESSION, value: 'old' }, { name: AUTH_COOKIE_DOMAIN_MARKER, value: '.joinclick.co' }];
+    const response = NextResponse.next();
+    migrateAuthCookiesToDomain(response, marked, `${SESSION}=old; ${header}`, '.joinclick.co', true);
+    expect(response.headers.getSetCookie()).toContain(hostOnlyExpiry(SESSION));
   });
 
   it('leaves signed-out browsers alone', () => {

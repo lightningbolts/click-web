@@ -53,19 +53,27 @@ export function isSupabaseAuthCookieName(name: string): boolean {
   return name.startsWith('sb-') && name.includes('-auth-token');
 }
 
-/** Names sent more than once in a `Cookie` header (a host-only and a domain copy). */
-export function duplicatedCookieNames(cookieHeader: string | null | undefined): Set<string> {
-  const seen = new Set<string>();
-  const duplicated = new Set<string>();
-  for (const part of (cookieHeader ?? '').split(';')) {
-    const eq = part.indexOf('=');
-    const name = (eq === -1 ? part : part.slice(0, eq)).trim();
-    if (!name) continue;
-    if (seen.has(name)) duplicated.add(name);
-    seen.add(name);
-  }
-  return duplicated;
+/**
+ * True when the request's auth cookies cannot be one coherent session: a name sent twice
+ * (host-only + domain copy), or one session sent both whole (`…-auth-token`) and chunked
+ * (`…-auth-token.0`). Supabase would merge chunks of two sessions, or prefer a stale whole
+ * cookie, so these must be cleared before the session is read.
+ */
+export function hasConflictingAuthCookies(cookieHeader: string | null | undefined): boolean {
+  const names = (cookieHeader ?? '')
+    .split(';')
+    .map((part) => part.split('=')[0]?.trim() ?? '')
+    .filter(isSupabaseAuthCookieName);
+  if (new Set(names).size !== names.length) return true;
+  const whole = new Set(names.filter((name) => !/\.\d+$/.test(name)));
+  return names.some((name) => /\.\d+$/.test(name) && whole.has(name.replace(/\.\d+$/, '')));
 }
+
+/**
+ * Set (briefly, host-only) when middleware deletes the host-only auth cookies and reloads, so a
+ * conflict that survives the reload is read as-is instead of redirecting forever.
+ */
+export const AUTH_COOKIE_CLEANUP_MARKER = 'click-auth-cookie-cleanup';
 
 /**
  * A `Set-Cookie` value that deletes the host-only copy of `name` and nothing else: with no
@@ -100,8 +108,8 @@ export function appendHostOnlyExpiries(response: { headers: Headers }, names: It
  * possibly refreshed). Signed-in users from before the switch hold host-only cookies; this
  * writes each one again with `Domain=domain` and deletes the host-only copy, then sets
  * {@link AUTH_COOKIE_DOMAIN_MARKER} so later requests skip the work. It runs again whenever the
- * request carries an auth cookie twice (a host-only copy came back, e.g. from a tab still
- * running the old bundle).
+ * request's auth cookies conflict ({@link hasConflictingAuthCookies}: a host-only copy came
+ * back, e.g. from a tab still running the old bundle).
  *
  * @param requestCookies the request's cookies as Supabase left them (refreshed values included)
  * @param originalCookieHeader the request's `Cookie` header before Supabase touched it
@@ -121,9 +129,8 @@ export function migrateAuthCookiesToDomain(
   )];
   if (originalAuthNames.length === 0) return;
 
-  const duplicated = duplicatedCookieNames(originalCookieHeader);
   const marked = requestCookies.some((c) => c.name === AUTH_COOKIE_DOMAIN_MARKER && c.value === domain);
-  if (marked && !originalAuthNames.some((name) => duplicated.has(name))) return;
+  if (marked && !hasConflictingAuthCookies(originalCookieHeader)) return;
 
   const options = { domain, path: '/', sameSite: 'lax', httpOnly: false, secure, maxAge: SESSION_COOKIE_MAX_AGE };
   for (const { name, value } of requestCookies) {

@@ -43,11 +43,12 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ success: true });
     written.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
 
-    // Delete every auth cookie even when Supabase kept some (a failed revoke keeps the session).
-    const authNames = request.cookies
-      .getAll()
-      .map((c) => c.name)
-      .filter(isSupabaseAuthCookieName);
+    // Delete every auth cookie even when Supabase kept some (a failed revoke keeps the session),
+    // including names it wrote during this request: a refresh can re-chunk the session under a
+    // name the request didn't carry, and that live cookie must not survive sign-out.
+    const authNames = [
+      ...new Set([...request.cookies.getAll().map((c) => c.name), ...written.map((c) => c.name)]),
+    ].filter(isSupabaseAuthCookieName);
     for (const name of authNames) {
       if (response.cookies.get(name)?.maxAge === 0) continue;
       response.cookies.set(name, '', { path: '/', sameSite: 'lax', maxAge: 0, ...(domain ? { domain } : {}) });

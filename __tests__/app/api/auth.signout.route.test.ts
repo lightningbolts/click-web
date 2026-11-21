@@ -68,3 +68,25 @@ test('without a cookie domain, sign-out stays host-only', async () => {
   expect(setCookies.some((c) => /domain=/i.test(c))).toBe(false);
   expect(setCookies.filter((c) => c.startsWith(`${SESSION}.`))).toHaveLength(2);
 });
+
+test('a refresh that re-chunks the session during sign-out does not leave a live cookie behind', async () => {
+  process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN = '.joinclick.co';
+  mockSignOut.mockImplementation(async () => {
+    const opts = { ...mockSupabaseOptions.cookieOptions, path: '/' };
+    // Expired chunked session refreshes into one whole cookie, then sign-out deletes the chunks
+    // it knows about (the request's), never the new name.
+    mockSupabaseOptions.cookies.setAll([
+      { name: SESSION, value: 'refreshed', options: { ...opts, maxAge: 100 } },
+      { name: `${SESSION}.0`, value: '', options: { ...opts, maxAge: 0 } },
+      { name: `${SESSION}.1`, value: '', options: { ...opts, maxAge: 0 } },
+    ]);
+    return { error: null };
+  });
+
+  const response = await POST(signOutRequest('joinclick.co'));
+  const live = response.headers
+    .getSetCookie()
+    .filter((c) => c.startsWith('sb-') && !/Max-Age=0/i.test(c));
+  expect(live).toEqual([]);
+  expect(response.headers.getSetCookie()).toContain(hostOnlyExpiry(SESSION));
+});
