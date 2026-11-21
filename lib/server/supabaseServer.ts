@@ -1,17 +1,20 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { authCookieOptions } from '@/lib/auth/cookieDomain';
 
 /**
  * Supabase client for Server Actions / Server Components using the browser cookie session.
  */
 export async function createSupabaseServerClient(): Promise<ReturnType<typeof createServerClient>> {
   const cookieStore = await cookies();
+  const host = (await headers()).get('host');
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: authCookieOptions(host),
       cookies: {
         getAll() {
           return cookieStore.getAll();

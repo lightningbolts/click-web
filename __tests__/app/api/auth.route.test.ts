@@ -2,12 +2,18 @@
 
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/auth/route';
+import { hostOnlyExpiry } from '@/lib/auth/cookieDomain';
 
 const mockSignInWithPassword = jest.fn();
 const mockSignUp = jest.fn();
 
+let mockOptions: {
+  cookieOptions?: { domain?: string };
+  cookies: { setAll: (c: { name: string; value: string; options: object }[]) => void };
+};
+
 jest.mock('@supabase/ssr', () => ({
-  createServerClient: () => ({
+  createServerClient: (_url: string, _key: string, options: typeof mockOptions) => (mockOptions = options, {
     auth: {
       signInWithPassword: (...args: unknown[]) => mockSignInWithPassword(...args),
       signUp: (...args: unknown[]) => mockSignUp(...args),
@@ -15,12 +21,6 @@ jest.mock('@supabase/ssr', () => ({
   }),
 }));
 
-jest.mock('next/headers', () => ({
-  cookies: async () => ({
-    getAll: () => [],
-    set: jest.fn(),
-  }),
-}));
 
 describe('POST /api/auth', () => {
   beforeEach(() => {
@@ -109,5 +109,35 @@ describe('POST /api/auth', () => {
       password: 'short',
     });
     expect(JSON.stringify(await response.json())).not.toContain('token');
+  });
+
+  it("login on the shared domain deletes an older account's host-only session", async () => {
+    const before = process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN;
+    process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN = '.joinclick.co';
+    const session = 'sb-lrgcwnmcscimkmslihxp-auth-token';
+    mockSignInWithPassword.mockImplementation(async () => {
+      mockOptions.cookies.setAll([
+        { name: session, value: 'new', options: { ...mockOptions.cookieOptions, path: '/', maxAge: 100 } },
+      ]);
+      return { data: { user: { id: 'user-2', email: 'b@example.com' } }, error: null };
+    });
+    try {
+      const response = await POST(
+        new NextRequest('https://joinclick.co/api/auth', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', cookie: `${session}.0=old-0; ${session}.1=old-1` },
+          body: JSON.stringify({ action: 'login', email: 'b@example.com', password: 'password123' }),
+        }),
+      );
+      expect(response.status).toBe(200);
+      const setCookies = response.headers.getSetCookie();
+      expect(setCookies.find((c) => c.startsWith(`${session}=new`))).toMatch(/Domain=\.joinclick\.co/i);
+      expect(setCookies).toEqual(
+        expect.arrayContaining([hostOnlyExpiry(`${session}.0`), hostOnlyExpiry(`${session}.1`)]),
+      );
+    } finally {
+      if (before === undefined) delete process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN;
+      else process.env.NEXT_PUBLIC_AUTH_COOKIE_DOMAIN = before;
+    }
   });
 });

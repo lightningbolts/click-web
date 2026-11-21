@@ -1,6 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { hasSupabaseAuthCookie } from '@/lib/auth/authCookie';
+import {
+  appendHostOnlyExpiries,
+  AUTH_COOKIE_CLEANUP_MARKER,
+  authCookieDomainFor,
+  hasConflictingAuthCookies,
+  isSupabaseAuthCookieName,
+  migrateAuthCookiesToDomain,
+} from '@/lib/auth/cookieDomain';
 import { isSignedInAppPath } from '@/lib/shell/appRoutes';
 import { legacyTabRedirect } from '@/lib/shell/legacyTabRedirect';
 import { BIZ_PLACE_COOKIE } from '@/lib/places/workspace';
@@ -104,10 +112,33 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Read before Supabase runs: `request.cookies.set` below rewrites this header, and only the
+  // original shows whether the browser sent an auth cookie twice (host-only + domain copy).
+  const originalCookieHeader = request.headers.get('cookie');
+  const cookieDomain = authCookieDomainFor(request.nextUrl.hostname);
+
+  // Host-only and domain copies of the session that don't form one session (a name sent twice,
+  // or whole and chunked at once): Supabase would merge chunks of both or read the stale one,
+  // and could delete the good shared session as invalid. Delete the host-only family and
+  // reload, so the session is read from the surviving domain cookies. GET/HEAD only — never
+  // redirect a Server Action POST — and at most once a minute, so it can't loop.
+  if (
+    cookieDomain &&
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    !request.cookies.has(AUTH_COOKIE_CLEANUP_MARKER) &&
+    hasConflictingAuthCookies(originalCookieHeader)
+  ) {
+    const reload = NextResponse.redirect(request.nextUrl, 307);
+    reload.cookies.set(AUTH_COOKIE_CLEANUP_MARKER, '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 });
+    appendHostOnlyExpiries(reload, request.cookies.getAll().map((c) => c.name).filter(isSupabaseAuthCookieName));
+    return reload;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: cookieDomain ? { domain: cookieDomain } : {},
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -138,11 +169,28 @@ export async function middleware(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims ?? null;
 
+  // Last step on every response from here: moves pre-existing host-only auth cookies onto the
+  // shared domain. It appends raw `Set-Cookie` headers, which a later `cookies.set` would drop.
+  const finish = (response: NextResponse) => {
+    if (cookieDomain) {
+      migrateAuthCookiesToDomain(
+        response,
+        request.cookies.getAll(),
+        originalCookieHeader,
+        cookieDomain,
+        request.nextUrl.protocol === 'https:',
+      );
+    }
+    return response;
+  };
+
+  // Copy whole cookies (options included): name + value alone would write a refreshed
+  // session back as host-only.
   const withCookies = (redirect: NextResponse) => {
     supabaseResponse.cookies.getAll().forEach((c) => {
-      redirect.cookies.set(c.name, c.value);
+      redirect.cookies.set(c);
     });
-    return redirect;
+    return finish(redirect);
   };
 
   if (appRoute && !claims) {
@@ -169,7 +217,7 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  return supabaseResponse;
+  return finish(supabaseResponse);
 }
 
 /**
