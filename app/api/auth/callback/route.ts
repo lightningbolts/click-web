@@ -1,7 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { authCookieOptions } from '@/lib/auth/cookieDomain';
+import { applyAuthCookies, authCookieDomainFor, collectingCookieAdapter } from '@/lib/auth/cookieDomain';
 
 type OtpType = 'recovery' | 'signup' | 'magiclink';
 
@@ -21,28 +20,23 @@ export async function GET(request: NextRequest) {
   const type = request.nextUrl.searchParams.get('type') as OtpType | null;
   const nextPath = normalizeNextPath(request.nextUrl.searchParams.get('next'));
 
-  const cookieStore = await cookies();
+  const domain = authCookieDomainFor(request.nextUrl.hostname);
+  const cookieAdapter = collectingCookieAdapter(request);
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookieOptions: authCookieOptions(request.nextUrl.hostname),
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Safe to ignore from Server Components — middleware handles refresh.
-          }
-        },
-      },
+      cookieOptions: domain ? { domain } : {},
+      cookies: cookieAdapter,
     }
   );
+  // Every redirect carries the new session and deletes any older host-only one, which the
+  // browser could otherwise read first (a reset link would then change the wrong account).
+  const redirect = (url: URL) => {
+    const response = NextResponse.redirect(url);
+    applyAuthCookies(response, cookieAdapter.written, request.cookies.getAll(), domain);
+    return response;
+  };
 
   if (code) {
     // PKCE flow: exchange code for a cookie-backed session and redirect to a clean URL.
@@ -56,13 +50,13 @@ export async function GET(request: NextRequest) {
       errUrl.search = '';
       errUrl.searchParams.set('error', 'exchange_failed');
       errUrl.searchParams.set('error_description', error.message);
-      return NextResponse.redirect(errUrl);
+      return redirect(errUrl);
     }
 
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = nextPath;
     redirectUrl.search = '';
-    return NextResponse.redirect(redirectUrl);
+    return redirect(redirectUrl);
   } else if (tokenHash && type) {
     // Token-hash fallback flow for older links and compatibility.
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
@@ -74,14 +68,14 @@ export async function GET(request: NextRequest) {
       errUrl.search = '';
       errUrl.searchParams.set('error', 'otp_failed');
       errUrl.searchParams.set('error_description', error.message);
-      return NextResponse.redirect(errUrl);
+      return redirect(errUrl);
     }
 
     if (type === 'recovery') {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = '/reset-password';
       redirectUrl.search = '';
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (type === 'signup') {
@@ -89,19 +83,19 @@ export async function GET(request: NextRequest) {
       redirectUrl.pathname = '/auth/callback';
       redirectUrl.search = '';
       redirectUrl.searchParams.set('verified', 'signup');
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (type === 'magiclink') {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = nextPath;
       redirectUrl.search = '';
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
   }
 
   const redirectUrl = request.nextUrl.clone();
   redirectUrl.pathname = nextPath;
   redirectUrl.search = '';
-  return NextResponse.redirect(redirectUrl);
+  return redirect(redirectUrl);
 }

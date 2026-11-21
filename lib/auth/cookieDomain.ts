@@ -134,3 +134,47 @@ export function migrateAuthCookiesToDomain(
   response.cookies.set(AUTH_COOKIE_DOMAIN_MARKER, domain, { ...options, httpOnly: true });
   appendHostOnlyExpiries(response, originalAuthNames);
 }
+
+type WrittenCookie = { name: string; value: string; options: Record<string, unknown> };
+
+/**
+ * A `cookies` adapter for Route Handlers that write a new session (login, auth callback): it
+ * reads the request's cookies, sees its own writes, and queues them for {@link applyAuthCookies}
+ * instead of going through `cookies()`, so the raw host-only deletions can be appended after.
+ */
+export function collectingCookieAdapter(request: { cookies: { getAll(): CookieLike[] } }) {
+  const written: WrittenCookie[] = [];
+  const current = new Map(request.cookies.getAll().map((c) => [c.name, c.value]));
+  return {
+    written,
+    getAll(): CookieLike[] {
+      return [...current].filter(([, value]) => value !== '').map(([name, value]) => ({ name, value }));
+    },
+    setAll(cookiesToSet: WrittenCookie[]): void {
+      for (const cookie of cookiesToSet) {
+        written.push(cookie);
+        current.set(cookie.name, cookie.options.maxAge === 0 ? '' : cookie.value);
+      }
+    },
+  };
+}
+
+/**
+ * Puts the cookies Supabase wrote on `response`. When they went to a shared `domain`, also deletes
+ * every host-only auth cookie the request carried: a browser holding another account's
+ * pre-switch session would otherwise keep it beside the new one, and the browser client reads
+ * whichever copy comes first (a password reset could change the wrong account).
+ */
+export function applyAuthCookies(
+  response: ResponseWithCookies,
+  written: readonly WrittenCookie[],
+  requestCookies: readonly CookieLike[],
+  domain: string | undefined,
+): void {
+  for (const { name, value, options } of written) response.cookies.set(name, value, options);
+  if (!domain || !written.some((c) => isSupabaseAuthCookieName(c.name))) return;
+  response.cookies.set(AUTH_COOKIE_DOMAIN_MARKER, domain, {
+    domain, path: '/', sameSite: 'lax', httpOnly: true, maxAge: SESSION_COOKIE_MAX_AGE,
+  });
+  appendHostOnlyExpiries(response, requestCookies.map((c) => c.name).filter(isSupabaseAuthCookieName));
+}
