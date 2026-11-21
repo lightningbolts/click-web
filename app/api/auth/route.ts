@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { parseBody } from '@/lib/api/parseBody';
 import { authBodySchema } from '@/lib/api/schemas/user';
+import { authCookieOptions } from '@/lib/auth/cookieDomain';
 
 /** Deliberately excludes session tokens and mutable auth metadata from JSON. */
 function publicAuthUser(user: User | null) {
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
+        cookieOptions: authCookieOptions(request.nextUrl.hostname),
         cookies: {
           getAll() {
             return cookieStore.getAll();

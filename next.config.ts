@@ -32,7 +32,13 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   // BUILD_YEAR: what prerendered HTML says, so the footer hydrates cleanly after New Year.
-  env: { NEXT_PUBLIC_BUILD_VERSION: buildVersion, NEXT_PUBLIC_BUILD_YEAR: String(new Date().getFullYear()) },
+  // AUTH_COOKIE_DOMAIN: one build-time constant for server and browser Supabase clients, so both
+  // write the session cookie for the same Domain (lib/auth/cookieDomain.ts).
+  env: {
+    NEXT_PUBLIC_BUILD_VERSION: buildVersion,
+    NEXT_PUBLIC_BUILD_YEAR: String(new Date().getFullYear()),
+    NEXT_PUBLIC_AUTH_COOKIE_DOMAIN: process.env.AUTH_COOKIE_DOMAIN?.trim() ?? '',
+  },
   // OpenNext on Workers needs an IMAGES binding (Cloudflare Images) for /_next/image.
   // Without it, optimized URLs 404; serve public assets as-is on the free plan.
   images: {

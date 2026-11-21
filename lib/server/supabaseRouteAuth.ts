@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+import { authCookieOptions } from '@/lib/auth/cookieDomain';
 import { requireRuntimeEnv } from '@/lib/server/runtimeEnv';
 import { verifyBearerLocally } from '@/lib/server/verifyBearerJwt';
 
@@ -50,6 +51,7 @@ export async function getSupabaseFromRouteRequest(
 
   const cookieStore = await cookies();
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: authCookieOptions(request.nextUrl.hostname),
     cookies: {
       getAll() {
         return cookieStore.getAll();

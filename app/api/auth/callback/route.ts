@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { authCookieOptions } from '@/lib/auth/cookieDomain';
 
 type OtpType = 'recovery' | 'signup' | 'magiclink';
 
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: authCookieOptions(request.nextUrl.hostname),
       cookies: {
         getAll() {
           return cookieStore.getAll();
